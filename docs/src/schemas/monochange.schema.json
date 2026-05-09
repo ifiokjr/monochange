@@ -834,6 +834,9 @@
 				"show_progress": {
 					"type": "boolean"
 				},
+				"always_run": {
+					"type": "boolean"
+				},
 				"allow_empty_changesets": {
 					"type": "boolean"
 				},

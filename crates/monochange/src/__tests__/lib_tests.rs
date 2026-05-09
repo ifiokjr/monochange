@@ -1453,6 +1453,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 			monochange_core::CliStepDefinition::PrepareRelease {
 				name: None,
 				when: Some("{{ inputs.enabled }}".to_string()),
+				always_run: false,
 				inputs: BTreeMap::from([(
 					"format".to_string(),
 					monochange_core::CliStepInputValue::String("json".to_string()),
@@ -1463,6 +1464,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 				show_progress: None,
 				name: None,
 				when: None,
+				always_run: false,
 				command: "echo hello".to_string(),
 				dry_run_command: Some("echo dry-run".to_string()),
 				shell: monochange_core::ShellConfig::None,
@@ -1477,6 +1479,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 				show_progress: None,
 				name: None,
 				when: None,
+				always_run: false,
 				command: "echo through-shell".to_string(),
 				dry_run_command: None,
 				shell: monochange_core::ShellConfig::Default,
@@ -1512,6 +1515,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 				show_progress: None,
 				name: None,
 				when: None,
+				always_run: false,
 				command: "echo custom-shell".to_string(),
 				dry_run_command: None,
 				shell: monochange_core::ShellConfig::Custom("bash".to_string()),
@@ -1522,6 +1526,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 			monochange_core::CliStepDefinition::CommitRelease {
 				name: None,
 				when: None,
+				always_run: false,
 				no_verify: false,
 				inputs: BTreeMap::from([(
 					"format".to_string(),
@@ -1531,6 +1536,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 			monochange_core::CliStepDefinition::PublishRelease {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::from([(
 					"format".to_string(),
 					monochange_core::CliStepInputValue::String("text".to_string()),
@@ -1539,6 +1545,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 			monochange_core::CliStepDefinition::OpenReleaseRequest {
 				name: None,
 				when: None,
+				always_run: false,
 				no_verify: false,
 				inputs: BTreeMap::from([(
 					"format".to_string(),
@@ -1548,6 +1555,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 			monochange_core::CliStepDefinition::CommentReleasedIssues {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::from([(
 					"format".to_string(),
 					monochange_core::CliStepInputValue::String("text".to_string()),
@@ -1911,6 +1919,7 @@ fn change_command_sources_type_choices_from_workspace_configuration() {
 		steps: vec![monochange_core::CliStepDefinition::CreateChangeFile {
 			name: None,
 			when: None,
+			always_run: false,
 			show_progress: None,
 			inputs: BTreeMap::new(),
 		}],
@@ -3314,6 +3323,7 @@ fn command_step_without_dry_run_override_reports_skipped_command() {
 			show_progress: None,
 			name: None,
 			when: None,
+			always_run: false,
 			command: "echo hello".to_string(),
 			dry_run_command: None,
 			shell: monochange_core::ShellConfig::default(),
@@ -3347,6 +3357,7 @@ fn command_step_rejects_unparseable_commands() {
 			show_progress: None,
 			name: None,
 			when: None,
+			always_run: false,
 			command: "\"unterminated".to_string(),
 			dry_run_command: None,
 			shell: monochange_core::ShellConfig::default(),
@@ -3385,6 +3396,7 @@ fn command_step_rejects_empty_commands() {
 			show_progress: None,
 			name: None,
 			when: None,
+			always_run: false,
 			command: String::new(),
 			dry_run_command: None,
 			shell: monochange_core::ShellConfig::default(),
@@ -3419,6 +3431,7 @@ fn command_step_reports_process_spawn_failures() {
 			show_progress: None,
 			name: None,
 			when: None,
+			always_run: false,
 			command: "definitely-not-a-real-command-12345".to_string(),
 			dry_run_command: None,
 			shell: monochange_core::ShellConfig::default(),
@@ -3457,6 +3470,7 @@ fn command_step_reports_nonzero_exit_status_without_stderr() {
 			show_progress: None,
 			name: None,
 			when: None,
+			always_run: false,
 			command: "sh -c 'exit 7'".to_string(),
 			dry_run_command: None,
 			shell: monochange_core::ShellConfig::default(),
@@ -3494,6 +3508,7 @@ fn command_step_reports_stderr_text_for_nonzero_exit_status() {
 			show_progress: None,
 			name: None,
 			when: None,
+			always_run: false,
 			command: "sh -c 'echo boom 1>&2; exit 1'".to_string(),
 			dry_run_command: None,
 			shell: monochange_core::ShellConfig::default(),
@@ -4256,6 +4271,7 @@ fn should_execute_cli_step_runs_when_condition_is_true() {
 		show_progress: None,
 		name: None,
 		when: Some("{{ inputs.run && inputs.extra }}".to_string()),
+		always_run: false,
 		command: "printf hi".to_string(),
 		dry_run_command: None,
 		shell: monochange_core::ShellConfig::default(),
@@ -4277,6 +4293,7 @@ fn should_execute_cli_step_skips_when_condition_is_false() {
 		show_progress: None,
 		name: None,
 		when: Some("{{ inputs.run }}".to_string()),
+		always_run: false,
 		command: "printf hi".to_string(),
 		dry_run_command: None,
 		shell: monochange_core::ShellConfig::default(),
@@ -4298,6 +4315,7 @@ fn should_execute_cli_step_skips_for_zero_value() {
 		show_progress: None,
 		name: None,
 		when: Some("{{ inputs.run }}".to_string()),
+		always_run: false,
 		command: "printf hi".to_string(),
 		dry_run_command: None,
 		shell: monochange_core::ShellConfig::default(),
@@ -4319,6 +4337,7 @@ fn should_execute_cli_step_can_gate_on_number_of_changesets() {
 		show_progress: None,
 		name: None,
 		when: Some("{{ number_of_changesets > 0 }}".to_string()),
+		always_run: false,
 		command: "printf hi".to_string(),
 		dry_run_command: None,
 		shell: monochange_core::ShellConfig::default(),
@@ -4350,6 +4369,7 @@ fn should_execute_cli_step_trims_and_treats_1_as_true() {
 		show_progress: None,
 		name: None,
 		when: Some("{{ inputs.run }}".to_string()),
+		always_run: false,
 		command: "printf hi".to_string(),
 		dry_run_command: None,
 		shell: monochange_core::ShellConfig::default(),
@@ -4371,6 +4391,7 @@ fn should_execute_cli_step_skips_with_not_operator() {
 		show_progress: None,
 		name: None,
 		when: Some("{{ ! inputs.skip }}".to_string()),
+		always_run: false,
 		command: "printf hi".to_string(),
 		dry_run_command: None,
 		shell: monochange_core::ShellConfig::default(),
@@ -4392,6 +4413,7 @@ fn should_execute_cli_step_rejects_unknown_template_reference() {
 		show_progress: None,
 		name: None,
 		when: Some("{{ inputs.missing }}".to_string()),
+		always_run: false,
 		command: "printf hi".to_string(),
 		dry_run_command: None,
 		shell: monochange_core::ShellConfig::default(),
@@ -4416,6 +4438,7 @@ fn should_execute_cli_step_rejects_non_scalar_condition_value() {
 		show_progress: None,
 		name: None,
 		when: Some("{{ inputs.list }}".to_string()),
+		always_run: false,
 		command: "printf hi".to_string(),
 		dry_run_command: None,
 		shell: monochange_core::ShellConfig::default(),
@@ -6054,6 +6077,7 @@ fn execute_cli_command_retarget_release_requires_from_input() {
 		steps: vec![monochange_core::CliStepDefinition::RetargetRelease {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
 	};
@@ -6112,6 +6136,7 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 			monochange_core::CliStepDefinition::PublishRelease {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			},
 			"no monochange release record found in first-parent ancestry",
@@ -6121,6 +6146,7 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 			monochange_core::CliStepDefinition::OpenReleaseRequest {
 				name: None,
 				when: None,
+				always_run: false,
 				no_verify: false,
 				inputs: BTreeMap::new(),
 			},
@@ -6131,6 +6157,7 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 			monochange_core::CliStepDefinition::CommentReleasedIssues {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			},
 			"no monochange release record found in first-parent ancestry",
@@ -6178,12 +6205,14 @@ fn execute_cli_command_source_follow_up_steps_require_source_configuration() {
 			monochange_core::CliStepDefinition::PrepareRelease {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 				allow_empty_changesets: false,
 			},
 			monochange_core::CliStepDefinition::CommentReleasedIssues {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			},
 		],
@@ -6218,12 +6247,14 @@ fn execute_cli_command_comment_released_issues_requires_source_configuration() {
 			monochange_core::CliStepDefinition::PrepareRelease {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 				allow_empty_changesets: false,
 			},
 			monochange_core::CliStepDefinition::CommentReleasedIssues {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			},
 		],
@@ -6254,6 +6285,7 @@ fn execute_cli_command_publish_and_request_steps_require_source_configuration() 
 			monochange_core::CliStepDefinition::PublishRelease {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			},
 			"`PublishRelease` requires `[source]` configuration",
@@ -6263,6 +6295,7 @@ fn execute_cli_command_publish_and_request_steps_require_source_configuration() 
 			monochange_core::CliStepDefinition::OpenReleaseRequest {
 				name: None,
 				when: None,
+				always_run: false,
 				no_verify: false,
 				inputs: BTreeMap::new(),
 			},
@@ -6279,6 +6312,7 @@ fn execute_cli_command_publish_and_request_steps_require_source_configuration() 
 				monochange_core::CliStepDefinition::PrepareRelease {
 					name: None,
 					when: None,
+					always_run: false,
 					inputs: BTreeMap::new(),
 					allow_empty_changesets: false,
 				},
@@ -6306,6 +6340,7 @@ fn execute_cli_command_change_step_requires_reason_input() {
 			show_progress: None,
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
 	};
@@ -6353,6 +6388,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 		steps: vec![monochange_core::CliStepDefinition::PrepareRelease {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 			allow_empty_changesets: false,
 		}],
@@ -6378,12 +6414,14 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 			monochange_core::CliStepDefinition::PrepareRelease {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 				allow_empty_changesets: false,
 			},
 			monochange_core::CliStepDefinition::PublishRelease {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			},
 		],
@@ -6407,12 +6445,14 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 			monochange_core::CliStepDefinition::PrepareRelease {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 				allow_empty_changesets: false,
 			},
 			monochange_core::CliStepDefinition::OpenReleaseRequest {
 				name: None,
 				when: None,
+				always_run: false,
 				no_verify: false,
 				inputs: BTreeMap::new(),
 			},
@@ -6437,12 +6477,14 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 			monochange_core::CliStepDefinition::PrepareRelease {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 				allow_empty_changesets: false,
 			},
 			monochange_core::CliStepDefinition::CommentReleasedIssues {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			},
 		],
@@ -6527,6 +6569,7 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 				steps: vec![monochange_core::CliStepDefinition::PlaceholderPublish {
 					name: None,
 					when: None,
+					always_run: false,
 					inputs: BTreeMap::new(),
 				}],
 			};
@@ -6550,12 +6593,14 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 					monochange_core::CliStepDefinition::PrepareRelease {
 						name: None,
 						when: None,
+						always_run: false,
 						inputs: BTreeMap::new(),
 						allow_empty_changesets: false,
 					},
 					monochange_core::CliStepDefinition::PublishPackages {
 						name: None,
 						when: None,
+						always_run: false,
 						inputs: BTreeMap::new(),
 					},
 				],
@@ -6604,6 +6649,7 @@ fn execute_cli_command_allows_package_publish_steps_without_readiness_or_matchin
 				steps: vec![monochange_core::CliStepDefinition::PlaceholderPublish {
 					name: None,
 					when: None,
+					always_run: false,
 					inputs: BTreeMap::new(),
 				}],
 			};
@@ -6630,12 +6676,14 @@ fn execute_cli_command_allows_package_publish_steps_without_readiness_or_matchin
 					monochange_core::CliStepDefinition::PrepareRelease {
 						name: None,
 						when: None,
+						always_run: false,
 						inputs: BTreeMap::new(),
 						allow_empty_changesets: false,
 					},
 					monochange_core::CliStepDefinition::PublishPackages {
 						name: None,
 						when: None,
+						always_run: false,
 						inputs: BTreeMap::new(),
 					},
 				],
@@ -6670,6 +6718,7 @@ fn execute_cli_command_allows_package_publish_steps_without_readiness_or_matchin
 				steps: vec![monochange_core::CliStepDefinition::PublishPackages {
 					name: None,
 					when: None,
+					always_run: false,
 					inputs: BTreeMap::new(),
 				}],
 			};
@@ -6701,6 +6750,7 @@ fn execute_cli_command_allows_package_publish_steps_without_readiness_or_matchin
 				steps: vec![monochange_core::CliStepDefinition::PlanPublishRateLimits {
 					name: None,
 					when: None,
+					always_run: false,
 					inputs: BTreeMap::new(),
 				}],
 			};
@@ -7789,6 +7839,7 @@ fn execute_cli_command_commit_release_requires_prepare_release() {
 		steps: vec![monochange_core::CliStepDefinition::CommitRelease {
 			name: None,
 			when: None,
+			always_run: false,
 			no_verify: false,
 			inputs: BTreeMap::new(),
 		}],
@@ -10432,6 +10483,7 @@ fn apply_runtime_prepare_release_markdown_defaults_promotes_release_format_defau
 		steps: vec![monochange_core::CliStepDefinition::PrepareRelease {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 			allow_empty_changesets: false,
 		}],
@@ -13415,6 +13467,7 @@ branches = ["release/*"]
 		steps: vec![monochange_core::CliStepDefinition::PublishRelease {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
 	};
@@ -13559,6 +13612,7 @@ repo = "monochange"
 		steps: vec![monochange_core::CliStepDefinition::CommentReleasedIssues {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
 	};

@@ -4816,6 +4816,7 @@ fn validate_cli_rejects_invalid_command_shapes() {
 			vec![CliStepDefinition::Validate {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			}],
 		),
@@ -4824,6 +4825,7 @@ fn validate_cli_rejects_invalid_command_shapes() {
 			vec![CliStepDefinition::Validate {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			}],
 		),
@@ -4841,6 +4843,7 @@ fn validate_cli_rejects_invalid_command_shapes() {
 		vec![CliStepDefinition::Validate {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
 	)])
@@ -4853,6 +4856,7 @@ fn validate_cli_rejects_invalid_command_shapes() {
 		vec![CliStepDefinition::Validate {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
 	)])
@@ -4881,6 +4885,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 		vec![CliStepDefinition::Validate {
 			name: Some("Validate workspace".to_string()),
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
 	);
@@ -4902,6 +4907,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 		vec![CliStepDefinition::Validate {
 			name: Some("Validate workspace".to_string()),
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
 	);
@@ -4923,6 +4929,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 		vec![CliStepDefinition::Validate {
 			name: Some("Validate workspace".to_string()),
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
 	);
@@ -4943,6 +4950,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 		vec![CliStepDefinition::Validate {
 			name: Some("   ".to_string()),
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
 	)])
@@ -4956,11 +4964,13 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 			CliStepDefinition::Validate {
 				name: Some("Shared".to_string()),
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			},
 			CliStepDefinition::Discover {
 				name: Some("Shared".to_string()),
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			},
 		],
@@ -4978,6 +4988,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 		vec![CliStepDefinition::Command {
 			name: Some("Run command".to_string()),
 			when: Some(" ".to_string()),
+			always_run: false,
 			show_progress: None,
 			command: String::new(),
 			dry_run_command: Some(" ".to_string()),
@@ -5003,6 +5014,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 		vec![CliStepDefinition::Command {
 			name: Some("Run command".to_string()),
 			when: None,
+			always_run: false,
 			show_progress: None,
 			command: " ".to_string(),
 			dry_run_command: None,
@@ -5025,6 +5037,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 		vec![CliStepDefinition::Command {
 			name: Some("Run command".to_string()),
 			when: None,
+			always_run: false,
 			show_progress: None,
 			command: "echo release".to_string(),
 			dry_run_command: Some(" ".to_string()),
@@ -5049,6 +5062,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 		steps: vec![CliStepDefinition::Validate {
 			name: Some("Validate workspace".to_string()),
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
 	}])
@@ -5067,6 +5081,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 		steps: vec![CliStepDefinition::Validate {
 			name: Some("Validate workspace".to_string()),
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
 	}])
@@ -5085,6 +5100,7 @@ fn validate_cli_rejects_invalid_inputs_and_step_metadata() {
 		steps: vec![CliStepDefinition::Validate {
 			name: Some("Validate workspace".to_string()),
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
 	}])
@@ -5105,6 +5121,7 @@ fn validate_cli_runtime_requirements_enforce_source_features() {
 			vec![CliStepDefinition::PublishRelease {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			}],
 		)],
@@ -5132,6 +5149,7 @@ fn validate_cli_runtime_requirements_enforce_source_features() {
 			vec![CliStepDefinition::PublishRelease {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			}],
 		)],
@@ -5151,6 +5169,7 @@ fn validate_cli_runtime_requirements_enforce_source_features() {
 			vec![CliStepDefinition::OpenReleaseRequest {
 				name: None,
 				when: None,
+				always_run: false,
 				no_verify: false,
 				inputs: BTreeMap::new(),
 			}],
@@ -5173,6 +5192,7 @@ fn validate_cli_runtime_requirements_enforce_source_features() {
 			vec![CliStepDefinition::CommentReleasedIssues {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			}],
 		)],
@@ -5196,6 +5216,7 @@ fn validate_cli_runtime_requirements_enforce_affected_package_inputs() {
 			vec![CliStepDefinition::AffectedPackages {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			}],
 		)],
@@ -5218,6 +5239,7 @@ fn validate_cli_runtime_requirements_enforce_affected_package_inputs() {
 			vec![CliStepDefinition::AffectedPackages {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			}],
 		)],
@@ -5237,6 +5259,7 @@ fn validate_cli_runtime_requirements_enforce_affected_package_inputs() {
 		vec![CliStepDefinition::AffectedPackages {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
 	);

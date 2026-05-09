@@ -1873,6 +1873,8 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
+		always_run: bool,
+		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Validate `monochange` configuration and changesets, and run lint rules
@@ -1883,6 +1885,8 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
+		always_run: bool,
+		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Discover packages across supported ecosystems and render the result.
@@ -1891,6 +1895,8 @@ pub enum CliStepDefinition {
 		name: Option<String>,
 		#[serde(default)]
 		when: Option<String>,
+		#[serde(default)]
+		always_run: bool,
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
@@ -1901,6 +1907,8 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
+		always_run: bool,
+		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Create a `.changeset/*.md` file from typed CLI inputs or interactive
@@ -1910,6 +1918,8 @@ pub enum CliStepDefinition {
 		name: Option<String>,
 		#[serde(default)]
 		when: Option<String>,
+		#[serde(default)]
+		always_run: bool,
 		#[serde(default)]
 		show_progress: Option<bool>,
 		#[serde(default)]
@@ -1922,6 +1932,8 @@ pub enum CliStepDefinition {
 		name: Option<String>,
 		#[serde(default)]
 		when: Option<String>,
+		#[serde(default)]
+		always_run: bool,
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 		/// When true, do not error when there are no pending changesets.
@@ -1939,6 +1951,8 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
+		always_run: bool,
+		#[serde(default)]
 		no_verify: bool,
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
@@ -1949,6 +1963,8 @@ pub enum CliStepDefinition {
 		name: Option<String>,
 		#[serde(default)]
 		when: Option<String>,
+		#[serde(default)]
+		always_run: bool,
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
@@ -1962,6 +1978,8 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
+		always_run: bool,
+		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Publish placeholder package versions for missing registry packages.
@@ -1970,6 +1988,8 @@ pub enum CliStepDefinition {
 		name: Option<String>,
 		#[serde(default)]
 		when: Option<String>,
+		#[serde(default)]
+		always_run: bool,
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
@@ -1980,6 +2000,8 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
+		always_run: bool,
+		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Plan package-registry rate-limit windows for publish operations.
@@ -1988,6 +2010,8 @@ pub enum CliStepDefinition {
 		name: Option<String>,
 		#[serde(default)]
 		when: Option<String>,
+		#[serde(default)]
+		always_run: bool,
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
@@ -2000,6 +2024,8 @@ pub enum CliStepDefinition {
 		name: Option<String>,
 		#[serde(default)]
 		when: Option<String>,
+		#[serde(default)]
+		always_run: bool,
 		#[serde(default)]
 		no_verify: bool,
 		#[serde(default)]
@@ -2015,6 +2041,8 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
+		always_run: bool,
+		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Evaluate affected packages and changeset coverage for changed files.
@@ -2026,6 +2054,8 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
+		always_run: bool,
+		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Inspect parsed changeset data, provenance, and linked metadata.
@@ -2034,6 +2064,8 @@ pub enum CliStepDefinition {
 		name: Option<String>,
 		#[serde(default)]
 		when: Option<String>,
+		#[serde(default)]
+		always_run: bool,
 		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
@@ -2047,6 +2079,8 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		when: Option<String>,
 		#[serde(default)]
+		always_run: bool,
+		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Run an arbitrary command with `monochange` template context.
@@ -2057,6 +2091,8 @@ pub enum CliStepDefinition {
 		name: Option<String>,
 		#[serde(default)]
 		when: Option<String>,
+		#[serde(default)]
+		always_run: bool,
 		#[serde(default)]
 		show_progress: Option<bool>,
 		command: String,
@@ -2155,6 +2191,32 @@ impl CliStepDefinition {
 		}
 	}
 
+	/// Return whether this step should always execute even when earlier
+	/// steps fail.
+	#[must_use]
+	pub fn always_run(&self) -> bool {
+		match self {
+			Self::Config { always_run, .. }
+			| Self::Validate { always_run, .. }
+			| Self::Discover { always_run, .. }
+			| Self::DisplayVersions { always_run, .. }
+			| Self::CreateChangeFile { always_run, .. }
+			| Self::PrepareRelease { always_run, .. }
+			| Self::CommitRelease { always_run, .. }
+			| Self::VerifyReleaseBranch { always_run, .. }
+			| Self::PublishRelease { always_run, .. }
+			| Self::PlaceholderPublish { always_run, .. }
+			| Self::PublishPackages { always_run, .. }
+			| Self::PlanPublishRateLimits { always_run, .. }
+			| Self::OpenReleaseRequest { always_run, .. }
+			| Self::CommentReleasedIssues { always_run, .. }
+			| Self::AffectedPackages { always_run, .. }
+			| Self::DiagnoseChangesets { always_run, .. }
+			| Self::RetargetRelease { always_run, .. }
+			| Self::Command { always_run, .. } => *always_run,
+		}
+	}
+
 	/// Return whether progress output is explicitly enabled or disabled.
 	#[must_use]
 	pub fn show_progress(&self) -> Option<bool> {
@@ -2212,7 +2274,16 @@ impl CliStepDefinition {
 			Self::PublishRelease { .. } => Some(&["format", "from-ref", "draft"]),
 			Self::OpenReleaseRequest { .. } => Some(&["format", "no_verify"]),
 			Self::PlaceholderPublish { .. } => Some(&["format", "package", "show-all"]),
-			Self::PublishPackages { .. } => Some(&["format", "output", "package", "resume"]),
+			Self::PublishPackages { .. } => {
+				Some(&[
+					"format",
+					"output",
+					"package",
+					"group",
+					"ecosystem",
+					"resume",
+				])
+			}
 			Self::PlanPublishRateLimits { .. } => {
 				Some(&["format", "mode", "package", "ci", "readiness"])
 			}
@@ -3964,90 +4035,107 @@ pub fn all_step_variants() -> Vec<CliStepDefinition> {
 		CliStepDefinition::Config {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::Validate {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::Discover {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::DisplayVersions {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::CreateChangeFile {
 			name: None,
 			when: None,
+			always_run: false,
 			show_progress: None,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::PrepareRelease {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 			allow_empty_changesets: false,
 		},
 		CliStepDefinition::CommitRelease {
 			name: None,
 			when: None,
+			always_run: false,
 			no_verify: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::VerifyReleaseBranch {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::PublishRelease {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::PlaceholderPublish {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::PublishPackages {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::PlanPublishRateLimits {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::OpenReleaseRequest {
 			name: None,
 			when: None,
+			always_run: false,
 			no_verify: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::CommentReleasedIssues {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::AffectedPackages {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::DiagnoseChangesets {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::RetargetRelease {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		},
 	]

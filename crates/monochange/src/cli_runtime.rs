@@ -23,6 +23,7 @@ use monochange_core::CliInputKind;
 use monochange_core::CliStepDefinition;
 use monochange_core::CliStepInputValue;
 use monochange_core::CommandVariable;
+use monochange_core::Ecosystem;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::ShellConfig;
@@ -553,9 +554,21 @@ pub(crate) fn execute_cli_command_with_options(
 		progress_format,
 		command_started_at,
 	);
+	let mut command_error = None;
 
 	for (step_index, step) in cli_command.steps.iter().enumerate() {
 		let step_started_at = Instant::now();
+		if command_error.is_some() && !step.always_run() {
+			telemetry.capture_step(
+				step_index,
+				step,
+				true,
+				Duration::default(),
+				TelemetryOutcome::Skipped,
+				None,
+			);
+			continue;
+		}
 		let step_inputs = match resolve_step_inputs(&context, step) {
 			Ok(step_inputs) => step_inputs,
 			Err(error) => {
@@ -567,8 +580,12 @@ pub(crate) fn execute_cli_command_with_options(
 					TelemetryOutcome::Error,
 					Some(&error),
 				);
-				telemetry.capture_command(TelemetryOutcome::Error, Some(&error));
-				return Err(error);
+				if !has_remaining_always_run_steps(&cli_command.steps, step_index) {
+					telemetry.capture_command(TelemetryOutcome::Error, Some(&error));
+					return Err(error);
+				}
+				command_error = Some(error);
+				continue;
 			}
 		};
 		context.last_step_inputs = step_inputs.clone();
@@ -585,8 +602,12 @@ pub(crate) fn execute_cli_command_with_options(
 					TelemetryOutcome::Error,
 					Some(&error),
 				);
-				telemetry.capture_command(TelemetryOutcome::Error, Some(&error));
-				return Err(error);
+				if !has_remaining_always_run_steps(&cli_command.steps, step_index) {
+					telemetry.capture_command(TelemetryOutcome::Error, Some(&error));
+					return Err(error);
+				}
+				command_error = Some(error);
+				continue;
 			}
 		};
 		if !should_execute {
@@ -809,6 +830,8 @@ pub(crate) fn execute_cli_command_with_options(
 				}
 				CliStepDefinition::PublishPackages { .. } => {
 					let selected_packages = selected_package_ids(&step_inputs);
+					let selected_groups = selected_group_ids(&step_inputs);
+					let selected_ecosystems = selected_ecosystem_ids(&step_inputs)?;
 					let resume_path = optional_publish_resume_artifact_path(&step_inputs)?;
 					let output_path = optional_publish_output_artifact_path(&step_inputs)?;
 					if !context.dry_run {
@@ -822,8 +845,18 @@ pub(crate) fn execute_cli_command_with_options(
 						publish_rate_limits::enforce_publish_rate_limits(configuration, &rate_limit_report, publish_rate_limits::PublishRateLimitMode::Publish)?;
 					}
 					#[rustfmt::skip]
-					let report = package_publish::run_publish_packages_with_resume(root, configuration, context.prepared_release.as_ref(), &selected_packages, context.dry_run, resume_path.as_deref())?;
-					if let Some(output_path) = output_path.as_deref() {
+					let report = package_publish::run_publish_packages_with_resume(
+						root,
+						configuration,
+						context.prepared_release.as_ref(),
+						&selected_packages,
+						&selected_groups,
+						&selected_ecosystems,
+						context.dry_run,
+						resume_path.as_deref())?;
+					if !context.dry_run
+						&& let Some(output_path) = output_path.as_deref()
+					{
 						monochange_publish::write_publish_report_artifact(output_path, &report)?;
 					}
 					monochange_publish::ensure_publish_report_succeeded(&report)?;
@@ -1113,9 +1146,12 @@ pub(crate) fn execute_cli_command_with_options(
 				TelemetryOutcome::Error,
 				Some(&error),
 			);
-			telemetry.capture_command(TelemetryOutcome::Error, Some(&error));
+			if !has_remaining_always_run_steps(&cli_command.steps, step_index) {
+				telemetry.capture_command(TelemetryOutcome::Error, Some(&error));
 
-			return Err(error);
+				return Err(error);
+			}
+			command_error = Some(error);
 		}
 		let elapsed = step_started_at.elapsed();
 		if show_progress {
@@ -1132,6 +1168,11 @@ pub(crate) fn execute_cli_command_with_options(
 	}
 
 	progress.command_finished(command_started_at.elapsed());
+
+	if let Some(error) = command_error {
+		telemetry.capture_command(TelemetryOutcome::Error, Some(&error));
+		return Err(error);
+	}
 
 	let artifact_path = prepared_release_path.as_deref();
 	let result = save_prepared_release_artifact(root, configuration, &context, artifact_path)
@@ -1215,6 +1256,13 @@ pub(crate) fn should_execute_cli_step(
 		return Ok(true);
 	};
 	evaluate_cli_step_condition(condition, context, step_inputs)
+}
+
+fn has_remaining_always_run_steps(steps: &[CliStepDefinition], current_index: usize) -> bool {
+	steps
+		.iter()
+		.skip(current_index + 1)
+		.any(CliStepDefinition::always_run)
 }
 
 fn steps_reference_release_file_diffs(steps: &[CliStepDefinition]) -> bool {
@@ -2211,6 +2259,43 @@ fn selected_package_ids(inputs: &BTreeMap<String, Vec<String>>) -> BTreeSet<Stri
 		.flatten()
 		.map(ToString::to_string)
 		.collect()
+}
+
+fn selected_group_ids(inputs: &BTreeMap<String, Vec<String>>) -> BTreeSet<String> {
+	inputs
+		.get("group")
+		.into_iter()
+		.flatten()
+		.map(ToString::to_string)
+		.collect()
+}
+
+fn selected_ecosystem_ids(
+	inputs: &BTreeMap<String, Vec<String>>,
+) -> MonochangeResult<BTreeSet<Ecosystem>> {
+	let ecosystems = inputs.get("ecosystem").into_iter().flatten();
+	let mut result = BTreeSet::new();
+	for value in ecosystems {
+		result.insert(parse_ecosystem_input(value)?);
+	}
+	Ok(result)
+}
+
+fn parse_ecosystem_input(input: &str) -> MonochangeResult<Ecosystem> {
+	match input.to_lowercase().as_str() {
+		"cargo" => Ok(Ecosystem::Cargo),
+		"npm" => Ok(Ecosystem::Npm),
+		"deno" => Ok(Ecosystem::Deno),
+		"dart" => Ok(Ecosystem::Dart),
+		"flutter" => Ok(Ecosystem::Flutter),
+		"python" => Ok(Ecosystem::Python),
+		"go" => Ok(Ecosystem::Go),
+		_ => {
+			Err(MonochangeError::Config(format!(
+				"unknown ecosystem `{input}`; expected one of: cargo, npm, deno, dart, flutter, python, go"
+			)))
+		}
+	}
 }
 
 fn boolean_step_input(step_inputs: &BTreeMap<String, Vec<String>>, name: &str) -> bool {

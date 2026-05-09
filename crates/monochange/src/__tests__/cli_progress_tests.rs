@@ -32,6 +32,7 @@ fn named_command_step(name: &str) -> CliStepDefinition {
 		show_progress: None,
 		name: Some(name.to_string()),
 		when: None,
+		always_run: false,
 		command: "echo hi".to_string(),
 		dry_run_command: None,
 		shell: ShellConfig::Default,

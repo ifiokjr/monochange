@@ -456,6 +456,7 @@
 					]
 				},
 				"show_progress": { "type": "boolean" },
+				"always_run": { "type": "boolean" },
 				"allow_empty_changesets": { "type": "boolean" },
 				"no_verify": { "type": "boolean" },
 				"dry_run_command": { "type": "string" },

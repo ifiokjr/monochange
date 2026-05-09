@@ -1040,6 +1040,7 @@ where
 				steps: vec![CliStepDefinition::Validate {
 					name: None,
 					when: None,
+					always_run: false,
 					inputs: BTreeMap::new(),
 				}],
 			};
