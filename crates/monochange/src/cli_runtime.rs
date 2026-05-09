@@ -47,7 +47,7 @@ use crate::release_branch_policy;
 use crate::save_prepared_release_execution;
 use crate::*;
 
-pub(crate) fn execute_matches(
+pub(crate) async fn execute_matches(
 	root: &Path,
 	configuration: &monochange_core::WorkspaceConfiguration,
 	cli_command_name: &str,
@@ -297,7 +297,7 @@ pub(crate) fn write_release_manifest_file(
 	manifest: &ReleaseManifest,
 ) -> MonochangeResult<PathBuf> {
 	let resolved_path = resolve_config_path(root, path);
-	ensure_monochange_artifact_ignored(root, &resolved_path)?;
+	ensure_monochange_artifact_ignored(root, &resolved_path).await?;
 	let rendered = render_release_manifest_json(manifest)?;
 	let update = FileUpdate {
 		path: resolved_path.clone(),
@@ -472,7 +472,7 @@ fn build_issue_comment_results_for_source(
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
-pub(crate) fn execute_cli_command(
+pub(crate) async fn execute_cli_command(
 	root: &Path,
 	configuration: &monochange_core::WorkspaceConfiguration,
 	cli_command: &CliCommandDefinition,
@@ -504,7 +504,7 @@ pub(crate) struct ExecuteCliCommandOptions {
 }
 
 #[tracing::instrument(skip_all, fields(command = cli_command.name))]
-pub(crate) fn execute_cli_command_with_options(
+pub(crate) async fn execute_cli_command_with_options(
 	root: &Path,
 	configuration: &monochange_core::WorkspaceConfiguration,
 	cli_command: &CliCommandDefinition,
@@ -773,7 +773,7 @@ pub(crate) fn execute_cli_command_with_options(
 						)
 					})?;
 					#[rustfmt::skip]
-					let report = release_branch_policy::verify_release_ref(root, &source.releases, &from_ref)?;
+					let report = release_branch_policy::verify_release_ref(root, &source.releases, &from_ref).await?;
 					output = Some(format!(
 						"release branch verified: `{}` is reachable from `{}`",
 						from_ref, report.matched_branch
@@ -793,7 +793,7 @@ pub(crate) fn execute_cli_command_with_options(
 							.get("from-ref")
 							.and_then(|v| v.first().cloned())
 							.unwrap_or_else(|| "HEAD".to_string());
-						let discovery = discover_release_record(root, &from_ref)?;
+						let discovery = discover_release_record(root, &from_ref).await?;
 						build_release_manifest_from_record(&discovery.record)
 					};
 					let source = publish_release_source_configuration(
@@ -915,7 +915,7 @@ pub(crate) fn execute_cli_command_with_options(
 							.unwrap_or(*update_release_json);
 					#[rustfmt::skip]
 				let release_commit_report =
-					commit_release(root, &context, configuration.source.as_ref(), &manifest, no_verify, update_release_json)?;
+					commit_release(root, &context, configuration.source.as_ref(), &manifest, no_verify, update_release_json).await?;
 					context.release_commit_report = Some(release_commit_report);
 					output = None;
 					Ok(())
@@ -972,7 +972,7 @@ pub(crate) fn execute_cli_command_with_options(
 							.get("from-ref")
 							.and_then(|v| v.first().cloned())
 							.unwrap_or_else(|| "HEAD".to_string());
-						let discovery = discover_release_record(root, &from_ref)?;
+						let discovery = discover_release_record(root, &from_ref).await?;
 						build_release_manifest_from_record(&discovery.record)
 					};
 					let auto_close_issues =
@@ -1113,7 +1113,7 @@ pub(crate) fn execute_cli_command_with_options(
 						);
 					}
 					let phase_started_at = Instant::now();
-					let discovery = discover_release_record(root, &from)?;
+					let discovery = discover_release_record(root, &from).await?;
 					step_phase_timings.push(StepPhaseTiming {
 						label: "locate release record".to_string(),
 						duration: phase_started_at.elapsed(),
@@ -1167,7 +1167,7 @@ pub(crate) fn execute_cli_command_with_options(
 						);
 					}
 					let phase_started_at = Instant::now();
-					let result = execute_release_retarget(root, source.as_ref(), &plan)?;
+					let result = execute_release_retarget(root, source.as_ref(), &plan).await?;
 					step_phase_timings.push(StepPhaseTiming {
 						label: "apply retarget".to_string(),
 						duration: phase_started_at.elapsed(),

@@ -30,12 +30,12 @@ use crate::git_support::resolve_git_commit_ref;
 use crate::git_support::resolve_git_tag_commit;
 use crate::hosted_sources;
 
-pub(crate) fn render_release_record_discovery(
+pub(crate) async fn render_release_record_discovery(
 	root: &Path,
 	from: &str,
 	format: OutputFormat,
 ) -> MonochangeResult<String> {
-	let discovery = discover_release_record(root, from)?;
+	let discovery = discover_release_record(root, from).await?;
 	match format {
 		OutputFormat::Json => {
 			serde_json::to_string_pretty(&discovery)
@@ -248,7 +248,7 @@ pub async fn execute_release_retarget(
 }
 
 /// Plan and execute a release retarget operation in one call.
-pub fn retarget_release(
+pub async fn retarget_release(
 	root: &Path,
 	discovery: &ReleaseRecordDiscovery,
 	target: &str,
@@ -265,8 +265,8 @@ pub fn retarget_release(
 		sync_provider,
 		dry_run,
 		source,
-	)?;
-	execute_release_retarget(root, source, &plan)
+	).await?;
+	execute_release_retarget(root, source, &plan).await
 }
 
 fn validate_retarget_provider(
@@ -342,15 +342,15 @@ pub(crate) struct ReleaseTagReport {
 	pub status: String,
 }
 
-pub(crate) fn render_release_tag_report(
+pub(crate) async fn render_release_tag_report(
 	root: &Path,
 	from: &str,
 	format: OutputFormat,
 	push: bool,
 	dry_run: bool,
 ) -> MonochangeResult<String> {
-	let discovery = discover_release_record(root, from)?;
-	let report = create_release_tags(root, &discovery, push, dry_run)?;
+	let discovery = discover_release_record(root, from).await?;
+	let report = create_release_tags(root, &discovery, push, dry_run).await?;
 
 	match format {
 		OutputFormat::Json => {
