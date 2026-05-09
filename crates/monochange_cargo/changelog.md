@@ -4,6 +4,70 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.4.0](https://github.com/monochange/monochange/releases/tag/v0.4.0) (2026-05-09)
+
+### Added
+
+#### Consolidate adapter traits to remove ecosystem match arms
+
+Replace hardcoded ecosystem and registry match arms in `workspace_ops`, `monochange_config`, and `monochange_publish` with adapter registry dispatch.
+
+- Expand `EcosystemAdapter` in `monochange_core` with `load_configured`, `supported_versioned_file_kind`, and `validate_versioned_file`.
+- Add `From<EcosystemType>` and `From<PackageType>` conversions for `Ecosystem`.
+- Add `FromStr` for `Ecosystem` and extract `default_registry_kind_for_ecosystem` into `monochange_core`.
+- Implement the new trait methods in all ecosystem adapter crates.
+- Replace `discover_packages` body with `build_ecosystem_registry().discover_all(root)?`.
+- Replace `discover_release_workspace` `load_configured` match arms with registry dispatch.
+- Replace `path_is_supported_for_ecosystem` and `validate_ecosystem_version_readable` match arms in `monochange_config` with registry dispatch.
+- Introduce `PublishAdapter` trait and `PublishCommandBuilder` in `monochange_publish` to replace `build_publish_command` registry match arms.
+- Extract `default_registry_kind_for_ecosystem` mapping out of `package_publish.rs` into `monochange_core`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #429](https://github.com/monochange/monochange/pull/429) _Introduced in:_ [`271e554`](https://github.com/monochange/monochange/commit/271e55420154265e798a0de3adf26a64faba66c8)
+
+#### Move ecosystem constants out of core and delegate validation to ecosystem crates
+
+Each ecosystem crate now owns its own `default_dependency_version_prefix()`, `default_dependency_fields()`, and `validate_versioned_file()` functions. The `EcosystemType::default_prefix()` and `EcosystemType::default_fields()` methods on `monochange_core::EcosystemType` are deprecated in favor of the ecosystem crate equivalents. `monochange_config` versioned file validation now dispatches to ecosystem crate validators instead of embedding ecosystem-specific parsing logic in config.
+
+Closes #137 Closes #138
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #411](https://github.com/monochange/monochange/pull/411) _Introduced in:_ [`57e2322`](https://github.com/monochange/monochange/commit/57e232282d41e89e70f3e5b34b3e07d8b2089fea) _Related issues:_ [#137](https://github.com/monochange/monochange/issues/137), [#138](https://github.com/monochange/monochange/issues/138)
+
+#### Move Cargo placeholder manifests into monochange_cargo
+
+Move crates.io placeholder `Cargo.toml` and `src/lib.rs` generation out of `monochange::package_publish` and into `monochange_cargo`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #427](https://github.com/monochange/monochange/pull/427) _Introduced in:_ [`084e110`](https://github.com/monochange/monochange/commit/084e1102a13408b12da5159cc7c2cf2815174308)
+
+#### Move Cargo publish readiness blockers into monochange_cargo
+
+Move `cargo_publish_readiness_blockers` and workspace package table helpers (`read_workspace_package_table`, `maybe_read_workspace_manifest_contents`, `parse_workspace_manifest_value`, `extract_workspace_package_table`) from the top-level `monochange` crate into `monochange_cargo`.
+
+Also fixes a clippy `indexing_slicing` lint in `monochange_publish` that was introduced by the previous resume/dependency-ordering extraction.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #413](https://github.com/monochange/monochange/pull/413) _Introduced in:_ [`904ba37`](https://github.com/monochange/monochange/commit/904ba37962c1fb2db7af87ebfa2ef80230c780a5)
+
+### Fixed
+
+#### Remove grouped release member summaries
+
+Grouped release notes no longer include generated changed or synchronized member lists, keeping the release note summary focused on the group release itself.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #395](https://github.com/monochange/monochange/pull/395) _Introduced in:_ [`2d012ff`](https://github.com/monochange/monochange/commit/2d012ff900a612f4aed6e4d7034c8c876f50aeae) _Last updated in:_ [`8c6a312`](https://github.com/monochange/monochange/commit/8c6a312f2d9e7477fd7901688d878c721ba41336)
+
+### Testing
+
+#### Extract inline test modules into separate files
+
+Move all inline `#[cfg(test)] mod tests { ... }` blocks out of source files into dedicated test files. This reduces source file sizes and keeps test code in a consistent `__tests/` directory structure next to the module it tests.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #416](https://github.com/monochange/monochange/pull/416) _Introduced in:_ [`3535c88`](https://github.com/monochange/monochange/commit/3535c887c46d66db2768377cb5f01406f6e9a8b6)
+
+#### Normalize Rust unit test file layout
+
+Move Rust unit tests into colocated `__tests__/` directories and name each file after the module under test with a `_tests.rs` suffix.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #428](https://github.com/monochange/monochange/pull/428) _Introduced in:_ [`b61cc3e`](https://github.com/monochange/monochange/commit/b61cc3e66989fd83ffb16a31568d2f46d7075216)
+
 ## [0.3.4](https://github.com/monochange/monochange/releases/tag/v0.3.4) (2026-05-06)
 
 ### Fixed

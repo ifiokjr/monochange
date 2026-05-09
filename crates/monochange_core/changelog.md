@@ -4,6 +4,183 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.4.0](https://github.com/monochange/monochange/releases/tag/v0.4.0) (2026-05-09)
+
+### Breaking Change
+
+#### Publish durable release schema contracts
+
+Impact: release records now use the first public durable schema header, `v = "0.1"`, and monochange rejects missing, invalid, old, or future durable schema versions instead of reading unsafe historical shapes. The new `monochange_schema` crate owns schema version parsing, release-record wire validation, committed schema assets, and the initially empty machine-readable migration changelog.
+
+Usage: editors can use the hosted configuration schema once GitHub Pages publishes the docs, or the raw GitHub fallback immediately. Durable release records now embed the public version field instead of the internal Rust-only `schemaVersion` field:
+
+```json
+{
+	"v": "0.1",
+	"kind": "monochange.releaseRecord"
+}
+```
+
+The `monochange_schema` package remains independently versioned from the main release group. Its crate version starts at `0.0.0` on this branch, while this major changeset gives release planning the explicit signal to publish the first crate release without changing the durable public schema version `0.1`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #396](https://github.com/monochange/monochange/pull/396) _Introduced in:_ [`563ef83`](https://github.com/monochange/monochange/commit/563ef83fa21260518ae60c972240e2f0562e9bc2) _Last updated in:_ [`8c6a312`](https://github.com/monochange/monochange/commit/8c6a312f2d9e7477fd7901688d878c721ba41336)
+
+### Added
+
+#### Consolidate adapter traits to remove ecosystem match arms
+
+Replace hardcoded ecosystem and registry match arms in `workspace_ops`, `monochange_config`, and `monochange_publish` with adapter registry dispatch.
+
+- Expand `EcosystemAdapter` in `monochange_core` with `load_configured`, `supported_versioned_file_kind`, and `validate_versioned_file`.
+- Add `From<EcosystemType>` and `From<PackageType>` conversions for `Ecosystem`.
+- Add `FromStr` for `Ecosystem` and extract `default_registry_kind_for_ecosystem` into `monochange_core`.
+- Implement the new trait methods in all ecosystem adapter crates.
+- Replace `discover_packages` body with `build_ecosystem_registry().discover_all(root)?`.
+- Replace `discover_release_workspace` `load_configured` match arms with registry dispatch.
+- Replace `path_is_supported_for_ecosystem` and `validate_ecosystem_version_readable` match arms in `monochange_config` with registry dispatch.
+- Introduce `PublishAdapter` trait and `PublishCommandBuilder` in `monochange_publish` to replace `build_publish_command` registry match arms.
+- Extract `default_registry_kind_for_ecosystem` mapping out of `package_publish.rs` into `monochange_core`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #429](https://github.com/monochange/monochange/pull/429) _Introduced in:_ [`271e554`](https://github.com/monochange/monochange/commit/271e55420154265e798a0de3adf26a64faba66c8)
+
+#### Move ecosystem constants out of core and delegate validation to ecosystem crates
+
+Each ecosystem crate now owns its own `default_dependency_version_prefix()`, `default_dependency_fields()`, and `validate_versioned_file()` functions. The `EcosystemType::default_prefix()` and `EcosystemType::default_fields()` methods on `monochange_core::EcosystemType` are deprecated in favor of the ecosystem crate equivalents. `monochange_config` versioned file validation now dispatches to ecosystem crate validators instead of embedding ecosystem-specific parsing logic in config.
+
+Closes #137 Closes #138
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #411](https://github.com/monochange/monochange/pull/411) _Introduced in:_ [`57e2322`](https://github.com/monochange/monochange/commit/57e232282d41e89e70f3e5b34b3e07d8b2089fea) _Related issues:_ [#137](https://github.com/monochange/monochange/issues/137), [#138](https://github.com/monochange/monochange/issues/138)
+
+#### File-based release records
+
+Store release records as committed JSON files under `.monochange/releases/` instead of embedding them in commit message bodies.
+
+##### Before
+
+Release records were embedded inside the commit message body between HTML comment markers:
+
+````markdown
+chore(release): prepare release
+
+## monochange Release Record
+
+<!-- monochange:release-record:start -->
+
+```json
+{
+	"schemaVersion": 1,
+	"kind": "monochange.releaseRecord",
+	"createdAt": "2026-05-08T08:00:00Z",
+	"command": "release-pr",
+	"releaseTargets": [
+		{
+			"id": "sdk",
+			"kind": "group",
+			"version": "1.2.3",
+			"tag": true,
+			"release": true
+		}
+	]
+}
+```
+````
+
+<!-- monochange:release-record:end -->
+
+```
+Discovery required parsing every commit message in first-parent ancestry with regex-based extraction.
+
+## After
+
+Release records are plain JSON files committed to the repository:
+```
+
+.monochange/ ├── local/ # gitignored — local artifacts │ ├── release-manifest.json │ └── prepared-release-cache.json └── releases/ └── <hash>/ # content-addressable directory └── release.json # the release record
+
+```
+The `<hash>` is derived from sorted `(package_id, version)` pairs via `DefaultHasher`. For a release targeting `sdk` at version `1.2.3` the hash might look like:
+```
+
+.monochange/releases/8f3e2a1b/c/release.json
+
+````
+(The exact hex value depends on the hasher state; it is always 16 hex characters.)
+
+## Deduplication
+
+When writing a new release record, any existing record that shares an overlapping `(package_id, version)` tag is automatically removed. This prevents stale records from accumulating when a release is retried or amended.
+
+## Discovery
+
+`mc release-record` now discovers files via `git diff-tree --no-commit-id --name-only -r` (falling back to `git ls-tree` for root commits) rather than parsing commit messages.
+
+## CI detection
+
+```bash
+git diff-tree --no-commit-id --name-only -r HEAD |
+  grep '^\.monochange/releases/.*/release\.json$'
+````
+
+## Breaking changes
+
+- `.monochange/*` is no longer fully gitignored; only `.monochange/local/` is ignored.
+- The `ReleaseRecord` JSON schema itself remains identical; only the storage location changes.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #408](https://github.com/monochange/monochange/pull/408) _Introduced in:_ [`cd989c3`](https://github.com/monochange/monochange/commit/cd989c303a9722ca8240c44003f1ef4c96abc284)
+
+#### Add Forgejo source provider
+
+Add Forgejo as a hosted source provider for releases and release pull requests.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #401](https://github.com/monochange/monochange/pull/401) _Introduced in:_ [`86026ac`](https://github.com/monochange/monochange/commit/86026acb83e338fe8d07c200fb8e38693616b6e8)
+
+#### Move release record generation from commit_release to prepare_release
+
+The release record JSON is now written during the `PrepareRelease` CLI step instead of the `CommitRelease` step. This gives users a formatting preview and the opportunity to review or edit the record before it is committed.
+
+##### What changed
+
+- `ReleaseManifest` and `PreparedRelease` no longer store a `release_record_path` field. The path is derived on demand via the new `ReleasePaths` helper, which computes the hash, relative path, and absolute path from the manifest's `release_targets`.
+- A new `ReleasePaths` runtime helper provides `hash`, `relative`, and `absolute` paths for any release record. Steps that need the path can call `ReleasePaths::from_manifest` or `ReleasePaths::from_record` instead of reading a cached field.
+- The `PrepareRelease` step calls `write_release_record_file` to write the record to `.monochange/releases/<hash>/release.json`. The file is left unstaged for user review.
+- `commit_release` now validates the pre-written record with `validate_release_record_file` instead of generating it.
+- `deduplicate_overlapping_release_records` is now cached per-process to avoid redundant filesystem scans when both `write_release_record_file` and `validate_release_record_file` run in the same CLI invocation.
+- `git_stage_paths_command` adds `-f` so that ignored `.monochange/releases/` files can still be staged.
+- `release_path_requires_staging` explicitly allows `.monochange/releases/` paths even when gitignored.
+- `write_release_record_file` skips overwriting an existing record file so that subsequent `PrepareRelease` steps (for example during `mc release-pr`) do not dirty the working tree.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #421](https://github.com/monochange/monochange/pull/421) _Introduced in:_ [`46fb400`](https://github.com/monochange/monochange/commit/46fb40022d6275faa9f8e231764643665248b773) _Closed issues:_ [#418](https://github.com/monochange/monochange/issues/418)
+
+### Fixed
+
+#### Add schema version redaction to snapshot settings and release record tests
+
+Stop hardcoding `monochange_schema` public schema version (`0.0`) in snapshot assertions and unit tests. Use insta redaction for the release record `"v"` wire-format field in multiline snapshots, and read the expected schema version from `monochange_schema::CURRENT_SCHEMA_VERSION_TEXT` at runtime in `monochange_core` unit tests.
+
+This prevents failures after every release when the `monochange_schema` version bumps and `CURRENT_SCHEMA_VERSION_TEXT` changes.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #410](https://github.com/monochange/monochange/pull/410) _Introduced in:_ [`f9396c3`](https://github.com/monochange/monochange/commit/f9396c3029d7a49502908fcec908bca00f3853b4)
+
+#### Remove grouped release member summaries
+
+Grouped release notes no longer include generated changed or synchronized member lists, keeping the release note summary focused on the group release itself.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #395](https://github.com/monochange/monochange/pull/395) _Introduced in:_ [`2d012ff`](https://github.com/monochange/monochange/commit/2d012ff900a612f4aed6e4d7034c8c876f50aeae) _Last updated in:_ [`8c6a312`](https://github.com/monochange/monochange/commit/8c6a312f2d9e7477fd7901688d878c721ba41336)
+
+### Testing
+
+#### Extract inline test modules into separate files
+
+Move all inline `#[cfg(test)] mod tests { ... }` blocks out of source files into dedicated test files. This reduces source file sizes and keeps test code in a consistent `__tests/` directory structure next to the module it tests.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #416](https://github.com/monochange/monochange/pull/416) _Introduced in:_ [`3535c88`](https://github.com/monochange/monochange/commit/3535c887c46d66db2768377cb5f01406f6e9a8b6)
+
+#### Normalize Rust unit test file layout
+
+Move Rust unit tests into colocated `__tests__/` directories and name each file after the module under test with a `_tests.rs` suffix.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #428](https://github.com/monochange/monochange/pull/428) _Introduced in:_ [`b61cc3e`](https://github.com/monochange/monochange/commit/b61cc3e66989fd83ffb16a31568d2f46d7075216)
+
 ## [0.3.4](https://github.com/monochange/monochange/releases/tag/v0.3.4) (2026-05-06)
 
 ### Fixed

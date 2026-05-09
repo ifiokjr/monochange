@@ -4,6 +4,311 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.4.0](https://github.com/monochange/monochange/releases/tag/v0.4.0) (2026-05-09)
+
+### Breaking Change
+
+#### Publish durable release schema contracts
+
+Impact: release records now use the first public durable schema header, `v = "0.1"`, and monochange rejects missing, invalid, old, or future durable schema versions instead of reading unsafe historical shapes. The new `monochange_schema` crate owns schema version parsing, release-record wire validation, committed schema assets, and the initially empty machine-readable migration changelog.
+
+Usage: editors can use the hosted configuration schema once GitHub Pages publishes the docs, or the raw GitHub fallback immediately. Durable release records now embed the public version field instead of the internal Rust-only `schemaVersion` field:
+
+```json
+{
+	"v": "0.1",
+	"kind": "monochange.releaseRecord"
+}
+```
+
+The `monochange_schema` package remains independently versioned from the main release group. Its crate version starts at `0.0.0` on this branch, while this major changeset gives release planning the explicit signal to publish the first crate release without changing the durable public schema version `0.1`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #396](https://github.com/monochange/monochange/pull/396) _Introduced in:_ [`563ef83`](https://github.com/monochange/monochange/commit/563ef83fa21260518ae60c972240e2f0562e9bc2) _Last updated in:_ [`8c6a312`](https://github.com/monochange/monochange/commit/8c6a312f2d9e7477fd7901688d878c721ba41336)
+
+#### File-based release records
+
+Store release records as committed JSON files under `.monochange/releases/` instead of embedding them in commit message bodies.
+
+##### Before
+
+Release records were embedded inside the commit message body between HTML comment markers:
+
+````markdown
+chore(release): prepare release
+
+## monochange Release Record
+
+<!-- monochange:release-record:start -->
+
+```json
+{
+	"schemaVersion": 1,
+	"kind": "monochange.releaseRecord",
+	"createdAt": "2026-05-08T08:00:00Z",
+	"command": "release-pr",
+	"releaseTargets": [
+		{
+			"id": "sdk",
+			"kind": "group",
+			"version": "1.2.3",
+			"tag": true,
+			"release": true
+		}
+	]
+}
+```
+````
+
+<!-- monochange:release-record:end -->
+
+```
+Discovery required parsing every commit message in first-parent ancestry with regex-based extraction.
+
+## After
+
+Release records are plain JSON files committed to the repository:
+```
+
+.monochange/ ├── local/ # gitignored — local artifacts │ ├── release-manifest.json │ └── prepared-release-cache.json └── releases/ └── <hash>/ # content-addressable directory └── release.json # the release record
+
+```
+The `<hash>` is derived from sorted `(package_id, version)` pairs via `DefaultHasher`. For a release targeting `sdk` at version `1.2.3` the hash might look like:
+```
+
+.monochange/releases/8f3e2a1b/c/release.json
+
+````
+(The exact hex value depends on the hasher state; it is always 16 hex characters.)
+
+## Deduplication
+
+When writing a new release record, any existing record that shares an overlapping `(package_id, version)` tag is automatically removed. This prevents stale records from accumulating when a release is retried or amended.
+
+## Discovery
+
+`mc release-record` now discovers files via `git diff-tree --no-commit-id --name-only -r` (falling back to `git ls-tree` for root commits) rather than parsing commit messages.
+
+## CI detection
+
+```bash
+git diff-tree --no-commit-id --name-only -r HEAD |
+  grep '^\.monochange/releases/.*/release\.json$'
+````
+
+## Breaking changes
+
+- `.monochange/*` is no longer fully gitignored; only `.monochange/local/` is ignored.
+- The `ReleaseRecord` JSON schema itself remains identical; only the storage location changes.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #408](https://github.com/monochange/monochange/pull/408) _Introduced in:_ [`cd989c3`](https://github.com/monochange/monochange/commit/cd989c303a9722ca8240c44003f1ef4c96abc284)
+
+### Added
+
+#### Consolidate adapter traits to remove ecosystem match arms
+
+Replace hardcoded ecosystem and registry match arms in `workspace_ops`, `monochange_config`, and `monochange_publish` with adapter registry dispatch.
+
+- Expand `EcosystemAdapter` in `monochange_core` with `load_configured`, `supported_versioned_file_kind`, and `validate_versioned_file`.
+- Add `From<EcosystemType>` and `From<PackageType>` conversions for `Ecosystem`.
+- Add `FromStr` for `Ecosystem` and extract `default_registry_kind_for_ecosystem` into `monochange_core`.
+- Implement the new trait methods in all ecosystem adapter crates.
+- Replace `discover_packages` body with `build_ecosystem_registry().discover_all(root)?`.
+- Replace `discover_release_workspace` `load_configured` match arms with registry dispatch.
+- Replace `path_is_supported_for_ecosystem` and `validate_ecosystem_version_readable` match arms in `monochange_config` with registry dispatch.
+- Introduce `PublishAdapter` trait and `PublishCommandBuilder` in `monochange_publish` to replace `build_publish_command` registry match arms.
+- Extract `default_registry_kind_for_ecosystem` mapping out of `package_publish.rs` into `monochange_core`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #429](https://github.com/monochange/monochange/pull/429) _Introduced in:_ [`271e554`](https://github.com/monochange/monochange/commit/271e55420154265e798a0de3adf26a64faba66c8)
+
+#### Move ecosystem constants out of core and delegate validation to ecosystem crates
+
+Each ecosystem crate now owns its own `default_dependency_version_prefix()`, `default_dependency_fields()`, and `validate_versioned_file()` functions. The `EcosystemType::default_prefix()` and `EcosystemType::default_fields()` methods on `monochange_core::EcosystemType` are deprecated in favor of the ecosystem crate equivalents. `monochange_config` versioned file validation now dispatches to ecosystem crate validators instead of embedding ecosystem-specific parsing logic in config.
+
+Closes #137 Closes #138
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #411](https://github.com/monochange/monochange/pull/411) _Introduced in:_ [`57e2322`](https://github.com/monochange/monochange/commit/57e232282d41e89e70f3e5b34b3e07d8b2089fea) _Related issues:_ [#137](https://github.com/monochange/monochange/issues/137), [#138](https://github.com/monochange/monochange/issues/138)
+
+#### Add Forgejo source provider
+
+Add Forgejo as a hosted source provider for releases and release pull requests.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #401](https://github.com/monochange/monochange/pull/401) _Introduced in:_ [`86026ac`](https://github.com/monochange/monochange/commit/86026acb83e338fe8d07c200fb8e38693616b6e8)
+
+#### Move release record generation from commit_release to prepare_release
+
+The release record JSON is now written during the `PrepareRelease` CLI step instead of the `CommitRelease` step. This gives users a formatting preview and the opportunity to review or edit the record before it is committed.
+
+##### What changed
+
+- `ReleaseManifest` and `PreparedRelease` no longer store a `release_record_path` field. The path is derived on demand via the new `ReleasePaths` helper, which computes the hash, relative path, and absolute path from the manifest's `release_targets`.
+- A new `ReleasePaths` runtime helper provides `hash`, `relative`, and `absolute` paths for any release record. Steps that need the path can call `ReleasePaths::from_manifest` or `ReleasePaths::from_record` instead of reading a cached field.
+- The `PrepareRelease` step calls `write_release_record_file` to write the record to `.monochange/releases/<hash>/release.json`. The file is left unstaged for user review.
+- `commit_release` now validates the pre-written record with `validate_release_record_file` instead of generating it.
+- `deduplicate_overlapping_release_records` is now cached per-process to avoid redundant filesystem scans when both `write_release_record_file` and `validate_release_record_file` run in the same CLI invocation.
+- `git_stage_paths_command` adds `-f` so that ignored `.monochange/releases/` files can still be staged.
+- `release_path_requires_staging` explicitly allows `.monochange/releases/` paths even when gitignored.
+- `write_release_record_file` skips overwriting an existing record file so that subsequent `PrepareRelease` steps (for example during `mc release-pr`) do not dirty the working tree.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #421](https://github.com/monochange/monochange/pull/421) _Introduced in:_ [`46fb400`](https://github.com/monochange/monochange/commit/46fb40022d6275faa9f8e231764643665248b773) _Closed issues:_ [#418](https://github.com/monochange/monochange/issues/418)
+
+### Fixed
+
+#### Extract publish support into a dedicated crate
+
+Move the publish support surface out of the top-level `monochange` crate and into the new `monochange_publish` crate. The extracted crate now owns the publish report/request models, trusted-publishing capability detection, provider/registry capability messages, and built-in publish command builders for npm, pnpm, Cargo, Dart, Flutter, JSR, PyPI, and Go proxy releases.
+
+This keeps `monochange` focused on orchestration while giving publish integrations a dedicated crate boundary for future registry checks, readiness logic, and provider-specific publishing workflows.
+
+```text
+monochange_publish owns reusable publish capabilities and command construction.
+monochange wires those capabilities into CLI workflows and release orchestration.
+```
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #397](https://github.com/monochange/monochange/pull/397) _Introduced in:_ [`fa78e4d`](https://github.com/monochange/monochange/commit/fa78e4db56fd3a6897896c6e1b1c62ea2d8e46b9) _Last updated in:_ [`8c6a312`](https://github.com/monochange/monochange/commit/8c6a312f2d9e7477fd7901688d878c721ba41336)
+
+#### Move Cargo placeholder manifests into monochange_cargo
+
+Move crates.io placeholder `Cargo.toml` and `src/lib.rs` generation out of `monochange::package_publish` and into `monochange_cargo`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #427](https://github.com/monochange/monochange/pull/427) _Introduced in:_ [`084e110`](https://github.com/monochange/monochange/commit/084e1102a13408b12da5159cc7c2cf2815174308)
+
+#### Move Cargo publish readiness blockers into monochange_cargo
+
+Move `cargo_publish_readiness_blockers` and workspace package table helpers (`read_workspace_package_table`, `maybe_read_workspace_manifest_contents`, `parse_workspace_manifest_value`, `extract_workspace_package_table`) from the top-level `monochange` crate into `monochange_cargo`.
+
+Also fixes a clippy `indexing_slicing` lint in `monochange_publish` that was introduced by the previous resume/dependency-ordering extraction.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #413](https://github.com/monochange/monochange/pull/413) _Introduced in:_ [`904ba37`](https://github.com/monochange/monochange/commit/904ba37962c1fb2db7af87ebfa2ef80230c780a5)
+
+#### Move CommandExecutor and command rendering into monochange_publish
+
+Extract `CommandOutput`, `CommandExecutor`, `ProcessCommandExecutor`, and the helper functions `render_command` and `render_command_error` from `monochange::package_publish` into `monochange_publish`. This continues the Phase 2 crate boundary cleanup by ensuring the publish crate owns all command execution infrastructure used during publishing.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #409](https://github.com/monochange/monochange/pull/409) _Introduced in:_ [`f08c48b`](https://github.com/monochange/monochange/commit/f08c48be727539436ba7d839fa93a6ca5df7d0bb)
+
+#### Move Dart placeholder manifests into monochange_dart
+
+Move pub.dev placeholder `pubspec.yaml` generation out of `monochange::package_publish` and into `monochange_dart`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #424](https://github.com/monochange/monochange/pull/424) _Introduced in:_ [`d8df7c6`](https://github.com/monochange/monochange/commit/d8df7c61aaa6dc47c54c87c529052322a8ab4d4e) _Related issues:_ [#423](https://github.com/monochange/monochange/issues/423)
+
+#### Move JSR placeholder manifests into monochange_deno
+
+Move JSR placeholder `deno.json` and `mod.ts` generation out of `monochange::package_publish` and into `monochange_deno`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #423](https://github.com/monochange/monochange/pull/423) _Introduced in:_ [`7df4b05`](https://github.com/monochange/monochange/commit/7df4b05ca0279b5ad5409e3eb3404c2cc94ae45a)
+
+#### Move GitHub trust context into monochange_github
+
+Move GitHub-specific trust resolution functions out of `monochange::package_publish` and into the provider crate `monochange_github`.
+
+This includes:
+
+- `GitHubTrustContext` and its derive impls
+- `resolve_github_trust_context`
+- `verify_github_trust_context`
+- `trusted_publishing_identity_error`
+- `parse_github_workflow_ref`
+- `resolve_github_job_environment`
+- `trust_list_contains_context`
+- `json_value_contains`
+- `format_manual_trust_context`
+- `GITHUB_ACTIONS_ID_TOKEN_REQUEST_URL` and `GITHUB_ACTIONS_ID_TOKEN_REQUEST_TOKEN`
+
+These functions are now behind the usual `monochange_github` feature flag and can be reused independently of the main publish pipeline.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #417](https://github.com/monochange/monochange/pull/417) _Introduced in:_ [`c3475b6`](https://github.com/monochange/monochange/commit/c3475b6fe46f5ecacd64b39ba473595cb56b5509)
+
+#### Move Go placeholder manifests into monochange_go
+
+Move Go placeholder `go.mod` generation out of `monochange::package_publish` and into `monochange_go`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #420](https://github.com/monochange/monochange/pull/420) _Introduced in:_ [`28e4c9d`](https://github.com/monochange/monochange/commit/28e4c9d1c31579456ec93dc59d59f683608240e4) _Related issues:_ [#419](https://github.com/monochange/monochange/issues/419)
+
+#### Move npm publish helpers into monochange_npm
+
+Move npm trusted-publishing command helpers and npm placeholder manifest generation out of `monochange::package_publish` and into `monochange_npm`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #419](https://github.com/monochange/monochange/pull/419) _Introduced in:_ [`889e318`](https://github.com/monochange/monochange/commit/889e318f66e10193f741963af02d34c199fbcbc3) _Related issues:_ [#408](https://github.com/monochange/monochange/issues/408), [#417](https://github.com/monochange/monochange/issues/417)
+
+#### Move Python placeholder manifests into monochange_python
+
+Move PyPI placeholder `pyproject.toml` and module scaffold generation out of `monochange::package_publish` and into `monochange_python`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #425](https://github.com/monochange/monochange/pull/425) _Introduced in:_ [`f0609f1`](https://github.com/monochange/monochange/commit/f0609f15349d693d98694104d2ec986dad61aff6) _Related issues:_ [#424](https://github.com/monochange/monochange/issues/424)
+
+#### Move registry infrastructure from `monochange` into `monochange_publish`
+
+This change relocates registry-facing utilities so the publish crate owns all HTTP transport and registry endpoint concerns:
+
+- `RegistryEndpoints` – configurable registry base URLs with environment fallbacks
+- `registry_client()` – shared blocking HTTP client with monochange user-agent
+- `package_can_be_published()` – predicate that checks publish enablement and state
+- `filter_pending_publish_requests()` – filters out already-published or external entries
+- `filter_pending_publish_requests_with_transport()` – same with transport-aware checks
+- `registry_version_exists()` – ecosystem-aware version existence probe
+- `crates_io_version_exists()` – Crates.io API version lookup with index fallback
+- `crates_io_index_version_exists()` – sparse-index version existence check
+- `crates_io_index_entry_path()` – sparse-index path computation for a crate name
+
+`monochange` now delegates to these via `monochange_publish` imports rather than owning the implementation. `publish_rate_limits.rs` also imports them from `monochange_publish` instead of `package_publish` directly.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #404](https://github.com/monochange/monochange/pull/404) _Introduced in:_ [`7b09570`](https://github.com/monochange/monochange/commit/7b09570cd076b97c49210b6f3e1aeb33fb7eaf68)
+
+#### Move resume and dependency ordering to monochange_publish
+
+Move resume/artifact logic (`read_publish_report_artifact`, `write_publish_report_artifact`, `ensure_publish_report_succeeded`, `resume_publish_requests`, `merge_publish_resume_report`) and dependency ordering (`order_release_requests_by_publish_dependencies`, `render_publish_dependency_cycle`) from `monochange` into `monochange_publish`.
+
+This continues the Phase 2 crate boundary audit by removing more publish-orchestration helpers from the top-level `monochange` crate into the dedicated `monochange_publish` crate where they belong.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #412](https://github.com/monochange/monochange/pull/412) _Introduced in:_ [`86cbd66`](https://github.com/monochange/monochange/commit/86cbd668fbbd1ce20154a7b3102eed18e26209a8)
+
+#### Preserve publish batch dependency order
+
+Carry prior packages into later publish-plan batches so dependency-ordered publish requests remain available when registry rate limits split a release into multiple jobs.
+
+This fixes publish plans for releases that are split by registry rate limits. Dependent packages now continue to see their earlier dependency-ordered predecessors in later publish jobs instead of publishing before required package versions are available.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #389](https://github.com/monochange/monochange/pull/389) _Introduced in:_ [`12d3582`](https://github.com/monochange/monochange/commit/12d35826c3b0a8768bbf05c82b1e999a0e9ca30a) _Last updated in:_ [`8c6a312`](https://github.com/monochange/monochange/commit/8c6a312f2d9e7477fd7901688d878c721ba41336)
+
+#### Remove grouped release member summaries
+
+Grouped release notes no longer include generated changed or synchronized member lists, keeping the release note summary focused on the group release itself.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #395](https://github.com/monochange/monochange/pull/395) _Introduced in:_ [`2d012ff`](https://github.com/monochange/monochange/commit/2d012ff900a612f4aed6e4d7034c8c876f50aeae) _Last updated in:_ [`8c6a312`](https://github.com/monochange/monochange/commit/8c6a312f2d9e7477fd7901688d878c721ba41336)
+
+#### Remove indexing/slicing lint allowances
+
+Remove crate-level `clippy::indexing_slicing` allowances and replace production indexing/slicing call sites with safe accessors.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #414](https://github.com/monochange/monochange/pull/414) _Introduced in:_ [`4d06f06`](https://github.com/monochange/monochange/commit/4d06f0695edb280b4dc7ab661cc69449674fe38e)
+
+### Testing
+
+#### Extract inline test modules into separate files
+
+Move all inline `#[cfg(test)] mod tests { ... }` blocks out of source files into dedicated test files. This reduces source file sizes and keeps test code in a consistent `__tests/` directory structure next to the module it tests.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #416](https://github.com/monochange/monochange/pull/416) _Introduced in:_ [`3535c88`](https://github.com/monochange/monochange/commit/3535c887c46d66db2768377cb5f01406f6e9a8b6)
+
+#### Normalize Rust unit test file layout
+
+Move Rust unit tests into colocated `__tests__/` directories and name each file after the module under test with a `_tests.rs` suffix.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #428](https://github.com/monochange/monochange/pull/428) _Introduced in:_ [`b61cc3e`](https://github.com/monochange/monochange/commit/b61cc3e66989fd83ffb16a31568d2f46d7075216)
+
+#### Improve readability of multiline JSON snapshots
+
+Redact multiline string fields inside JSON snapshots and assert their contents separately so release-planning test snapshots remain readable without escaped newline sequences.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #398](https://github.com/monochange/monochange/pull/398) _Introduced in:_ [`458b671`](https://github.com/monochange/monochange/commit/458b671252f98a25628cd08a497792149370386d)
+
+#### Redact schema crate version in snapshot to survive release bumps
+
+Stop hardcoding `monochange_schema` crate version in integration test assertions. Use insta redaction for `schemaCrateVersion` in the schema asset inventory snapshot, and read the expected version from the crate's `Cargo.toml` at runtime.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #406](https://github.com/monochange/monochange/pull/406) _Introduced in:_ [`660d20a`](https://github.com/monochange/monochange/commit/660d20aebadae1096c3f4ddf1d24531c534ee5d4)
+
 ## [0.3.4](https://github.com/monochange/monochange/releases/tag/v0.3.4) (2026-05-06)
 
 ### Fixed

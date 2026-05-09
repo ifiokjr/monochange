@@ -1315,9 +1315,9 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.17.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f467dd6dccf739c208452f8014c75c18bb8301b050ad1cfb27153803edb0f51"
+checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 dependencies = [
  "allocator-api2",
 ]
@@ -1688,7 +1688,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d466e9454f08e4a911e14806c24e16fba1b4c121d1ea474396f396069cf949d9"
 dependencies = [
  "equivalent",
- "hashbrown 0.17.0",
+ "hashbrown 0.17.1",
  "serde",
  "serde_core",
 ]
@@ -2026,7 +2026,7 @@ dependencies = [
 
 [[package]]
 name = "monochange"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "anstyle",
  "chrono",
@@ -2085,7 +2085,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_analysis"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "insta",
  "monochange_cargo",
@@ -2106,7 +2106,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_book"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "doc-comment",
  "monochange",
@@ -2124,7 +2124,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_cargo"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "glob",
  "insta",
@@ -2152,7 +2152,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_config"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "doc-comment",
  "glob",
@@ -2186,7 +2186,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_core"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "ignore",
  "insta",
@@ -2205,7 +2205,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_dart"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "glob",
  "insta",
@@ -2227,7 +2227,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_deno"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "glob",
  "insta",
@@ -2247,7 +2247,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_ecmascript"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "monochange_core",
  "oxc_allocator",
@@ -2258,7 +2258,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_forgejo"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "etest",
  "httpmock",
@@ -2278,7 +2278,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_gitea"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "etest",
  "httpmock",
@@ -2297,7 +2297,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_github"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "etest",
  "httpmock",
@@ -2320,7 +2320,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_gitlab"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "etest",
  "httpmock",
@@ -2339,7 +2339,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_go"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "glob",
  "insta",
@@ -2357,7 +2357,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_graph"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "insta",
  "monochange_core",
@@ -2371,7 +2371,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_hosting"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "httpmock",
  "monochange_core",
@@ -2397,7 +2397,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_lint"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "glob",
  "ignore",
@@ -2410,7 +2410,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_lint_testing"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "monochange_core",
  "monochange_lint",
@@ -2419,14 +2419,14 @@ dependencies = [
 
 [[package]]
 name = "monochange_linting"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "monochange_core",
 ]
 
 [[package]]
 name = "monochange_npm"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "glob",
  "insta",
@@ -2452,7 +2452,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_publish"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "monochange_core",
  "reqwest",
@@ -2463,7 +2463,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_python"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "glob",
  "insta",
@@ -2483,7 +2483,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_schema"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "insta",
  "serde",
@@ -2493,7 +2493,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_semver"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "insta",
  "monochange_core",
@@ -2505,7 +2505,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_telemetry"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "monochange_core",
  "reqwest",
@@ -2518,7 +2518,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_test_helpers"
-version = "0.3.4"
+version = "0.4.0"
 dependencies = [
  "insta",
  "monochange_core",
@@ -2720,7 +2720,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ae84cda3381ab6f90bcab6325d1874ac4bbd71232f2200dc6e866123c8cc4ef"
 dependencies = [
  "allocator-api2",
- "hashbrown 0.17.0",
+ "hashbrown 0.17.1",
  "oxc_data_structures",
  "rustc-hash",
 ]
@@ -2866,7 +2866,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0273521fbd4655da9c5b2f659f4cc7f2e5370a573b54d37a4456c336c7bc8af6"
 dependencies = [
  "compact_str",
- "hashbrown 0.17.0",
+ "hashbrown 0.17.1",
  "oxc_allocator",
  "oxc_estree",
 ]
