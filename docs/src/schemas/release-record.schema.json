@@ -6,7 +6,7 @@
 	"type": "object",
 	"additionalProperties": false,
 	"required": [
-		"v",
+		"schemaVersion",
 		"kind",
 		"createdAt",
 		"command",
@@ -15,7 +15,7 @@
 		"changedFiles"
 	],
 	"properties": {
-		"v": {
+		"schemaVersion": {
 			"type": "string",
 			"const": "0.0",
 			"description": "Public durable artifact schema version. Older CLIs reject missing, future, or non-current versions."

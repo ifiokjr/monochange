@@ -20,9 +20,12 @@ pub fn snapshot_settings() -> insta::Settings {
 	settings.add_filter(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", "[DATETIME]");
 	settings.add_filter(r"\d{4}-\d{2}-\d{2}", "[DATE]");
 
-	// Release-record schema version filter — redact the wire-format `v` field so
+	// Release-record schema version filter — redact the wire-format `schemaVersion` field so
 	// snapshots survive release bumps that change `monochange_schema` version.
-	settings.add_filter(r#""v": "\d+\.\d+""#, r#""v": "[SCHEMA_VERSION]""#);
+	settings.add_filter(
+		r#""schemaVersion": "\d+\.\d+""#,
+		r#""schemaVersion": "[SCHEMA_VERSION]""#,
+	);
 
 	settings
 }

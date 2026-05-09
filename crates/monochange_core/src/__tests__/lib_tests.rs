@@ -1902,20 +1902,20 @@ fn release_record_block_roundtrips_with_reserved_markers() {
 }
 
 #[test]
-fn render_release_record_block_writes_current_schema_v_header() {
+fn render_release_record_block_writes_current_schema_version_header() {
 	let record = sample_release_record();
 	let rendered = crate::render_release_record_block(&record)
 		.unwrap_or_else(|error| panic!("render release record: {error}"));
 
 	assert!(rendered.contains(&format!(
-		r#""v": "{}""#,
+		r#""schemaVersion": "{}""#,
 		monochange_schema::CURRENT_SCHEMA_VERSION_TEXT
 	)));
-	assert!(!rendered.contains("\"schemaVersion\""));
+	assert!(!rendered.contains("\"v\""));
 }
 
 #[test]
-fn parse_release_record_block_accepts_current_schema_v_header() {
+fn parse_release_record_block_accepts_current_schema_version_header() {
 	let schema_version = monochange_schema::CURRENT_SCHEMA_VERSION_TEXT;
 	let current = format!(
 		r#"{RELEASE_RECORD_HEADING}
@@ -1923,7 +1923,7 @@ fn parse_release_record_block_accepts_current_schema_v_header() {
 {RELEASE_RECORD_START_MARKER}
 ```json
 {{
-  "v": "{schema_version}",
+  "schemaVersion": "{schema_version}",
   "kind": "{RELEASE_RECORD_KIND}",
   "createdAt": "2026-04-06T12:00:00Z",
   "command": "release-pr",
@@ -1943,14 +1943,14 @@ fn parse_release_record_block_accepts_current_schema_v_header() {
 }
 
 #[test]
-fn parse_release_record_block_rejects_future_schema_v_header() {
+fn parse_release_record_block_rejects_future_schema_version_header() {
 	let future = format!(
 		r#"{RELEASE_RECORD_HEADING}
 
 {RELEASE_RECORD_START_MARKER}
 ```json
 {{
-  "v": "9.0",
+  "schemaVersion": "9.0",
   "kind": "{RELEASE_RECORD_KIND}",
   "createdAt": "2026-04-06T12:00:00Z",
   "command": "release-pr",
@@ -2025,7 +2025,7 @@ fn parse_release_record_block_rejects_unsupported_kind() {
 {start}
 ```json
 {{
-  "v": "{schema_version}",
+  "schemaVersion": "{schema_version}",
   "kind": "monochange.otherRecord",
   "createdAt": "2026-04-06T12:00:00Z",
   "command": "release-pr",
@@ -2050,7 +2050,7 @@ fn parse_release_record_json_rejects_unsupported_kind() {
 	let schema_version = monochange_schema::CURRENT_SCHEMA_VERSION_TEXT;
 	let invalid_kind = format!(
 		r#"{{
-  "v": "{schema_version}",
+  "schemaVersion": "{schema_version}",
   "kind": "monochange.otherRecord",
   "createdAt": "2026-04-06T12:00:00Z",
   "command": "release-pr",
@@ -2080,7 +2080,7 @@ fn parse_release_record_block_rejects_unsupported_schema_version() {
 {start}
 ```json
 {{
-  "v": "0.2",
+  "schemaVersion": "0.2",
   "kind": "{kind}",
   "createdAt": "2026-04-06T12:00:00Z",
   "command": "release-pr",
@@ -2113,7 +2113,7 @@ fn parse_release_record_block_ignores_unknown_fields() {
 {start}
 ```json
 {{
-  "v": "{schema_version}",
+  "schemaVersion": "{schema_version}",
   "kind": "{kind}",
   "createdAt": "2026-04-06T12:00:00Z",
   "command": "release-pr",
@@ -2134,7 +2134,7 @@ fn parse_release_record_block_ignores_unknown_fields() {
 
 fn sample_release_record() -> ReleaseRecord {
 	ReleaseRecord {
-		schema_version: RELEASE_RECORD_SCHEMA_VERSION,
+		schema_version: RELEASE_RECORD_SCHEMA_VERSION.to_string(),
 		kind: RELEASE_RECORD_KIND.to_string(),
 		created_at: "2026-04-06T12:00:00Z".to_string(),
 		command: "release-pr".to_string(),
@@ -2194,14 +2194,14 @@ fn render_release_record_block_rejects_unsupported_kind() {
 #[test]
 fn render_release_record_block_rejects_unsupported_schema_version() {
 	let mut record = sample_release_record();
-	record.schema_version = 2;
+	record.schema_version = "0.2".to_string();
 
 	let error = crate::render_release_record_block(&record)
 		.err()
 		.unwrap_or_else(|| panic!("expected unsupported schema render error"));
 	assert!(matches!(
 		error,
-		ReleaseRecordError::UnsupportedSchemaVersion(2)
+		ReleaseRecordError::UnsupportedSchemaVersionValue(version) if version == "0.2"
 	));
 }
 
@@ -2224,7 +2224,7 @@ fn parse_release_record_block_rejects_missing_kind() {
 {RELEASE_RECORD_START_MARKER}
 ```json
 {{
-  "v": "{schema_version}",
+  "schemaVersion": "{schema_version}",
   "createdAt": "2026-04-06T12:00:00Z",
   "command": "release-pr",
   "releaseTargets": [],

@@ -38,7 +38,7 @@ fn release_record_schema_declares_current_artifact_contract() -> Result<(), Box<
 	);
 	assert!(!json_bool(&schema, "/additionalProperties")?);
 	assert_eq!(
-		json_str(&schema, "/properties/v/const")?,
+		json_str(&schema, "/properties/schemaVersion/const")?,
 		monochange_schema::CURRENT_SCHEMA_VERSION_TEXT
 	);
 	assert_eq!(
@@ -48,7 +48,7 @@ fn release_record_schema_declares_current_artifact_contract() -> Result<(), Box<
 
 	let required = json_array(&schema, "/required")?;
 	for key in [
-		"v",
+		"schemaVersion",
 		"kind",
 		"createdAt",
 		"command",
@@ -274,7 +274,7 @@ fn schema_crate_version_stays_decoupled_from_public_schema_version() -> Result<(
 fn release_record_migration_outcomes_match_snapshot() {
 	let mut missing_version = sample_release_record();
 	if let Some(object) = missing_version.as_object_mut() {
-		object.remove("v");
+		object.remove("schemaVersion");
 	}
 
 	let mut missing_kind = sample_release_record();
@@ -326,7 +326,7 @@ fn release_record_migration_outcomes_match_snapshot() {
 					json!({
 						"scenario": scenario,
 						"status": "ok",
-						"v": value.get("v"),
+						"schemaVersion": value.get("schemaVersion"),
 					})
 				}
 				Err(error) => {
@@ -430,7 +430,7 @@ fn sample_release_record_with(version: &str, kind: &str) -> Value {
 
 fn sample_release_record_with_value(version: Value, kind: Value) -> Value {
 	json!({
-		"v": version,
+		"schemaVersion": version,
 		"kind": kind,
 		"createdAt": "2026-04-06T12:00:00Z",
 		"command": "release-pr",
