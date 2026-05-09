@@ -40,6 +40,7 @@ type TomlValue = Value;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashSet;
+use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -62,6 +63,7 @@ use monochange_core::PackageDependency;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
 use monochange_core::ShellConfig;
+use monochange_core::SourceConfiguration;
 use monochange_core::normalize_path;
 use monochange_semver::CompatibilityProvider;
 use semver::Version;
@@ -1217,6 +1219,138 @@ pub fn read_workspace_package_table(
 	};
 	let parsed = parse_workspace_manifest_value(&workspace_manifest_path, &contents)?;
 	Ok(extract_workspace_package_table(&parsed))
+}
+
+pub fn write_cargo_placeholder_manifest(
+	dir: &Path,
+	request: &PublishRequest,
+	root: &Path,
+	source: Option<&SourceConfiguration>,
+) -> MonochangeResult<()> {
+	let contents = fs::read_to_string(&request.manifest_path).map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to read Cargo manifest {}: {error}",
+			request.manifest_path.display()
+		))
+	})?;
+	let parsed = toml::from_str::<TomlValue>(&contents).map_err(|error| {
+		MonochangeError::Config(format!(
+			"failed to parse {}: {error}",
+			request.manifest_path.display()
+		))
+	})?;
+	let package = parsed
+		.get("package")
+		.and_then(TomlValue::as_table)
+		.ok_or_else(|| {
+			MonochangeError::Config(format!(
+				"{} is missing [package]",
+				request.manifest_path.display()
+			))
+		})?;
+	let (license, license_file) = resolve_cargo_placeholder_license_metadata(package, root)?;
+	let package_license_file = package
+		.get("license-file")
+		.and_then(TomlValue::as_str)
+		.map(ToString::to_string);
+	if license.is_none() && license_file.is_none() {
+		return Err(MonochangeError::Config(format!(
+			"`{}` placeholder publishing requires `package.license` or `package.license-file`",
+			request.package_id
+		)));
+	}
+
+	let description = package
+		.get("description")
+		.and_then(TomlValue::as_str)
+		.unwrap_or("Placeholder crate published by monochange");
+	let edition = package
+		.get("edition")
+		.and_then(TomlValue::as_str)
+		.unwrap_or("2021");
+	let repository = package
+		.get("repository")
+		.and_then(TomlValue::as_str)
+		.map(ToString::to_string)
+		.or_else(|| {
+			source.map(|source| format!("https://github.com/{}/{}", source.owner, source.repo))
+		});
+
+	let mut manifest = format!(
+		"[package]\nname = \"{}\"\nversion = \"{}\"\nedition = \"{}\"\ndescription = \"{}\"\nreadme = \"README.md\"\n",
+		request.package_name, request.version, edition, description
+	);
+	if let Some(license) = license {
+		let _ = writeln!(manifest, "license = \"{license}\"");
+	}
+	if let Some(license_file) = license_file {
+		manifest.push_str("license-file = \"LICENSE\"\n");
+		let source_root = if package_license_file.as_deref() == Some(license_file.as_str()) {
+			request.package_root.as_path()
+		} else {
+			root
+		};
+		let source_path = source_root.join(&license_file);
+		let resolved_source = if source_path.is_absolute() {
+			source_path
+		} else {
+			root.join(source_path)
+		};
+		fs::copy(&resolved_source, dir.join("LICENSE")).map_err(|error| {
+			MonochangeError::Io(format!(
+				"failed to copy placeholder license file {}: {error}",
+				resolved_source.display()
+			))
+		})?;
+	}
+	if let Some(repository) = repository {
+		let _ = writeln!(manifest, "repository = \"{repository}\"");
+	}
+	fs::create_dir_all(dir.join("src")).map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to create placeholder src directory: {error}"
+		))
+	})?;
+	fs::write(
+		dir.join("src/lib.rs"),
+		"//! Placeholder crate published by monochange.\n",
+	)
+	.map_err(|error| {
+		MonochangeError::Io(format!("failed to write placeholder src/lib.rs: {error}"))
+	})?;
+	fs::write(dir.join("Cargo.toml"), manifest).map_err(|error| {
+		MonochangeError::Io(format!("failed to write placeholder Cargo.toml: {error}"))
+	})
+}
+
+pub fn resolve_cargo_placeholder_license_metadata(
+	package: &toml::map::Map<String, TomlValue>,
+	root: &Path,
+) -> MonochangeResult<(Option<String>, Option<String>)> {
+	let license = package
+		.get("license")
+		.and_then(TomlValue::as_str)
+		.map(ToString::to_string);
+	let license_file = package
+		.get("license-file")
+		.and_then(TomlValue::as_str)
+		.map(ToString::to_string);
+	if license.is_some() || license_file.is_some() {
+		return Ok((license, license_file));
+	}
+
+	let workspace_package = read_workspace_package_table(root)?;
+	let workspace_license = workspace_package
+		.as_ref()
+		.and_then(|package| package.get("license"))
+		.and_then(TomlValue::as_str)
+		.map(ToString::to_string);
+	let workspace_license_file = workspace_package
+		.as_ref()
+		.and_then(|package| package.get("license-file"))
+		.and_then(TomlValue::as_str)
+		.map(ToString::to_string);
+	Ok((workspace_license, workspace_license_file))
 }
 
 pub fn maybe_read_workspace_manifest_contents(
