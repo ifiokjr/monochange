@@ -662,5 +662,5 @@ fn summarized_phase_timings(phase_timings: &[StepPhaseTiming]) -> Vec<StepPhaseT
 }
 
 #[cfg(test)]
-#[path = "__tests/cli_progress.rs"]
+#[path = "__tests__/cli_progress_tests.rs"]
 mod tests;

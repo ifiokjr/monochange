@@ -725,4 +725,5 @@ fn find_all_manifests(root: &Path) -> Vec<PathBuf> {
 }
 
 #[cfg(test)]
-mod __tests;
+#[path = "__tests__/lib_tests.rs"]
+mod tests;

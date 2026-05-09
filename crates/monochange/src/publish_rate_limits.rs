@@ -390,5 +390,5 @@ fn registry_policies() -> Vec<RegistryRateLimitPolicy> {
 }
 
 #[cfg(test)]
-#[path = "__tests/publish_rate_limits.rs"]
+#[path = "__tests__/publish_rate_limits_tests.rs"]
 mod tests;

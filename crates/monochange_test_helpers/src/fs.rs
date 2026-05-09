@@ -110,5 +110,5 @@ fn copy_directory_filtered(source: &Path, destination: &Path, skipped: &dyn Fn(&
 }
 
 #[cfg(test)]
-#[path = "__tests/fs.rs"]
+#[path = "__tests__/fs_tests.rs"]
 mod tests;

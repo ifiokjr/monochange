@@ -732,5 +732,5 @@ fn default_publish_readiness_input_fingerprint() -> String {
 }
 
 #[cfg(test)]
-#[path = "__tests/publish_readiness.rs"]
+#[path = "__tests__/publish_readiness_tests.rs"]
 mod tests;

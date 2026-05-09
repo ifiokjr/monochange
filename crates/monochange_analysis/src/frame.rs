@@ -532,5 +532,5 @@ fn run_git_diff_name_only(
 }
 
 #[cfg(test)]
-#[path = "__tests/frame.rs"]
+#[path = "__tests__/frame_tests.rs"]
 mod tests;

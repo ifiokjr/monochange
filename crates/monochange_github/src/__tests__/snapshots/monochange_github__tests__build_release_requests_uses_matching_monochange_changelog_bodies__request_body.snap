@@ -1,0 +1,11 @@
+---
+source: crates/monochange_github/src/__tests__/lib_tests.rs
+expression: "request.body.as_deref().unwrap_or_else(|| panic!(\"expected body\"))"
+---
+## 1.2.0
+
+Grouped release for `sdk`.
+
+### Features
+
+- add github publishing

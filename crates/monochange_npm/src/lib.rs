@@ -1145,4 +1145,5 @@ pub fn default_dependency_fields() -> &'static [&'static str] {
 	&["dependencies", "devDependencies", "peerDependencies"]
 }
 #[cfg(test)]
-mod __tests;
+#[path = "__tests__/lib_tests.rs"]
+mod tests;

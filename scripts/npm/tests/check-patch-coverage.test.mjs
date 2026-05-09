@@ -82,9 +82,9 @@ describe("parseChangedLines", () => {
 	test("ignores test-only Rust module paths", () => {
 		const changedLinesByFile = parseChangedLines(
 			[
-				"diff --git a/crates/monochange/src/__tests/analyze.rs b/crates/monochange/src/__tests/analyze.rs",
+				"diff --git a/crates/monochange/src/__tests__/analyze_tests.rs b/crates/monochange/src/__tests__/analyze_tests.rs",
 				"--- /dev/null",
-				"+++ b/crates/monochange/src/__tests/analyze.rs",
+				"+++ b/crates/monochange/src/__tests__/analyze_tests.rs",
 				"@@ -0,0 +1 @@",
 				"+#[test]",
 				"diff --git a/crates/monochange/src/lib.rs b/crates/monochange/src/lib.rs",

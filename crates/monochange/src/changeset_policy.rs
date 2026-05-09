@@ -509,5 +509,5 @@ fn render_changeset_verification_comment(
 }
 
 #[cfg(test)]
-#[path = "__tests/changeset_policy.rs"]
+#[path = "__tests__/changeset_policy_tests.rs"]
 mod tests;

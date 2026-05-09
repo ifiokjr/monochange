@@ -82,7 +82,7 @@ Run cargo-mutants across the monochange Rust workspace from the latest `main`, f
   - exact changelog owner matching in `release_body`
   - successful GET/POST/PUT/PATCH JSON helpers
   - `get_optional_json` handling of both 404 and successful responses
-  - packaging/build compatibility for `src/__tests.rs` via `include = ["src/*.rs", ...]` and `#[cfg(test)] mod __tests;`
+  - packaging/build compatibility for `src/__tests__/lib_tests.rs` via `include = ["src/**/*.rs", ...]` and `#[path = "__tests__/lib_tests.rs"] mod tests;`
 - `monochange_hosting` rerun result: 34 caught, 43 unviable, 0 missed.
 - Completed focused pass on `monochange_analysis`.
 - Added mutation-killing coverage for:

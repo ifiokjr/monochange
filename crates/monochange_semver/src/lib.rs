@@ -137,4 +137,5 @@ pub fn propagated_release_severity(
 }
 
 #[cfg(test)]
-mod __tests;
+#[path = "__tests__/lib_tests.rs"]
+mod tests;

@@ -2353,4 +2353,5 @@ pub fn format_manual_trust_context(context: &GitHubTrustContext) -> String {
 }
 
 #[cfg(test)]
-mod __tests;
+#[path = "__tests__/lib_tests.rs"]
+mod tests;

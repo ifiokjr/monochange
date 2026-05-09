@@ -1,0 +1,11 @@
+---
+source: crates/monochange/src/__tests__/lib_tests.rs
+expression: content
+---
+---
+core:
+  bump: none
+  caused_by: ["sdk"]
+---
+
+# dependency-only follow-up

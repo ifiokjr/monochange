@@ -496,7 +496,7 @@ impl LintRuleRunner for NoDuplicateDependenciesRule {
 }
 
 #[cfg(test)]
-#[path = "__tests/npm.rs"]
+#[path = "__tests__/npm_tests.rs"]
 mod tests;
 /// Rule: unlisted-package-private
 ///

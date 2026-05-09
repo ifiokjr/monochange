@@ -78,6 +78,7 @@ function ensureLineSet(changedLinesByFile, filePath) {
 
 function isTestOnlyPath(filePath) {
 	return (
+		filePath.includes("/__tests__/") ||
 		filePath.includes("/__tests/") ||
 		filePath.endsWith("/__tests.rs") ||
 		filePath.endsWith("_tests.rs")

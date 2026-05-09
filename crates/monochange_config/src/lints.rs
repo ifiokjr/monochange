@@ -586,5 +586,5 @@ impl LintRuleConfigExt for LintRuleConfig {
 }
 
 #[cfg(test)]
-#[path = "__tests/lints.rs"]
+#[path = "__tests__/lints_tests.rs"]
 mod tests;

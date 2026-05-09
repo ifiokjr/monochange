@@ -299,5 +299,5 @@ impl LintProgressReporter for HumanLintProgressReporter {
 }
 
 #[cfg(test)]
-#[path = "__tests/lint_check_reporter.rs"]
+#[path = "__tests__/lint_check_reporter_tests.rs"]
 mod tests;

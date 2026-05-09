@@ -167,5 +167,5 @@ fn branch_matches(patterns: &[Pattern], ref_name: &str, display_name: &str) -> b
 }
 
 #[cfg(test)]
-#[path = "__tests/release_branch_policy.rs"]
+#[path = "__tests__/release_branch_policy_tests.rs"]
 mod tests;

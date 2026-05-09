@@ -49,5 +49,5 @@ macro_rules! declare_lint_rule {
 }
 
 #[cfg(test)]
-#[path = "__tests.rs"]
+#[path = "__tests__/lib_tests.rs"]
 mod tests;

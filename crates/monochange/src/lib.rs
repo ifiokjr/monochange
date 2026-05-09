@@ -1099,4 +1099,5 @@ fn format_publish_state(publish_state: monochange_core::PublishState) -> &'stati
 }
 
 #[cfg(test)]
-mod __tests;
+#[path = "__tests__/lib_tests.rs"]
+mod tests;

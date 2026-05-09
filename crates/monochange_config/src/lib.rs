@@ -5089,7 +5089,9 @@ pub mod lints;
 
 #[cfg(test)]
 #[cfg(test)]
+#[path = "__tests__/mutant_killers_tests.rs"]
 mod mutant_killers;
 
 #[cfg(test)]
-mod __tests;
+#[path = "__tests__/lib_tests.rs"]
+mod tests;

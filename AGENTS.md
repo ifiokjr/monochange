@@ -10,6 +10,7 @@
 - Quality/typecheck: `lint:all`
 - Validation: `mc validate`
 - Patch coverage: every pull request must keep patch coverage at 100% for executable changed lines. Add or adjust tests until `coverage:patch` is green.
+- Rust unit tests inside crate `src/` trees must live in a `__tests__/` directory next to the module under test, with file names matching `__tests__/<module_name>_tests.rs` (`lib.rs` → `__tests__/lib_tests.rs`, `mod.rs` → `__tests__/mod_tests.rs`). Reference them with `#[cfg(test)] #[path = "__tests__/<module_name>_tests.rs"] mod tests;` instead of inline test modules or sibling `__tests.rs` files. This rule does not apply to integration tests in `<crate>/tests/`; leave those files in the standard integration-test layout.
 - New integration tests must live in `crates/monochange_integration_tests`, use file fixtures instead of dynamically generated fixtures, and use Insta snapshots for integration output assertions.
 - Snapshot readability: JSON snapshots must not embed multiline strings with escaped `\n` sequences. Redact multiline JSON fields as `"[multiline text]"` and add separate string snapshots for the multiline contents.
 - Snapshot relevance: `test:cargo` and CI reject unreferenced `.snap` files. Use `snapshot:update` to regenerate snapshots and delete unreferenced snapshot files.

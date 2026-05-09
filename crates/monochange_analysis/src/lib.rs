@@ -808,5 +808,5 @@ fn read_text_file_from_git_object(
 }
 
 #[cfg(test)]
-#[path = "__tests.rs"]
+#[path = "__tests__/lib_tests.rs"]
 mod tests;

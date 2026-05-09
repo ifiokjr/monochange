@@ -87,5 +87,5 @@ pub fn relative_path(root: &Path, path: &Path) -> String {
 }
 
 #[cfg(test)]
-#[path = "__tests.rs"]
+#[path = "__tests__/lib_tests.rs"]
 mod tests;

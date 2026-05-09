@@ -2029,5 +2029,5 @@ fn materialize_lockfile_command_updates_with_timing(
 }
 
 #[cfg(test)]
-#[path = "__tests/workspace_ops.rs"]
+#[path = "__tests__/workspace_ops_tests.rs"]
 mod workspace_ops_tests;

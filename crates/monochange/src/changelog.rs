@@ -1265,5 +1265,5 @@ fn classify_release_note_change(
 }
 
 #[cfg(test)]
-#[path = "__tests/changelog.rs"]
+#[path = "__tests__/changelog_tests.rs"]
 mod tests;
