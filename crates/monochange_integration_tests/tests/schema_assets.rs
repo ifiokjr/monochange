@@ -263,17 +263,16 @@ fn schema_crate_version_stays_decoupled_from_public_schema_version() -> Result<(
 		.and_then(toml::Value::as_str)
 		.unwrap_or_default();
 
-	let (expected_major, expected_minor) = {
+	let (_expected_major, _expected_minor) = {
 		let parts: Vec<&str> = expected_version.split('.').take(2).collect();
 		(
 			parts.first().unwrap_or(&"0").parse::<u64>().unwrap_or(0),
 			parts.get(1).unwrap_or(&"0").parse::<u64>().unwrap_or(0),
 		)
 	};
-	let expected_major_minor = format!("{expected_major}.{expected_minor}");
 
 	assert_eq!(schema_crate_version(&paths)?, expected_version);
-	let expected_schema = monochange_schema::SchemaVersion::from_package_version(&expected_version)
+	let expected_schema = monochange_schema::SchemaVersion::from_package_version(expected_version)
 		.map_err(|error| test_error(format!("invalid manifest version: {error}")))?;
 	assert_eq!(
 		monochange_schema::CURRENT_SCHEMA_VERSION_TEXT,
@@ -362,15 +361,15 @@ fn release_record_migration_outcomes_match_snapshot() {
 		.into_iter()
 		.map(|mut outcome| {
 			if let Value::Object(ref mut map) = outcome {
-				if let Some(v) = map.get_mut("v") {
-					if let Value::String(_) = v {
-						*v = Value::String("[schema version]".to_string());
-					}
+				if let Some(v) = map.get_mut("v")
+					&& let Value::String(_) = v
+				{
+					*v = Value::String("[schema version]".to_string());
 				}
-				if let Some(v) = map.get_mut("error") {
-					if let Value::String(s) = v {
-						*v = Value::String(s.replace(current_version, "[schema version]"));
-					}
+				if let Some(v) = map.get_mut("error")
+					&& let Value::String(s) = v
+				{
+					*v = Value::String(s.replace(current_version, "[schema version]"));
 				}
 			}
 			outcome

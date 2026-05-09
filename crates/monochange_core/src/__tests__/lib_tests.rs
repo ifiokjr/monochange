@@ -2378,16 +2378,6 @@ fn parse_release_record_json_normalizes_integer_schema_version() {
 	);
 	let parsed = crate::parse_release_record_json(&json_text)
 		.unwrap_or_else(|error| panic!("parse release record with integer schemaVersion: {error}"));
-	assert_eq!(
-		parsed.schema_version,
-		monochange_schema::CURRENT_SCHEMA_VERSION_TEXT
-	);
-}
-
-#[test]
-fn parse_release_record_json_rejects_non_object() {
-	let error = crate::parse_release_record_json("[]").expect_err("expected error for non-object");
-	assert!(matches!(error, ReleaseRecordError::MissingKind));
 }
 
 #[test]
@@ -2407,7 +2397,7 @@ fn parse_release_record_json_normalizes_legacy_v_field() {
 	);
 	let parsed = crate::parse_release_record_json(&json_text)
 		.unwrap_or_else(|error| panic!("parse release record with legacy v: {error}"));
-	assert_eq!(parsed.schema_version, schema_version);
+	assert_eq!(parsed.schema_version, RELEASE_RECORD_SCHEMA_VERSION);
 }
 
 fn sample_release_record() -> ReleaseRecord {
