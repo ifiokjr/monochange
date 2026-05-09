@@ -16,6 +16,78 @@ thread_local! {
 		std::cell::RefCell::new(std::collections::HashSet::new());
 }
 
+#[cfg(test)]
+pub(crate) fn clear_dedup_cache() {
+	DEDUPLICATED_CACHE.with(|cache| cache.borrow_mut().clear());
+}
+
+/// Path to the persistent deduplication index relative to the workspace root.
+const DEDUP_INDEX_PATH: &str = ".monochange/local/release-index.jsonl";
+
+/// Load the persistent deduplication index as a set of hashes.
+///
+/// The index is stored as a JSONL file at `.monochange/local/release-index.jsonl`.
+/// Each line is a JSON object with a `hash` field. Missing or unreadable files
+/// are treated as empty indices.
+fn load_dedup_index(root: &Path) -> std::collections::HashSet<String> {
+	let path = root.join(DEDUP_INDEX_PATH);
+	let Ok(content) = fs::read_to_string(&path) else {
+		return std::collections::HashSet::new();
+	};
+	content
+		.lines()
+		.filter_map(|line| {
+			let line = line.trim();
+			if line.is_empty() {
+				return None;
+			}
+			serde_json::from_str::<serde_json::Value>(line)
+				.ok()
+				.and_then(|v| v.get("hash").and_then(|h| h.as_str().map(String::from)))
+		})
+		.collect()
+}
+
+/// Save the persistent deduplication index atomically.
+///
+/// Writes to a temporary file next to the target and renames it into place.
+/// This avoids corrupting the index if the process is interrupted mid-write.
+fn save_dedup_index(
+	root: &Path,
+	index: &std::collections::HashSet<String>,
+) -> MonochangeResult<()> {
+	let path = root.join(DEDUP_INDEX_PATH);
+	if let Some(parent) = path.parent() {
+		fs::create_dir_all(parent)
+			.map_err(|error| MonochangeError::Io(format!("create dedup index dir: {error}")))?;
+	}
+	let mut lines = Vec::with_capacity(index.len());
+	for hash in index {
+		lines.push(format!(r#"{{"hash":"{hash}"}}"#));
+	}
+	lines.sort();
+	let temp = path.with_extension("tmp");
+	fs::write(&temp, lines.join("\n"))
+		.map_err(|error| MonochangeError::Io(format!("write dedup index: {error}")))?;
+	fs::rename(&temp, &path)
+		.map_err(|error| MonochangeError::Io(format!("rename dedup index: {error}")))?;
+	Ok(())
+}
+
+/// Add a hash to the persistent deduplication index.
+fn add_to_dedup_index(root: &Path, hash: &str) -> MonochangeResult<()> {
+	let mut index = load_dedup_index(root);
+	index.insert(hash.to_string());
+	save_dedup_index(root, &index)
+}
+
+/// Remove a hash from the persistent deduplication index.
+fn remove_from_dedup_index(root: &Path, hash: &str) -> MonochangeResult<()> {
+	let mut index = load_dedup_index(root);
+	index.remove(hash);
+	save_dedup_index(root, &index)
+}
+
 pub(crate) fn build_release_targets(
 	configuration: &monochange_core::WorkspaceConfiguration,
 	packages: &[PackageRecord],
@@ -1411,6 +1483,7 @@ pub(crate) fn write_release_record_file(
 	// subsequent PrepareRelease steps (for example during `mc release-pr`)
 	// do not produce a dirty working tree.
 	if paths.absolute.is_file() {
+		add_to_dedup_index(root, &paths.hash).ok();
 		return Ok(paths.absolute);
 	}
 
@@ -1425,6 +1498,7 @@ pub(crate) fn write_release_record_file(
 		.map_err(|error| MonochangeError::Io(format!("create release record dir: {error}")))?;
 	fs::write(&paths.absolute, json)
 		.map_err(|error| MonochangeError::Io(format!("write release record: {error}")))?;
+	add_to_dedup_index(root, &paths.hash)?;
 	Ok(paths.absolute)
 }
 
@@ -1449,14 +1523,65 @@ fn compare_json_strings(json1: &str, json2: &str) -> bool {
 /// on disk after re-running deduplication. Called by `commit_release` to
 /// guard against stale or missing records between `prepare_release` and
 /// `commit_release`.
+///
+/// Performance note: when the file already exists and its `release_targets`
+/// match the manifest, this function skips rebuilding the `ReleaseRecord`
+/// entirely. It only falls back to `build_release_record` when the file is
+/// missing or the targets differ, avoiding the JSON round-trip on the hot
+/// path.
 pub(crate) fn validate_release_record_file(
 	root: &Path,
 	source: Option<&SourceConfiguration>,
 	manifest: &ReleaseManifest,
 	update_release_json: bool,
 ) -> MonochangeResult<PathBuf> {
+	// Compute the expected path from the manifest without building the record.
+	let paths = ReleasePaths::from_manifest(root, manifest);
+
+	// Fast path: if the file exists, verify its release_targets identity
+	// without rebuilding the entire ReleaseRecord.
+	if paths.absolute.is_file() {
+		match fs::read_to_string(&paths.absolute) {
+			Ok(existing_json) => {
+				if let Ok(existing_value) =
+					serde_json::from_str::<serde_json::Value>(&existing_json)
+					&& let Some(existing_targets) = existing_value
+						.get("releaseTargets")
+						.and_then(|v| v.as_array())
+				{
+					let manifest_targets = &manifest.release_targets;
+					if existing_targets.len() == manifest_targets.len() {
+						let all_match = manifest_targets.iter().all(|mt| {
+							existing_targets.iter().any(|et| {
+								let Some(id) = et.get("id").and_then(|v| v.as_str()) else {
+									return false;
+								};
+								let Some(kind) = et.get("kind").and_then(|v| v.as_str()) else {
+									return false;
+								};
+								let Some(version) = et.get("version").and_then(|v| v.as_str())
+								else {
+									return false;
+								};
+								mt.id == id && mt.kind.as_str() == kind && mt.version == version
+							})
+						});
+						if all_match {
+							// Targets match — no need to rebuild or rewrite.
+							add_to_dedup_index(root, &paths.hash).ok();
+							return Ok(paths.absolute);
+						}
+					}
+				}
+			}
+			Err(error) => {
+				return Err(MonochangeError::Io(format!("read release record: {error}")));
+			}
+		}
+	}
+
+	// Slow path: rebuild the record, deduplicate, and validate or rewrite.
 	let record = build_release_record(source, manifest);
-	let paths = ReleasePaths::from_record(root, &record);
 	deduplicate_overlapping_release_records(
 		root,
 		&record.release_targets,
@@ -1512,6 +1637,7 @@ impl ReleasePaths {
 	/// Compute paths from an already-built `ReleaseRecord`.
 	///
 	/// Use this when you have the record in hand to avoid rebuilding it.
+	#[allow(dead_code)]
 	pub fn from_record(root: &Path, record: &ReleaseRecord) -> Self {
 		let hash = release_targets_hash(&record.release_targets);
 		let relative = PathBuf::from(".monochange/releases")
@@ -1623,6 +1749,16 @@ fn deduplicate_overlapping_release_records(
 		return Ok(());
 	}
 
+	let persistent_index = load_dedup_index(root);
+	if persistent_index.contains(&hash) {
+		DEDUPLICATED_CACHE.with(|cache| {
+			cache
+				.borrow_mut()
+				.insert((root.to_path_buf(), hash.clone()));
+		});
+		return Ok(());
+	}
+
 	let new_tags: std::collections::HashSet<(&str, &str)> = release_targets
 		.iter()
 		.map(|target| (target.id.as_str(), target.version.as_str()))
@@ -1659,15 +1795,20 @@ fn deduplicate_overlapping_release_records(
 			.iter()
 			.any(|t| new_tags.contains(&(t.id.as_str(), t.version.as_str())));
 		if has_overlap {
+			let hash_to_remove = release_targets_hash(&existing.release_targets);
 			fs::remove_dir_all(&path).map_err(|error| {
 				MonochangeError::Io(format!("remove stale release record dir: {error}"))
 			})?;
+			remove_from_dedup_index(root, &hash_to_remove).ok();
 		}
 	}
 
 	DEDUPLICATED_CACHE.with(|cache| {
-		cache.borrow_mut().insert((root.to_path_buf(), hash));
+		cache
+			.borrow_mut()
+			.insert((root.to_path_buf(), hash.clone()));
 	});
+	add_to_dedup_index(root, &hash)?;
 
 	Ok(())
 }
