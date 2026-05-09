@@ -11,6 +11,11 @@ thread_local! {
 	static FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR: Cell<bool> = const { Cell::new(false) };
 }
 
+thread_local! {
+	static DEDUPLICATED_CACHE: std::cell::RefCell<std::collections::HashSet<(PathBuf, String)>> =
+		std::cell::RefCell::new(std::collections::HashSet::new());
+}
+
 pub(crate) fn build_release_targets(
 	configuration: &monochange_core::WorkspaceConfiguration,
 	packages: &[PackageRecord],
@@ -969,7 +974,6 @@ pub(crate) fn build_release_manifest(
 		package_publications: prepared_release.package_publications.clone(),
 		changesets: prepared_release.changesets.clone(),
 		deleted_changesets: prepared_release.deleted_changesets.clone(),
-		release_record_path: prepared_release.release_record_path.clone(),
 		plan: ReleaseManifestPlan {
 			workspace_root: PathBuf::from("."),
 			decisions: prepared_release
@@ -1072,7 +1076,6 @@ pub(crate) fn build_release_manifest_from_record(record: &ReleaseRecord) -> Rele
 		package_publications: record.package_publications.clone(),
 		changesets: record.changesets.clone(),
 		deleted_changesets: record.deleted_changesets.clone(),
-		release_record_path: None,
 		plan: ReleaseManifestPlan {
 			workspace_root: PathBuf::from("."),
 			decisions: Vec::new(),
@@ -1403,24 +1406,26 @@ pub(crate) fn write_release_record_file(
 	manifest: &ReleaseManifest,
 ) -> MonochangeResult<PathBuf> {
 	let record = build_release_record(source, manifest);
-	let hash = release_targets_hash(&record.release_targets);
-	let dir = root.join(".monochange/releases").join(&hash);
-	let path = dir.join("release.json");
+	let paths = ReleasePaths::from_record(root, &record);
 
 	// If the record already exists, return it without overwriting so that
 	// subsequent PrepareRelease steps (for example during `mc release-pr`)
 	// do not produce a dirty working tree.
-	if path.is_file() {
-		return Ok(path);
+	if paths.absolute.is_file() {
+		return Ok(paths.absolute);
 	}
 
-	deduplicate_overlapping_release_records(root, &record.release_targets, &dir)?;
+	deduplicate_overlapping_release_records(
+		root,
+		&record.release_targets,
+		paths.absolute.parent().unwrap_or(root),
+	)?;
 	let json = serde_json::to_string_pretty(&record).unwrap_or_default();
-	fs::create_dir_all(&dir)
+	fs::create_dir_all(paths.absolute.parent().unwrap_or(root))
 		.map_err(|error| MonochangeError::Io(format!("create release record dir: {error}")))?;
-	fs::write(&path, json)
+	fs::write(&paths.absolute, json)
 		.map_err(|error| MonochangeError::Io(format!("write release record: {error}")))?;
-	Ok(path)
+	Ok(paths.absolute)
 }
 
 /// Validate that the release record file expected for `manifest` still exists
@@ -1433,25 +1438,75 @@ pub(crate) fn validate_release_record_file(
 	manifest: &ReleaseManifest,
 ) -> MonochangeResult<PathBuf> {
 	let record = build_release_record(source, manifest);
-	let hash = release_targets_hash(&record.release_targets);
-	let record_dir = root.join(".monochange/releases").join(&hash);
-	let path = record_dir.join("release.json");
-	deduplicate_overlapping_release_records(root, &record.release_targets, &record_dir)?;
-	if path.is_file() {
+	let paths = ReleasePaths::from_record(root, &record);
+	deduplicate_overlapping_release_records(
+		root,
+		&record.release_targets,
+		paths.absolute.parent().unwrap_or(root),
+	)?;
+	if paths.absolute.is_file() {
 		let json = serde_json::to_string_pretty(&record).unwrap_or_default();
-		let existing = fs::read_to_string(&path)
+		let existing = fs::read_to_string(&paths.absolute)
 			.map_err(|error| MonochangeError::Io(format!("read release record: {error}")))?;
 		if existing != json {
-			fs::write(&path, json)
+			fs::write(&paths.absolute, json)
 				.map_err(|error| MonochangeError::Io(format!("update release record: {error}")))?;
 		}
 	} else {
 		return Err(MonochangeError::Io(format!(
 			"release record missing at {} — was it removed by deduplication or never written?",
-			path.display()
+			paths.absolute.display()
 		)));
 	}
-	Ok(path)
+	Ok(paths.absolute)
+}
+
+/// Derived filesystem paths for a release record.
+///
+/// The record path is a deterministic function of the manifest's
+/// `release_targets`. It is computed on demand rather than stored in the
+/// manifest so that the manifest remains portable and the path format can
+/// evolve without invalidating cached manifests.
+#[allow(dead_code)]
+pub(crate) struct ReleasePaths {
+	/// Hexadecimal hash derived from the release targets.
+	pub hash: String,
+	/// Path relative to the workspace root (`.monochange/releases/<hash>/release.json`).
+	pub relative: PathBuf,
+	/// Absolute path resolved against the workspace root.
+	pub absolute: PathBuf,
+}
+
+impl ReleasePaths {
+	/// Compute paths from an already-built `ReleaseRecord`.
+	///
+	/// Use this when you have the record in hand to avoid rebuilding it.
+	pub fn from_record(root: &Path, record: &ReleaseRecord) -> Self {
+		let hash = release_targets_hash(&record.release_targets);
+		let relative = PathBuf::from(".monochange/releases")
+			.join(&hash)
+			.join("release.json");
+		let absolute = root.join(&relative);
+		Self {
+			hash,
+			relative,
+			absolute,
+		}
+	}
+
+	/// Compute paths directly from a `ReleaseManifest`.
+	///
+	/// This builds the intermediate `ReleaseRecord` internally, so prefer
+	/// `from_record` when the record is already available.
+	#[allow(dead_code)]
+	pub fn from_manifest(
+		root: &Path,
+		source: Option<&SourceConfiguration>,
+		manifest: &ReleaseManifest,
+	) -> Self {
+		let record = build_release_record(source, manifest);
+		Self::from_record(root, &record)
+	}
 }
 
 fn release_targets_hash(release_targets: &[ReleaseRecordTarget]) -> String {
@@ -1470,6 +1525,13 @@ fn deduplicate_overlapping_release_records(
 	release_targets: &[ReleaseRecordTarget],
 	current_record_dir: &Path,
 ) -> MonochangeResult<()> {
+	let hash = release_targets_hash(release_targets);
+	let already_deduped = DEDUPLICATED_CACHE
+		.with(|cache| cache.borrow().contains(&(root.to_path_buf(), hash.clone())));
+	if already_deduped {
+		return Ok(());
+	}
+
 	let new_tags: std::collections::HashSet<(&str, &str)> = release_targets
 		.iter()
 		.map(|target| (target.id.as_str(), target.version.as_str()))
@@ -1511,6 +1573,11 @@ fn deduplicate_overlapping_release_records(
 			})?;
 		}
 	}
+
+	DEDUPLICATED_CACHE.with(|cache| {
+		cache.borrow_mut().insert((root.to_path_buf(), hash));
+	});
+
 	Ok(())
 }
 

@@ -4612,7 +4612,6 @@ fn sample_release_manifest_for_commit_message(
 	include_deleted_changeset: bool,
 ) -> monochange_core::ReleaseManifest {
 	monochange_core::ReleaseManifest {
-		release_record_path: None,
 		command: "release-pr".to_string(),
 		dry_run: false,
 		version: Some("1.2.3".to_string()),
@@ -11874,7 +11873,6 @@ fn sample_planned_group() -> monochange_core::PlannedVersionGroup {
 
 fn sample_prepared_release_for_cli_render() -> crate::PreparedRelease {
 	crate::PreparedRelease {
-		release_record_path: None,
 		plan: monochange_core::ReleasePlan {
 			workspace_root: PathBuf::from("."),
 			decisions: vec![monochange_core::ReleaseDecision {

@@ -1309,7 +1309,6 @@ fn sample_source(api_url: Option<String>, host: Option<String>) -> SourceConfigu
 
 fn sample_manifest() -> ReleaseManifest {
 	ReleaseManifest {
-		release_record_path: None,
 		command: "release".to_string(),
 		dry_run: true,
 		version: Some("1.2.0".to_string()),

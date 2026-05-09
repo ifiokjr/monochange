@@ -306,7 +306,6 @@ fn comment_released_issues_with_client_closes_issues_when_plan_close_is_true() {
 		pull_requests: ProviderMergeRequestSettings::default(),
 	};
 	let _manifest = ReleaseManifest {
-		release_record_path: None,
 		command: "release".to_string(),
 		dry_run: false,
 		version: None,
@@ -505,7 +504,6 @@ fn build_release_requests_fall_back_to_minimal_release_bodies() {
 		pull_requests: ProviderMergeRequestSettings::default(),
 	};
 	let manifest = ReleaseManifest {
-		release_record_path: None,
 		command: "release".to_string(),
 		dry_run: true,
 		version: None,
@@ -2732,7 +2730,6 @@ fn sample_source_with_verified_commits(api_url: Option<String>) -> SourceConfigu
 
 fn sample_manifest() -> ReleaseManifest {
 	ReleaseManifest {
-		release_record_path: None,
 		command: "release".to_string(),
 		dry_run: true,
 		version: Some("1.2.0".to_string()),

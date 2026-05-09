@@ -119,7 +119,6 @@ fn sample_package_definition(
 
 fn sample_prepared_release(root: &Path) -> PreparedRelease {
 	PreparedRelease {
-		release_record_path: None,
 		plan: monochange_core::ReleasePlan {
 			workspace_root: root.to_path_buf(),
 			decisions: Vec::new(),

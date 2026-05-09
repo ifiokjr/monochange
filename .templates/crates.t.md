@@ -314,7 +314,6 @@ use monochange_core::VersionFormat;
 use monochange_github::build_release_requests;
 
 let manifest = ReleaseManifest {
-    release_record_path: None,
     command: "release".to_string(),
     dry_run: true,
     version: Some("1.2.0".to_string()),

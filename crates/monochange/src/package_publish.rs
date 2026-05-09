@@ -1408,7 +1408,6 @@ mod tests {
 		package_publications: Vec<PackagePublicationTarget>,
 	) -> PreparedRelease {
 		PreparedRelease {
-			release_record_path: None,
 			plan: monochange_core::ReleasePlan {
 				workspace_root: root.to_path_buf(),
 				decisions: Vec::new(),

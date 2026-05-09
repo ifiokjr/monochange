@@ -727,16 +727,14 @@ pub(crate) fn execute_cli_command_with_options(
 						.prepared_release
 						.as_ref()
 						.expect("prepared release must be available after prepare step");
-					let mut manifest = build_release_manifest(
+					let manifest = build_release_manifest(
 						cli_command,
 						prepared_release,
 						&context.command_logs,
 					);
-					let record_path =
+					let _record_path =
 						write_release_record_file(root, configuration.source.as_ref(), &manifest)?;
-					manifest.release_record_path = Some(record_path.clone());
-					let mut updated_prepared_release = context.prepared_release.take().unwrap();
-					updated_prepared_release.release_record_path = Some(record_path);
+					let updated_prepared_release = context.prepared_release.take().unwrap();
 					context.prepared_release = Some(updated_prepared_release);
 					context.release_manifest_path =
 						Some(write_default_release_manifest_file(root, &manifest)?);

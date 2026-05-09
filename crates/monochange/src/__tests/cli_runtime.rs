@@ -130,7 +130,6 @@ fn sample_configuration(root: &Path) -> monochange_core::WorkspaceConfiguration 
 
 fn sample_prepared_release() -> PreparedRelease {
 	PreparedRelease {
-		release_record_path: None,
 		plan: ReleasePlan {
 			workspace_root: PathBuf::from("."),
 			decisions: Vec::new(),
@@ -156,7 +155,6 @@ fn sample_prepared_release() -> PreparedRelease {
 
 fn sample_prepared_release_with_versions() -> PreparedRelease {
 	PreparedRelease {
-		release_record_path: None,
 		plan: ReleasePlan {
 			workspace_root: PathBuf::from("."),
 			decisions: vec![
@@ -528,7 +526,6 @@ fn render_cli_command_results_include_release_details_policy_and_logs() {
 		status: "completed".to_string(),
 	});
 	context.prepared_release = Some(PreparedRelease {
-		release_record_path: None,
 		plan: ReleasePlan {
 			workspace_root: PathBuf::from("."),
 			decisions: Vec::new(),
@@ -1710,7 +1707,6 @@ fn execute_cli_command_reports_command_failures_after_progress_callbacks() {
 fn build_release_template_value_serializes_file_diffs() {
 	let mut context = cli_context();
 	context.prepared_release = Some(PreparedRelease {
-		release_record_path: None,
 		plan: ReleasePlan {
 			workspace_root: PathBuf::from("."),
 			decisions: Vec::new(),
@@ -2112,7 +2108,6 @@ fn render_cli_command_result_and_markdown_include_release_target_details_without
 	let cli_command = default_cli_command("prepare-release");
 	let mut context = cli_context();
 	context.prepared_release = Some(PreparedRelease {
-		release_record_path: None,
 		plan: ReleasePlan {
 			workspace_root: PathBuf::from("."),
 			decisions: Vec::new(),

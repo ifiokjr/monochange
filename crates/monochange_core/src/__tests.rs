@@ -155,7 +155,6 @@ fn test_source_configuration(provider: SourceProvider) -> SourceConfiguration {
 
 fn test_release_manifest() -> ReleaseManifest {
 	ReleaseManifest {
-		release_record_path: None,
 		command: "release".to_string(),
 		dry_run: true,
 		version: Some("1.2.3".to_string()),
