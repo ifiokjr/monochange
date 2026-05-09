@@ -530,13 +530,13 @@ const CHANGESET_DIR: &str = ".changeset";
 /// matching subcommand, and prints any non-empty stdout payload unless
 /// `--quiet` was requested.
 #[must_use = "the run result must be checked"]
-pub fn run_from_env(bin_name: &'static str) -> MonochangeResult<()> {
+pub async fn run_from_env(bin_name: &'static str) -> MonochangeResult<()> {
 	let log_level = extract_log_level_from_args();
 	tracing_setup::init_tracing(log_level.as_deref());
 
 	let quiet = extract_quiet_from_args(std::env::args_os());
 	let args = std::env::args_os();
-	let output = run_with_args(bin_name, args)?;
+	let output = run_with_args(bin_name, args).await?;
 	if !quiet && !output.is_empty() {
 		let format = detect_output_format_from_env_args(std::env::args());
 		if format == OutputFormat::Markdown {
@@ -609,12 +609,12 @@ where
 
 /// Execute the `monochange` CLI with an explicit argument iterator.
 #[must_use = "the run result must be checked"]
-pub fn run_with_args<I>(bin_name: &'static str, args: I) -> MonochangeResult<String>
+pub async fn run_with_args<I>(bin_name: &'static str, args: I) -> MonochangeResult<String>
 where
 	I: IntoIterator<Item = OsString>,
 {
 	let root = current_dir_or_dot();
-	run_with_args_in_dir(bin_name, args, &root)
+	run_with_args_in_dir(bin_name, args, &root).await
 }
 
 #[tracing::instrument(skip_all, fields(bin_name))]
@@ -693,7 +693,7 @@ fn render_custom_command_argument_error(
 /// and command execution.
 #[doc(hidden)]
 #[allow(clippy::redundant_closure_for_method_calls)]
-pub fn run_with_args_in_dir<I>(
+pub async fn run_with_args_in_dir<I>(
 	bin_name: &'static str,
 	args: I,
 	root: &Path,

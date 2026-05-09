@@ -55,7 +55,7 @@ temp-env = { version = "0.3", default-features = false }
 tempfile = { version = "3", default-features = false }
 termimad = { version = "0.34", default-features = false }
 thiserror = { version = "2.0.18", default-features = false }
-tokio = { version = "1", default-features = false, features = ["rt", "rt-multi-thread"] }
+tokio = { version = "1", default-features = false, features = ["rt", "rt-multi-thread", "macros", "process", "fs"] }
 toml = { version = "1.1.2", default-features = false }
 # Pinned: format-preserving edits in Cargo.toml files depend on this version's
 # whitespace and comment handling. Bumping requires verifying manifest output.

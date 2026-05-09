@@ -26,6 +26,7 @@ serde = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }
 tempfile = { workspace = true, default-features = true }
 thiserror = { workspace = true, default-features = true }
+tokio = { workspace = true, default-features = true, features = ["process", "fs"] }
 tracing = { workspace = true, default-features = true }
 
 [dev-dependencies]
