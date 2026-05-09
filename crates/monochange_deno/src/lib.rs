@@ -54,7 +54,9 @@ use monochange_core::MonochangeResult;
 use monochange_core::PackageDependency;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
+use monochange_core::SourceConfiguration;
 use monochange_core::normalize_path;
+use monochange_publish::PublishRequest;
 use semver::Version;
 use serde_json::Value;
 use walkdir::DirEntry;
@@ -83,6 +85,45 @@ pub fn supported_versioned_file_kind(path: &Path) -> Option<DenoVersionedFileKin
 		}
 		_ => None,
 	}
+}
+
+pub fn write_jsr_placeholder_manifest(
+	dir: &Path,
+	request: &PublishRequest,
+	source: Option<&SourceConfiguration>,
+) -> MonochangeResult<()> {
+	let mut manifest = serde_json::Map::new();
+	manifest.insert(
+		"name".to_string(),
+		Value::String(request.package_name.clone()),
+	);
+	manifest.insert(
+		"version".to_string(),
+		Value::String(request.version.clone()),
+	);
+	manifest.insert(
+		"exports".to_string(),
+		Value::Object(
+			[(".".to_string(), Value::String("./mod.ts".to_string()))]
+				.into_iter()
+				.collect(),
+		),
+	);
+	if let Some(source) = source {
+		manifest.insert(
+			"repository".to_string(),
+			Value::String(format!(
+				"https://github.com/{}/{}",
+				source.owner, source.repo
+			)),
+		);
+	}
+	fs::write(dir.join("deno.json"), Value::Object(manifest).to_string()).map_err(|error| {
+		MonochangeError::Io(format!("failed to write placeholder deno.json: {error}"))
+	})?;
+	fs::write(dir.join("mod.ts"), "export {};\n").map_err(|error| {
+		MonochangeError::Io(format!("failed to write placeholder mod.ts: {error}"))
+	})
 }
 
 fn rewrite_dependency_reference(text: &str, package_name: &str, version: &str) -> String {

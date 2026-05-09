@@ -2232,6 +2232,7 @@ dependencies = [
  "insta",
  "monochange_core",
  "monochange_ecmascript",
+ "monochange_publish",
  "rstest",
  "semver",
  "serde",

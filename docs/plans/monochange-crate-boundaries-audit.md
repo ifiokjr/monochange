@@ -145,7 +145,7 @@ The top-level `monochange` crate should only register adapters and call `monocha
 2. Extract Cargo readiness blockers into `monochange_cargo`. ✅
 3. Extract GitHub trust context into `monochange_github`. ✅
 4. Move npm trusted-publishing command helpers and npm placeholder manifest generation into `monochange_npm`.
-5. Extract remaining placeholder manifest generation per ecosystem, starting with Go proxy placeholders in `monochange_go`.
+5. Extract remaining placeholder manifest generation per ecosystem, continuing with JSR/Deno placeholders in `monochange_deno`.
 6. Extract registry existence checks per ecosystem or route them through publish adapters.
 7. Delete top-level ecosystem/provider match arms from `package_publish.rs` and reduce it to CLI glue or remove it entirely.
 
@@ -508,3 +508,7 @@ The latest `origin/main` moved ecosystem constants and versioned-file validation
 ### 2026-05-08: Go placeholder boundary follow-up
 
 After the npm helper extraction, the next focused follow-up moves Go placeholder `go.mod` generation into `monochange_go`. This keeps Go module bootstrap formatting with the Go ecosystem adapter while `package_publish.rs` still owns the temporary-directory orchestration until `PublishAdapter` exists.
+
+### 2026-05-09: JSR placeholder boundary follow-up
+
+After the npm and Go placeholder extractions, the next focused follow-up moves JSR placeholder `deno.json` and `mod.ts` generation into `monochange_deno`. This keeps Deno/JSR package scaffold rules with the Deno ecosystem adapter while `package_publish.rs` still owns temporary-directory orchestration until `PublishAdapter` exists.
