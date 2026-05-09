@@ -16,6 +16,7 @@ description = "GitLab release payload rendering and publishing for monochange"
 monochange_core = { workspace = true }
 monochange_hosting = { workspace = true }
 reqwest = { workspace = true, default-features = true }
+tokio = { workspace = true, default-features = true }
 serde = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }
 tracing = { workspace = true, default-features = true }
