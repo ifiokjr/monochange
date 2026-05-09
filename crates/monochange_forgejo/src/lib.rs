@@ -423,7 +423,7 @@ pub fn publish_release_requests(
 /// Commit, push, and publish the release pull request against Forgejo.
 #[must_use = "the pull request result must be checked"]
 #[allow(clippy::disallowed_methods)]
-pub fn publish_release_pull_request(
+pub async fn publish_release_pull_request(
 	source: &SourceConfiguration,
 	root: &Path,
 	request: &SourceChangeRequest,
@@ -451,15 +451,15 @@ pub fn publish_release_pull_request(
 		root,
 		&request.head_branch,
 		"prepare release pull request branch",
-	)?;
-	git_stage_paths(root, tracked_paths, "stage release pull request files")?;
+	).await?;
+	git_stage_paths(root, tracked_paths, "stage release pull request files").await?;
 	git_commit_paths(
 		root,
 		&request.commit_message,
 		"commit release pull request changes",
 		no_verify,
-	)?;
-	let head_commit = git_head_commit(root)?;
+	).await?;
+	let head_commit = git_head_commit(root).await?;
 	let existing = join_existing_pull_request_lookup(existing_pull_request)?;
 	let head_matches_existing = existing
 		.as_ref()
@@ -471,30 +471,24 @@ pub fn publish_release_pull_request(
 			&request.head_branch,
 			"push release pull request branch",
 			no_verify,
-		)?;
+		).await?;
 	}
 
-	let runtime = RuntimeBuilder::new_current_thread()
-		.enable_all()
+	let client = Client::builder()
 		.build()
-		.expect("failed to build Forgejo runtime");
-	runtime.block_on(async {
-		let client = Client::builder()
-			.build()
-			.expect("failed to build Forgejo HTTP client");
-		let token = forgejo_token()?;
-		let headers = auth_headers(&token)?;
-		let api_base = forgejo_api_base(source)?;
-		publish_pull_request_with_existing(
-			&client,
-			&headers,
-			&api_base,
-			request,
-			existing.as_ref(),
-			&head_commit,
-		)
-		.await
-	})
+		.expect("failed to build Forgejo HTTP client");
+	let token = forgejo_token()?;
+	let headers = auth_headers(&token)?;
+	let api_base = forgejo_api_base(source)?;
+	publish_pull_request_with_existing(
+		&client,
+		&headers,
+		&api_base,
+		request,
+		existing.as_ref(),
+		&head_commit,
+	)
+	.await
 }
 
 async fn publish_release_request(
