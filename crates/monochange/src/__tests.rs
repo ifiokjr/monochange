@@ -13627,3 +13627,62 @@ fn write_release_record_file_snapshot_matches_expected_content() {
 	value["createdAt"] = serde_json::Value::String("[timestamp]".to_string());
 	insta::assert_json_snapshot!("release_record_file_snapshot", value);
 }
+
+#[test]
+fn deduplicate_cache_is_hit_on_second_call_with_same_manifest() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	write_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("write record: {error}"));
+	// first validate call populates the cache
+	validate_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("first validate: {error}"));
+	// second validate call should hit the cache early-return
+	validate_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("second validate: {error}"));
+}
+
+#[test]
+#[cfg(unix)]
+fn validate_release_record_file_reports_error_when_dedupe_cannot_read_releases_dir() {
+	use std::os::unix::fs::PermissionsExt;
+
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+
+	// Write a record so the releases directory exists.
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	let record_path = write_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("write record: {error}"));
+	assert!(record_path.exists());
+
+	// Remove read permission from the releases directory so dedupe cannot iterate.
+	let releases_dir = root.join(".monochange/releases");
+	let mut permissions = fs::metadata(&releases_dir)
+		.unwrap_or_else(|error| panic!("metadata: {error}"))
+		.permissions();
+	let original_mode = permissions.mode();
+	permissions.set_mode(0o100);
+	fs::set_permissions(&releases_dir, permissions)
+		.unwrap_or_else(|error| panic!("set permissions: {error}"));
+
+	let result = validate_release_record_file(root, None, &manifest);
+	assert!(
+		result.is_err(),
+		"expected error when dedupe cannot read releases dir, got: {result:?}"
+	);
+	let message = result.unwrap_err().to_string();
+	assert!(
+		message.contains("read releases dir"),
+		"expected 'read releases dir' in error, got: {message}"
+	);
+
+	// Restore permissions so tempdir cleanup succeeds.
+	let mut permissions = fs::metadata(&releases_dir)
+		.unwrap_or_else(|error| panic!("metadata: {error}"))
+		.permissions();
+	permissions.set_mode(original_mode);
+	fs::set_permissions(&releases_dir, permissions)
+		.unwrap_or_else(|error| panic!("restore permissions: {error}"));
+}
