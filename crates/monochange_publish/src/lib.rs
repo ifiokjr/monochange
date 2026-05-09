@@ -131,6 +131,9 @@ pub trait PublishAdapter {
 	fn registry_notes(&self) -> Vec<String> {
 		vec!["unknown registry capabilities are treated as unsupported".to_string()]
 	}
+	fn supports_provenance(&self) -> bool {
+		false
+	}
 }
 
 /// Registry of publish adapters used to dispatch publish command construction.
@@ -155,7 +158,7 @@ impl PublishCommandBuilder {
 		self.adapters.push(adapter);
 	}
 
-	fn adapter_for_registry(&self, registry: RegistryKind) -> Option<&dyn PublishAdapter> {
+	pub fn adapter_for_registry(&self, registry: RegistryKind) -> Option<&dyn PublishAdapter> {
 		self.adapters
 			.iter()
 			.find(|adapter| adapter.registry_kind() == registry)
@@ -244,7 +247,7 @@ pub fn build_publish_command(
 	build_publish_command_builder().build_publish_command(request, mode, placeholder_dir, dry_run)
 }
 
-fn build_publish_command_builder() -> PublishCommandBuilder {
+pub fn build_publish_command_builder() -> PublishCommandBuilder {
 	PublishCommandBuilder::new()
 		.with_adapter(Box::new(NpmPublishAdapter))
 		.with_adapter(Box::new(CargoPublishAdapter))
@@ -259,6 +262,10 @@ struct NpmPublishAdapter;
 impl PublishAdapter for NpmPublishAdapter {
 	fn registry_kind(&self) -> RegistryKind {
 		RegistryKind::Npm
+	}
+
+	fn supports_provenance(&self) -> bool {
+		true
 	}
 
 	fn build_placeholder_command(
@@ -381,6 +388,10 @@ struct JsrPublishAdapter;
 impl PublishAdapter for JsrPublishAdapter {
 	fn registry_kind(&self) -> RegistryKind {
 		RegistryKind::Jsr
+	}
+
+	fn supports_provenance(&self) -> bool {
+		true
 	}
 
 	fn build_placeholder_command(
