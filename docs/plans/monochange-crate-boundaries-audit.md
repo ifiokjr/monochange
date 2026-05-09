@@ -56,7 +56,7 @@ Examples of ecosystem/provider leakage in the top-level crate:
 
 - `npm token` environment rejection still lives in `package_publish.rs`; npm trusted-publishing command construction and npm placeholder manifest generation are moving into `monochange_npm`
 - Cargo placeholder manifest generation in `package_publish.rs` (Cargo publish readiness blockers now live in `monochange_cargo`)
-- Cargo and Python placeholder manifest generation in `package_publish.rs`
+- Cargo placeholder manifest generation in `package_publish.rs`
 - top-level orchestration that still hardcodes ecosystem/provider trust setup instead of calling publish/provider adapters
 - trusted publishing capability matrix now lives in `monochange_publish`, while GitHub workflow/environment trust context now lives in `monochange_github`
 
@@ -108,7 +108,8 @@ Provider-specific trust context should move to provider crates:
 | npm placeholder manifest generation                           | `monochange_npm`     | Done in #419 |
 | Go placeholder manifest generation                            | `monochange_go`      | Done in #420 |
 | JSR/Deno placeholder manifest generation                      | `monochange_deno`    | In #423      |
-| Dart placeholder manifest generation                          | `monochange_dart`    | Next         |
+| Dart placeholder manifest generation                          | `monochange_dart`    | In #424      |
+| Python placeholder manifest generation                        | `monochange_python`  | Next         |
 
 **Phase 3: Introduce `PublishAdapter` trait**
 
@@ -148,7 +149,7 @@ The top-level `monochange` crate should only register adapters and call `monocha
 2. Extract Cargo readiness blockers into `monochange_cargo`. ✅
 3. Extract GitHub trust context into `monochange_github`. ✅
 4. Move npm trusted-publishing command helpers and npm placeholder manifest generation into `monochange_npm`.
-5. Extract remaining placeholder manifest generation per ecosystem, continuing with Dart placeholders in `monochange_dart`.
+5. Extract remaining placeholder manifest generation per ecosystem, continuing with Python placeholders in `monochange_python`.
 6. Extract registry existence checks per ecosystem or route them through publish adapters.
 7. Delete top-level ecosystem/provider match arms from `package_publish.rs` and reduce it to CLI glue or remove it entirely.
 
@@ -519,3 +520,7 @@ After the npm and Go placeholder extractions, the next focused follow-up moves J
 ### 2026-05-09: Dart placeholder boundary follow-up
 
 After the JSR placeholder extraction, the next focused follow-up moves pub.dev placeholder `pubspec.yaml` generation into `monochange_dart`. This keeps Dart package scaffold rules with the Dart ecosystem adapter while `package_publish.rs` still owns temporary-directory orchestration until `PublishAdapter` exists.
+
+### 2026-05-09: Python placeholder boundary follow-up
+
+After the Dart placeholder extraction, the next focused follow-up moves PyPI placeholder `pyproject.toml` and module scaffold generation into `monochange_python`. This keeps Python package scaffold rules with the Python ecosystem adapter while `package_publish.rs` still owns temporary-directory orchestration until `PublishAdapter` exists.

@@ -43,7 +43,9 @@ use monochange_core::PackageDependency;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
 use monochange_core::ShellConfig;
+use monochange_core::SourceConfiguration;
 use monochange_core::normalize_path;
+use monochange_publish::PublishRequest;
 use semver::Version;
 use toml::Value;
 use toml_edit::DocumentMut;
@@ -54,6 +56,63 @@ use walkdir::WalkDir;
 pub const PYPROJECT_FILE: &str = "pyproject.toml";
 pub const UV_LOCK_FILE: &str = "uv.lock";
 pub const POETRY_LOCK_FILE: &str = "poetry.lock";
+
+pub fn write_python_placeholder_manifest(
+	dir: &Path,
+	request: &PublishRequest,
+	source: Option<&SourceConfiguration>,
+) -> MonochangeResult<()> {
+	let module_name = python_placeholder_module_name(&request.package_name);
+	let project_urls = source.map(|source| {
+		format!(
+			"\n[project.urls]\nRepository = \"https://github.com/{}/{}\"\n",
+			source.owner, source.repo
+		)
+	});
+	let pyproject = format!(
+		"[build-system]\nrequires = [\"hatchling\"]\nbuild-backend = \"hatchling.build\"\n\n[project]\nname = \"{}\"\nversion = \"{}\"\ndescription = \"Placeholder package for {}\"\nreadme = \"README.md\"\nrequires-python = \">=3.8\"\n{}\n[tool.hatch.build.targets.wheel]\npackages = [\"src/{}\"]\n",
+		request.package_name,
+		request.version,
+		request.package_name,
+		project_urls.unwrap_or_default(),
+		module_name,
+	);
+	fs::write(dir.join("pyproject.toml"), pyproject).map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to write placeholder pyproject.toml: {error}"
+		))
+	})?;
+	let package_dir = dir.join("src").join(&module_name);
+	fs::create_dir_all(&package_dir).map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to create placeholder Python package: {error}"
+		))
+	})?;
+	fs::write(
+		package_dir.join("__init__.py"),
+		"\"\"\"Placeholder package published by monochange.\"\"\"\n",
+	)
+	.map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to write placeholder Python package module: {error}"
+		))
+	})
+}
+
+fn python_placeholder_module_name(package_name: &str) -> String {
+	let mut module = String::new();
+	for character in package_name.chars() {
+		if character.is_ascii_alphanumeric() || character == '_' {
+			module.push(character.to_ascii_lowercase());
+		} else {
+			module.push('_');
+		}
+	}
+	if module.is_empty() || module.starts_with(|character: char| character.is_ascii_digit()) {
+		module.insert_str(0, "placeholder_");
+	}
+	module
+}
 
 pub struct PythonAdapter;
 
