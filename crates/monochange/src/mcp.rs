@@ -377,6 +377,7 @@ fn manifest_for_prepared_release(prepared_release: &PreparedRelease) -> ReleaseM
 		help_text: Some("Render a release manifest for MCP consumers".to_string()),
 		inputs: Vec::new(),
 		steps: Vec::new(),
+		dry_run: false,
 	};
 	super::build_release_manifest(&cli_command, prepared_release, &[])
 }

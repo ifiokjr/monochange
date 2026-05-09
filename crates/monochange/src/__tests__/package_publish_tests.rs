@@ -4335,3 +4335,69 @@ fn build_release_requests_uses_publication_targets_and_package_metadata() {
 		Some("pnpm")
 	);
 }
+
+#[test]
+fn run_publish_packages_with_resume_filters_by_group_and_ecosystem() {
+	let server = MockServer::start();
+	server.mock(|when, then| {
+		when.method(GET).path("/pkg");
+		then.status(404);
+	});
+	let root = tempfile::tempdir().expect("tempdir:");
+	fs::write(
+		root.path().join("monochange.toml"),
+		"[package.pkg]\npath = \"packages/pkg\"\ntype = \"npm\"\n\n[group.my-group]\npackages = [\"pkg\"]\n",
+	)
+	.expect("config:");
+	fs::create_dir_all(root.path().join("packages/pkg")).expect("mkdir:");
+	fs::write(
+		root.path().join("packages/pkg/package.json"),
+		r#"{ "name": "pkg", "version": "1.0.0" }"#,
+	)
+	.expect("manifest:");
+
+	let configuration = crate::load_workspace_configuration(root.path()).expect("configuration:");
+	let prepared_release = sample_prepared_release(
+		root.path(),
+		vec![PackagePublicationTarget {
+			package: "pkg".to_string(),
+			ecosystem: Ecosystem::Npm,
+			registry: Some(PublishRegistry::Builtin(RegistryKind::Npm)),
+			version: "1.2.3".to_string(),
+			mode: PublishMode::Builtin,
+			trusted_publishing: TrustedPublishingSettings::default(),
+			attestations: PublishAttestationSettings::default(),
+		}],
+	);
+
+	let mut selected_groups = BTreeSet::new();
+	selected_groups.insert("my-group".to_string());
+
+	let mut selected_ecosystems = BTreeSet::new();
+	selected_ecosystems.insert(Ecosystem::Npm);
+
+	with_locked_env_vars(|| {
+		with_vars(
+			vec![(
+				"MONOCHANGE_NPM_REGISTRY_URL",
+				Some(server.base_url().as_str()),
+			)],
+			|| {
+				let report = run_publish_packages_with_resume(
+					root.path(),
+					&configuration,
+					Some(&prepared_release),
+					&BTreeSet::new(),
+					&selected_groups,
+					&selected_ecosystems,
+					true,
+					None,
+				)
+				.expect("publish report:");
+
+				assert_eq!(report.packages.len(), 1);
+				assert_eq!(report.packages[0].package, "pkg");
+			},
+		);
+	});
+}

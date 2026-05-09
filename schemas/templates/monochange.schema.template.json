@@ -381,7 +381,8 @@
 				"steps": {
 					"type": "array",
 					"items": { "$ref": "#/$defs/cliStep" }
-				}
+				},
+				"dry_run": { "type": "boolean" }
 			}
 		},
 		"cliInput": {
@@ -456,6 +457,7 @@
 					]
 				},
 				"show_progress": { "type": "boolean" },
+				"always_run": { "type": "boolean" },
 				"allow_empty_changesets": { "type": "boolean" },
 				"no_verify": { "type": "boolean" },
 				"dry_run_command": { "type": "string" },

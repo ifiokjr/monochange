@@ -32,6 +32,7 @@ fn named_command_step(name: &str) -> CliStepDefinition {
 		show_progress: None,
 		name: Some(name.to_string()),
 		when: None,
+		always_run: false,
 		command: "echo hi".to_string(),
 		dry_run_command: None,
 		shell: ShellConfig::Default,
@@ -47,6 +48,7 @@ fn command_with_step(step: CliStepDefinition) -> CliCommandDefinition {
 		help_text: Some("release".to_string()),
 		inputs: Vec::new(),
 		steps: vec![step],
+		dry_run: false,
 	}
 }
 

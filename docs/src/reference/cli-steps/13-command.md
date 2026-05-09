@@ -32,6 +32,7 @@ Use `Command` for what is truly custom.
 - `variables` — optional custom variable mapping for command substitution
 - `inputs` — optional step-local input overrides
 - `show_progress` — optional boolean; set to `false` when the command itself is interactive and spinner output would get in the way
+- `always_run` — optional boolean; set to `true` to run this step even when a previous step has failed
 
 ## Prerequisites
 

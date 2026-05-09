@@ -113,6 +113,14 @@ It uses minijinja-style expression evaluation with template context and supports
 
 If the expression resolves to false, monochange skips that step and continues with the next step. Falsy values include `false`, `0`, and the empty string.
 
+### Step-local `always_run`
+
+Every step can declare `always_run = true`.
+
+When a previous step in the same command fails, monochange normally aborts and returns the error. Steps marked with `always_run = true` are the exception: they still execute even after an earlier step has failed.
+
+Use this for cleanup, notification, or dry-run preview steps that should run regardless of whether earlier work succeeded.
+
 ### Step-local `inputs`
 
 Every step can define an `inputs = { ... }` override inside the step table.

@@ -340,6 +340,8 @@ struct RawCliCommandDefinition {
 	inputs: Vec<CliInputDefinition>,
 	#[serde(default)]
 	steps: Vec<CliStepDefinition>,
+	#[serde(default)]
+	dry_run: bool,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -529,6 +531,7 @@ fn merge_cli_commands(cli: BTreeMap<String, RawCliCommandDefinition>) -> Vec<Cli
 			help_text: definition.help_text,
 			inputs: definition.inputs,
 			steps: definition.steps,
+			dry_run: definition.dry_run,
 		};
 
 		if let Some(existing) = merged
