@@ -45,7 +45,7 @@ use monochange_core::git::git_push_branch_command;
 use monochange_core::git::git_stage_paths_command;
 use monochange_core::git::run_command;
 use monochange_core::git::run_git_commit_message;
-use reqwest::blocking::Client;
+use reqwest::Client;
 use reqwest::header::HeaderMap;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -221,7 +221,7 @@ pub fn build_http_client(provider: &str) -> MonochangeResult<Client> {
 }
 
 /// Perform a GET request that treats `404` as `Ok(None)`.
-pub fn get_optional_json<T>(
+pub async fn get_optional_json<T>(
 	client: &Client,
 	headers: &HeaderMap,
 	url: &str,
@@ -234,6 +234,7 @@ where
 		.get(url)
 		.headers(headers.clone())
 		.send()
+		.await
 		.map_err(|error| {
 			MonochangeError::Config(format!("{provider} API GET `{url}` failed: {error}"))
 		})?;
@@ -246,13 +247,13 @@ where
 			response.status()
 		)));
 	}
-	response.json::<T>().map(Some).map_err(|error| {
+	response.json::<T>().await.map(Some).map_err(|error| {
 		MonochangeError::Config(format!("{provider} API GET `{url}` failed: {error}"))
 	})
 }
 
 /// Perform a GET request and deserialize a successful JSON response.
-pub fn get_json<T>(
+pub async fn get_json<T>(
 	client: &Client,
 	headers: &HeaderMap,
 	url: &str,
@@ -265,6 +266,7 @@ where
 		.get(url)
 		.headers(headers.clone())
 		.send()
+		.await
 		.map_err(|error| {
 			MonochangeError::Config(format!("{provider} API GET `{url}` failed: {error}"))
 		})?;
@@ -274,13 +276,13 @@ where
 			response.status()
 		)));
 	}
-	response.json::<T>().map_err(|error| {
+	response.json::<T>().await.map_err(|error| {
 		MonochangeError::Config(format!("{provider} API GET `{url}` failed: {error}"))
 	})
 }
 
 /// Perform a POST request and deserialize a successful JSON response.
-pub fn post_json<Body, Response>(
+pub async fn post_json<Body, Response>(
 	client: &Client,
 	headers: &HeaderMap,
 	url: &str,
@@ -296,6 +298,7 @@ where
 		.headers(headers.clone())
 		.json(body)
 		.send()
+		.await
 		.map_err(|error| {
 			MonochangeError::Config(format!("{provider} API POST `{url}` failed: {error}"))
 		})?;
@@ -305,13 +308,13 @@ where
 			response.status()
 		)));
 	}
-	response.json::<Response>().map_err(|error| {
+	response.json::<Response>().await.map_err(|error| {
 		MonochangeError::Config(format!("{provider} API POST `{url}` failed: {error}"))
 	})
 }
 
 /// Perform a PUT request and deserialize a successful JSON response.
-pub fn put_json<Body, Response>(
+pub async fn put_json<Body, Response>(
 	client: &Client,
 	headers: &HeaderMap,
 	url: &str,
@@ -327,6 +330,7 @@ where
 		.headers(headers.clone())
 		.json(body)
 		.send()
+		.await
 		.map_err(|error| {
 			MonochangeError::Config(format!("{provider} API PUT `{url}` failed: {error}"))
 		})?;
@@ -336,13 +340,13 @@ where
 			response.status()
 		)));
 	}
-	response.json::<Response>().map_err(|error| {
+	response.json::<Response>().await.map_err(|error| {
 		MonochangeError::Config(format!("{provider} API PUT `{url}` failed: {error}"))
 	})
 }
 
 /// Perform a PATCH request and deserialize a successful JSON response.
-pub fn patch_json<Body, Response>(
+pub async fn patch_json<Body, Response>(
 	client: &Client,
 	headers: &HeaderMap,
 	url: &str,
@@ -358,6 +362,7 @@ where
 		.headers(headers.clone())
 		.json(body)
 		.send()
+		.await
 		.map_err(|error| {
 			MonochangeError::Config(format!("{provider} API PATCH `{url}` failed: {error}"))
 		})?;
@@ -367,46 +372,47 @@ where
 			response.status()
 		)));
 	}
-	response.json::<Response>().map_err(|error| {
+	response.json::<Response>().await.map_err(|error| {
 		MonochangeError::Config(format!("{provider} API PATCH `{url}` failed: {error}"))
 	})
 }
 
 /// Check out or reset the local release branch used for provider requests.
-pub fn git_checkout_branch(root: &Path, branch: &str, context: &str) -> MonochangeResult<()> {
-	if matches!(git_current_branch(root).as_deref(), Ok(current) if current == branch) {
+pub async fn git_checkout_branch(root: &Path, branch: &str, context: &str) -> MonochangeResult<()> {
+	let current = git_current_branch(root).await?;
+	if current == branch {
 		return Ok(());
 	}
-	run_command(git_checkout_branch_command(root, branch), context)
+	run_command(git_checkout_branch_command(root, branch), context).await
 }
 
 /// Stage the provided paths before creating a release commit.
-pub fn git_stage_paths(
+pub async fn git_stage_paths(
 	root: &Path,
 	tracked_paths: &[PathBuf],
 	context: &str,
 ) -> MonochangeResult<()> {
-	run_command(git_stage_paths_command(root, tracked_paths), context)
+	run_command(git_stage_paths_command(root, tracked_paths), context).await
 }
 
 /// Commit the prepared release changes, tolerating a no-op commit.
-pub fn git_commit_paths(
+pub async fn git_commit_paths(
 	root: &Path,
 	message: &CommitMessage,
 	context: &str,
 	no_verify: bool,
 ) -> MonochangeResult<()> {
-	run_git_commit_message(root, message, context, no_verify)
+	run_git_commit_message(root, message, context, no_verify).await
 }
 
 /// Push the release branch to `origin` with `--force-with-lease`.
-pub fn git_push_branch(
+pub async fn git_push_branch(
 	root: &Path,
 	branch: &str,
 	context: &str,
 	no_verify: bool,
 ) -> MonochangeResult<()> {
-	run_command(git_push_branch_command(root, branch, no_verify), context)
+	run_command(git_push_branch_command(root, branch, no_verify), context).await
 }
 
 #[cfg(test)]
