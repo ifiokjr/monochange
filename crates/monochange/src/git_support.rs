@@ -407,5 +407,5 @@ fn handle_git_process_output(
 }
 
 #[cfg(test)]
-#[path = "__tests/git_support.rs"]
+#[path = "__tests__/git_support_tests.rs"]
 mod tests;

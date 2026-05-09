@@ -1,9 +1,0 @@
----
-source: crates/monochange/src/mcp.rs
-expression: contents
----
-## 1.1.0 ([DATE])
-
-### Changed
-
-- No package-specific changes were recorded; `workflow-app` was updated to 1.1.0 as part of group `sdk`.

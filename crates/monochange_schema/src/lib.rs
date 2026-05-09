@@ -393,5 +393,5 @@ pub mod migration_changelog {
 }
 
 #[cfg(test)]
-#[path = "__tests.rs"]
+#[path = "__tests__/lib_tests.rs"]
 mod tests;

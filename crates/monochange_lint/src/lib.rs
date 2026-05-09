@@ -553,5 +553,5 @@ fn apply_fixes_to_content(contents: &str, fixes: &[LintFix]) -> String {
 }
 
 #[cfg(test)]
-#[path = "__tests.rs"]
+#[path = "__tests__/lib_tests.rs"]
 mod tests;

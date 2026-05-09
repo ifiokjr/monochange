@@ -874,5 +874,5 @@ impl std::fmt::Display for LintResult {
 }
 
 #[cfg(test)]
-#[path = "__tests/lint.rs"]
+#[path = "__tests__/lint_tests.rs"]
 mod tests;

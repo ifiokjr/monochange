@@ -1,0 +1,16 @@
+---
+source: crates/monochange/src/__tests__/lib_tests.rs
+expression: contents
+---
+{
+  "mcpServers": {
+    "monochange": {
+      "args": [
+        "-y",
+        "@monochange/cli",
+        "mcp"
+      ],
+      "command": "npx"
+    }
+  }
+}

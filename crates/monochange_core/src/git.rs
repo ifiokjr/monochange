@@ -507,5 +507,5 @@ fn preview_text(text: &str) -> String {
 }
 
 #[cfg(test)]
-#[path = "__tests/git.rs"]
+#[path = "__tests__/git_tests.rs"]
 mod tests;

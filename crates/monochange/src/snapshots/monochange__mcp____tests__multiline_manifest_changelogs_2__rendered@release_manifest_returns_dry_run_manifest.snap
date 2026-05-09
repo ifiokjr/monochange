@@ -1,9 +1,0 @@
----
-source: crates/monochange/src/mcp.rs
-expression: contents
----
-## 1.1.0 ([DATE])
-
-### Minor
-
-#### add release command

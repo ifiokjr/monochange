@@ -1,0 +1,32 @@
+---
+source: crates/monochange/src/__tests__/lib_tests.rs
+expression: redacted
+---
+{
+  "dry_run": true,
+  "files": [
+    {
+      "contents": "[multiline text]",
+      "description": "Claude subagent definition",
+      "operation": "skip",
+      "path": ".claude/agents/monochange-release-agent.md"
+    },
+    {
+      "contents": "[multiline text]",
+      "description": "Claude MCP server configuration",
+      "operation": "skip",
+      "path": ".mcp.json"
+    },
+    {
+      "contents": "[multiline text]",
+      "description": "Pi project agent definition",
+      "operation": "skip",
+      "path": ".pi/agents/monochange-release-agent.md"
+    }
+  ],
+  "notes": [],
+  "targets": [
+    "claude",
+    "pi"
+  ]
+}

@@ -184,5 +184,5 @@ fn executable_candidates(program: &str) -> Vec<String> {
 }
 
 #[cfg(test)]
-#[path = "__tests/skill.rs"]
+#[path = "__tests__/skill_tests.rs"]
 mod tests;

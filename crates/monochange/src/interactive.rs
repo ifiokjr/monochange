@@ -359,5 +359,5 @@ fn map_inquire_error(error: inquire::error::InquireError) -> MonochangeError {
 }
 
 #[cfg(test)]
-#[path = "__tests/interactive.rs"]
-mod __tests;
+#[path = "__tests__/interactive_tests.rs"]
+mod tests;

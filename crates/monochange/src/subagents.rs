@@ -428,5 +428,5 @@ fn subagent_target_name(target: SubagentTarget) -> &'static str {
 }
 
 #[cfg(test)]
-#[path = "__tests/subagents.rs"]
+#[path = "__tests__/subagents_tests.rs"]
 mod tests;

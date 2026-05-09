@@ -333,7 +333,7 @@ fn batch_load_changeset_contexts(
 }
 
 #[cfg(test)]
-#[path = "__tests/diagnostics.rs"]
+#[path = "__tests__/diagnostics_tests.rs"]
 mod diagnostics_tests;
 /// Run a single `git log` command covering the entire `.changeset/` directory
 /// and return both the introduced and last-updated revision maps.
@@ -678,5 +678,5 @@ pub(crate) fn render_changeset_markdown(
 }
 
 #[cfg(test)]
-#[path = "__tests/changesets.rs"]
+#[path = "__tests__/changesets_tests.rs"]
 mod tests;

@@ -1077,5 +1077,5 @@ pub(crate) fn released_versions_by_record_id(plan: &ReleasePlan) -> BTreeMap<Str
 }
 
 #[cfg(test)]
-#[path = "__tests/versioned_files.rs"]
+#[path = "__tests__/versioned_files_tests.rs"]
 mod tests;

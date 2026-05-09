@@ -1694,5 +1694,5 @@ pub(crate) fn text_discovery_report(report: &DiscoveryReport) -> String {
 }
 
 #[cfg(test)]
-#[path = "__tests/release_artifacts.rs"]
+#[path = "__tests__/release_artifacts_tests.rs"]
 mod tests;

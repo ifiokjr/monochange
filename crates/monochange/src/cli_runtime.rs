@@ -3670,5 +3670,5 @@ fn resolve_command_output(
 }
 
 #[cfg(test)]
-#[path = "__tests/cli_runtime.rs"]
+#[path = "__tests__/cli_runtime_tests.rs"]
 mod tests;

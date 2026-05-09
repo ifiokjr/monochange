@@ -1141,7 +1141,7 @@ pub fn packages_by_config_id(packages: &[PackageRecord]) -> BTreeMap<&str, &Pack
 }
 
 #[cfg(test)]
-#[path = "__tests.rs"]
+#[path = "__tests__/lib_tests.rs"]
 mod tests;
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RegistryEndpoints {

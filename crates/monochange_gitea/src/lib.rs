@@ -701,4 +701,5 @@ fn auth_headers(token: &str) -> MonochangeResult<HeaderMap> {
 }
 
 #[cfg(test)]
-mod __tests;
+#[path = "__tests__/lib_tests.rs"]
+mod tests;

@@ -511,5 +511,5 @@ fn yes_no(value: bool) -> &'static str {
 }
 
 #[cfg(test)]
-#[path = "__tests/analyze.rs"]
+#[path = "__tests__/analyze_tests.rs"]
 mod tests;

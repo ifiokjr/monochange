@@ -5,6 +5,7 @@
 - Cross-ecosystem behavior should remain consistent across Cargo, npm-family, Deno, Dart, and Flutter.
 - Keep `mc validate` green alongside the rest of the validation suite.
 - New integration tests must be added to the dedicated `crates/monochange_integration_tests` crate, not to individual package `tests/` directories.
+- Rust unit tests inside crate `src/` trees must be placed in a `__tests__/` directory beside the source module and named after the source file: `analysis.rs` uses `#[path = "__tests__/analysis_tests.rs"] mod tests;`, `lib.rs` uses `#[path = "__tests__/lib_tests.rs"] mod tests;`, and `mod.rs` uses `#[path = "__tests__/mod_tests.rs"] mod tests;`. Do not add inline `#[cfg(test)] mod tests { ... }` blocks or sibling `__tests.rs` files. Integration tests in `<crate>/tests/` keep the standard Rust integration-test layout and should not be moved into `__tests__/`.
 - PRs must keep patch coverage at 100% for executable changed lines in the Rust coverage report.
 
 ## Fixture-first testing
@@ -16,7 +17,7 @@
   - additional checked-in files under the scenario only when they are part of the input being exercised
 - Read-only tests (e.g. config validation that only calls `load_workspace_configuration`) may point directly at the fixture path without copying.
 - If a scenario needs a different file payload or expected output, add a new fixture variant rather than writing inline strings in the test body.
-- This rule applies to unit tests in `__tests.rs` modules as well as integration tests in `tests/*.rs` — if a test writes config or manifest files to disk, those files must originate from the fixtures directory.
+- This rule applies to unit tests in `__tests__/*_tests.rs` modules as well as integration tests in `tests/*.rs` — if a test writes config or manifest files to disk, those files must originate from the fixtures directory.
 - The fixture-first approach makes it easy to visually audit test scenarios, reuse fixtures across tests, and catch regressions via `git diff` on fixture content.
 - Runtime git-repository provider tests are still exempt because they intentionally create and mutate live repositories.
 

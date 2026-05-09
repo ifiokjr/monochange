@@ -546,5 +546,5 @@ fn format_check_report(report: &LintReport, fixed: bool) -> String {
 }
 
 #[cfg(test)]
-#[path = "__tests/lint.rs"]
+#[path = "__tests__/lint_tests.rs"]
 mod tests;

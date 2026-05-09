@@ -1,0 +1,11 @@
+---
+source: crates/monochange/src/__tests__/mcp_tests.rs
+expression: content_text(&result)
+---
+{
+  "action": "release_manifest",
+  "error": "config error: no markdown changesets found under .changeset",
+  "ok": false,
+  "root": "[ROOT]
+  "summary": "config error: no markdown changesets found under .changeset"
+}

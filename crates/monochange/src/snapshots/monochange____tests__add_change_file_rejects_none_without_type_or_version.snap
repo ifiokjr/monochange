@@ -1,5 +1,0 @@
----
-source: crates/monochange/src/__tests.rs
-expression: error.to_string()
----
-config error: target `core` must not use a `none` bump without also declaring `type`, `version`, or `caused_by`

@@ -334,5 +334,5 @@ fn render_value(value: &Value) -> String {
 }
 
 #[cfg(test)]
-#[path = "__tests/jq_filter.rs"]
+#[path = "__tests__/jq_filter_tests.rs"]
 mod tests;

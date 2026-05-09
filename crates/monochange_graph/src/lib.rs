@@ -653,10 +653,13 @@ fn planned_group(
 }
 
 #[cfg(test)]
+#[path = "__tests__/mutant_killers_tests.rs"]
 mod mutant_killers;
 
 #[cfg(test)]
-mod __tests;
+#[path = "__tests__/lib_tests.rs"]
+mod tests;
 
 #[cfg(test)]
+#[path = "__tests__/prop_tests.rs"]
 mod prop_tests;

@@ -4116,7 +4116,9 @@ pub fn materialize_dependency_edges(packages: &[PackageRecord]) -> Vec<Dependenc
 }
 
 #[cfg(test)]
+#[path = "__tests__/proptest_bump_severity_tests.rs"]
 mod proptest_bump_severity;
 
 #[cfg(test)]
-mod __tests;
+#[path = "__tests__/lib_tests.rs"]
+mod tests;

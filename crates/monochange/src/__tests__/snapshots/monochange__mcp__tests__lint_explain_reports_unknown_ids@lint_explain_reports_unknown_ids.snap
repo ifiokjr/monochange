@@ -1,0 +1,10 @@
+---
+source: crates/monochange/src/__tests__/mcp_tests.rs
+expression: content_text(&result)
+---
+{
+  "action": "lint_explain",
+  "error": "unknown lint rule or preset `cargo/does-not-exist`",
+  "ok": false,
+  "summary": "Unknown lint rule or preset `cargo/does-not-exist`."
+}

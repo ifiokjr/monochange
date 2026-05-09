@@ -458,5 +458,5 @@ fn render_unified_file_diff(path: &Path, before: &[u8], after: &[u8]) -> String 
 }
 
 #[cfg(test)]
-#[path = "__tests/prepared_release_cache.rs"]
+#[path = "__tests__/prepared_release_cache_tests.rs"]
 mod tests;

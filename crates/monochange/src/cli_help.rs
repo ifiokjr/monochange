@@ -1691,5 +1691,5 @@ fn multiline_indent(text: &str, indent: usize) -> String {
 }
 
 #[cfg(test)]
-#[path = "__tests/cli_help.rs"]
+#[path = "__tests__/cli_help_tests.rs"]
 mod tests;

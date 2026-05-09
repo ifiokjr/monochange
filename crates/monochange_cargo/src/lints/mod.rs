@@ -708,5 +708,5 @@ impl LintRuleRunner for UnlistedPackagePrivateRule {
 }
 
 #[cfg(test)]
-#[path = "__tests/lints.rs"]
+#[path = "__tests__/mod_tests.rs"]
 mod tests;
