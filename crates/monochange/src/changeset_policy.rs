@@ -247,7 +247,7 @@ pub fn affected_packages(
 	Ok(evaluation)
 }
 
-fn current_branch_matches_pull_request_branch_prefix(
+async fn current_branch_matches_pull_request_branch_prefix(
 	root: &Path,
 	source: Option<&SourceConfiguration>,
 ) -> Option<(String, String)> {
@@ -257,7 +257,7 @@ fn current_branch_matches_pull_request_branch_prefix(
 		return None;
 	}
 
-	let current_branch = git_current_branch(root).ok()?;
+	let current_branch = git_current_branch(root).await.ok()?;
 	current_branch
 		.starts_with(branch_prefix)
 		.then(|| (current_branch, branch_prefix.to_string()))

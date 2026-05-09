@@ -54,12 +54,12 @@ pub(crate) fn render_release_record_discovery(
 /// first commit that contains `.monochange/releases/<hash>/release.json` files.
 /// It reads the first such file and returns it together with discovery
 /// metadata such as the resolved commit and ancestry distance.
-pub fn discover_release_record(
+pub async fn discover_release_record(
 	root: &Path,
 	from: &str,
 ) -> MonochangeResult<ReleaseRecordDiscovery> {
-	let resolved_commit = resolve_git_commit_ref(root, from)?;
-	for (distance, commit) in first_parent_commits(root, &resolved_commit)?
+	let resolved_commit = resolve_git_commit_ref(root, from).await?;
+	for (distance, commit) in first_parent_commits(root, &resolved_commit).await?
 		.into_iter()
 		.enumerate()
 	{
@@ -68,12 +68,12 @@ pub fn discover_release_record(
 			distance,
 			"scanning for release record files"
 		);
-		let files = find_release_record_files_at_commit(root, &commit)?;
+		let files = find_release_record_files_at_commit(root, &commit).await?;
 		if files.is_empty() {
 			continue;
 		}
 		let record_path = files.into_iter().next().unwrap_or_default();
-		let json_text = read_git_file_at_commit(root, &commit, &record_path)?;
+		let json_text = read_git_file_at_commit(root, &commit, &record_path).await?;
 		match parse_release_record_json(&json_text) {
 			Ok(record) => {
 				return Ok(ReleaseRecordDiscovery {
@@ -100,7 +100,7 @@ pub fn discover_release_record(
 }
 
 /// Build a retarget plan for a previously published release.
-pub fn plan_release_retarget(
+pub async fn plan_release_retarget(
 	root: &Path,
 	discovery: &ReleaseRecordDiscovery,
 	target: &str,
@@ -109,8 +109,8 @@ pub fn plan_release_retarget(
 	dry_run: bool,
 	source: Option<&SourceConfiguration>,
 ) -> MonochangeResult<RetargetPlan> {
-	let target_commit = resolve_git_commit_ref(root, target)?;
-	let is_descendant = git_is_ancestor(root, &discovery.record_commit, &target_commit)?;
+	let target_commit = resolve_git_commit_ref(root, target).await?;
+	let is_descendant = git_is_ancestor(root, &discovery.record_commit, &target_commit).await?;
 
 	if !is_descendant && !force {
 		return Err(MonochangeError::Config(format!(
@@ -125,7 +125,7 @@ pub fn plan_release_retarget(
 	let git_tag_updates = release_record_tag_names(&discovery.record)
 		.into_iter()
 		.map(|tag_name| {
-			let from_commit = resolve_git_tag_commit(root, &tag_name)?;
+			let from_commit = resolve_git_tag_commit(root, &tag_name).await?;
 
 			Ok(RetargetTagResult {
 				tag_name,
@@ -186,7 +186,7 @@ pub fn plan_release_retarget(
 }
 
 /// Execute a previously prepared release-retarget plan.
-pub fn execute_release_retarget(
+pub async fn execute_release_retarget(
 	root: &Path,
 	source: Option<&SourceConfiguration>,
 	plan: &RetargetPlan,
@@ -199,7 +199,7 @@ pub fn execute_release_retarget(
 				update.operation = RetargetOperation::AlreadyUpToDate;
 				continue;
 			}
-			move_git_tag(root, &update.tag_name, &update.to_commit)?;
+			move_git_tag(root, &update.tag_name, &update.to_commit).await?;
 			update.operation = RetargetOperation::Moved;
 		}
 
@@ -210,7 +210,7 @@ pub fn execute_release_retarget(
 			.collect::<Vec<_>>();
 
 		if !moved_tags.is_empty() {
-			push_git_tags(root, &moved_tags)?;
+			push_git_tags(root, &moved_tags).await?;
 		}
 	}
 
@@ -364,7 +364,7 @@ pub(crate) fn render_release_tag_report(
 	}
 }
 
-pub(crate) fn create_release_tags(
+pub(crate) async fn create_release_tags(
 	root: &Path,
 	discovery: &ReleaseRecordDiscovery,
 	push: bool,
@@ -383,7 +383,7 @@ pub(crate) fn create_release_tags(
 	let tag_results = release_record_tag_names(&discovery.record)
 		.into_iter()
 		.map(|tag_name| {
-			let existing_commit = resolve_git_tag_commit(root, &tag_name).ok();
+			let existing_commit = resolve_git_tag_commit(root, &tag_name).await.ok();
 			let operation = if existing_commit.as_deref() == Some(discovery.record_commit.as_str())
 			{
 				ReleaseTagOperation::AlreadyUpToDate
@@ -420,7 +420,7 @@ pub(crate) fn create_release_tags(
 				continue;
 			}
 
-			create_git_tag(root, &tag_result.tag_name, &tag_result.target_commit)?;
+			create_git_tag(root, &tag_result.tag_name, &tag_result.target_commit).await?;
 			tag_result.operation = ReleaseTagOperation::Created;
 		}
 
@@ -432,7 +432,7 @@ pub(crate) fn create_release_tags(
 				.collect::<Vec<_>>();
 
 			if !tags_to_push.is_empty() {
-				push_git_tags_without_force(root, &tags_to_push)?;
+				push_git_tags_without_force(root, &tags_to_push).await?;
 			}
 		}
 	}

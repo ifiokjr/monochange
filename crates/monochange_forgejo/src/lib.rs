@@ -395,29 +395,23 @@ pub fn build_release_pull_request_request(
 #[tracing::instrument(skip_all)]
 #[must_use = "the publish result must be checked"]
 #[allow(clippy::disallowed_methods)]
-pub fn publish_release_requests(
+pub async fn publish_release_requests(
 	source: &SourceConfiguration,
 	requests: &[SourceReleaseRequest],
 ) -> MonochangeResult<Vec<SourceReleaseOutcome>> {
-	let runtime = RuntimeBuilder::new_current_thread()
-		.enable_all()
+	let client = Client::builder()
 		.build()
-		.expect("failed to build Forgejo runtime");
-	runtime.block_on(async {
-		let client = Client::builder()
-			.build()
-			.expect("failed to build Forgejo HTTP client");
-		let token = forgejo_token()?;
-		let headers = auth_headers(&token)?;
-		let api_base = forgejo_api_base(source)?;
-		let mut outcomes = Vec::with_capacity(requests.len());
-		for request in requests {
-			outcomes.push(
-				publish_release_request(&client, &headers, &api_base, source, request).await?,
-			);
-		}
-		Ok(outcomes)
-	})
+		.expect("failed to build Forgejo HTTP client");
+	let token = forgejo_token()?;
+	let headers = auth_headers(&token)?;
+	let api_base = forgejo_api_base(source)?;
+	let mut outcomes = Vec::with_capacity(requests.len());
+	for request in requests {
+		outcomes.push(
+			publish_release_request(&client, &headers, &api_base, source, request).await?,
+		);
+	}
+	Ok(outcomes)
 }
 
 /// Commit, push, and publish the release pull request against Forgejo.

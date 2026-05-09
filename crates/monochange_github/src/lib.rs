@@ -1119,16 +1119,13 @@ fn release_issue_comment_body(release_tags: &[String], marker: &str) -> String {
 /// Publish or update all planned GitHub releases for a manifest.
 #[tracing::instrument(skip_all)]
 #[must_use = "the publish result must be checked"]
-pub fn publish_release_requests(
+pub async fn publish_release_requests(
 	source: &SourceConfiguration,
 	requests: &[GitHubReleaseRequest],
 ) -> MonochangeResult<Vec<GitHubReleaseOutcome>> {
-	let runtime = github_runtime()?;
-	runtime.block_on(async {
-		let client = github_client_from_env(source)?;
+	let client = github_client_from_env(source)?;
 
-		publish_release_requests_with_client(&client, requests).await
-	})
+	publish_release_requests_with_client(&client, requests).await
 }
 
 /// Commit, push, and publish the release pull request against GitHub.

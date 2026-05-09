@@ -157,7 +157,7 @@ pub(crate) fn maybe_load_prepared_release_execution(
 	}
 }
 
-pub(crate) fn save_prepared_release_execution(
+pub(crate) async fn save_prepared_release_execution(
 	root: &Path,
 	configuration: &WorkspaceConfiguration,
 	prepared_release: &PreparedRelease,
@@ -179,7 +179,7 @@ pub(crate) fn save_prepared_release_execution(
 	let artifact = PreparedReleaseArtifact {
 		schema_version: PREPARED_RELEASE_ARTIFACT_SCHEMA_VERSION,
 		configuration_snapshot: configuration_snapshot(configuration)?,
-		head_commit: git_head_commit(root)?,
+		head_commit: git_head_commit(root).await?,
 		worktree_status: git_status_snapshot(root, Some(&artifact_path))?,
 		tracked_paths: tracked_path_snapshots(root, prepared_release)?,
 		prepared_release: prepared_release.clone(),
@@ -222,7 +222,7 @@ fn read_prepared_release_artifact(path: &Path) -> MonochangeResult<PreparedRelea
 	})
 }
 
-fn validate_prepared_release_artifact(
+async fn validate_prepared_release_artifact(
 	root: &Path,
 	configuration: &WorkspaceConfiguration,
 	artifact_path: &Path,
@@ -254,7 +254,7 @@ fn validate_prepared_release_artifact(
 		));
 	}
 
-	let current_head = git_head_commit(root)?;
+	let current_head = git_head_commit(root).await?;
 	if current_head != artifact.head_commit {
 		return Err(stale_artifact_error(
 			artifact_path,
@@ -307,11 +307,11 @@ fn configuration_snapshot(configuration: &WorkspaceConfiguration) -> MonochangeR
 	})
 }
 
-fn git_status_snapshot(root: &Path, excluded_path: Option<&Path>) -> MonochangeResult<Vec<String>> {
+async fn git_status_snapshot(root: &Path, excluded_path: Option<&Path>) -> MonochangeResult<Vec<String>> {
 	let output = git_command_output(
 		root,
 		&["status", "--short", "--untracked-files=all", "--porcelain"],
-	)
+	).await
 	.map_err(|error| MonochangeError::Io(format!("failed to read git status: {error}")))?;
 	if !output.status.success() {
 		return Err(MonochangeError::Config(format!(
@@ -372,10 +372,10 @@ fn tracked_path_snapshots(
 		.collect()
 }
 
-fn hash_file_at_path(root: &Path, path: &Path) -> MonochangeResult<String> {
+async fn hash_file_at_path(root: &Path, path: &Path) -> MonochangeResult<String> {
 	let relative_path = root_relative(root, path);
 	let relative = relative_path.to_string_lossy().into_owned();
-	let output = git_command_output(root, &["hash-object", "--", &relative]).map_err(|error| {
+	let output = git_command_output(root, &["hash-object", "--", &relative]).await.map_err(|error| {
 		MonochangeError::Io(format!("failed to hash {}: {error}", path.display()))
 	})?;
 	if !output.status.success() {
@@ -388,7 +388,7 @@ fn hash_file_at_path(root: &Path, path: &Path) -> MonochangeResult<String> {
 	Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
-pub(crate) fn ensure_monochange_artifact_ignored(
+pub(crate) async fn ensure_monochange_artifact_ignored(
 	root: &Path,
 	artifact_path: &Path,
 ) -> MonochangeResult<()> {
@@ -397,7 +397,7 @@ pub(crate) fn ensure_monochange_artifact_ignored(
 		return Ok(());
 	}
 
-	let output = git_command_output(root, &["rev-parse", "--git-path", "info/exclude"]).map_err(
+	let output = git_command_output(root, &["rev-parse", "--git-path", "info/exclude"]).await.map_err(
 		|error| MonochangeError::Io(format!("failed to resolve git exclude path: {error}")),
 	)?;
 	if !output.status.success() {

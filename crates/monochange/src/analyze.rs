@@ -237,20 +237,20 @@ fn parse_origin_head_branch(symbolic_ref: &str) -> Option<String> {
 	}
 }
 
-fn default_branch_name(root: &Path) -> MonochangeResult<String> {
+async fn default_branch_name(root: &Path) -> MonochangeResult<String> {
 	run_git_capture(
 		root,
 		&["rev-parse", "--abbrev-ref", "origin/HEAD"],
 		"failed to determine default branch from origin/HEAD",
-	)
+	).await
 	.ok()
 	.and_then(|symbolic_ref| parse_origin_head_branch(&symbolic_ref))
 	.map_or_else(|| fallback_default_branch(root), Ok)
 }
 
-fn fallback_default_branch(root: &Path) -> MonochangeResult<String> {
+async fn fallback_default_branch(root: &Path) -> MonochangeResult<String> {
 	for branch in ["main", "master"] {
-		if resolve_git_commit_ref(root, branch).is_ok() {
+		if resolve_git_commit_ref(root, branch).await.is_ok() {
 			return Ok(branch.to_string());
 		}
 	}
@@ -260,7 +260,7 @@ fn fallback_default_branch(root: &Path) -> MonochangeResult<String> {
 	))
 }
 
-fn latest_release_tag_for_identity(
+async fn latest_release_tag_for_identity(
 	root: &Path,
 	release_identity: Option<&EffectiveReleaseIdentity>,
 ) -> MonochangeResult<Option<String>> {
@@ -276,7 +276,7 @@ fn latest_release_tag_for_identity(
 		root,
 		&["tag", "--list", "--sort=-v:refname"],
 		"failed to list git tags for release baseline resolution",
-	)?;
+	).await?;
 	let latest = tag_output
 		.lines()
 		.map(str::trim)

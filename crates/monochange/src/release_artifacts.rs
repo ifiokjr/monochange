@@ -347,11 +347,11 @@ pub(crate) fn compare_url_for_provider(
 	}
 }
 
-fn load_sorted_tags(root: &Path) -> Vec<String> {
+async fn load_sorted_tags(root: &Path) -> Vec<String> {
 	let output = match monochange_core::git::git_command_output(
 		root,
 		&["tag", "--list", "--sort=-v:refname"],
-	) {
+	).await {
 		Ok(output) if output.status.success() => output,
 		_ => return Vec::new(),
 	};
@@ -1317,19 +1317,19 @@ pub(crate) fn build_source_change_request(
 	request
 }
 
-pub(crate) fn publish_source_release_requests(
+pub(crate) async fn publish_source_release_requests(
 	source: &SourceConfiguration,
 	requests: &[SourceReleaseRequest],
 ) -> MonochangeResult<Vec<SourceReleaseOutcome>> {
 	match source.provider {
 		#[cfg(feature = "github")]
-		SourceProvider::GitHub => github_provider::publish_release_requests(source, requests),
+		SourceProvider::GitHub => github_provider::publish_release_requests(source, requests).await,
 		#[cfg(feature = "gitlab")]
-		SourceProvider::GitLab => gitlab_provider::publish_release_requests(source, requests),
+		SourceProvider::GitLab => gitlab_provider::publish_release_requests(source, requests).await,
 		#[cfg(feature = "gitea")]
-		SourceProvider::Gitea => gitea_provider::publish_release_requests(source, requests),
+		SourceProvider::Gitea => gitea_provider::publish_release_requests(source, requests).await,
 		#[cfg(feature = "forgejo")]
-		SourceProvider::Forgejo => forgejo_provider::publish_release_requests(source, requests),
+		SourceProvider::Forgejo => forgejo_provider::publish_release_requests(source, requests).await,
 		#[cfg(not(any(
 			feature = "github",
 			feature = "gitlab",
@@ -1340,7 +1340,7 @@ pub(crate) fn publish_source_release_requests(
 	}
 }
 
-pub(crate) fn publish_source_change_request(
+pub(crate) async fn publish_source_change_request(
 	source: &SourceConfiguration,
 	root: &Path,
 	request: &SourceChangeRequest,
@@ -1356,7 +1356,7 @@ pub(crate) fn publish_source_change_request(
 				request,
 				tracked_paths,
 				no_verify,
-			)
+			).await
 		}
 		#[cfg(feature = "gitlab")]
 		SourceProvider::GitLab => {
@@ -1366,7 +1366,7 @@ pub(crate) fn publish_source_change_request(
 				request,
 				tracked_paths,
 				no_verify,
-			)
+			).await
 		}
 		#[cfg(feature = "gitea")]
 		SourceProvider::Gitea => {
@@ -1376,7 +1376,7 @@ pub(crate) fn publish_source_change_request(
 				request,
 				tracked_paths,
 				no_verify,
-			)
+			).await
 		}
 		#[cfg(feature = "forgejo")]
 		SourceProvider::Forgejo => {
@@ -1386,7 +1386,7 @@ pub(crate) fn publish_source_change_request(
 				request,
 				tracked_paths,
 				no_verify,
-			)
+			).await
 		}
 		#[cfg(not(any(
 			feature = "github",
@@ -1801,7 +1801,7 @@ fn deduplicate_overlapping_release_records(
 	Ok(())
 }
 
-pub(crate) fn commit_release(
+pub(crate) async fn commit_release(
 	root: &Path,
 	context: &CliContext,
 	source: Option<&SourceConfiguration>,
@@ -1816,8 +1816,8 @@ pub(crate) fn commit_release(
 	let mut tracked_paths = tracked_paths;
 	tracked_paths.push(release_record_path);
 	if !context.dry_run {
-		git_stage_paths(root, &tracked_paths)?;
-		git_commit_paths(root, &message, no_verify)?;
+		git_stage_paths(root, &tracked_paths).await?;
+		git_commit_paths(root, &message, no_verify).await?;
 	}
 	Ok(CommitReleaseReport {
 		subject: message.subject,
@@ -1825,7 +1825,7 @@ pub(crate) fn commit_release(
 		commit: if context.dry_run {
 			None
 		} else {
-			Some(git_head_commit(root)?)
+			Some(git_head_commit(root).await?)
 		},
 		tracked_paths,
 		dry_run: context.dry_run,

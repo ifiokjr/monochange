@@ -530,7 +530,7 @@ const CHANGESET_DIR: &str = ".changeset";
 /// matching subcommand, and prints any non-empty stdout payload unless
 /// `--quiet` was requested.
 #[must_use = "the run result must be checked"]
-pub async fn run_from_env(bin_name: &'static str) -> MonochangeResult<()> {
+pub fn run_from_env(bin_name: &'static str) -> MonochangeResult<()> {
 	let log_level = extract_log_level_from_args();
 	tracing_setup::init_tracing(log_level.as_deref());
 
@@ -693,7 +693,7 @@ fn render_custom_command_argument_error(
 /// and command execution.
 #[doc(hidden)]
 #[allow(clippy::redundant_closure_for_method_calls)]
-pub async fn run_with_args_in_dir<I>(
+pub fn run_with_args_in_dir<I>(
 	bin_name: &'static str,
 	args: I,
 	root: &Path,
