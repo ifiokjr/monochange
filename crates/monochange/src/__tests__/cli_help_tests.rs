@@ -168,6 +168,7 @@ fn render_overview_help_with_cli_lists_user_defined_commands() {
 		help_text: Some("Ship the workspace".to_string()),
 		inputs: vec![],
 		steps: vec![],
+		dry_run: false,
 	}];
 	let out = render_overview_help_with_cli("mc", &cli);
 
@@ -245,6 +246,7 @@ fn render_command_help_with_cli_documents_user_defined_commands() {
 			},
 		],
 		steps: vec![discover_step],
+		dry_run: false,
 	}];
 	let out = render_command_help_with_cli("mc", "ship-it", &cli);
 
@@ -267,6 +269,7 @@ fn render_command_help_with_cli_uses_rich_help_for_configured_legacy_commands() 
 		help_text: Some("Configured release workflow".to_string()),
 		inputs: vec![],
 		steps: vec![],
+		dry_run: false,
 	}];
 	let out = render_command_help_with_cli("mc", "release", &cli);
 
@@ -281,6 +284,7 @@ fn render_command_help_with_cli_documents_empty_user_defined_commands() {
 		help_text: None,
 		inputs: vec![],
 		steps: vec![],
+		dry_run: false,
 	}];
 	let out = render_command_help_with_cli("mc", "noop", &cli);
 
@@ -297,18 +301,21 @@ fn available_command_items_include_builtins_steps_and_configured_commands() {
 			help_text: Some("Override built-in init".to_string()),
 			inputs: vec![],
 			steps: vec![],
+			dry_run: false,
 		},
 		CliCommandDefinition {
 			name: "step:discover".to_string(),
 			help_text: Some("Override step".to_string()),
 			inputs: vec![],
 			steps: vec![],
+			dry_run: false,
 		},
 		CliCommandDefinition {
 			name: "custom".to_string(),
 			help_text: Some("Custom workflow".to_string()),
 			inputs: vec![],
 			steps: vec![],
+			dry_run: false,
 		},
 	];
 	let items = available_command_items(&cli);

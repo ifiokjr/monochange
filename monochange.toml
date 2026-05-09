@@ -843,3 +843,11 @@ inputs = [
 	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
 ]
 steps = [{ name = "publish packages", type = "PublishPackages" }]
+
+[cli.publish-check]
+help_text = "Validate the release and preview package publishing in dry-run mode"
+dry_run = true
+steps = [
+	{ type = "PrepareRelease", name = "plan release" },
+	{ type = "PublishPackages", name = "publish packages dry run" },
+]

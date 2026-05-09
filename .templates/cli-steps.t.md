@@ -457,6 +457,16 @@ name = "package"
 type = "string_list"
 
 [[cli.publish.inputs]]
+name = "group"
+type = "string_list"
+help_text = "Group ids whose member packages should be published"
+
+[[cli.publish.inputs]]
+name = "ecosystem"
+type = "string_list"
+help_text = "Ecosystems to publish (cargo, npm, deno, dart, flutter, python, go)"
+
+[[cli.publish.inputs]]
 name = "resume"
 type = "path"
 help_text = "JSON result artifact from an earlier mc publish run; completed package versions are skipped"

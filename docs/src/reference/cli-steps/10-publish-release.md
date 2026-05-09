@@ -35,6 +35,16 @@ If the expression resolves to false at runtime, monochange skips the step and co
 when = "{{ inputs.enabled }}"
 ```
 
+## Step-level `always_run` flag
+
+All CLI steps support an optional `always_run = true` flag.
+
+When set, the step executes even if a previous step in the same command has failed. This is useful for cleanup, notification, or dry-run preview steps that must run regardless of earlier outcomes.
+
+```toml
+always_run = true
+```
+
 ## Prerequisites
 
 - a previous `PrepareRelease` step in the same command

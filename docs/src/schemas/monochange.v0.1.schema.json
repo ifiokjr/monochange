@@ -709,6 +709,9 @@
 					"items": {
 						"$ref": "#/$defs/cliStep"
 					}
+				},
+				"dry_run": {
+					"type": "boolean"
 				}
 			}
 		},
@@ -832,6 +835,9 @@
 					]
 				},
 				"show_progress": {
+					"type": "boolean"
+				},
+				"always_run": {
 					"type": "boolean"
 				},
 				"allow_empty_changesets": {

@@ -106,26 +106,43 @@ pub(crate) fn run_publish_packages(
 		configuration,
 		prepared_release,
 		selected_packages,
+		&BTreeSet::new(),
+		&BTreeSet::new(),
 		dry_run,
 		None,
 	)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_publish_packages_with_resume(
 	root: &Path,
 	configuration: &WorkspaceConfiguration,
 	prepared_release: Option<&PreparedRelease>,
 	selected_packages: &BTreeSet<String>,
+	selected_groups: &BTreeSet<String>,
+	selected_ecosystems: &BTreeSet<Ecosystem>,
 	dry_run: bool,
 	resume_path: Option<&Path>,
 ) -> MonochangeResult<PackagePublishReport> {
-	let publication_targets =
+	let mut publication_targets =
 		release_record_package_publications_from_prepared_or_head(root, prepared_release)?;
+
+	if !selected_ecosystems.is_empty() {
+		publication_targets.retain(|t| selected_ecosystems.contains(&t.ecosystem));
+	}
+
+	let mut effective_selected_packages = selected_packages.clone();
+	for group_id in selected_groups {
+		if let Some(group) = configuration.group_by_id(group_id) {
+			effective_selected_packages.extend(group.packages.iter().cloned());
+		}
+	}
+
 	run_publish_packages_with_publications_and_resume(
 		root,
 		configuration,
 		&publication_targets,
-		selected_packages,
+		&effective_selected_packages,
 		dry_run,
 		resume_path,
 	)

@@ -72,6 +72,8 @@ Use `PlaceholderPublish` instead when you need to bootstrap a package that does 
 
 - `format` — `text`, `markdown`, or `json`
 - `package` — optional repeated package ids used to filter the publish set
+- `group` — optional repeated group ids; all packages in each group are added to the publish set
+- `ecosystem` — optional repeated ecosystem names (`cargo`, `npm`, `deno`, `dart`, `flutter`, `python`, `go`); only packages targeting the selected ecosystems are published
 - `resume` — optional path to a JSON result artifact from an earlier real `mc publish` run; completed package versions are skipped and failed or pending work is retried
 - `output` — optional path where monochange writes the package publish result JSON artifact for retry/resume workflows
 
@@ -83,6 +85,16 @@ If the expression resolves to false at runtime, monochange skips the step and co
 
 ```toml
 when = "{{ inputs.enabled }}"
+```
+
+## Step-level `always_run` flag
+
+All CLI steps support an optional `always_run = true` flag.
+
+When set, the step executes even if a previous step in the same command has failed. This is useful for cleanup, notification, or dry-run preview steps that must run regardless of earlier outcomes.
+
+```toml
+always_run = true
 ```
 
 ## Prerequisites
@@ -115,6 +127,16 @@ default = "text"
 [[cli.publish.inputs]]
 name = "package"
 type = "string_list"
+
+[[cli.publish.inputs]]
+name = "group"
+type = "string_list"
+help_text = "Group ids whose member packages should be published"
+
+[[cli.publish.inputs]]
+name = "ecosystem"
+type = "string_list"
+help_text = "Ecosystems to publish (cargo, npm, deno, dart, flutter, python, go)"
 
 [[cli.publish.inputs]]
 name = "resume"

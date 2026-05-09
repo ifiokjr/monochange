@@ -540,6 +540,7 @@ fn build_release_manifest_copies_package_publications_from_prepared_release() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: Vec::new(),
+		dry_run: false,
 	};
 	let prepared_release = PreparedRelease {
 		plan: ReleasePlan {

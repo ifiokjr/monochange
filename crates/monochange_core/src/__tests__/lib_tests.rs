@@ -820,6 +820,7 @@ fn command_steps_have_no_generated_input_schema() {
 	let step = CliStepDefinition::Command {
 		name: None,
 		when: None,
+		always_run: false,
 		show_progress: None,
 		command: "echo ok".to_string(),
 		dry_run_command: None,
@@ -840,6 +841,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 			CliStepDefinition::Validate {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			},
 			"Validate",
@@ -848,6 +850,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 			CliStepDefinition::Discover {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			},
 			"Discover",
@@ -856,6 +859,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 			CliStepDefinition::DisplayVersions {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			},
 			"DisplayVersions",
@@ -865,6 +869,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 				show_progress: None,
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			},
 			"CreateChangeFile",
@@ -873,6 +878,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 			CliStepDefinition::PrepareRelease {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 				allow_empty_changesets: false,
 			},
@@ -882,6 +888,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 			CliStepDefinition::CommitRelease {
 				name: None,
 				when: None,
+				always_run: false,
 				no_verify: false,
 				inputs: BTreeMap::new(),
 			},
@@ -891,6 +898,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 			CliStepDefinition::PublishRelease {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			},
 			"PublishRelease",
@@ -899,6 +907,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 			CliStepDefinition::OpenReleaseRequest {
 				name: None,
 				when: None,
+				always_run: false,
 				no_verify: false,
 				inputs: BTreeMap::new(),
 			},
@@ -908,6 +917,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 			CliStepDefinition::CommentReleasedIssues {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			},
 			"CommentReleasedIssues",
@@ -916,6 +926,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 			CliStepDefinition::AffectedPackages {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			},
 			"AffectedPackages",
@@ -924,6 +935,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 			CliStepDefinition::DiagnoseChangesets {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			},
 			"DiagnoseChangesets",
@@ -932,6 +944,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 			CliStepDefinition::RetargetRelease {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			},
 			"RetargetRelease",
@@ -941,6 +954,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 				show_progress: None,
 				name: None,
 				when: None,
+				always_run: false,
 				command: "echo".into(),
 				dry_run_command: None,
 				shell: ShellConfig::None,
@@ -962,12 +976,14 @@ fn cli_step_show_progress_returns_configured_values_for_interactive_steps() {
 		show_progress: Some(false),
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	let command = CliStepDefinition::Command {
 		show_progress: Some(true),
 		name: None,
 		when: None,
+		always_run: false,
 		command: "echo hi".to_string(),
 		dry_run_command: None,
 		shell: ShellConfig::None,
@@ -978,6 +994,7 @@ fn cli_step_show_progress_returns_configured_values_for_interactive_steps() {
 	let validate = CliStepDefinition::Validate {
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(create_change.show_progress(), Some(false));
@@ -990,12 +1007,14 @@ fn cli_step_display_name_prefers_explicit_name_over_kind() {
 	let named = CliStepDefinition::PrepareRelease {
 		name: Some("plan release".to_string()),
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 		allow_empty_changesets: false,
 	};
 	let unnamed = CliStepDefinition::PrepareRelease {
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 		allow_empty_changesets: false,
 	};
@@ -1010,66 +1029,78 @@ fn cli_step_name_returns_explicit_names_for_all_variants() {
 		CliStepDefinition::Discover {
 			name: Some(expected.to_string()),
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::DisplayVersions {
 			name: Some(expected.to_string()),
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::CreateChangeFile {
 			show_progress: None,
 			name: Some(expected.to_string()),
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::PrepareRelease {
 			name: Some(expected.to_string()),
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 			allow_empty_changesets: false,
 		},
 		CliStepDefinition::CommitRelease {
 			name: Some(expected.to_string()),
 			when: None,
+			always_run: false,
 			no_verify: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::PublishRelease {
 			name: Some(expected.to_string()),
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::OpenReleaseRequest {
 			name: Some(expected.to_string()),
 			when: None,
+			always_run: false,
 			no_verify: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::CommentReleasedIssues {
 			name: Some(expected.to_string()),
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::AffectedPackages {
 			name: Some(expected.to_string()),
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::DiagnoseChangesets {
 			name: Some(expected.to_string()),
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::RetargetRelease {
 			name: Some(expected.to_string()),
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::Command {
 			show_progress: None,
 			name: Some(expected.to_string()),
 			when: None,
+			always_run: false,
 			command: "echo hi".to_string(),
 			dry_run_command: None,
 			shell: ShellConfig::None,
@@ -1089,6 +1120,7 @@ fn valid_input_names_returns_none_for_command_steps() {
 		show_progress: None,
 		name: None,
 		when: None,
+		always_run: false,
 		command: "echo hi".into(),
 		dry_run_command: None,
 		shell: ShellConfig::None,
@@ -1104,6 +1136,7 @@ fn valid_input_names_returns_fix_for_validate() {
 	let step = CliStepDefinition::Validate {
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(step.valid_input_names(), Some(["fix"].as_slice()));
@@ -1114,6 +1147,7 @@ fn valid_input_names_returns_empty_for_commit_release() {
 	let step = CliStepDefinition::CommitRelease {
 		name: None,
 		when: None,
+		always_run: false,
 		no_verify: false,
 		inputs: BTreeMap::new(),
 	};
@@ -1125,6 +1159,7 @@ fn valid_input_names_returns_from_for_verify_release_branch() {
 	let step = CliStepDefinition::VerifyReleaseBranch {
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(step.valid_input_names(), Some(["from"].as_slice()));
@@ -1137,6 +1172,7 @@ fn valid_input_names_returns_expected_names_for_affected_packages() {
 	let step = CliStepDefinition::AffectedPackages {
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	let names = step.valid_input_names().unwrap();
@@ -1152,6 +1188,7 @@ fn valid_input_names_returns_expected_names_for_retarget_release() {
 	let step = CliStepDefinition::RetargetRelease {
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	let names = step.valid_input_names().unwrap();
@@ -1165,6 +1202,7 @@ fn valid_input_names_returns_expected_names_for_display_and_publish_steps() {
 	let display_versions = CliStepDefinition::DisplayVersions {
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(
@@ -1175,6 +1213,7 @@ fn valid_input_names_returns_expected_names_for_display_and_publish_steps() {
 	let publish_release = CliStepDefinition::PublishRelease {
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(
@@ -1185,16 +1224,28 @@ fn valid_input_names_returns_expected_names_for_display_and_publish_steps() {
 	let publish = CliStepDefinition::PublishPackages {
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(
 		publish.valid_input_names(),
-		Some(["format", "output", "package", "resume"].as_slice())
+		Some(
+			[
+				"format",
+				"output",
+				"package",
+				"group",
+				"ecosystem",
+				"resume"
+			]
+			.as_slice()
+		)
 	);
 
 	let plan = CliStepDefinition::PlanPublishRateLimits {
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	let names = plan.valid_input_names().unwrap();
@@ -1204,11 +1255,177 @@ fn valid_input_names_returns_expected_names_for_display_and_publish_steps() {
 }
 
 #[test]
+fn always_run_accessor_returns_value_for_all_variants() {
+	let validate = CliStepDefinition::Validate {
+		name: None,
+		when: None,
+		always_run: true,
+		inputs: BTreeMap::new(),
+	};
+	assert!(validate.always_run());
+
+	let validate_false = CliStepDefinition::Validate {
+		name: None,
+		when: None,
+		always_run: false,
+		inputs: BTreeMap::new(),
+	};
+	assert!(!validate_false.always_run());
+
+	let command = CliStepDefinition::Command {
+		show_progress: None,
+		name: None,
+		when: None,
+		always_run: true,
+		command: String::new(),
+		dry_run_command: None,
+		shell: ShellConfig::Default,
+		id: None,
+		variables: None,
+		inputs: BTreeMap::new(),
+	};
+	assert!(command.always_run());
+
+	let publish = CliStepDefinition::PublishPackages {
+		name: None,
+		when: None,
+		always_run: true,
+		inputs: BTreeMap::new(),
+	};
+	assert!(publish.always_run());
+
+	let prepare = CliStepDefinition::PrepareRelease {
+		name: None,
+		when: None,
+		always_run: false,
+		inputs: BTreeMap::new(),
+		allow_empty_changesets: false,
+	};
+	assert!(!prepare.always_run());
+
+	let config = CliStepDefinition::Config {
+		name: None,
+		when: None,
+		always_run: false,
+		inputs: BTreeMap::new(),
+	};
+	assert!(!config.always_run());
+
+	let discover = CliStepDefinition::Discover {
+		name: None,
+		when: None,
+		always_run: true,
+		inputs: BTreeMap::new(),
+	};
+	assert!(discover.always_run());
+
+	let display = CliStepDefinition::DisplayVersions {
+		name: None,
+		when: None,
+		always_run: false,
+		inputs: BTreeMap::new(),
+	};
+	assert!(!display.always_run());
+
+	let change = CliStepDefinition::CreateChangeFile {
+		show_progress: None,
+		name: None,
+		when: None,
+		always_run: true,
+		inputs: BTreeMap::new(),
+	};
+	assert!(change.always_run());
+
+	let commit = CliStepDefinition::CommitRelease {
+		name: None,
+		when: None,
+		always_run: false,
+		inputs: BTreeMap::new(),
+		no_verify: false,
+	};
+	assert!(!commit.always_run());
+
+	let verify = CliStepDefinition::VerifyReleaseBranch {
+		name: None,
+		when: None,
+		always_run: true,
+		inputs: BTreeMap::new(),
+	};
+	assert!(verify.always_run());
+
+	let publish_release = CliStepDefinition::PublishRelease {
+		name: None,
+		when: None,
+		always_run: false,
+		inputs: BTreeMap::new(),
+	};
+	assert!(!publish_release.always_run());
+
+	let placeholder = CliStepDefinition::PlaceholderPublish {
+		name: None,
+		when: None,
+		always_run: true,
+		inputs: BTreeMap::new(),
+	};
+	assert!(placeholder.always_run());
+
+	let plan_limits = CliStepDefinition::PlanPublishRateLimits {
+		name: None,
+		when: None,
+		always_run: false,
+		inputs: BTreeMap::new(),
+	};
+	assert!(!plan_limits.always_run());
+
+	let open_request = CliStepDefinition::OpenReleaseRequest {
+		name: None,
+		when: None,
+		always_run: true,
+		no_verify: false,
+		inputs: BTreeMap::new(),
+	};
+	assert!(open_request.always_run());
+
+	let comment = CliStepDefinition::CommentReleasedIssues {
+		name: None,
+		when: None,
+		always_run: false,
+		inputs: BTreeMap::new(),
+	};
+	assert!(!comment.always_run());
+
+	let affected = CliStepDefinition::AffectedPackages {
+		name: None,
+		when: None,
+		always_run: true,
+		inputs: BTreeMap::new(),
+	};
+	assert!(affected.always_run());
+
+	let diagnose = CliStepDefinition::DiagnoseChangesets {
+		name: None,
+		when: None,
+		always_run: false,
+		inputs: BTreeMap::new(),
+	};
+	assert!(!diagnose.always_run());
+
+	let retarget = CliStepDefinition::RetargetRelease {
+		name: None,
+		when: None,
+		always_run: true,
+		inputs: BTreeMap::new(),
+	};
+	assert!(retarget.always_run());
+}
+
+#[test]
 fn valid_input_names_returns_expected_names_for_create_change_file() {
 	let step = CliStepDefinition::CreateChangeFile {
 		show_progress: None,
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	let names = step.valid_input_names().unwrap();
@@ -1232,6 +1449,7 @@ fn expected_input_kind_returns_correct_types_for_affected_packages() {
 	let step = CliStepDefinition::AffectedPackages {
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(
@@ -1260,6 +1478,7 @@ fn expected_input_kind_returns_none_for_command_steps() {
 		show_progress: None,
 		name: None,
 		when: None,
+		always_run: false,
 		command: "echo".into(),
 		dry_run_command: None,
 		shell: ShellConfig::None,
@@ -1275,6 +1494,7 @@ fn expected_input_kind_returns_none_for_commit_release() {
 	let step = CliStepDefinition::CommitRelease {
 		name: None,
 		when: None,
+		always_run: false,
 		no_verify: false,
 		inputs: BTreeMap::new(),
 	};
@@ -1287,6 +1507,7 @@ fn expected_input_kind_returns_correct_types_for_display_and_publish_steps() {
 	let display_versions = CliStepDefinition::DisplayVersions {
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(
@@ -1298,6 +1519,7 @@ fn expected_input_kind_returns_correct_types_for_display_and_publish_steps() {
 	let prepare = CliStepDefinition::PrepareRelease {
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 		allow_empty_changesets: false,
 	};
@@ -1311,6 +1533,7 @@ fn expected_input_kind_returns_correct_types_for_display_and_publish_steps() {
 	let comment_released_issues = CliStepDefinition::CommentReleasedIssues {
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(
@@ -1330,6 +1553,7 @@ fn expected_input_kind_returns_correct_types_for_display_and_publish_steps() {
 	let publish_release = CliStepDefinition::PublishRelease {
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(
@@ -1349,6 +1573,7 @@ fn expected_input_kind_returns_correct_types_for_display_and_publish_steps() {
 	let publish = CliStepDefinition::PublishPackages {
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(
@@ -1373,6 +1598,7 @@ fn expected_input_kind_returns_correct_types_for_display_and_publish_steps() {
 	let placeholder = CliStepDefinition::PlaceholderPublish {
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(
@@ -1392,6 +1618,7 @@ fn expected_input_kind_returns_correct_types_for_display_and_publish_steps() {
 	let plan = CliStepDefinition::PlanPublishRateLimits {
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(
@@ -1428,6 +1655,7 @@ fn expected_input_kind_returns_correct_types_for_create_change_file() {
 		show_progress: None,
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(
@@ -1452,6 +1680,7 @@ fn expected_input_kind_returns_correct_types_for_diagnose_changesets() {
 	let step = CliStepDefinition::DiagnoseChangesets {
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(
@@ -1471,6 +1700,7 @@ fn expected_input_kind_returns_correct_types_for_retarget_release() {
 	let step = CliStepDefinition::RetargetRelease {
 		name: None,
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(step.expected_input_kind("from"), Some(CliInputKind::String));

@@ -699,8 +699,10 @@ fn render_cli_command_results_include_package_publish_reports() {
 		steps: vec![CliStepDefinition::PublishPackages {
 			name: Some("publish packages".to_string()),
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 	let mut context = cli_context();
 	context.package_publish_report = Some(package_publish::PackagePublishReport {
@@ -1009,8 +1011,10 @@ fn resolve_command_output_supports_package_publish_json_without_release_state() 
 		steps: vec![CliStepDefinition::PlaceholderPublish {
 			name: Some("publish placeholder packages".to_string()),
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 	let mut context = cli_context();
 	context.last_step_inputs = BTreeMap::from([("format".to_string(), vec!["json".to_string()])]);
@@ -1080,8 +1084,10 @@ fn resolve_command_output_supports_package_publish_text_and_markdown_without_rel
 		steps: vec![CliStepDefinition::PlaceholderPublish {
 			name: Some("publish placeholder packages".to_string()),
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 
 	let mut text_context = cli_context();
@@ -1128,8 +1134,10 @@ fn resolve_command_output_supports_publish_rate_limit_reports_without_release_st
 		steps: vec![CliStepDefinition::PlanPublishRateLimits {
 			name: Some("plan publish rate limits".to_string()),
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 
 	let mut context = cli_context();
@@ -1351,6 +1359,7 @@ fn run_cli_command_command_streams_output_when_progress_is_enabled() {
 	let step = CliStepDefinition::Command {
 		name: Some("announce release".to_string()),
 		when: None,
+		always_run: false,
 		command: "printf 'streamed line\\n'".to_string(),
 		dry_run_command: None,
 		show_progress: None,
@@ -1364,6 +1373,7 @@ fn run_cli_command_command_streams_output_when_progress_is_enabled() {
 		help_text: Some("release".to_string()),
 		inputs: Vec::new(),
 		steps: vec![step.clone()],
+		dry_run: false,
 	};
 	let mut progress = CliProgressReporter::new(&cli_command, false, false, ProgressFormat::Json);
 
@@ -1409,6 +1419,7 @@ fn step_shows_progress_disables_interactive_change_steps_by_default() {
 		show_progress: None,
 		name: Some("interactive change".to_string()),
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	let mut step_inputs = BTreeMap::new();
@@ -1424,6 +1435,7 @@ fn step_shows_progress_respects_explicit_step_flags() {
 		show_progress: Some(false),
 		name: Some("interactive shell".to_string()),
 		when: None,
+		always_run: false,
 		command: "echo hello".to_string(),
 		dry_run_command: None,
 		shell: ShellConfig::Default,
@@ -1441,12 +1453,14 @@ fn drain_stream_events_collects_stdout_stderr_and_handles_closed_channels() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: Vec::new(),
+		dry_run: false,
 	};
 	let mut progress = CliProgressReporter::new(&cli_command, false, false, ProgressFormat::Auto);
 	let step = CliStepDefinition::Command {
 		show_progress: None,
 		name: Some("stream output".to_string()),
 		when: None,
+		always_run: false,
 		command: "echo hello".to_string(),
 		dry_run_command: None,
 		shell: ShellConfig::Default,
@@ -1506,8 +1520,10 @@ fn configured_config_step_uses_generic_completion_without_config_json() {
 		steps: vec![CliStepDefinition::Config {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 
 	let output = execute_cli_command_with_options(
@@ -1545,11 +1561,13 @@ fn execute_cli_command_captures_telemetry_when_step_input_resolution_fails() {
 		steps: vec![CliStepDefinition::Validate {
 			name: Some("invalid input".to_string()),
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::from([(
 				"target".to_string(),
 				CliStepInputValue::String("{{".to_string()),
 			)]),
 		}],
+		dry_run: false,
 	};
 
 	temp_env::with_vars(
@@ -1608,8 +1626,10 @@ fn execute_cli_command_captures_telemetry_when_step_condition_fails() {
 		steps: vec![CliStepDefinition::Validate {
 			name: Some("invalid condition".to_string()),
 			when: Some("{{ missing.path }}".to_string()),
+			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 
 	temp_env::with_vars(
@@ -1663,6 +1683,7 @@ fn execute_cli_command_reports_command_failures_after_progress_callbacks() {
 			show_progress: None,
 			name: Some("fail loud".to_string()),
 			when: None,
+			always_run: false,
 			command: "printf 'boom\\n' >&2; exit 3".to_string(),
 			dry_run_command: None,
 			shell: ShellConfig::Default,
@@ -1670,6 +1691,7 @@ fn execute_cli_command_reports_command_failures_after_progress_callbacks() {
 			variables: None,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 
 	let configuration = monochange_core::WorkspaceConfiguration {
@@ -1753,6 +1775,7 @@ fn execute_cli_command_with_options_covers_final_artifact_save_call() {
 		help_text: None,
 		inputs: Vec::new(),
 		steps: Vec::new(),
+		dry_run: false,
 	};
 
 	let output = execute_cli_command_with_options(
@@ -1788,15 +1811,18 @@ fn execute_cli_command_with_options_plans_publish_rate_limits_from_prepared_rele
 			CliStepDefinition::PrepareRelease {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 				allow_empty_changesets: false,
 			},
 			CliStepDefinition::PlanPublishRateLimits {
 				name: None,
 				when: None,
+				always_run: false,
 				inputs: BTreeMap::new(),
 			},
 		],
+		dry_run: false,
 	};
 	save_prepared_release_execution(
 		&root,
@@ -1835,8 +1861,10 @@ fn execute_cli_command_with_options_rejects_readiness_for_placeholder_publish_pl
 		steps: vec![CliStepDefinition::PlanPublishRateLimits {
 			name: None,
 			when: None,
+			always_run: false,
 			inputs: BTreeMap::new(),
 		}],
+		dry_run: false,
 	};
 
 	let error = execute_cli_command_with_options(
@@ -1977,6 +2005,7 @@ fn record_skipped_and_failure_helpers_cover_silent_paths() {
 	let step = CliStepDefinition::Validate {
 		name: Some("validate".to_string()),
 		when: None,
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	let mut context = cli_context();
@@ -2044,6 +2073,7 @@ fn step_references_release_file_diffs_detects_all_supported_locations() {
 	let from_when = CliStepDefinition::Validate {
 		name: Some("validate".to_string()),
 		when: Some("{{ file_diffs }}".to_string()),
+		always_run: false,
 		inputs: BTreeMap::new(),
 	};
 	assert!(step_references_release_file_diffs(&from_when));
@@ -2056,6 +2086,7 @@ fn step_references_release_file_diffs_detects_all_supported_locations() {
 	let from_inputs = CliStepDefinition::PublishRelease {
 		name: Some("publish".to_string()),
 		when: None,
+		always_run: false,
 		inputs,
 	};
 	assert!(step_references_release_file_diffs(&from_inputs));
@@ -2063,6 +2094,7 @@ fn step_references_release_file_diffs_detects_all_supported_locations() {
 	let from_variables = CliStepDefinition::Command {
 		name: Some("command".to_string()),
 		when: None,
+		always_run: false,
 		command: "echo done".to_string(),
 		dry_run_command: None,
 		show_progress: None,
@@ -2079,6 +2111,7 @@ fn step_references_release_file_diffs_detects_all_supported_locations() {
 	let without_file_diffs = CliStepDefinition::Command {
 		name: Some("command".to_string()),
 		when: None,
+		always_run: false,
 		command: "echo done".to_string(),
 		dry_run_command: None,
 		show_progress: None,
@@ -2332,4 +2365,269 @@ fn optional_publish_resume_and_output_paths_trim_and_reject_blank_values() {
 	let error =
 		optional_publish_resume_artifact_path(&blank).expect_err("blank resume path should fail");
 	assert!(error.to_string().contains("blank `resume` path"));
+}
+
+#[test]
+fn has_remaining_always_run_steps_detects_always_run_later_in_sequence() {
+	let steps = vec![
+		CliStepDefinition::Validate {
+			name: None,
+			when: None,
+			always_run: false,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::Command {
+			show_progress: None,
+			name: None,
+			when: None,
+			always_run: true,
+			command: String::new(),
+			dry_run_command: None,
+			shell: ShellConfig::Default,
+			id: None,
+			variables: None,
+			inputs: BTreeMap::new(),
+		},
+	];
+	assert!(has_remaining_always_run_steps(&steps, 0));
+	assert!(!has_remaining_always_run_steps(&steps, 1));
+}
+
+#[test]
+fn selected_group_ids_returns_empty_for_missing_input() {
+	let inputs = BTreeMap::new();
+	assert!(selected_group_ids(&inputs).is_empty());
+}
+
+#[test]
+fn selected_group_ids_collects_comma_separated_values() {
+	let inputs = BTreeMap::from([(
+		"group".to_string(),
+		vec!["group-a".to_string(), "group-b".to_string()],
+	)]);
+	let groups = selected_group_ids(&inputs);
+	assert_eq!(
+		groups,
+		BTreeSet::from(["group-a".to_string(), "group-b".to_string()])
+	);
+}
+
+#[test]
+fn selected_ecosystem_ids_returns_empty_for_missing_input() {
+	let inputs = BTreeMap::new();
+	assert!(selected_ecosystem_ids(&inputs).unwrap().is_empty());
+}
+
+#[test]
+fn selected_ecosystem_ids_parses_known_ecosystems() {
+	let inputs = BTreeMap::from([(
+		"ecosystem".to_string(),
+		vec!["npm".to_string(), "cargo".to_string()],
+	)]);
+	let ecosystems = selected_ecosystem_ids(&inputs).unwrap();
+	assert_eq!(
+		ecosystems,
+		BTreeSet::from([Ecosystem::Npm, Ecosystem::Cargo])
+	);
+}
+
+#[test]
+fn selected_ecosystem_ids_rejects_unknown_ecosystem() {
+	let inputs = BTreeMap::from([(
+		"ecosystem".to_string(),
+		vec!["unknown-ecosystem".to_string()],
+	)]);
+	let error = selected_ecosystem_ids(&inputs).expect_err("expected unknown ecosystem");
+	assert!(error.to_string().contains("unknown ecosystem"), "{error}");
+}
+
+#[test]
+fn execute_cli_command_always_run_steps_continue_after_failure() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let marker = tempdir.path().join("always-run-marker");
+	let skipped_marker = tempdir.path().join("skipped-marker");
+	let cli_command = CliCommandDefinition {
+		name: "test".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![
+			CliStepDefinition::Command {
+				show_progress: None,
+				name: Some("fail".to_string()),
+				when: None,
+				always_run: false,
+				command: "exit 1".to_string(),
+				dry_run_command: None,
+				shell: ShellConfig::Default,
+				id: None,
+				variables: None,
+				inputs: BTreeMap::new(),
+			},
+			CliStepDefinition::Command {
+				show_progress: None,
+				name: Some("always".to_string()),
+				when: None,
+				always_run: true,
+				command: format!("touch {}", marker.display()),
+				dry_run_command: None,
+				shell: ShellConfig::Default,
+				id: None,
+				variables: None,
+				inputs: BTreeMap::new(),
+			},
+			CliStepDefinition::Command {
+				show_progress: None,
+				name: Some("skip".to_string()),
+				when: None,
+				always_run: false,
+				command: format!("touch {}", skipped_marker.display()),
+				dry_run_command: None,
+				shell: ShellConfig::Default,
+				id: None,
+				variables: None,
+				inputs: BTreeMap::new(),
+			},
+		],
+		dry_run: false,
+	};
+
+	let result = execute_cli_command_with_options(
+		tempdir.path(),
+		&sample_configuration(tempdir.path()),
+		&cli_command,
+		ExecuteCliCommandOptions {
+			dry_run: false,
+			quiet: true,
+			show_diff: false,
+			inputs: BTreeMap::new(),
+			prepared_release_path: None,
+			progress_format: ProgressFormat::Auto,
+		},
+	);
+
+	assert!(result.is_err());
+	assert!(marker.exists(), "always_run step should have executed");
+	assert!(
+		!skipped_marker.exists(),
+		"non-always_run step after failure should be skipped"
+	);
+}
+
+#[test]
+fn execute_cli_command_always_run_continue_after_resolve_step_inputs_failure() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let marker = tempdir.path().join("always-run-marker");
+	let cli_command = CliCommandDefinition {
+		name: "test".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![
+			CliStepDefinition::Command {
+				show_progress: None,
+				name: Some("fail".to_string()),
+				when: None,
+				always_run: false,
+				command: "echo hi".to_string(),
+				dry_run_command: None,
+				shell: ShellConfig::Default,
+				id: None,
+				variables: None,
+				inputs: BTreeMap::from([(
+					"command".to_string(),
+					CliStepInputValue::String("{{ bad".to_string()),
+				)]),
+			},
+			CliStepDefinition::Command {
+				show_progress: None,
+				name: Some("always".to_string()),
+				when: None,
+				always_run: true,
+				command: format!("touch {}", marker.display()),
+				dry_run_command: None,
+				shell: ShellConfig::Default,
+				id: None,
+				variables: None,
+				inputs: BTreeMap::new(),
+			},
+		],
+		dry_run: false,
+	};
+
+	let result = execute_cli_command_with_options(
+		tempdir.path(),
+		&sample_configuration(tempdir.path()),
+		&cli_command,
+		ExecuteCliCommandOptions {
+			dry_run: false,
+			quiet: true,
+			show_diff: false,
+			inputs: BTreeMap::new(),
+			prepared_release_path: None,
+			progress_format: ProgressFormat::Auto,
+		},
+	);
+
+	assert!(result.is_err());
+	assert!(
+		marker.exists(),
+		"always_run step should have executed after resolve_step_inputs failure"
+	);
+}
+
+#[test]
+fn execute_cli_command_always_run_continue_after_should_execute_failure() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let marker = tempdir.path().join("always-run-marker");
+	let cli_command = CliCommandDefinition {
+		name: "test".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![
+			CliStepDefinition::Command {
+				show_progress: None,
+				name: Some("fail".to_string()),
+				when: Some("{{ unknown_var }}".to_string()),
+				always_run: false,
+				command: "echo hi".to_string(),
+				dry_run_command: None,
+				shell: ShellConfig::Default,
+				id: None,
+				variables: None,
+				inputs: BTreeMap::new(),
+			},
+			CliStepDefinition::Command {
+				show_progress: None,
+				name: Some("always".to_string()),
+				when: None,
+				always_run: true,
+				command: format!("touch {}", marker.display()),
+				dry_run_command: None,
+				shell: ShellConfig::Default,
+				id: None,
+				variables: None,
+				inputs: BTreeMap::new(),
+			},
+		],
+		dry_run: false,
+	};
+
+	let result = execute_cli_command_with_options(
+		tempdir.path(),
+		&sample_configuration(tempdir.path()),
+		&cli_command,
+		ExecuteCliCommandOptions {
+			dry_run: false,
+			quiet: true,
+			show_diff: false,
+			inputs: BTreeMap::new(),
+			prepared_release_path: None,
+			progress_format: ProgressFormat::Auto,
+		},
+	);
+
+	assert!(result.is_err());
+	assert!(
+		marker.exists(),
+		"always_run step should have executed after should_execute failure"
+	);
 }

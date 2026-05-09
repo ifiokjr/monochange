@@ -63,23 +63,36 @@ fn extract_major_minor_strips_patch_at_runtime() {
 
 #[test]
 fn current_schema_version_strips_patch_from_package_version() {
-	assert_eq!(env!("CARGO_PKG_VERSION"), "0.0.0");
-	assert_eq!(CURRENT_SCHEMA_VERSION_TEXT, "0.0");
+	let pkg_version = env!("CARGO_PKG_VERSION");
+
+	let (expected_major, expected_minor) = {
+		let parts: Vec<&str> = pkg_version.split('.').take(2).collect();
+		(
+			parts.first().unwrap_or(&"0").parse::<u64>().unwrap_or(0),
+			parts.get(1).unwrap_or(&"0").parse::<u64>().unwrap_or(0),
+		)
+	};
+	let expected_text = format!("{expected_major}.{expected_minor}");
+
+	assert_eq!(CURRENT_SCHEMA_VERSION_TEXT, expected_text);
 	let current = current_schema_version()
 		.unwrap_or_else(|error| panic!("parse current schema version: {error}"));
-	assert_eq!(current, SchemaVersion::new(0, 0));
-	let from_package = SchemaVersion::from_package_version(env!("CARGO_PKG_VERSION"))
+	assert_eq!(current, SchemaVersion::new(expected_major, expected_minor));
+	let from_package = SchemaVersion::from_package_version(pkg_version)
 		.unwrap_or_else(|error| panic!("parse package version: {error}"));
-	assert_eq!(from_package, SchemaVersion::new(0, 0));
+	assert_eq!(
+		from_package,
+		SchemaVersion::new(expected_major, expected_minor)
+	);
 	let serialized = serde_json::to_value(current)
 		.unwrap_or_else(|error| panic!("serialize schema version: {error}"));
-	assert_eq!(serialized, json!("0.0"));
+	assert_eq!(serialized, json!(expected_text));
 }
 
 #[test]
 fn release_record_accepts_current_schema_version() {
 	let migrated = release_record::migrate_value(json!({
-		"schemaVersion": "0.0",
+		"schemaVersion": CURRENT_SCHEMA_VERSION_TEXT,
 		"kind": release_record::KIND,
 		"createdAt": "2026-04-06T12:00:00Z",
 		"command": "release-pr",
@@ -89,7 +102,10 @@ fn release_record_accepts_current_schema_version() {
 	}))
 	.unwrap_or_else(|error| panic!("validate release record: {error}"));
 
-	assert_eq!(migrated.get("schemaVersion"), Some(&json!("0.0")));
+	assert_eq!(
+		migrated.get("schemaVersion"),
+		Some(&json!(CURRENT_SCHEMA_VERSION_TEXT))
+	);
 }
 
 #[test]

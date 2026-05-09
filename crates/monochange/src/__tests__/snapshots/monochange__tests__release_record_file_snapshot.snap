@@ -34,7 +34,7 @@ expression: value
     "monochange",
     "monochange_core"
   ],
-  "schemaVersion": "0.0",
+  "schemaVersion": "0.1",
   "updatedChangelogs": [],
   "version": "1.2.3"
 }

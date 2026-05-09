@@ -260,11 +260,23 @@ fn schema_crate_version_stays_decoupled_from_public_schema_version() -> Result<(
 		.and_then(toml::Value::as_str)
 		.unwrap_or_default();
 
+	let (expected_major, expected_minor) = {
+		let parts: Vec<&str> = expected_version.split('.').take(2).collect();
+		(
+			parts.first().unwrap_or(&"0").parse::<u64>().unwrap_or(0),
+			parts.get(1).unwrap_or(&"0").parse::<u64>().unwrap_or(0),
+		)
+	};
+	let expected_major_minor = format!("{expected_major}.{expected_minor}");
+
 	assert_eq!(schema_crate_version(&paths)?, expected_version);
-	assert_eq!(monochange_schema::CURRENT_SCHEMA_VERSION_TEXT, "0.1");
+	assert_eq!(
+		monochange_schema::CURRENT_SCHEMA_VERSION_TEXT,
+		expected_major_minor
+	);
 	assert_eq!(
 		monochange_schema::current_schema_version()?,
-		monochange_schema::SchemaVersion::new(0, 1)
+		monochange_schema::SchemaVersion::new(expected_major, expected_minor)
 	);
 
 	Ok(())
