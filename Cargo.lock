@@ -2173,6 +2173,7 @@ dependencies = [
  "proptest",
  "regex",
  "rstest",
+ "schemars",
  "semver",
  "serde",
  "serde_json",
@@ -2194,6 +2195,7 @@ dependencies = [
  "proptest",
  "reqwest",
  "rstest",
+ "schemars",
  "semver",
  "serde",
  "serde_json",
@@ -2489,6 +2491,16 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "monochange_schema_gen"
+version = "0.4.0"
+dependencies = [
+ "monochange_config",
+ "monochange_core",
+ "schemars",
+ "serde_json",
 ]
 
 [[package]]

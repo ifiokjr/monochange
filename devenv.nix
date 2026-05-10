@@ -286,7 +286,7 @@ in
     "schema:update" = {
       exec = ''
         set -euo pipefail
-        scripts/schema-assets.sh update
+        cargo run -p monochange_schema_gen -- update
       '';
       description = "Regenerate committed JSON Schema assets.";
       binary = "bash";
@@ -294,7 +294,7 @@ in
     "schema:check" = {
       exec = ''
         set -euo pipefail
-        scripts/schema-assets.sh check
+        cargo run -p monochange_schema_gen -- check
       '';
       description = "Check committed JSON Schema assets are up to date.";
       binary = "bash";

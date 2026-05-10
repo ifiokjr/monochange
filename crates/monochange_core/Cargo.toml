@@ -14,11 +14,13 @@ description = "Manage versions and releases for your multiplatform, multilanguag
 
 [features]
 http = ["reqwest"]
+schema = ["dep:schemars"]
 
 [dependencies]
 ignore = { workspace = true, default-features = true }
 monochange_schema = { workspace = true, default-features = true }
 reqwest = { workspace = true, optional = true, default-features = true }
+schemars = { workspace = true, optional = true }
 semver = { workspace = true, default-features = true }
 serde = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }
