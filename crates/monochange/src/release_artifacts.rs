@@ -1096,7 +1096,7 @@ pub(crate) fn build_release_manifest_from_record(record: &ReleaseRecord) -> Rele
 		command: record.command.clone(),
 		dry_run: false,
 		version: record.version.clone(),
-		group_version: record.group_version.clone(),
+		group_version: None,
 		release_targets: record
 			.release_targets
 			.iter()
@@ -1153,6 +1153,13 @@ pub(crate) fn build_release_manifest_from_record(record: &ReleaseRecord) -> Rele
 	}
 }
 
+fn release_record_versions(release_targets: &[ReleaseManifestTarget]) -> BTreeMap<String, String> {
+	release_targets
+		.iter()
+		.map(|target| (target.id.clone(), target.version.clone()))
+		.collect()
+}
+
 pub(crate) fn build_release_record(
 	source: Option<&SourceConfiguration>,
 	manifest: &ReleaseManifest,
@@ -1165,7 +1172,7 @@ pub(crate) fn build_release_record(
 			.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
 		command: manifest.command.clone(),
 		version: manifest.version.clone(),
-		group_version: manifest.group_version.clone(),
+		versions: release_record_versions(&manifest.release_targets),
 		release_targets: manifest
 			.release_targets
 			.iter()

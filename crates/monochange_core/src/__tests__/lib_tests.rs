@@ -2422,7 +2422,7 @@ fn sample_release_record() -> ReleaseRecord {
 		created_at: "2026-04-06T12:00:00Z".to_string(),
 		command: "release-pr".to_string(),
 		version: Some("1.2.3".to_string()),
-		group_version: Some("1.2.3".to_string()),
+		versions: BTreeMap::from([("main".to_string(), "1.2.3".to_string())]),
 		release_targets: vec![ReleaseRecordTarget {
 			id: "main".to_string(),
 			kind: ReleaseOwnerKind::Group,

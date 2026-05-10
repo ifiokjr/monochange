@@ -4621,7 +4621,10 @@ fn build_release_record_captures_provider_and_release_targets() {
 	let record = crate::build_release_record(Some(&source), &manifest);
 	assert_eq!(record.command, "release-pr");
 	assert_eq!(record.version.as_deref(), Some("1.2.3"));
-	assert_eq!(record.group_version.as_deref(), Some("1.2.3"));
+	assert_eq!(
+		record.versions.get("sdk").map(String::as_str),
+		Some("1.2.3")
+	);
 	assert_eq!(record.release_targets.len(), 1);
 	assert_eq!(record.release_targets[0].tag_name, "v1.2.3");
 	assert_eq!(record.updated_changelogs.len(), 1);
@@ -4722,7 +4725,8 @@ fn text_release_record_discovery_renders_targets_packages_and_provider() {
 	assert!(rendered.contains("record commit: abc1234"));
 	assert!(rendered.contains("distance: 0"));
 	assert!(rendered.contains("version: 1.2.3"));
-	assert!(rendered.contains("group version: 1.2.3"));
+	assert!(rendered.contains("versions:"));
+	assert!(rendered.contains("sdk: 1.2.3"));
 	assert!(rendered.contains("- group sdk -> 1.2.3 (tag: v1.2.3)"));
 	assert!(rendered.contains("- monochange"));
 	assert!(rendered.contains("- monochange_core"));
@@ -4736,7 +4740,7 @@ fn sample_release_record_for_discovery_text() -> monochange_core::ReleaseRecord 
 		created_at: "2026-04-07T08:00:00Z".to_string(),
 		command: "release-pr".to_string(),
 		version: Some("1.2.3".to_string()),
-		group_version: Some("1.2.3".to_string()),
+		versions: BTreeMap::from([("sdk".to_string(), "1.2.3".to_string())]),
 		release_targets: vec![monochange_core::ReleaseRecordTarget {
 			id: "sdk".to_string(),
 			kind: monochange_core::ReleaseOwnerKind::Group,
@@ -4776,7 +4780,7 @@ fn text_release_record_discovery_omits_empty_sections() {
 			created_at: "2026-04-07T08:00:00Z".to_string(),
 			command: "release-pr".to_string(),
 			version: None,
-			group_version: None,
+			versions: BTreeMap::new(),
 			release_targets: Vec::new(),
 			released_packages: Vec::new(),
 			changed_files: Vec::new(),
@@ -10323,7 +10327,7 @@ fn sample_release_record_for_retarget() -> monochange_core::ReleaseRecord {
 		created_at: "2026-04-07T08:00:00Z".to_string(),
 		command: "release-pr".to_string(),
 		version: Some("1.2.3".to_string()),
-		group_version: Some("1.2.3".to_string()),
+		versions: BTreeMap::from([("sdk".to_string(), "1.2.3".to_string())]),
 		release_targets: vec![monochange_core::ReleaseRecordTarget {
 			id: "sdk".to_string(),
 			kind: monochange_core::ReleaseOwnerKind::Group,
@@ -13381,7 +13385,7 @@ fn build_release_manifest_from_record_populates_manifest_from_release_record() {
 		created_at: "2024-01-01T00:00:00Z".to_string(),
 		command: "release-pr".to_string(),
 		version: Some("1.0.0".to_string()),
-		group_version: None,
+		versions: BTreeMap::new(),
 		release_targets: vec![ReleaseRecordTarget {
 			id: "core".to_string(),
 			kind: ReleaseOwnerKind::Package,
@@ -13463,7 +13467,7 @@ fn build_release_manifest_from_record_preserves_changelog_metadata() {
 		created_at: "2024-01-01T00:00:00Z".to_string(),
 		command: "publish-release".to_string(),
 		version: Some("1.0.0".to_string()),
-		group_version: None,
+		versions: BTreeMap::new(),
 		release_targets: Vec::new(),
 		released_packages: Vec::new(),
 		changed_files: Vec::new(),
@@ -13560,7 +13564,7 @@ branches = ["release/*"]
 		created_at: "2024-01-01T00:00:00Z".to_string(),
 		command: "release-pr".to_string(),
 		version: Some("1.0.0".to_string()),
-		group_version: None,
+		versions: BTreeMap::new(),
 		release_targets: vec![monochange_core::ReleaseRecordTarget {
 			id: "test".to_string(),
 			kind: monochange_core::ReleaseOwnerKind::Group,
@@ -13706,7 +13710,7 @@ repo = "monochange"
 		created_at: "2024-01-01T00:00:00Z".to_string(),
 		command: "release-pr".to_string(),
 		version: Some("1.0.0".to_string()),
-		group_version: None,
+		versions: BTreeMap::new(),
 		release_targets: vec![monochange_core::ReleaseRecordTarget {
 			id: "test".to_string(),
 			kind: monochange_core::ReleaseOwnerKind::Group,

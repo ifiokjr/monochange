@@ -800,7 +800,7 @@ fn sample_release_record() -> ReleaseRecord {
 		created_at: "2026-04-07T08:00:00Z".to_string(),
 		command: "release-pr".to_string(),
 		version: Some("1.2.3".to_string()),
-		group_version: Some("1.2.3".to_string()),
+		versions: std::collections::BTreeMap::from([("sdk".to_string(), "1.2.3".to_string())]),
 		release_targets: vec![ReleaseRecordTarget {
 			id: "sdk".to_string(),
 			kind: ReleaseOwnerKind::Group,
