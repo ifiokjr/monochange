@@ -1428,6 +1428,23 @@ pub(crate) fn write_release_record_file(
 	Ok(paths.absolute)
 }
 
+/// Compare two JSON strings for semantic equality.
+/// If the strings are byte-equal, they match immediately.
+/// Otherwise, both are parsed into `serde_json::Value` and compared structurally.
+fn compare_json_strings(json1: &str, json2: &str) -> bool {
+	if json1 == json2 {
+		return true;
+	}
+
+	let parsed1: Result<serde_json::Value, _> = serde_json::from_str(json1);
+	let parsed2: Result<serde_json::Value, _> = serde_json::from_str(json2);
+
+	match (parsed1, parsed2) {
+		(Ok(v1), Ok(v2)) => v1 == v2,
+		_ => false,
+	}
+}
+
 /// Validate that the release record file expected for `manifest` still exists
 /// on disk after re-running deduplication. Called by `commit_release` to
 /// guard against stale or missing records between `prepare_release` and
@@ -1448,19 +1465,9 @@ pub(crate) fn validate_release_record_file(
 		let json = serde_json::to_string_pretty(&record).unwrap_or_default();
 		let existing = fs::read_to_string(&paths.absolute)
 			.map_err(|error| MonochangeError::Io(format!("read release record: {error}")))?;
-		if existing != json {
-			let existing_value =
-				serde_json::from_str::<serde_json::Value>(&existing).map_err(|error| {
-					MonochangeError::Io(format!("parse existing release record: {error}"))
-				})?;
-			let new_value = serde_json::from_str::<serde_json::Value>(&json).map_err(|error| {
-				MonochangeError::Io(format!("parse new release record: {error}"))
-			})?;
-			if existing_value != new_value {
-				fs::write(&paths.absolute, json).map_err(|error| {
-					MonochangeError::Io(format!("update release record: {error}"))
-				})?;
-			}
+		if existing != json && !compare_json_strings(&existing, &json) {
+			fs::write(&paths.absolute, json)
+				.map_err(|error| MonochangeError::Io(format!("update release record: {error}")))?;
 		}
 	} else {
 		return Err(MonochangeError::Io(format!(

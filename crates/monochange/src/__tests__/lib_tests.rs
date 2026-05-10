@@ -5366,6 +5366,30 @@ fn validate_release_record_file_succeeds_when_record_exists_and_matches() {
 }
 
 #[test]
+fn validate_release_record_file_does_not_rewrite_when_only_formatting_differs() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	let expected_path = write_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("write record: {error}"));
+	// Simulate dprint reformatting: write back with tab indentation
+	let content =
+		fs::read_to_string(&expected_path).unwrap_or_else(|error| panic!("read record: {error}"));
+	let reformatted = content.replace("  ", "\t");
+	fs::write(&expected_path, &reformatted)
+		.unwrap_or_else(|error| panic!("reformat record: {error}"));
+	let actual_path = validate_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("validate record: {error}"));
+	assert_eq!(expected_path, actual_path);
+	let after =
+		fs::read_to_string(&actual_path).unwrap_or_else(|error| panic!("read after: {error}"));
+	assert!(
+		after.contains('\t'),
+		"record should keep dprint formatting, got: {after}"
+	);
+}
+
+#[test]
 fn validate_release_record_file_rewrites_record_when_content_differs() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -5385,6 +5409,57 @@ fn validate_release_record_file_rewrites_record_when_content_differs() {
 	assert!(
 		!content.contains(r#""kind":"monochange.releaseRecord""#),
 		"record should have been rewritten, got: {content}"
+	);
+}
+
+#[test]
+fn validate_release_record_file_rewrites_invalid_json() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	let expected_path = write_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("write record: {error}"));
+	fs::write(&expected_path, "not valid json")
+		.unwrap_or_else(|error| panic!("corrupt record: {error}"));
+	let actual_path = validate_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("validate record: {error}"));
+	assert_eq!(expected_path, actual_path);
+	let content =
+		fs::read_to_string(&actual_path).unwrap_or_else(|error| panic!("read rewritten: {error}"));
+	assert!(
+		content.contains("\"kind\": \"monochange.releaseRecord\""),
+		"invalid json should have been rewritten with valid content, got: {content}"
+	);
+}
+
+#[test]
+#[allow(clippy::permissions_set_readonly_false)]
+fn validate_release_record_file_reports_write_error_when_file_is_readonly() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	let expected_path = write_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("write record: {error}"));
+	fs::write(
+		&expected_path,
+		r#"{"schemaVersion":"0.1","kind":"monochange.releaseRecord","createdAt":"2026-01-01T00:00:00Z","command":"test","releaseTargets":[],"releasedPackages":[],"changedFiles":[]}"#,
+	)
+	.unwrap_or_else(|error| panic!("corrupt record: {error}"));
+	let mut permissions = fs::metadata(&expected_path).unwrap().permissions();
+	permissions.set_readonly(true);
+	fs::set_permissions(&expected_path, permissions).unwrap();
+	let result = validate_release_record_file(root, None, &manifest);
+	let mut restore = fs::metadata(&expected_path).unwrap().permissions();
+	restore.set_readonly(false);
+	let _ = fs::set_permissions(&expected_path, restore);
+	assert!(
+		result.is_err(),
+		"expected error for readonly file, got: {result:?}"
+	);
+	let message = result.unwrap_err().to_string();
+	assert!(
+		message.contains("update release record"),
+		"expected 'update release record' in error, got: {message}"
 	);
 }
 
