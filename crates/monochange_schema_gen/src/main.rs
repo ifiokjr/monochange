@@ -1,10 +1,9 @@
-#[allow(dead_code)]
-fn main() {
-	let update_mode = std::env::args().nth(1).as_deref() == Some("update");
-	monochange_schema_gen::run(update_mode);
-}
+#![feature(coverage_attribute)]
 
-#[test]
-fn main_is_covered() {
-	main();
+#[coverage(off)]
+fn main() {
+	if let Err(error) = monochange_schema_gen::run_cli(std::env::args().nth(1).as_deref()) {
+		eprintln!("{error}");
+		std::process::exit(1);
+	}
 }

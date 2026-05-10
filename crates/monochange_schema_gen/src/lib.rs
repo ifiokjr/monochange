@@ -24,35 +24,36 @@ pub fn post_process_release(schema: &mut serde_json::Value, id: &str, title: &st
 		title,
 		"Durable commit-embedded release record schema for monochange artifact version 0.1.",
 	);
-	if let Some(obj) = schema.as_object_mut() {
-		obj.insert(
-			"additionalProperties".to_string(),
-			serde_json::Value::Bool(false),
+	let Some(obj) = schema.as_object_mut() else {
+		return;
+	};
+	obj.insert(
+		"additionalProperties".to_string(),
+		serde_json::Value::Bool(false),
+	);
+	// Override schemaVersion and kind to use const (single allowed value)
+	let Some(props) = schema
+		.pointer_mut("/properties")
+		.and_then(|v| v.as_object_mut())
+	else {
+		return;
+	};
+	if let Some(sv_obj) = props
+		.get_mut("schemaVersion")
+		.and_then(|sv| sv.as_object_mut())
+	{
+		sv_obj.remove("default");
+		sv_obj.insert(
+			"const".to_string(),
+			serde_json::Value::String("0.1".to_string()),
 		);
-		// Override schemaVersion and kind to use const (single allowed value)
-		if let Some(props) = schema
-			.pointer_mut("/properties")
-			.and_then(|v| v.as_object_mut())
-		{
-			if let Some(sv) = props.get_mut("schemaVersion") {
-				if let Some(sv_obj) = sv.as_object_mut() {
-					sv_obj.remove("default");
-					sv_obj.insert(
-						"const".to_string(),
-						serde_json::Value::String("0.1".to_string()),
-					);
-				}
-			}
-			if let Some(kind) = props.get_mut("kind") {
-				if let Some(kind_obj) = kind.as_object_mut() {
-					kind_obj.remove("default");
-					kind_obj.insert(
-						"const".to_string(),
-						serde_json::Value::String("monochange.releaseRecord".to_string()),
-					);
-				}
-			}
-		}
+	}
+	if let Some(kind_obj) = props.get_mut("kind").and_then(|kind| kind.as_object_mut()) {
+		kind_obj.remove("default");
+		kind_obj.insert(
+			"const".to_string(),
+			serde_json::Value::String("monochange.releaseRecord".to_string()),
+		);
 	}
 }
 
@@ -93,12 +94,11 @@ pub fn post_process_config(schema: &mut serde_json::Value, id: &str, title: &str
 		match value {
 			serde_json::Value::Object(obj) => {
 				for (k, v) in obj.iter_mut() {
-					if k == "$ref" {
-						if let serde_json::Value::String(s) = v {
-							for (old, new) in map {
-								*s =
-									s.replace(&format!("#/$defs/{old}"), &format!("#/$defs/{new}"));
-							}
+					if k == "$ref"
+						&& let serde_json::Value::String(s) = v
+					{
+						for (old, new) in map {
+							*s = s.replace(&format!("#/$defs/{old}"), &format!("#/$defs/{new}"));
 						}
 					} else {
 						rename_refs(v, map);
@@ -115,35 +115,43 @@ pub fn post_process_config(schema: &mut serde_json::Value, id: &str, title: &str
 	}
 	rename_refs(schema, &replacements);
 
+	#[allow(clippy::option_map_unit_fn)]
 	// Rename $defs keys and add additionalProperties: false
-	if let Some(defs) = schema.pointer_mut("/$defs").and_then(|v| v.as_object_mut()) {
-		let keys_to_rename: Vec<(String, String, serde_json::Value)> = defs
-			.iter_mut()
-			.filter_map(|(k, v)| {
-				replacements.get(k).map(|new| {
-					if let Some(obj) = v.as_object_mut() {
-						if obj.contains_key("properties") {
+	schema
+		.pointer_mut("/$defs")
+		.and_then(|v| v.as_object_mut())
+		.map(|defs| {
+			let keys_to_rename: Vec<(String, String, serde_json::Value)> = defs
+				.iter_mut()
+				.filter_map(|(k, v)| {
+					replacements.get(k).map(|new| {
+						if let Some(obj) = v.as_object_mut()
+							&& obj.contains_key("properties")
+						{
 							obj.insert(
 								"additionalProperties".to_string(),
 								serde_json::Value::Bool(false),
 							);
 						}
-					}
-					(k.clone(), new.clone(), v.clone())
+						(k.clone(), new.clone(), v.clone())
+					})
 				})
-			})
-			.collect();
-		for (old, new, value) in keys_to_rename {
-			defs.remove(&old);
-			defs.insert(new, value);
-		}
-	}
+				.collect();
+			for (old, new, value) in keys_to_rename {
+				defs.remove(&old);
+				defs.insert(new, value);
+			}
+		});
 }
 
 /// Generate schema JSON strings and write them to disk (update_mode) or compare to disk (check mode).
-pub fn run(update_mode: bool) {
-	let schemas_dir = PathBuf::from("crates/monochange_schema/schemas");
-	let docs_schemas_dir = PathBuf::from("docs/src/schemas");
+///
+/// Returns `Ok(())` on success, or an error message describing the mismatch.
+pub fn run(update_mode: bool) -> Result<(), String> {
+	let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+	let workspace_dir = crate_dir.parent().unwrap().parent().unwrap();
+	let schemas_dir = workspace_dir.join("crates/monochange_schema/schemas");
+	let docs_schemas_dir = workspace_dir.join("docs/src/schemas");
 	let version = monochange_schema::CURRENT_SCHEMA_VERSION_TEXT;
 
 	// Release record schema
@@ -222,26 +230,43 @@ pub fn run(update_mode: bool) {
 		.unwrap();
 
 		println!("Schemas updated successfully.");
-	} else {
-		// Check mode: compare existing files
-		let check_file = |path: &PathBuf, content: &str| {
-			if path.exists() {
-				let existing = fs::read_to_string(path).unwrap();
-				if existing != content {
-					eprintln!("Schema mismatch: {}", path.display());
-					std::process::exit(1);
-				}
-			} else {
-				eprintln!("Schema file missing: {}", path.display());
-				std::process::exit(1);
-			}
-		};
-
-		check_file(&release_path, &release_json);
-		check_file(&config_path, &config_json);
-
-		println!("Schemas are up to date.");
+		return Ok(());
 	}
+
+	// Check mode: compare existing files
+	check_schemas(&[
+		(&release_path, release_json.as_str()),
+		(&config_path, config_json.as_str()),
+	])
+}
+
+/// Compare expected schema JSON strings against files on disk.
+fn check_schemas(paths: &[(&PathBuf, &str)]) -> Result<(), String> {
+	let mut errors = Vec::new();
+	for (path, expected) in paths {
+		if path.exists() {
+			let existing = fs::read_to_string(path).unwrap();
+			if existing != *expected {
+				errors.push(format!("Schema mismatch: {}", path.display()));
+			}
+		} else {
+			errors.push(format!("Schema file missing: {}", path.display()));
+		}
+	}
+	if errors.is_empty() {
+		println!("Schemas are up to date.");
+		Ok(())
+	} else {
+		Err(errors.join("\n"))
+	}
+}
+
+/// CLI entry point that parses the subcommand and delegates to [`run`].
+///
+/// Returns an error message if schema generation or validation fails.
+pub fn run_cli(subcommand: Option<&str>) -> Result<(), String> {
+	let update_mode = subcommand == Some("update");
+	run(update_mode)
 }
 
 #[cfg(test)]
@@ -314,6 +339,60 @@ mod tests {
 	}
 
 	#[test]
+	fn post_process_release_non_object() {
+		let mut schema = serde_json::Value::Null;
+		post_process_release(
+			&mut schema,
+			"https://example.com/release.json",
+			"release record",
+		);
+		// Should not panic and not modify
+		assert!(schema.is_null());
+	}
+
+	#[test]
+	fn post_process_release_no_properties() {
+		let mut schema = serde_json::json!({
+			"type": "object",
+			"title": "test"
+		});
+		post_process_release(
+			&mut schema,
+			"https://example.com/release.json",
+			"release record",
+		);
+		let obj = schema.as_object().unwrap();
+		assert_eq!(
+			obj.get("additionalProperties"),
+			Some(&serde_json::Value::Bool(false))
+		);
+	}
+
+	#[test]
+	fn post_process_release_converts_kind_to_const() {
+		let mut schema = serde_json::json!({
+			"type": "object",
+			"properties": {
+				"kind": {"type": "string", "default": "default.kind"}
+			}
+		});
+		post_process_release(
+			&mut schema,
+			"https://example.com/release.json",
+			"release record",
+		);
+		let props = schema.pointer("/properties").unwrap().as_object().unwrap();
+		let kind = props.get("kind").unwrap().as_object().unwrap();
+		assert!(!kind.contains_key("default"));
+		assert_eq!(
+			kind.get("const"),
+			Some(&serde_json::Value::String(
+				"monochange.releaseRecord".to_string()
+			))
+		);
+	}
+
+	#[test]
 	fn post_process_config_renames_defs() {
 		let mut schema = serde_json::json!({
 			"type": "object",
@@ -366,5 +445,33 @@ mod tests {
 				"#/$defs/packageDefinition".to_string()
 			))
 		);
+	}
+
+	#[test]
+	fn run_cli_round_trip() {
+		// Update writes schemas, check validates them
+		assert!(run_cli(Some("update")).is_ok());
+		assert!(run_cli(None).is_ok());
+	}
+
+	#[test]
+	fn check_schemas_mismatch() {
+		let temp_path = PathBuf::from("/tmp/test-schema-mismatch.json");
+		fs::write(&temp_path, "wrong content").unwrap();
+		let paths = [(&temp_path, "expected content")];
+		let result = check_schemas(&paths);
+		fs::remove_file(&temp_path).unwrap();
+		assert!(result.is_err());
+		assert!(result.unwrap_err().contains("mismatch"));
+	}
+
+	#[test]
+	fn check_schemas_missing() {
+		let temp_path = PathBuf::from("/tmp/test-schema-missing.json");
+		let _ = fs::remove_file(&temp_path);
+		let paths = [(&temp_path, "expected content")];
+		let result = check_schemas(&paths);
+		assert!(result.is_err());
+		assert!(result.unwrap_err().contains("missing"));
 	}
 }
