@@ -4,6 +4,130 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)
+
+### Added
+
+#### Add `always_run` primitive to CLI steps and group/ecosystem filters to `PublishPackages`
+
+##### `always_run` primitive
+
+A new `always_run` boolean field is available on every CLI step definition. When `always_run: true`, the step continues to execute even when a previous step in the same command has failed.
+
+This enables composable dry-run workflows such as:
+
+```toml
+[[cli.publish-dry-run]]
+name = "publish-dry-run"
+help_text = "Preview publishing without side effects"
+steps = [
+	{ type = "PrepareRelease", name = "prepare", inputs = { allow_empty_changesets = "true" } },
+	{ type = "PublishPackages", name = "publish", always_run = true, inputs = { resume = ".monochange/local/previous-result.json" } },
+]
+```
+
+Running `mc publish-dry-run --dry-run` will always execute the `PublishPackages` step regardless of whether `PrepareRelease` succeeds, because `PublishPackages` is marked `always_run = true`.
+
+###### Behavior
+
+- When a step fails and later steps have `always_run: true`, those steps still execute.
+- Non-`always_run` steps after a failure are skipped.
+- The overall command still returns the first error after all `always_run` steps finish.
+
+##### `PublishPackages` filters
+
+`PublishPackages` now accepts two new step inputs:
+
+- `--group <group-id>` — resolves a group from the workspace configuration and publishes all packages in that group.
+- `--ecosystem <ecosystem>` — filters publication targets to a specific ecosystem (`cargo`, `npm`, `deno`, `dart`, `flutter`, `python`, or `go`).
+
+Both inputs can be repeated:
+
+```bash
+mc publish --group sdk --group apps --ecosystem npm --ecosystem cargo
+```
+
+Groups are resolved to their member packages before ecosystem filtering is applied.
+
+##### Dry-run guards
+
+`PublishPackages` now skips the following side-effecting operations when `--dry-run` is active:
+
+- `release_branch_policy::verify_release_ref_for_publish`
+- `publish_rate_limits::enforce_publish_rate_limits`
+- writing the publish report artifact to disk
+
+##### Per-command `dry_run` field
+
+CLI command definitions now support a `dry_run` boolean field. When `dry_run = true`, the command always executes in dry-run mode regardless of whether `--dry-run` is passed on the CLI. This enables built-in preview commands such as:
+
+```toml
+[cli.publish-check]
+help_text = "Validate the release and preview package publishing in dry-run mode"
+dry_run = true
+steps = [
+	{ type = "PrepareRelease", name = "plan release" },
+	{ type = "PublishPackages", name = "publish packages dry run" },
+]
+```
+
+Running `mc publish-check` (without `--dry-run`) will still run in dry-run mode because the command definition sets `dry_run = true`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #426](https://github.com/monochange/monochange/pull/426) _Introduced in:_ [`6ea6236`](https://github.com/monochange/monochange/commit/6ea623624e36d795edd531ae72080a2e9c3fb86a)
+
+#### Migrate JSON Schema generation from hand-tuned templates to schemars
+
+Schema assets (`monochange.schema.json` and `release-record.schema.json`) are now generated from the Rust type tree via the `schemars` crate, eliminating manual drift between source types and committed schemas.
+
+###### Added
+
+- `schema` feature on `monochange_core` and `monochange_config` gating `schemars`.
+- `JsonSchema` derives on `ReleaseRecord`, `RawWorkspaceConfiguration`, and their transitive types.
+- `monochange_core::schema` and `monochange_config::schema` modules providing `release_record()` and `workspace_configuration()` schema generation functions.
+- `xtask` binary crate providing `schema update` and `schema check` subcommands, with a `cargo xtask` alias.
+
+###### Changed
+
+- `devenv.nix` `schema:update` / `schema:check` now invoke `cargo xtask schema update` and `cargo xtask schema check`.
+- `$defs` keys use camelCase names (e.g. `packageDefinition`) via `#[schemars(rename)]` attributes.
+- Release-record `schemaVersion` and `kind` emit `const` constraints instead of `default`.
+
+###### Removed
+
+- `scripts/schema-assets.sh` shell script.
+- `schemas/templates/*.schema.template.json` template files.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #438](https://github.com/monochange/monochange/pull/438) _Introduced in:_ [`d0676f0`](https://github.com/monochange/monochange/commit/d0676f067299fb4db38cc748dcbb619ab7532a49)
+
+### Fixed
+
+#### allow boolean and numeric literals in `CliInputDefinition.default`
+
+The JSON schema for `monochange.toml` `[cli.*.inputs]` previously rejected boolean and numeric defaults, even though the Rust deserializer already accepted them correctly.
+
+**Before:**
+
+```toml
+[[cli.release-pr.inputs]]
+name = "no_verify"
+type = "boolean"
+default = true # jsonschema error: "true is not of types \"null\", \"string\""
+```
+
+**After:**
+
+The `default` field in `CliInputDefinition` now accepts `string | boolean | integer | number | null` in the generated schema. TOML like the snippet above validates cleanly, and numeric defaults such as `default = 42` are also accepted.
+
+The internal `CliInputDefault` enum gained `Integer(i64)` and `Number(f64)` variants, and the `schemars` derive now generates a multi-type `anyOf` schema for the `default` property.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #445](https://github.com/monochange/monochange/pull/445) _Introduced in:_ [`1d42ece`](https://github.com/monochange/monochange/commit/1d42ece77ceda58cd44ce67749c5faa5d4ec8314)
+
+#### Split crate boundaries for changelog, config, and publish behavior
+
+Move changelog rendering into `monochange_changelog`, shift publish planning and execution helpers into `monochange_publish`, and reduce direct concrete ecosystem/provider dependencies in `monochange_config`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #441](https://github.com/monochange/monochange/pull/441) _Introduced in:_ [`ae8ea56`](https://github.com/monochange/monochange/commit/ae8ea563ae95c6cc4e8d3d1acdc5303069ea44cf)
+
 ## [0.4.0](https://github.com/monochange/monochange/releases/tag/v0.4.0) (2026-05-09)
 
 ### Added

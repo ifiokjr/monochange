@@ -4,6 +4,144 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)
+
+### Added
+
+#### Add `always_run` primitive to CLI steps and group/ecosystem filters to `PublishPackages`
+
+##### `always_run` primitive
+
+A new `always_run` boolean field is available on every CLI step definition. When `always_run: true`, the step continues to execute even when a previous step in the same command has failed.
+
+This enables composable dry-run workflows such as:
+
+```toml
+[[cli.publish-dry-run]]
+name = "publish-dry-run"
+help_text = "Preview publishing without side effects"
+steps = [
+	{ type = "PrepareRelease", name = "prepare", inputs = { allow_empty_changesets = "true" } },
+	{ type = "PublishPackages", name = "publish", always_run = true, inputs = { resume = ".monochange/local/previous-result.json" } },
+]
+```
+
+Running `mc publish-dry-run --dry-run` will always execute the `PublishPackages` step regardless of whether `PrepareRelease` succeeds, because `PublishPackages` is marked `always_run = true`.
+
+###### Behavior
+
+- When a step fails and later steps have `always_run: true`, those steps still execute.
+- Non-`always_run` steps after a failure are skipped.
+- The overall command still returns the first error after all `always_run` steps finish.
+
+##### `PublishPackages` filters
+
+`PublishPackages` now accepts two new step inputs:
+
+- `--group <group-id>` — resolves a group from the workspace configuration and publishes all packages in that group.
+- `--ecosystem <ecosystem>` — filters publication targets to a specific ecosystem (`cargo`, `npm`, `deno`, `dart`, `flutter`, `python`, or `go`).
+
+Both inputs can be repeated:
+
+```bash
+mc publish --group sdk --group apps --ecosystem npm --ecosystem cargo
+```
+
+Groups are resolved to their member packages before ecosystem filtering is applied.
+
+##### Dry-run guards
+
+`PublishPackages` now skips the following side-effecting operations when `--dry-run` is active:
+
+- `release_branch_policy::verify_release_ref_for_publish`
+- `publish_rate_limits::enforce_publish_rate_limits`
+- writing the publish report artifact to disk
+
+##### Per-command `dry_run` field
+
+CLI command definitions now support a `dry_run` boolean field. When `dry_run = true`, the command always executes in dry-run mode regardless of whether `--dry-run` is passed on the CLI. This enables built-in preview commands such as:
+
+```toml
+[cli.publish-check]
+help_text = "Validate the release and preview package publishing in dry-run mode"
+dry_run = true
+steps = [
+	{ type = "PrepareRelease", name = "plan release" },
+	{ type = "PublishPackages", name = "publish packages dry run" },
+]
+```
+
+Running `mc publish-check` (without `--dry-run`) will still run in dry-run mode because the command definition sets `dry_run = true`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #426](https://github.com/monochange/monochange/pull/426) _Introduced in:_ [`6ea6236`](https://github.com/monochange/monochange/commit/6ea623624e36d795edd531ae72080a2e9c3fb86a)
+
+#### Add persistent deduplication index and content-hash fast path for release records
+
+Introduce a JSONL index at `.monochange/local/release-index.jsonl` that survives across CLI invocations, eliminating repeated directory scans when checking for duplicate release records. A fast path in `validate_release_record_file` now compares the `releaseTargets` identity of an existing file against the manifest before rebuilding the full `ReleaseRecord`, skipping unnecessary I/O when the targets match.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #435](https://github.com/monochange/monochange/pull/435) _Introduced in:_ [`b906cab`](https://github.com/monochange/monochange/commit/b906cab608c84b30bfd429298892a80766221ef6) _Closed issues:_ [#430](https://github.com/monochange/monochange/issues/430)
+
+#### Sort release targets and hash identity fields directly
+
+`release_targets_hash` now sorts targets by `(id, kind, version)` before hashing and only feeds identity fields (`id`, `kind`, `version`) into the hasher. Operational flags (`tag`, `release`, `tag_name`, `version_format`, `members`) are excluded from the hash so that path identity matches release identity.
+
+`ReleasePaths::from_manifest` computes the hash directly from the manifest without building the intermediate `ReleaseRecord`, and `write_release_record_file` now checks file existence before doing any expensive work.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #431](https://github.com/monochange/monochange/pull/431) _Introduced in:_ [`88a6e4c`](https://github.com/monochange/monochange/commit/88a6e4cea075da0b1745cd24a0a150ebea99bb83) _Closed issues:_ [#430](https://github.com/monochange/monochange/issues/430)
+
+### Fixed
+
+#### Split crate boundaries for changelog, config, and publish behavior
+
+Move changelog rendering into `monochange_changelog`, shift publish planning and execution helpers into `monochange_publish`, and reduce direct concrete ecosystem/provider dependencies in `monochange_config`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #441](https://github.com/monochange/monochange/pull/441) _Introduced in:_ [`ae8ea56`](https://github.com/monochange/monochange/commit/ae8ea563ae95c6cc4e8d3d1acdc5303069ea44cf)
+
+#### Fix release record reformatting after dprint
+
+Prevent `commit_release` from rewriting `release.json` after `dprint fmt` has already formatted it. The validation now compares parsed JSON values instead of raw strings, so formatting-only differences (such as tab vs space indentation) no longer trigger a rewrite.
+
+The `CommitRelease` step now accepts an `update_release_json` input (default `false`). When `true`, the step will create or overwrite the `release.json` file if it is missing or mismatched. When `false`, a mismatch produces a clear error asking the user to set `update_release_json = true`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #439](https://github.com/monochange/monochange/pull/439) _Introduced in:_ [`f4b324e`](https://github.com/monochange/monochange/commit/f4b324ec920ea787ec6d5c511b81d9c22fbad753)
+
+#### Release PR formatting, schema version, and publish batch ordering
+
+1. Format generated `.monochange/releases/` manifests via `dprint fmt` in `[cli.release-pr]`.
+2. Derive expected schema versions in snapshots and tests from the actual `Cargo.toml` version instead of hardcoding `0.0`.
+3. Topologically sort publish requests by both runtime and development dependencies before batching so dependencies are published before dependents.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #436](https://github.com/monochange/monochange/pull/436) _Introduced in:_ [`ea78ccc`](https://github.com/monochange/monochange/commit/ea78ccc844318b0645010f15fcf60b9d8ea6a58c) _Related issues:_ [#434](https://github.com/monochange/monochange/issues/434)
+
+#### Replace release record `groupVersion` with `versions`
+
+Release records now include a `versions` map keyed by released package or group id, and no longer write the redundant `groupVersion` field.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #450](https://github.com/monochange/monochange/pull/450) _Introduced in:_ [`375bc19`](https://github.com/monochange/monochange/commit/375bc19dc69c125ffbd944d016b16ebc1c8cb7c5)
+
+### Documentation
+
+#### Document `CommitRelease.update_release_json` option
+
+Add comprehensive documentation for the `update_release_json` step-level input on `CommitRelease`:
+
+- Document the input in the `CommitRelease` CLI step reference with type, default, and description
+- Explain semantic JSON comparison (formatting-only differences such as indentation or key ordering are ignored)
+- Add a new composition example showing how to combine `dprint fmt` formatting with `CommitRelease` using `update_release_json = true`
+- Add a new common-mistake entry about running formatters between `PrepareRelease` and `CommitRelease` without setting the input
+- Document the field in the configuration guide's workflow variables section
+- Regenerate JSON Schema assets to include the new `update_release_json` field in `CommitRelease` step definitions
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #443](https://github.com/monochange/monochange/pull/443) _Introduced in:_ [`4b8cc5a`](https://github.com/monochange/monochange/commit/4b8cc5a25644ab3623177c08bd7904c649ea67a0)
+
+### Other
+
+#### Update release commands to regenerate JSON schemas
+
+Before `dprint fmt`, both commands now regenerate JSON schemas from schemars-annotated types so that committed schema assets stay in sync with the source code.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #442](https://github.com/monochange/monochange/pull/442) _Introduced in:_ [`66260c9`](https://github.com/monochange/monochange/commit/66260c9ff4880b73725807ada2ff67ed24c3096a)
+
 ## [0.4.0](https://github.com/monochange/monochange/releases/tag/v0.4.0) (2026-05-09)
 
 ### Breaking Change
