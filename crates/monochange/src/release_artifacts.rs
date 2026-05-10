@@ -1449,8 +1449,18 @@ pub(crate) fn validate_release_record_file(
 		let existing = fs::read_to_string(&paths.absolute)
 			.map_err(|error| MonochangeError::Io(format!("read release record: {error}")))?;
 		if existing != json {
-			fs::write(&paths.absolute, json)
-				.map_err(|error| MonochangeError::Io(format!("update release record: {error}")))?;
+			let existing_value =
+				serde_json::from_str::<serde_json::Value>(&existing).map_err(|error| {
+					MonochangeError::Io(format!("parse existing release record: {error}"))
+				})?;
+			let new_value = serde_json::from_str::<serde_json::Value>(&json).map_err(|error| {
+				MonochangeError::Io(format!("parse new release record: {error}"))
+			})?;
+			if existing_value != new_value {
+				fs::write(&paths.absolute, json).map_err(|error| {
+					MonochangeError::Io(format!("update release record: {error}"))
+				})?;
+			}
 		}
 	} else {
 		return Err(MonochangeError::Io(format!(
