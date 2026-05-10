@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 use std::path::Path;
 
 use monochange_core::VersionFormat;
@@ -124,8 +125,8 @@ fn tag_prefix_for_identity_matches_primary_and_namespaced_tags() {
 	assert_eq!(tag_prefix_for_identity(&primary), "v");
 }
 
-#[test]
-fn render_analyze_report_supports_json_with_explicit_refs() {
+#[tokio::test(flavor = "multi_thread")]
+async fn render_analyze_report_supports_json_with_explicit_refs() {
 	let tempdir = setup_analyze_repo(true, true);
 	let rendered = render_analyze_report(
 		tempdir.path(),
@@ -136,6 +137,7 @@ fn render_analyze_report_supports_json_with_explicit_refs() {
 		"semantic",
 		OutputFormat::Json,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("render analyze json: {error}"));
 
 	assert!(rendered.contains("\"release\": \"v1.0.0\""));
@@ -144,8 +146,8 @@ fn render_analyze_report_supports_json_with_explicit_refs() {
 	assert!(rendered.contains("\"itemPath\": \"shout\""));
 }
 
-#[test]
-fn render_analyze_report_supports_first_release_fallback_and_text_warnings() {
+#[tokio::test(flavor = "multi_thread")]
+async fn render_analyze_report_supports_first_release_fallback_and_text_warnings() {
 	let tempdir = setup_analyze_repo(false, false);
 	let rendered = render_analyze_report(
 		tempdir.path(),
@@ -156,6 +158,7 @@ fn render_analyze_report_supports_first_release_fallback_and_text_warnings() {
 		"signature",
 		OutputFormat::Text,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("render analyze text: {error}"));
 
 	assert!(rendered.contains("release: none"));
@@ -164,13 +167,14 @@ fn render_analyze_report_supports_first_release_fallback_and_text_warnings() {
 	assert!(rendered.contains("main -> head:"));
 }
 
-#[test]
-fn parse_detection_level_and_default_branch_helpers_cover_error_paths() {
+#[tokio::test(flavor = "multi_thread")]
+async fn parse_detection_level_and_default_branch_helpers_cover_error_paths() {
 	let invalid_level = parse_detection_level("deep").unwrap_err().render();
 	assert!(invalid_level.contains("unknown detection level"));
 
 	let missing_repo = TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let default_branch_error = default_branch_name(missing_repo.path())
+		.await
 		.unwrap_err()
 		.render();
 	assert!(default_branch_error.contains("could not determine default branch"));
@@ -190,16 +194,18 @@ fn parse_origin_head_branch_covers_attached_and_unset_values() {
 	assert_eq!(parse_origin_head_branch(""), None);
 }
 
-#[test]
-fn default_branch_and_release_tag_resolution_cover_origin_head_and_missing_identity_paths() {
+#[tokio::test(flavor = "multi_thread")]
+async fn default_branch_and_release_tag_resolution_cover_origin_head_and_missing_identity_paths() {
 	let tempdir = setup_analyze_repo(true, true);
 	assert_eq!(
 		default_branch_name(tempdir.path())
+			.await
 			.unwrap_or_else(|error| panic!("default branch: {error}")),
 		"main"
 	);
 	assert_eq!(
 		latest_release_tag_for_identity(tempdir.path(), None)
+			.await
 			.unwrap_or_else(|error| panic!("no identity: {error}")),
 		None
 	);
@@ -215,6 +221,7 @@ fn default_branch_and_release_tag_resolution_cover_origin_head_and_missing_ident
 	};
 	assert_eq!(
 		latest_release_tag_for_identity(tempdir.path(), Some(&no_tag_identity))
+			.await
 			.unwrap_or_else(|error| panic!("no tag identity: {error}")),
 		None
 	);
@@ -274,8 +281,8 @@ fn render_frame_section_covers_change_and_warning_paths() {
 	assert!(rendered.contains("frame warning"));
 }
 
-#[test]
-fn latest_release_tag_and_text_rendering_cover_warning_branches() {
+#[tokio::test(flavor = "multi_thread")]
+async fn latest_release_tag_and_text_rendering_cover_warning_branches() {
 	let missing_repo = TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let identity = EffectiveReleaseIdentity {
 		owner_id: "sdk".to_string(),
@@ -287,6 +294,7 @@ fn latest_release_tag_and_text_rendering_cover_warning_branches() {
 		members: vec!["core".to_string()],
 	};
 	let tag_error = latest_release_tag_for_identity(missing_repo.path(), Some(&identity))
+		.await
 		.unwrap_err()
 		.render();
 	assert!(tag_error.contains("failed to list git tags"));
@@ -329,8 +337,8 @@ fn latest_release_tag_and_text_rendering_cover_warning_branches() {
 	assert!(rendered.contains("frame warning"));
 }
 
-#[test]
-fn render_analyze_report_propagates_workspace_errors() {
+#[tokio::test(flavor = "multi_thread")]
+async fn render_analyze_report_propagates_workspace_errors() {
 	let missing_workspace = TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let error = render_analyze_report(
 		missing_workspace.path(),
@@ -341,6 +349,7 @@ fn render_analyze_report_propagates_workspace_errors() {
 		"semantic",
 		OutputFormat::Markdown,
 	)
+	.await
 	.unwrap_err()
 	.render();
 

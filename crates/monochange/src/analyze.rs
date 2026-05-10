@@ -242,7 +242,8 @@ async fn default_branch_name(root: &Path) -> MonochangeResult<String> {
 		root,
 		&["rev-parse", "--abbrev-ref", "origin/HEAD"],
 		"failed to determine default branch from origin/HEAD",
-	).await
+	)
+	.await
 	.ok()
 	.and_then(|symbolic_ref| parse_origin_head_branch(&symbolic_ref));
 	match result {
@@ -279,7 +280,8 @@ async fn latest_release_tag_for_identity(
 		root,
 		&["tag", "--list", "--sort=-v:refname"],
 		"failed to list git tags for release baseline resolution",
-	).await?;
+	)
+	.await?;
 	let latest = tag_output
 		.lines()
 		.map(str::trim)

@@ -876,10 +876,22 @@ fn normalize_ecosystem_settings(
 	inferred_ecosystem_type: EcosystemType,
 	raw: RawEcosystemSettings,
 ) -> MonochangeResult<EcosystemSettings> {
-	#[rustfmt::skip]
-	let publish = normalize_publish_settings(contents, None, raw.publish, "ecosystems", owner_id, inferred_ecosystem_type)?;
-	#[rustfmt::skip]
-	let versioned_files = normalize_versioned_files(contents, raw.versioned_files, inferred_ecosystem_type, "ecosystems", owner_id, true)?;
+	let publish = normalize_publish_settings(
+		contents,
+		None,
+		raw.publish,
+		"ecosystems",
+		owner_id,
+		inferred_ecosystem_type,
+	)?;
+	let versioned_files = normalize_versioned_files(
+		contents,
+		raw.versioned_files,
+		inferred_ecosystem_type,
+		"ecosystems",
+		owner_id,
+		true,
+	)?;
 
 	Ok(EcosystemSettings {
 		enabled: raw.enabled,
@@ -896,8 +908,7 @@ fn normalize_ecosystem_settings(
 fn default_publish_registry_for_ecosystem(
 	inferred_ecosystem_type: EcosystemType,
 ) -> Option<PublishRegistry> {
-	#[rustfmt::skip]
-	let registry = match inferred_ecosystem_type {
+	match inferred_ecosystem_type {
 		EcosystemType::Cargo => Some(PublishRegistry::Builtin(RegistryKind::CratesIo)),
 		EcosystemType::Npm => Some(PublishRegistry::Builtin(RegistryKind::Npm)),
 		EcosystemType::Deno => Some(PublishRegistry::Builtin(RegistryKind::Jsr)),
@@ -905,8 +916,7 @@ fn default_publish_registry_for_ecosystem(
 		EcosystemType::Python => Some(PublishRegistry::Builtin(RegistryKind::Pypi)),
 		EcosystemType::Go => Some(PublishRegistry::Builtin(RegistryKind::GoProxy)),
 		_ => None,
-	};
-	registry
+	}
 }
 
 fn normalize_trusted_publishing_settings(
@@ -1133,17 +1143,13 @@ fn build_package_definitions(
 
 			let publish = normalize_publish_settings(
 				contents,
-				Some({
-					#[rustfmt::skip]
-					let publish = match inferred_ecosystem_type {
-						EcosystemType::Npm => &npm_ecosystem.publish,
-						EcosystemType::Deno => &deno_ecosystem.publish,
-						EcosystemType::Dart => &dart_ecosystem.publish,
-						EcosystemType::Python => &python_ecosystem.publish,
-						EcosystemType::Go => &go_ecosystem.publish,
-						_ => &cargo_ecosystem.publish,
-					};
-					publish
+				Some(match inferred_ecosystem_type {
+					EcosystemType::Npm => &npm_ecosystem.publish,
+					EcosystemType::Deno => &deno_ecosystem.publish,
+					EcosystemType::Dart => &dart_ecosystem.publish,
+					EcosystemType::Python => &python_ecosystem.publish,
+					EcosystemType::Go => &go_ecosystem.publish,
+					_ => &cargo_ecosystem.publish,
 				}),
 				package.publish,
 				"package",
@@ -5110,7 +5116,6 @@ fn validate_single_versioned_file_content(
 	Ok(())
 }
 
-#[rustfmt::skip]
 fn validate_ecosystem_version_readable(
 	full_path: &Path,
 	display_path: &str,
@@ -5144,12 +5149,17 @@ fn validate_ecosystem_version_readable(
 		}
 	};
 	let value_is_string = |value: &serde_json::Value, field: &str| {
-		value.get(field).and_then(serde_json::Value::as_str).is_some()
+		value
+			.get(field)
+			.and_then(serde_json::Value::as_str)
+			.is_some()
 	};
 	match ecosystem_type {
 		EcosystemType::Npm | EcosystemType::Deno => {
 			let value: serde_json::Value = serde_json::from_str(&contents).map_err(|error| {
-				MonochangeError::Config(format!("{owner_kind} `{owner_id}` `{display_path}` is not valid JSON: {error}"))
+				MonochangeError::Config(format!(
+					"{owner_kind} `{owner_id}` `{display_path}` is not valid JSON: {error}"
+				))
 			})?;
 			for field in field_names {
 				if value_is_string(&value, field) {
@@ -5159,9 +5169,12 @@ fn validate_ecosystem_version_readable(
 			}
 		}
 		EcosystemType::Dart => {
-			let value: serde_yaml_ng::Value = serde_yaml_ng::from_str(&contents).map_err(|error| {
-				MonochangeError::Config(format!("{owner_kind} `{owner_id}` `{display_path}` is not valid YAML: {error}"))
-			})?;
+			let value: serde_yaml_ng::Value =
+				serde_yaml_ng::from_str(&contents).map_err(|error| {
+					MonochangeError::Config(format!(
+						"{owner_kind} `{owner_id}` `{display_path}` is not valid YAML: {error}"
+					))
+				})?;
 			for field in field_names {
 				let is_string = value
 					.get(field)

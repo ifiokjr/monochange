@@ -438,56 +438,66 @@ fn gitlab_json_helpers_cover_not_found_and_status_errors() {
 	let base = server.base_url();
 	let headers = auth_headers("token").unwrap_or_else(|error| panic!("headers: {error}"));
 
-	let missing_value = tokio::runtime::Runtime::new().unwrap().block_on(get_optional_json::<serde_json::Value>(
-		&client,
-		&headers,
-		&format!("{base}/missing"),
-		"GitLab",
-	))
-	.unwrap_or_else(|error| panic!("optional json: {error}"));
+	let missing_value = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(get_optional_json::<serde_json::Value>(
+			&client,
+			&headers,
+			&format!("{base}/missing"),
+			"GitLab",
+		))
+		.unwrap_or_else(|error| panic!("optional json: {error}"));
 	assert_eq!(missing_value, None);
 
-	let get_error =
-		tokio::runtime::Runtime::new().unwrap().block_on(get_json::<serde_json::Value>(&client, &headers, &format!("{base}/fail-get"), "GitLab"))
-
-			.err()
-			.unwrap_or_else(|| panic!("expected get error"));
+	let get_error = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(get_json::<serde_json::Value>(
+			&client,
+			&headers,
+			&format!("{base}/fail-get"),
+			"GitLab",
+		))
+		.err()
+		.unwrap_or_else(|| panic!("expected get error"));
 	assert!(get_error.to_string().contains("GitLab API GET"));
 
-	let post_error = tokio::runtime::Runtime::new().unwrap().block_on(post_json::<_, serde_json::Value>(
-		&client,
-		&headers,
-		&format!("{base}/fail-post"),
-		&serde_json::json!({"tag_name": "v1.2.3"}),
-		"GitLab",
-	))
-
-	.err()
-	.unwrap_or_else(|| panic!("expected post error"));
+	let post_error = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(post_json::<_, serde_json::Value>(
+			&client,
+			&headers,
+			&format!("{base}/fail-post"),
+			&serde_json::json!({"tag_name": "v1.2.3"}),
+			"GitLab",
+		))
+		.err()
+		.unwrap_or_else(|| panic!("expected post error"));
 	assert!(post_error.to_string().contains("GitLab API POST"));
 
-	let put_error = tokio::runtime::Runtime::new().unwrap().block_on(put_json::<_, serde_json::Value>(
-		&client,
-		&headers,
-		&format!("{base}/fail-put"),
-		&serde_json::json!({"title": "Release"}),
-		"GitLab",
-	))
-
-	.err()
-	.unwrap_or_else(|| panic!("expected put error"));
+	let put_error = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(put_json::<_, serde_json::Value>(
+			&client,
+			&headers,
+			&format!("{base}/fail-put"),
+			&serde_json::json!({"title": "Release"}),
+			"GitLab",
+		))
+		.err()
+		.unwrap_or_else(|| panic!("expected put error"));
 	assert!(put_error.to_string().contains("GitLab API PUT"));
 
-	let patch_error = tokio::runtime::Runtime::new().unwrap().block_on(patch_json::<_, serde_json::Value>(
-		&client,
-		&headers,
-		&format!("{base}/fail-patch"),
-		&serde_json::json!({"name": "v1.2.3"}),
-		"GitLab",
-	))
-
-	.err()
-	.unwrap_or_else(|| panic!("expected patch error"));
+	let patch_error = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(patch_json::<_, serde_json::Value>(
+			&client,
+			&headers,
+			&format!("{base}/fail-patch"),
+			&serde_json::json!({"name": "v1.2.3"}),
+			"GitLab",
+		))
+		.err()
+		.unwrap_or_else(|| panic!("expected patch error"));
 	assert!(patch_error.to_string().contains("GitLab API PATCH"));
 
 	missing.assert();
@@ -591,8 +601,9 @@ fn publish_release_requests_creates_release_via_gitlab_api() {
 	let manifest = sample_manifest();
 	let requests = build_release_requests(&source, &manifest);
 	let outcomes = with_gitlab_env(Some("token"), || {
-		tokio::runtime::Runtime::new().unwrap().block_on(publish_release_requests(&source, &requests))
-
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(publish_release_requests(&source, &requests))
 			.unwrap_or_else(|error| panic!("publish release: {error}"))
 	});
 	lookup.assert();
@@ -627,8 +638,9 @@ fn publish_release_requests_updates_existing_release_via_gitlab_api() {
 	let requests = build_release_requests(&source, &sample_manifest());
 
 	let outcomes = with_gitlab_env(Some("token"), || {
-		tokio::runtime::Runtime::new().unwrap().block_on(publish_release_requests(&source, &requests))
-
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(publish_release_requests(&source, &requests))
 			.unwrap_or_else(|error| panic!("publish release: {error}"))
 	});
 
@@ -655,7 +667,9 @@ fn publish_release_requests_reports_gitlab_api_errors() {
 	let requests = build_release_requests(&source, &sample_manifest());
 
 	let error = with_gitlab_env(Some("token"), || {
-		tokio::runtime::Runtime::new().unwrap().block_on(publish_release_requests(&source, &requests))
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(publish_release_requests(&source, &requests))
 	})
 	.err()
 	.unwrap_or_else(|| panic!("expected publish error"));
@@ -692,15 +706,16 @@ fn publish_release_pull_request_create_branch_is_covered_without_etest() {
 	request.labels.clear();
 
 	let outcome = with_gitlab_env(Some("token"), || {
-		tokio::runtime::Runtime::new().unwrap().block_on(publish_release_pull_request(
-			&source,
-			&repo,
-			&request,
-			&[PathBuf::from("release.txt")],
-			false,
-		))
-
-		.unwrap_or_else(|error| panic!("publish merge request: {error}"))
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(publish_release_pull_request(
+				&source,
+				&repo,
+				&request,
+				&[PathBuf::from("release.txt")],
+				false,
+			))
+			.unwrap_or_else(|error| panic!("publish merge request: {error}"))
 	});
 
 	list.assert();
@@ -737,15 +752,16 @@ fn publish_release_pull_request_creates_merge_request_and_pushes_branch() {
 	request.commit_message.body = Some("release body".to_string());
 
 	let outcome = with_gitlab_env(Some("token"), || {
-		tokio::runtime::Runtime::new().unwrap().block_on(publish_release_pull_request(
-			&source,
-			&repo,
-			&request,
-			&[PathBuf::from("release.txt")],
-			false,
-		))
-
-		.unwrap_or_else(|error| panic!("publish merge request: {error}"))
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(publish_release_pull_request(
+				&source,
+				&repo,
+				&request,
+				&[PathBuf::from("release.txt")],
+				false,
+			))
+			.unwrap_or_else(|error| panic!("publish merge request: {error}"))
 	});
 
 	list.assert();
@@ -767,18 +783,19 @@ fn publish_release_pull_request_creates_merge_request_and_pushes_branch() {
 fn git_commit_paths_reports_io_and_non_noop_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let missing = tempdir.path().join("missing");
-	let io_error = tokio::runtime::Runtime::new().unwrap().block_on(git_commit_paths(
-		&missing,
-		&CommitMessage {
-			subject: "chore(release): prepare release".to_string(),
-			body: None,
-		},
-		"commit release merge request changes",
-		false,
-	))
-
-	.err()
-	.unwrap_or_else(|| panic!("expected missing worktree error"));
+	let io_error = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(git_commit_paths(
+			&missing,
+			&CommitMessage {
+				subject: "chore(release): prepare release".to_string(),
+				body: None,
+			},
+			"commit release merge request changes",
+			false,
+		))
+		.err()
+		.unwrap_or_else(|| panic!("expected missing worktree error"));
 	assert!(
 		io_error
 			.to_string()
@@ -800,18 +817,19 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 	std::fs::write(repo.join("release.txt"), "initial\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 	git(&repo, &["add", "release.txt"]);
-	let error = tokio::runtime::Runtime::new().unwrap().block_on(git_commit_paths(
-		&repo,
-		&CommitMessage {
-			subject: "chore(release): prepare release".to_string(),
-			body: None,
-		},
-		"commit release merge request changes",
-		false,
-	))
-
-	.err()
-	.unwrap_or_else(|| panic!("expected pre-commit hook failure"));
+	let error = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(git_commit_paths(
+			&repo,
+			&CommitMessage {
+				subject: "chore(release): prepare release".to_string(),
+				body: None,
+			},
+			"commit release merge request changes",
+			false,
+		))
+		.err()
+		.unwrap_or_else(|| panic!("expected pre-commit hook failure"));
 	assert!(
 		error
 			.to_string()
@@ -831,17 +849,18 @@ fn git_commit_paths_treats_clean_worktrees_as_already_committed() {
 	git(&repo, &["add", "release.txt"]);
 	git(&repo, &["commit", "-m", "initial"]);
 
-	tokio::runtime::Runtime::new().unwrap().block_on(git_commit_paths(
-		&repo,
-		&CommitMessage {
-			subject: "chore(release): prepare release".to_string(),
-			body: None,
-		},
-		"commit release merge request changes",
-		false,
-	))
-
-	.unwrap_or_else(|error| panic!("commit paths: {error}"));
+	tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(git_commit_paths(
+			&repo,
+			&CommitMessage {
+				subject: "chore(release): prepare release".to_string(),
+				body: None,
+			},
+			"commit release merge request changes",
+			false,
+		))
+		.unwrap_or_else(|error| panic!("commit paths: {error}"));
 
 	assert_eq!(
 		git_output(&repo, &["rev-list", "--count", "HEAD"]).trim(),
@@ -864,11 +883,23 @@ fn git_checkout_branch_is_noop_when_branch_is_already_checked_out() {
 	git(&repo, &["commit", "-m", "initial"]);
 
 	must_ok(
-		tokio::runtime::Runtime::new().unwrap().block_on(git_checkout_branch(&repo, "monochange/release/release", "test context")),
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(git_checkout_branch(
+				&repo,
+				"monochange/release/release",
+				"test context",
+			)),
 		"checkout branch",
 	);
 	must_ok(
-		tokio::runtime::Runtime::new().unwrap().block_on(git_checkout_branch(&repo, "monochange/release/release", "test context")),
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(git_checkout_branch(
+				&repo,
+				"monochange/release/release",
+				"test context",
+			)),
 		"repeat checkout branch",
 	);
 
@@ -909,32 +940,34 @@ fn publish_merge_request_updates_existing_merge_request() {
 	let client = gitlab_client().unwrap_or_else(|error| panic!("client: {error}"));
 	let headers = auth_headers("token").unwrap_or_else(|error| panic!("headers: {error}"));
 
-	let outcome = tokio::runtime::Runtime::new().unwrap().block_on(publish_merge_request(
-		&client,
-		&headers,
-		&format!("{}/api/v4", server.base_url()),
-		&request,
-	))
-
-	.unwrap_or_else(|error| panic!("update merge request: {error}"));
+	let outcome = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(publish_merge_request(
+			&client,
+			&headers,
+			&format!("{}/api/v4", server.base_url()),
+			&request,
+		))
+		.unwrap_or_else(|error| panic!("update merge request: {error}"));
 
 	list.assert();
 	update.assert();
 	assert_eq!(outcome.operation, SourceChangeRequestOperation::Updated);
 }
 
-#[test]
-fn join_existing_merge_request_lookup_reports_panicked_thread() {
-	let error = tokio::runtime::Runtime::new().unwrap().block_on(join_existing_merge_request_lookup(tokio::task::spawn(async {
+#[tokio::test(flavor = "multi_thread")]
+#[allow(clippy::disallowed_methods)]
+async fn join_existing_merge_request_lookup_reports_panicked_thread() {
+	let error = join_existing_merge_request_lookup(tokio::task::spawn(async {
 		panic!("boom");
-	})))
-
+	}))
+	.await
 	.err()
 	.unwrap_or_else(|| panic!("expected join error"));
 	assert!(
 		error
 			.to_string()
-			.contains("failed to join GitLab merge request lookup thread")
+			.contains("failed to join GitLab merge request lookup task")
 	);
 }
 
@@ -980,15 +1013,16 @@ fn publish_release_pull_request_skips_push_when_existing_merge_request_matches_l
 	);
 
 	let outcome = with_gitlab_env(Some("token"), || {
-		tokio::runtime::Runtime::new().unwrap().block_on(publish_release_pull_request(
-			&source,
-			&repo,
-			&request,
-			&[PathBuf::from("release.txt")],
-			false,
-		))
-
-		.unwrap_or_else(|error| panic!("publish merge request: {error}"))
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(publish_release_pull_request(
+				&source,
+				&repo,
+				&request,
+				&[PathBuf::from("release.txt")],
+				false,
+			))
+			.unwrap_or_else(|error| panic!("publish merge request: {error}"))
 	});
 
 	list.assert();

@@ -2,10 +2,10 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
 use std::fs;
+use std::future::Future;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
-use std::thread::JoinHandle;
 use std::time::Instant;
 
 #[cfg(feature = "cargo")]
@@ -38,6 +38,7 @@ use monochange_go::GoAdapter;
 use monochange_npm::NpmAdapter;
 use monochange_python::PythonAdapter;
 use serde_json::json;
+use tokio::task::JoinHandle;
 use typed_builder::TypedBuilder;
 
 use crate::interactive;
@@ -711,23 +712,54 @@ pub(crate) fn build_lockfile_command_executions(
 	#[cfg(feature = "cargo")]
 	warn_about_incomplete_cargo_lockfiles(root, configuration, packages, &released_versions);
 	#[cfg(feature = "cargo")]
-	#[rustfmt::skip]
-	let cargo_executions = resolve_lockfile_command_executions(root, &configuration.cargo.lockfile_commands, packages.iter().any(|package| package.ecosystem == Ecosystem::Cargo && released_versions.contains_key(&package.id)))?;
+	let cargo_executions = resolve_lockfile_command_executions(
+		root,
+		&configuration.cargo.lockfile_commands,
+		packages.iter().any(|package| {
+			package.ecosystem == Ecosystem::Cargo && released_versions.contains_key(&package.id)
+		}),
+	)?;
 	#[cfg(feature = "npm")]
-	#[rustfmt::skip]
-	let npm_executions = resolve_lockfile_command_executions(root, &configuration.npm.lockfile_commands, packages.iter().any(|package| package.ecosystem == Ecosystem::Npm && released_versions.contains_key(&package.id)))?;
+	let npm_executions = resolve_lockfile_command_executions(
+		root,
+		&configuration.npm.lockfile_commands,
+		packages.iter().any(|package| {
+			package.ecosystem == Ecosystem::Npm && released_versions.contains_key(&package.id)
+		}),
+	)?;
 	#[cfg(feature = "deno")]
-	#[rustfmt::skip]
-	let deno_executions = resolve_lockfile_command_executions(root, &configuration.deno.lockfile_commands, packages.iter().any(|package| package.ecosystem == Ecosystem::Deno && released_versions.contains_key(&package.id)))?;
+	let deno_executions = resolve_lockfile_command_executions(
+		root,
+		&configuration.deno.lockfile_commands,
+		packages.iter().any(|package| {
+			package.ecosystem == Ecosystem::Deno && released_versions.contains_key(&package.id)
+		}),
+	)?;
 	#[cfg(feature = "dart")]
-	#[rustfmt::skip]
-	let dart_executions = resolve_lockfile_command_executions(root, &configuration.dart.lockfile_commands, packages.iter().any(|package| matches!(package.ecosystem, Ecosystem::Dart | Ecosystem::Flutter) && released_versions.contains_key(&package.id)))?;
+	let dart_executions = resolve_lockfile_command_executions(
+		root,
+		&configuration.dart.lockfile_commands,
+		packages.iter().any(|package| {
+			matches!(package.ecosystem, Ecosystem::Dart | Ecosystem::Flutter)
+				&& released_versions.contains_key(&package.id)
+		}),
+	)?;
 	#[cfg(feature = "python")]
-	#[rustfmt::skip]
-	let python_executions = resolve_lockfile_command_executions(root, &configuration.python.lockfile_commands, packages.iter().any(|package| package.ecosystem == Ecosystem::Python && released_versions.contains_key(&package.id)))?;
+	let python_executions = resolve_lockfile_command_executions(
+		root,
+		&configuration.python.lockfile_commands,
+		packages.iter().any(|package| {
+			package.ecosystem == Ecosystem::Python && released_versions.contains_key(&package.id)
+		}),
+	)?;
 	#[cfg(feature = "go")]
-	#[rustfmt::skip]
-	let go_executions = resolve_lockfile_command_executions(root, &configuration.go.lockfile_commands, packages.iter().any(|package| package.ecosystem == Ecosystem::Go && released_versions.contains_key(&package.id)))?;
+	let go_executions = resolve_lockfile_command_executions(
+		root,
+		&configuration.go.lockfile_commands,
+		packages.iter().any(|package| {
+			package.ecosystem == Ecosystem::Go && released_versions.contains_key(&package.id)
+		}),
+	)?;
 	let mut executions = Vec::new();
 	#[cfg(feature = "cargo")]
 	executions.extend(cargo_executions);
@@ -1338,20 +1370,108 @@ fn run_lockfile_command_in_place(
 	)))
 }
 
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::collect_workspace_files;
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::copy_workspace_file;
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::copy_workspace_tree;
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::ensure_parent_directory;
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::read_optional_file;
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::remap_workspace_path;
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::run_lockfile_command;
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::strip_workspace_prefix;
+
+#[cfg(test)]
+fn collect_workspace_file_updates(
+	root: &Path,
+	temp_root: &Path,
+	base_updates: &[FileUpdate],
+	lockfile_commands: &[LockfileCommandExecution],
+) -> MonochangeResult<Vec<FileUpdate>> {
+	let normalized_root = monochange_core::normalize_path(root);
+	let mut dirs_to_scan = BTreeSet::new();
+
+	for update in base_updates {
+		if let Some(parent) = update.path.parent() {
+			let normalized = monochange_core::normalize_path(parent);
+			if let Ok(relative) = normalized.strip_prefix(&normalized_root) {
+				dirs_to_scan.insert(relative.to_path_buf());
+			}
+		}
+	}
+
+	for command in lockfile_commands {
+		let normalized = monochange_core::normalize_path(&command.cwd);
+		if let Ok(relative) = normalized.strip_prefix(&normalized_root) {
+			dirs_to_scan.insert(relative.to_path_buf());
+		} else {
+			dirs_to_scan.insert(command.cwd.clone());
+		}
+	}
+
+	// Always scan the changeset directory (files are deleted during release).
+	dirs_to_scan.insert(PathBuf::from(".changeset"));
+
+	let mut relative_paths = BTreeSet::new();
+
+	for dir in &dirs_to_scan {
+		let original_dir = root.join(dir);
+		let temp_dir = temp_root.join(dir);
+		if original_dir.is_dir() {
+			collect_workspace_files(root, &original_dir, &mut relative_paths)?;
+		}
+		if temp_dir.is_dir() {
+			collect_workspace_files(temp_root, &temp_dir, &mut relative_paths)?;
+		}
+	}
+
+	let mut updates = Vec::new();
+
+	for relative in relative_paths {
+		let before = read_optional_file(&root.join(&relative))?;
+		let after = read_optional_file(&temp_root.join(&relative))?;
+		if let Some(content) = after.filter(|content| before.as_ref() != Some(content)) {
+			updates.push(FileUpdate {
+				path: root.join(relative),
+				content,
+			});
+		}
+	}
+
+	updates.sort_by(|left, right| left.path.cmp(&right.path));
+
+	Ok(updates)
+}
+
 /// Prepare a release, update versioned files, and return the structured result.
 #[must_use = "the prepared release result must be checked"]
-pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedRelease> {
+pub async fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedRelease> {
 	// The public API returns structured release state, not rendered diffs.
 	// Building unified diffs for large lockfiles can dominate wall time, so skip
 	// that work here unless a caller explicitly asks for the richer execution
 	// report via `prepare_release_execution`.
 	prepare_release_execution_with_file_diffs(root, dry_run, false, false)
+		.await
 		.map(|execution| execution.prepared_release)
 }
 
+#[cfg(test)]
 #[tracing::instrument(skip_all, fields(dry_run))]
+pub(crate) async fn prepare_release_execution(
+	root: &Path,
+	dry_run: bool,
+) -> MonochangeResult<PreparedReleaseExecution> {
+	prepare_release_execution_with_file_diffs(root, dry_run, true, false).await
+}
+
 #[tracing::instrument(skip_all, fields(dry_run, build_file_diffs))]
-pub(crate) fn prepare_release_execution_with_file_diffs(
+pub(crate) async fn prepare_release_execution_with_file_diffs(
 	root: &Path,
 	dry_run: bool,
 	build_file_diffs: bool,
@@ -1464,7 +1584,8 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 			changesets
 				.as_mut()
 				.unwrap_or_else(|| panic!("changesets should exist for dry-run annotation")),
-		);
+		)
+		.await;
 	}
 	let plan = measure_prepare_phase(&mut phase_timings, "build release plan", || {
 		build_release_plan_from_signals(&configuration, &discovery, &change_signals)
@@ -1482,7 +1603,7 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 
 	let (
 		(changelog_targets_result, manifest_updates_result),
-		((versioned_file_updates_result, release_targets_result), lockfile_commands_result),
+		(versioned_file_updates_result, lockfile_commands_result),
 	) = rayon::join(
 		|| {
 			rayon::join(
@@ -1501,28 +1622,14 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 		|| {
 			rayon::join(
 				|| {
-					rayon::join(
-						|| {
-							capture_prepare_phase("build versioned file updates", || {
-								build_versioned_file_updates(
-									root,
-									&configuration,
-									&discovery.packages,
-									&plan,
-								)
-							})
-						},
-						|| {
-							capture_prepare_phase("build release targets", || {
-								Ok(cli_runtime::block_on_in_context(build_release_targets(
-									&configuration,
-									&discovery.packages,
-									&plan,
-									&changeset_paths,
-								)))
-							})
-						},
-					)
+					capture_prepare_phase("build versioned file updates", || {
+						build_versioned_file_updates(
+							root,
+							&configuration,
+							&discovery.packages,
+							&plan,
+						)
+					})
 				},
 				|| {
 					capture_prepare_phase("build lockfile refresh plan", || {
@@ -1541,18 +1648,22 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 		changelog_targets_result.1,
 		manifest_updates_result.1,
 		versioned_file_updates_result.1,
-		release_targets_result.1,
 		lockfile_commands_result.1,
 	]);
 	let changelog_targets = changelog_targets_result.0?;
 	let manifest_updates = manifest_updates_result.0?;
 	let versioned_file_updates = versioned_file_updates_result.0?;
-	let release_targets = release_targets_result.0?;
+	let release_targets = measure_async_prepare_phase(
+		&mut phase_timings,
+		"build release targets",
+		build_release_targets(&configuration, &discovery.packages, &plan, &changeset_paths),
+	)
+	.await;
 	let lockfile_commands = lockfile_commands_result.0?;
 	let package_publications =
 		build_package_publication_targets(&configuration, &discovery.packages, &plan);
 	let changesets = if let Some(handle) = background_changeset_context {
-		join_source_changeset_context_task(&mut phase_timings, handle)?
+		join_source_changeset_context_task(&mut phase_timings, handle).await?
 	} else {
 		changesets
 			.take()
@@ -1618,9 +1729,12 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 		// directory (which can take minutes for large repos).
 		base_updates.clone()
 	} else {
-		#[rustfmt::skip]
-		let materialized_updates = materialize_lockfile_command_updates_with_timing(&mut phase_timings, root, &base_updates, &lockfile_commands)?;
-		materialized_updates
+		materialize_lockfile_command_updates_with_timing(
+			&mut phase_timings,
+			root,
+			&base_updates,
+			&lockfile_commands,
+		)?
 	};
 	let mut changed_files = file_updates
 		.iter()
@@ -1715,6 +1829,18 @@ fn measure_prepare_phase<T>(
 	result
 }
 
+async fn measure_async_prepare_phase<T>(
+	phase_timings: &mut Vec<StepPhaseTiming>,
+	label: impl Into<String>,
+	future: impl Future<Output = T>,
+) -> T {
+	let label = label.into();
+	let started_at = Instant::now();
+	let result = future.await;
+	record_prepare_phase_timing(phase_timings, label, started_at);
+	result
+}
+
 fn capture_prepare_phase<T>(
 	label: impl Into<String>,
 	action: impl FnOnce() -> MonochangeResult<T>,
@@ -1761,7 +1887,7 @@ fn changeset_context_phase_label(source: &SourceConfiguration, dry_run: bool) ->
 	}
 }
 
-fn apply_source_changeset_context_with_timing(
+async fn apply_source_changeset_context_with_timing(
 	phase_timings: &mut Vec<StepPhaseTiming>,
 	source: &SourceConfiguration,
 	dry_run: bool,
@@ -1769,7 +1895,7 @@ fn apply_source_changeset_context_with_timing(
 ) {
 	let label = changeset_context_phase_label(source, dry_run);
 	let started_at = Instant::now();
-	apply_source_changeset_context(source, dry_run, changesets);
+	apply_source_changeset_context(source, dry_run, changesets).await;
 	record_prepare_phase_timing(phase_timings, label, started_at);
 }
 
@@ -1778,10 +1904,10 @@ fn spawn_source_changeset_context_task(
 	dry_run: bool,
 	mut changesets: Vec<PreparedChangeset>,
 ) -> JoinHandle<(Vec<PreparedChangeset>, StepPhaseTiming)> {
-	std::thread::spawn(move || {
+	tokio::spawn(async move {
 		let label = changeset_context_phase_label(&source, dry_run);
 		let started_at = Instant::now();
-		apply_source_changeset_context(&source, dry_run, &mut changesets);
+		apply_source_changeset_context(&source, dry_run, &mut changesets).await;
 		(
 			changesets,
 			StepPhaseTiming {
@@ -1792,18 +1918,18 @@ fn spawn_source_changeset_context_task(
 	})
 }
 
-fn join_source_changeset_context_task(
+async fn join_source_changeset_context_task(
 	phase_timings: &mut Vec<StepPhaseTiming>,
 	handle: JoinHandle<(Vec<PreparedChangeset>, StepPhaseTiming)>,
 ) -> MonochangeResult<Vec<PreparedChangeset>> {
-	let (changesets, timing) = handle.join().map_err(|_| {
+	let (changesets, timing) = handle.await.map_err(|_| {
 		MonochangeError::Io("background changeset context enrichment panicked".to_string())
 	})?;
 	phase_timings.push(timing);
 	Ok(changesets)
 }
 
-fn apply_source_changeset_context(
+async fn apply_source_changeset_context(
 	source: &SourceConfiguration,
 	dry_run: bool,
 	changesets: &mut [PreparedChangeset],
@@ -1812,7 +1938,7 @@ fn apply_source_changeset_context(
 	if dry_run {
 		adapter.annotate_changeset_context(source, changesets);
 	} else {
-		adapter.enrich_changeset_context(source, changesets);
+		adapter.enrich_changeset_context(source, changesets).await;
 	}
 }
 

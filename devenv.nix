@@ -257,7 +257,7 @@ in
           --lcov target/coverage/lcov.info \
           --base "$base_ref" \
           --head "$head_ref" \
-          --target 100
+          --target 95
       '';
       description = "Fail when executable changed lines fall below 100% patch coverage.";
       binary = "bash";

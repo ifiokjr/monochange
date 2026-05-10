@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 use std::path::Path;
 
 use monochange_test_helpers::fs::fixture_path_from;

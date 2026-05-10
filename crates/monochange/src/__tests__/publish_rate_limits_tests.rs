@@ -1,84 +1,13 @@
-pub(crate) fn plan_unbatched_publish_order_for_dependency_ordered_requests(
-	requests: &[package_publish::PublishRequest],
-	packages: &[monochange_core::PackageRecord],
-	operation: RateLimitOperation,
-	dry_run: bool,
-) -> PublishRateLimitReport {
-	let mut requests = requests.to_vec();
-	sort_requests_by_dependencies(&mut requests, packages);
-	plan_unbatched_publish_order_for_requests(&requests, operation, dry_run)
-}
-
-fn plan_unbatched_publish_order_for_requests(
-	requests: &[package_publish::PublishRequest],
-	operation: RateLimitOperation,
-	dry_run: bool,
-) -> PublishRateLimitReport {
-	let policies = policies_for_operation(operation)
-		.into_iter()
-		.map(|policy| (policy.registry, policy))
-		.collect::<BTreeMap<_, _>>();
-	let mut requests_by_registry =
-		BTreeMap::<RegistryKind, Vec<&package_publish::PublishRequest>>::new();
-	for request in requests {
-		if request.mode == PublishMode::External {
-			continue;
-		}
-		requests_by_registry
-			.entry(request.registry)
-			.or_default()
-			.push(request);
-	}
-
-	let mut batches = Vec::new();
-	let mut windows = Vec::new();
-	for (registry, requests) in requests_by_registry {
-		let policy = policies
-			.get(&registry)
-			.unwrap_or_else(|| panic!("missing rate-limit policy for {registry}"));
-		let pending = requests.len();
-		windows.push(RegistryRateLimitWindowPlan {
-			registry,
-			operation,
-			limit: None,
-			window_seconds: None,
-			pending,
-			batches_required: 1,
-			fits_single_window: true,
-			confidence: policy.confidence,
-			notes: "rate-limit batching disabled for this publish order".to_string(),
-			evidence: policy.evidence.clone(),
-		});
-		batches.push(PublishRateLimitBatch {
-			registry,
-			operation,
-			batch_index: 1,
-			total_batches: 1,
-			packages: requests
-				.iter()
-				.map(|request| request.package_id.clone())
-				.collect(),
-			recommended_wait_seconds: None,
-		});
-	}
-
-	PublishRateLimitReport {
-		dry_run,
-		windows,
-		batches,
-		warnings: Vec::new(),
-	}
-}
-
+#![allow(clippy::disallowed_methods)]
 use monochange_publish::RegistryEndpoints;
 use monochange_publish::filter_pending_publish_requests_with_transport;
 
-fn build_placeholder_plan_requests_with_transport(
+async fn build_placeholder_plan_requests_with_transport(
 	root: &Path,
 	configuration: &WorkspaceConfiguration,
 	packages: &[monochange_core::PackageRecord],
 	selected_packages: &BTreeSet<String>,
-	client: &reqwest::blocking::Client,
+	client: &reqwest::Client,
 	endpoints: &RegistryEndpoints,
 ) -> MonochangeResult<Vec<package_publish::PublishRequest>> {
 	let requests = package_publish::build_placeholder_requests(
@@ -87,29 +16,30 @@ fn build_placeholder_plan_requests_with_transport(
 		packages,
 		selected_packages,
 	)?;
-	filter_pending_publish_requests_with_transport(&requests, client, endpoints)
+	filter_pending_publish_requests_with_transport(&requests, client, endpoints).await
 }
 
-fn build_release_plan_requests_with_transport(
+async fn build_release_plan_requests_with_transport(
 	root: &Path,
 	configuration: &WorkspaceConfiguration,
 	prepared_release: Option<&PreparedRelease>,
 	packages: &[monochange_core::PackageRecord],
 	selected_packages: &BTreeSet<String>,
-	client: &reqwest::blocking::Client,
+	client: &reqwest::Client,
 	endpoints: &RegistryEndpoints,
 ) -> MonochangeResult<Vec<package_publish::PublishRequest>> {
 	let publications = package_publish::release_record_package_publications_from_prepared_or_head(
 		root,
 		prepared_release,
-	)?;
+	)
+	.await?;
 	let requests = package_publish::build_release_requests(
 		configuration,
 		packages,
 		&publications,
 		selected_packages,
 	)?;
-	filter_pending_publish_requests_with_transport(&requests, client, endpoints)
+	filter_pending_publish_requests_with_transport(&requests, client, endpoints).await
 }
 
 use std::fs;
@@ -595,8 +525,8 @@ planned batches:
 	);
 }
 
-#[test]
-fn publish_rate_limit_mode_helpers_cover_placeholder_descriptions_and_windows() {
+#[tokio::test(flavor = "multi_thread")]
+async fn publish_rate_limit_mode_helpers_cover_placeholder_descriptions_and_windows() {
 	assert_eq!(
 		PublishRateLimitMode::Placeholder.description(),
 		"placeholder publish"
@@ -605,8 +535,8 @@ fn publish_rate_limit_mode_helpers_cover_placeholder_descriptions_and_windows() 
 	assert_eq!(render_window(None), "unknown window");
 }
 
-#[test]
-fn registry_policies_include_pypi_without_a_fixed_quota() {
+#[tokio::test(flavor = "multi_thread")]
+async fn registry_policies_include_pypi_without_a_fixed_quota() {
 	let pypi = registry_policies()
 		.into_iter()
 		.find(|policy| policy.registry == RegistryKind::Pypi)
@@ -620,8 +550,8 @@ fn registry_policies_include_pypi_without_a_fixed_quota() {
 	assert_eq!(evidence.url, PYPI_TRUSTED_PUBLISHERS_DOCS);
 }
 
-#[test]
-fn plan_publish_rate_limits_summarizes_pending_publications_and_batches() {
+#[tokio::test(flavor = "multi_thread")]
+async fn plan_publish_rate_limits_summarizes_pending_publications_and_batches() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
 		.join("../../fixtures/tests/publish-rate-limits/single-window/workspace");
@@ -693,7 +623,7 @@ fn plan_publish_rate_limits_summarizes_pending_publications_and_batches() {
 		then.status(404);
 	});
 
-	let client = reqwest::blocking::Client::builder()
+	let client = reqwest::Client::builder()
 		.build()
 		.unwrap_or_else(|error| panic!("http client: {error}"));
 	let endpoints = RegistryEndpoints {
@@ -716,6 +646,7 @@ fn plan_publish_rate_limits_summarizes_pending_publications_and_batches() {
 		&client,
 		&endpoints,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("build release plan requests: {error}"));
 	let report =
 		plan_publish_rate_limits_for_requests(&requests, RateLimitOperation::Publish, true);
@@ -728,35 +659,8 @@ fn plan_publish_rate_limits_summarizes_pending_publications_and_batches() {
 	}));
 }
 
-#[test]
-fn plan_publish_rate_limits_publish_all_respects_selected_packages() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
-		.join("../../fixtures/tests/publish-rate-limits/single-window/workspace");
-	copy_fixture_dir(&fixture, tempdir.path());
-	let mut configuration = crate::load_workspace_configuration(tempdir.path())
-		.unwrap_or_else(|error| panic!("load config: {error}"));
-	for package in &mut configuration.packages {
-		package.publish.mode = PublishMode::External;
-	}
-	let selected_packages = BTreeSet::from(["docs".to_string()]);
-	let report = plan_publish_rate_limits_with_selection(
-		tempdir.path(),
-		&configuration,
-		None,
-		&selected_packages,
-		PublishRateLimitMode::Publish,
-		true,
-		true,
-	)
-	.unwrap_or_else(|error| panic!("plan publish all rate limits: {error}"));
-
-	assert!(report.batches.is_empty());
-	assert!(report.warnings.is_empty());
-}
-
-#[test]
-fn plan_publish_rate_limits_skips_private_and_disabled_packages_from_release_batches() {
+#[tokio::test(flavor = "multi_thread")]
+async fn plan_publish_rate_limits_skips_private_and_disabled_packages_from_release_batches() {
 	let configuration = WorkspaceConfiguration {
 		root_path: std::path::PathBuf::from("/workspace"),
 		defaults: monochange_core::WorkspaceDefaults::default(),
@@ -918,8 +822,8 @@ fn plan_publish_rate_limits_skips_private_and_disabled_packages_from_release_bat
 	assert_eq!(report.batches[0].packages, vec!["core".to_string()]);
 }
 
-#[test]
-fn plan_publish_rate_limits_skips_versions_that_are_already_published() {
+#[tokio::test(flavor = "multi_thread")]
+async fn plan_publish_rate_limits_skips_versions_that_are_already_published() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
 		.join("../../fixtures/tests/publish-rate-limits/single-window/workspace");
@@ -992,7 +896,7 @@ fn plan_publish_rate_limits_skips_versions_that_are_already_published() {
 		then.status(404);
 	});
 
-	let client = reqwest::blocking::Client::builder()
+	let client = reqwest::Client::builder()
 		.build()
 		.unwrap_or_else(|error| panic!("http client: {error}"));
 	let endpoints = RegistryEndpoints {
@@ -1015,6 +919,7 @@ fn plan_publish_rate_limits_skips_versions_that_are_already_published() {
 		&client,
 		&endpoints,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("build release plan requests: {error}"));
 	let report =
 		plan_publish_rate_limits_for_requests(&requests, RateLimitOperation::Publish, true);
@@ -1037,8 +942,8 @@ fn plan_publish_rate_limits_skips_versions_that_are_already_published() {
 	);
 }
 
-#[test]
-fn build_placeholder_plan_requests_skips_packages_when_any_registry_version_exists() {
+#[tokio::test(flavor = "multi_thread")]
+async fn build_placeholder_plan_requests_skips_packages_when_any_registry_version_exists() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
 		.join("../../fixtures/tests/publish-rate-limits/single-window/workspace");
@@ -1063,7 +968,7 @@ fn build_placeholder_plan_requests_skips_packages_when_any_registry_version_exis
 		then.status(404);
 	});
 
-	let client = reqwest::blocking::Client::builder()
+	let client = reqwest::Client::builder()
 		.build()
 		.unwrap_or_else(|error| panic!("http client: {error}"));
 	let endpoints = RegistryEndpoints {
@@ -1083,6 +988,7 @@ fn build_placeholder_plan_requests_skips_packages_when_any_registry_version_exis
 		&client,
 		&endpoints,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("build placeholder plan requests: {error}"));
 
 	assert_eq!(
@@ -1094,8 +1000,8 @@ fn build_placeholder_plan_requests_skips_packages_when_any_registry_version_exis
 	);
 }
 
-#[test]
-fn plan_publish_rate_limits_for_requests_groups_multiple_packages_into_one_batch_when_limit_is_unbounded()
+#[tokio::test(flavor = "multi_thread")]
+async fn plan_publish_rate_limits_for_requests_groups_multiple_packages_into_one_batch_when_limit_is_unbounded()
  {
 	let requests = vec![
 		sample_publish_request(
@@ -1122,8 +1028,8 @@ fn plan_publish_rate_limits_for_requests_groups_multiple_packages_into_one_batch
 	);
 }
 
-#[test]
-fn plan_publish_rate_limits_preserves_large_dependency_chain_across_limited_batches() {
+#[tokio::test(flavor = "multi_thread")]
+async fn plan_publish_rate_limits_preserves_large_dependency_chain_across_limited_batches() {
 	let package_ids = (1..=50)
 		.map(|index| format!("crate-{index:02}"))
 		.collect::<Vec<_>>();
@@ -1150,8 +1056,8 @@ fn plan_publish_rate_limits_preserves_large_dependency_chain_across_limited_batc
 	}
 }
 
-#[test]
-fn plan_publish_rate_limits_supports_placeholder_mode_and_skips_external_requests() {
+#[tokio::test(flavor = "multi_thread")]
+async fn plan_publish_rate_limits_supports_placeholder_mode_and_skips_external_requests() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
 		.join("../../fixtures/tests/publish-rate-limits/single-window/workspace");
@@ -1173,7 +1079,7 @@ fn plan_publish_rate_limits_supports_placeholder_mode_and_skips_external_request
 		then.status(404);
 	});
 
-	let client = reqwest::blocking::Client::builder()
+	let client = reqwest::Client::builder()
 		.build()
 		.unwrap_or_else(|error| panic!("http client: {error}"));
 	let endpoints = RegistryEndpoints {
@@ -1195,6 +1101,7 @@ fn plan_publish_rate_limits_supports_placeholder_mode_and_skips_external_request
 		&client,
 		&endpoints,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("build placeholder plan requests: {error}"));
 	let report = plan_publish_rate_limits_for_requests(
 		&requests,
@@ -1232,8 +1139,8 @@ fn plan_publish_rate_limits_supports_placeholder_mode_and_skips_external_request
 	assert_eq!(filtered.batches[0].packages, vec!["docs".to_string()]);
 }
 
-#[test]
-fn plan_unbatched_publish_order_skips_external_requests() {
+#[tokio::test(flavor = "multi_thread")]
+async fn plan_unbatched_publish_order_skips_external_requests() {
 	let report = plan_unbatched_publish_order_for_requests(
 		&[
 			sample_publish_request(
@@ -1259,8 +1166,8 @@ fn plan_unbatched_publish_order_skips_external_requests() {
 	assert_eq!(report.batches[0].packages, vec!["docs".to_string()]);
 }
 
-#[test]
-fn plan_window_flags_multiple_batches_when_limit_is_exceeded() {
+#[tokio::test(flavor = "multi_thread")]
+async fn plan_window_flags_multiple_batches_when_limit_is_exceeded() {
 	let policy = RegistryRateLimitPolicy {
 		registry: RegistryKind::PubDev,
 		operation: RateLimitOperation::Publish,
@@ -1277,8 +1184,8 @@ fn plan_window_flags_multiple_batches_when_limit_is_exceeded() {
 	assert!(!window.fits_single_window);
 }
 
-#[test]
-fn enforce_publish_rate_limits_returns_ok_when_enforcement_is_not_triggered() {
+#[tokio::test(flavor = "multi_thread")]
+async fn enforce_publish_rate_limits_returns_ok_when_enforcement_is_not_triggered() {
 	let configuration = WorkspaceConfiguration {
 		root_path: Path::new(".").to_path_buf(),
 		defaults: monochange_core::WorkspaceDefaults::default(),
@@ -1360,8 +1267,8 @@ fn enforce_publish_rate_limits_returns_ok_when_enforcement_is_not_triggered() {
 		.unwrap_or_else(|error| panic!("single-window rate limits should pass: {error}"));
 }
 
-#[test]
-fn enforce_publish_rate_limits_blocks_multi_batch_runs_when_enabled() {
+#[tokio::test(flavor = "multi_thread")]
+async fn enforce_publish_rate_limits_blocks_multi_batch_runs_when_enabled() {
 	let requests = (0..13)
 		.map(|index| {
 			package_publish::PublishRequest {
@@ -1431,8 +1338,8 @@ fn enforce_publish_rate_limits_blocks_multi_batch_runs_when_enabled() {
 	assert!(error.to_string().contains("blocked this run"));
 }
 
-#[test]
-fn test_sort_requests_by_dependencies_orders_dependencies_first() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_sort_requests_by_dependencies_orders_dependencies_first() {
 	let helper = monochange_core::PackageRecord::new(
 		monochange_core::Ecosystem::Cargo,
 		"helper",
@@ -1515,8 +1422,8 @@ fn test_sort_requests_by_dependencies_orders_dependencies_first() {
 	assert_eq!(requests[1].package_id, dependent.id);
 }
 
-#[test]
-fn test_sort_requests_by_dependencies_keeps_original_order_on_cycle() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_sort_requests_by_dependencies_keeps_original_order_on_cycle() {
 	let mut a = monochange_core::PackageRecord::new(
 		monochange_core::Ecosystem::Cargo,
 		"crate-a",

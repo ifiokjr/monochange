@@ -29,7 +29,9 @@ pub(crate) async fn verify_release_ref_for_tags(
 	if !source.releases.enforce_for_tags {
 		return Ok(None);
 	}
-	verify_release_ref(root, &source.releases, ref_name).await.map(Some)
+	verify_release_ref(root, &source.releases, ref_name)
+		.await
+		.map(Some)
 }
 
 pub(crate) async fn verify_release_ref_for_publish(
@@ -43,7 +45,9 @@ pub(crate) async fn verify_release_ref_for_publish(
 	if !source.releases.enforce_for_publish {
 		return Ok(None);
 	}
-	verify_release_ref(root, &source.releases, ref_name).await.map(Some)
+	verify_release_ref(root, &source.releases, ref_name)
+		.await
+		.map(Some)
 }
 
 pub(crate) async fn verify_release_ref_for_commit(
@@ -57,7 +61,9 @@ pub(crate) async fn verify_release_ref_for_commit(
 	if !source.releases.enforce_for_commit {
 		return Ok(None);
 	}
-	verify_release_ref(root, &source.releases, ref_name).await.map(Some)
+	verify_release_ref(root, &source.releases, ref_name)
+		.await
+		.map(Some)
 }
 
 pub(crate) async fn verify_release_ref(
@@ -125,8 +131,17 @@ async fn candidate_release_branch_refs(
 		})
 		.collect::<MonochangeResult<Vec<_>>>()?;
 
-	#[rustfmt::skip]
-	let output = git_support::run_git_capture(root, &["for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes"], "failed to list git branches for release branch verification").await?;
+	let output = git_support::run_git_capture(
+		root,
+		&[
+			"for-each-ref",
+			"--format=%(refname)",
+			"refs/heads",
+			"refs/remotes",
+		],
+		"failed to list git branches for release branch verification",
+	)
+	.await?;
 
 	let mut branches = Vec::new();
 	for (ref_name, display_name) in output

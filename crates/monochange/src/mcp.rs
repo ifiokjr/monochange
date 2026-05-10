@@ -479,7 +479,7 @@ impl MonochangeMcpServer {
 	) -> Result<CallToolResult, McpError> {
 		let root = resolve_root(params.path.as_deref());
 
-		let report = match crate::changesets::diagnose_changesets(&root, &params.changeset) {
+		let report = match crate::changesets::diagnose_changesets(&root, &params.changeset).await {
 			Ok(report) => report,
 			Err(error) => {
 				return Ok(json_error_result(json!({
@@ -558,7 +558,7 @@ impl MonochangeMcpServer {
 	) -> Result<CallToolResult, McpError> {
 		let root = resolve_root(params.path.as_deref());
 
-		let prepared_release = match crate::prepare_release(&root, true) {
+		let prepared_release = match crate::prepare_release(&root, true).await {
 			Ok(release) => release,
 			Err(error) => {
 				return Ok(json_error_result(json!({
@@ -592,7 +592,7 @@ impl MonochangeMcpServer {
 	) -> Result<CallToolResult, McpError> {
 		let root = resolve_root(params.path.as_deref());
 
-		let prepared_release = match crate::prepare_release(&root, true) {
+		let prepared_release = match crate::prepare_release(&root, true).await {
 			Ok(release) => release,
 			Err(error) => {
 				return Ok(json_error_result(json!({
@@ -629,10 +629,7 @@ impl MonochangeMcpServer {
 		let root = resolve_root(params.path.as_deref());
 
 		let evaluation =
-			match crate::cli_runtime::block_on_in_context(crate::affected_packages(&root,
-				&params.changed_paths,
-				&params.labels,
-			)) {
+			match crate::affected_packages(&root, &params.changed_paths, &params.labels).await {
 				Ok(eval) => eval,
 				Err(error) => {
 					return Ok(json_error_result(json!({

@@ -533,12 +533,26 @@ fn get_optional_json_returns_none_for_404_and_some_for_success() {
 	let headers = empty_headers();
 
 	assert_eq!(
-		tokio::runtime::Runtime::new().unwrap().block_on(get_optional_json::<SampleResponse>(&client, &headers, &server.url("/missing"), "test"))
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(get_optional_json::<SampleResponse>(
+				&client,
+				&headers,
+				&server.url("/missing"),
+				"test"
+			))
 			.unwrap_or_else(|error| panic!("404 response: {error}")),
 		None
 	);
 	assert_eq!(
-		tokio::runtime::Runtime::new().unwrap().block_on(get_optional_json::<SampleResponse>(&client, &headers, &server.url("/present"), "test"))
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(get_optional_json::<SampleResponse>(
+				&client,
+				&headers,
+				&server.url("/present"),
+				"test"
+			))
 			.unwrap_or_else(|error| panic!("200 response: {error}")),
 		Some(SampleResponse { ok: true })
 	);
@@ -580,22 +594,53 @@ fn get_json_and_write_helpers_require_success_status() {
 	};
 
 	assert_eq!(
-		tokio::runtime::Runtime::new().unwrap().block_on(get_json::<SampleResponse>(&client, &headers, &server.url("/get"), "test"))
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(get_json::<SampleResponse>(
+				&client,
+				&headers,
+				&server.url("/get"),
+				"test"
+			))
 			.unwrap_or_else(|error| panic!("get response: {error}")),
 		SampleResponse { ok: true }
 	);
 	assert_eq!(
-		tokio::runtime::Runtime::new().unwrap().block_on(post_json::<_, SampleResponse>(&client, &headers, &server.url("/post"), &body, "test"))
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(post_json::<_, SampleResponse>(
+				&client,
+				&headers,
+				&server.url("/post"),
+				&body,
+				"test"
+			))
 			.unwrap_or_else(|error| panic!("post response: {error}")),
 		SampleResponse { ok: true }
 	);
 	assert_eq!(
-		tokio::runtime::Runtime::new().unwrap().block_on(put_json::<_, SampleResponse>(&client, &headers, &server.url("/put"), &body, "test"))
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(put_json::<_, SampleResponse>(
+				&client,
+				&headers,
+				&server.url("/put"),
+				&body,
+				"test"
+			))
 			.unwrap_or_else(|error| panic!("put response: {error}")),
 		SampleResponse { ok: true }
 	);
 	assert_eq!(
-		tokio::runtime::Runtime::new().unwrap().block_on(patch_json::<_, SampleResponse>(&client, &headers, &server.url("/patch"), &body, "test"))
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(patch_json::<_, SampleResponse>(
+				&client,
+				&headers,
+				&server.url("/patch"),
+				&body,
+				"test"
+			))
 			.unwrap_or_else(|error| panic!("patch response: {error}")),
 		SampleResponse { ok: true }
 	);
@@ -659,8 +704,9 @@ fn get_json_returns_error_for_non_success_status() {
 
 	let client = build_http_client("test").unwrap();
 	let headers = HeaderMap::new();
-	let result: MonochangeResult<String> =
-		tokio::runtime::Runtime::new().unwrap().block_on(get_json(&client, &headers, &server.url("/test"), "test"));
+	let result: MonochangeResult<String> = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(get_json(&client, &headers, &server.url("/test"), "test"));
 
 	assert!(result.is_err());
 	let error = result.unwrap_err().to_string();
@@ -679,8 +725,14 @@ fn get_optional_json_returns_none_for_404() {
 
 	let client = build_http_client("test").unwrap();
 	let headers = HeaderMap::new();
-	let result: MonochangeResult<Option<String>> =
-		tokio::runtime::Runtime::new().unwrap().block_on(get_optional_json(&client, &headers, &server.url("/missing"), "test"));
+	let result: MonochangeResult<Option<String>> = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(get_optional_json(
+			&client,
+			&headers,
+			&server.url("/missing"),
+			"test",
+		));
 
 	assert!(result.is_ok());
 	assert!(result.unwrap().is_none());
@@ -697,8 +749,14 @@ fn get_optional_json_returns_error_for_non_404_non_success() {
 
 	let client = build_http_client("test").unwrap();
 	let headers = HeaderMap::new();
-	let result: MonochangeResult<Option<String>> =
-		tokio::runtime::Runtime::new().unwrap().block_on(get_optional_json(&client, &headers, &server.url("/bad"), "test"));
+	let result: MonochangeResult<Option<String>> = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(get_optional_json(
+			&client,
+			&headers,
+			&server.url("/bad"),
+			"test",
+		));
 
 	assert!(result.is_err());
 	let error = result.unwrap_err().to_string();
@@ -718,8 +776,9 @@ fn post_json_returns_error_for_non_success_status() {
 	let client = build_http_client("test").unwrap();
 	let headers = HeaderMap::new();
 	let body = "request body".to_string();
-	let result: MonochangeResult<String> =
-		tokio::runtime::Runtime::new().unwrap().block_on(post_json(&client, &headers, &server.url("/test"), &body, "test"));
+	let result: MonochangeResult<String> = tokio::runtime::Runtime::new().unwrap().block_on(
+		post_json(&client, &headers, &server.url("/test"), &body, "test"),
+	);
 
 	assert!(result.is_err());
 	let error = result.unwrap_err().to_string();
@@ -739,8 +798,9 @@ fn put_json_returns_error_for_non_success_status() {
 	let client = build_http_client("test").unwrap();
 	let headers = HeaderMap::new();
 	let body = "request body".to_string();
-	let result: MonochangeResult<String> =
-		tokio::runtime::Runtime::new().unwrap().block_on(put_json(&client, &headers, &server.url("/test"), &body, "test"));
+	let result: MonochangeResult<String> = tokio::runtime::Runtime::new().unwrap().block_on(
+		put_json(&client, &headers, &server.url("/test"), &body, "test"),
+	);
 
 	assert!(result.is_err());
 	let error = result.unwrap_err().to_string();
@@ -760,8 +820,9 @@ fn patch_json_returns_error_for_non_success_status() {
 	let client = build_http_client("test").unwrap();
 	let headers = HeaderMap::new();
 	let body = "request body".to_string();
-	let result: MonochangeResult<String> =
-		tokio::runtime::Runtime::new().unwrap().block_on(patch_json(&client, &headers, &server.url("/test"), &body, "test"));
+	let result: MonochangeResult<String> = tokio::runtime::Runtime::new().unwrap().block_on(
+		patch_json(&client, &headers, &server.url("/test"), &body, "test"),
+	);
 
 	assert!(result.is_err());
 	let error = result.unwrap_err().to_string();

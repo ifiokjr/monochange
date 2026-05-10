@@ -91,6 +91,7 @@ pub static HOSTED_SOURCE_ADAPTER: GiteaHostedSourceAdapter = GiteaHostedSourceAd
 /// Hosted-source adapter for Gitea repositories.
 pub struct GiteaHostedSourceAdapter;
 
+#[async_trait::async_trait]
 impl HostedSourceAdapter for GiteaHostedSourceAdapter {
 	fn provider(&self) -> SourceProvider {
 		SourceProvider::Gitea
@@ -112,7 +113,7 @@ impl HostedSourceAdapter for GiteaHostedSourceAdapter {
 		annotate_changeset_context(source, changesets);
 	}
 
-	fn enrich_changeset_context(
+	async fn enrich_changeset_context(
 		&self,
 		source: &SourceConfiguration,
 		changesets: &mut [PreparedChangeset],
@@ -408,7 +409,8 @@ pub async fn publish_release_requests(
 	let api_base = gitea_api_base(source)?;
 	let mut outcomes = Vec::new();
 	for request in requests {
-		outcomes.push(publish_release_request(&client, &headers, &api_base, source, request).await?);
+		outcomes
+			.push(publish_release_request(&client, &headers, &api_base, source, request).await?);
 	}
 	Ok(outcomes)
 }
@@ -435,14 +437,16 @@ pub async fn publish_release_pull_request(
 		root,
 		&request.head_branch,
 		"prepare release pull request branch",
-	).await?;
+	)
+	.await?;
 	git_stage_paths(root, tracked_paths, "stage release pull request files").await?;
 	git_commit_paths(
 		root,
 		&request.commit_message,
 		"commit release pull request changes",
 		no_verify,
-	).await?;
+	)
+	.await?;
 	let head_commit = git_head_commit(root).await?;
 	let existing = join_existing_pull_request_lookup(existing_pull_request).await?;
 	let head_matches_existing = existing
@@ -455,7 +459,8 @@ pub async fn publish_release_pull_request(
 			&request.head_branch,
 			"push release pull request branch",
 			no_verify,
-		).await?;
+		)
+		.await?;
 	}
 
 	let client = build_http_client("Gitea")?;
@@ -469,7 +474,8 @@ pub async fn publish_release_pull_request(
 		request,
 		existing.as_ref(),
 		&head_commit,
-	).await
+	)
+	.await
 }
 
 async fn publish_release_request(
@@ -507,7 +513,8 @@ async fn publish_release_request(
 				target_commitish: &source.pull_requests.base,
 			},
 			"Gitea",
-		).await?
+		)
+		.await?
 	} else {
 		let create_url = format!(
 			"{api_base}/repos/{}/{}/releases",
@@ -526,7 +533,8 @@ async fn publish_release_request(
 				target_commitish: &source.pull_requests.base,
 			},
 			"Gitea",
-		).await?
+		)
+		.await?
 	};
 	Ok(SourceReleaseOutcome {
 		provider: SourceProvider::Gitea,
@@ -549,7 +557,8 @@ async fn publish_pull_request(
 	request: &SourceChangeRequest,
 ) -> MonochangeResult<SourceChangeRequestOutcome> {
 	let existing = lookup_existing_pull_request(client, headers, api_base, request).await?;
-	publish_pull_request_with_existing(client, headers, api_base, request, existing.as_ref(), "").await
+	publish_pull_request_with_existing(client, headers, api_base, request, existing.as_ref(), "")
+		.await
 }
 
 async fn publish_pull_request_with_existing(
@@ -620,7 +629,8 @@ async fn publish_pull_request_with_existing(
 				labels: &request.labels,
 			},
 			"Gitea",
-		).await?;
+		)
+		.await?;
 	}
 	Ok(SourceChangeRequestOutcome {
 		provider: SourceProvider::Gitea,
@@ -653,7 +663,8 @@ async fn lookup_existing_pull_request(
 		encode(&request.base_branch),
 	);
 	Ok(
-		get_json::<Vec<GiteaExistingPullRequest>>(client, headers, &list_url, "Gitea").await?
+		get_json::<Vec<GiteaExistingPullRequest>>(client, headers, &list_url, "Gitea")
+			.await?
 			.into_iter()
 			.next(),
 	)

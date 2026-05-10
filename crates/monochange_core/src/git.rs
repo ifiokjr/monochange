@@ -158,8 +158,9 @@ pub fn git_push_branch_command(root: &Path, branch: &str, no_verify: bool) -> Co
 /// Return the current branch name for the repository at `root`.
 #[must_use = "the git branch result must be checked"]
 pub async fn git_current_branch(root: &Path) -> MonochangeResult<String> {
-	let output =
-		git_command_output(root, &["symbolic-ref", "--short", "HEAD"]).await.map_err(|error| {
+	let output = git_command_output(root, &["symbolic-ref", "--short", "HEAD"])
+		.await
+		.map_err(|error| {
 			MonochangeError::Io(format!("failed to read current git branch: {error}"))
 		})?;
 
@@ -316,20 +317,23 @@ where
 	})?;
 
 	let command = git_commit_file_command(root, message_file.path(), no_verify);
-	let output = tokio::process::Command::from(command).output().await.map_err(|error| {
-		MonochangeError::Io(format!(
-			"failed to {action}: {error}\n{}",
-			git_commit_message_diagnostics(
-				root,
-				message,
-				&message_text,
-				action,
-				"spawning git commit with --file",
-				no_verify,
-				Some(message_file.path()),
-			)
-		))
-	})?;
+	let output = tokio::process::Command::from(command)
+		.output()
+		.await
+		.map_err(|error| {
+			MonochangeError::Io(format!(
+				"failed to {action}: {error}\n{}",
+				git_commit_message_diagnostics(
+					root,
+					message,
+					&message_text,
+					action,
+					"spawning git commit with --file",
+					no_verify,
+					Some(message_file.path()),
+				)
+			))
+		})?;
 
 	if output.status.success() || git_reports_nothing_to_commit(&output) {
 		return Ok(());
@@ -357,7 +361,8 @@ pub async fn run_commit_command_allow_nothing_to_commit(
 	action: &str,
 ) -> MonochangeResult<()> {
 	let output = tokio::process::Command::from(command)
-		.output().await
+		.output()
+		.await
 		.map_err(|error| MonochangeError::Io(format!("failed to {action}: {error}")))?;
 
 	if output.status.success() || git_reports_nothing_to_commit(&output) {

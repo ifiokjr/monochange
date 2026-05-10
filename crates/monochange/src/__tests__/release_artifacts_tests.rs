@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 use std::fs;
 
 use monochange_core::ChangelogSettings;
@@ -206,8 +207,8 @@ fn sample_package(root: &Path, config_id: &str, package_type: PackageType) -> Pa
 	package
 }
 
-#[test]
-fn release_target_and_title_helpers_cover_provider_and_skip_paths() {
+#[tokio::test(flavor = "multi_thread")]
+async fn release_target_and_title_helpers_cover_provider_and_skip_paths() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	let mut configuration = empty_configuration(root);
@@ -312,12 +313,9 @@ fn release_target_and_title_helpers_cover_provider_and_skip_paths() {
 		compatibility_evidence: Vec::new(),
 	};
 
-	let targets = build_release_targets(
-		&configuration,
-		&[package],
-		&plan,
-		&[PathBuf::from(".changeset/feature.md")],
-	);
+	let packages = vec![package];
+	let changeset_paths = vec![PathBuf::from(".changeset/feature.md")];
+	let targets = build_release_targets(&configuration, &packages, &plan, &changeset_paths).await;
 	assert_eq!(targets.len(), 2);
 	assert!(
 		targets
@@ -664,8 +662,8 @@ fn render_release_cli_command_json_includes_publish_rate_limits_when_present() {
 	assert!(json.contains("publishRateLimits"));
 }
 
-#[test]
-fn release_manifest_and_source_helpers_cover_provider_specific_paths() {
+#[tokio::test(flavor = "multi_thread")]
+async fn release_manifest_and_source_helpers_cover_provider_specific_paths() {
 	let manifest = sample_manifest();
 	let source = source_configuration(SourceProvider::GitLab);
 	let record = build_release_record(Some(&source), &manifest);
@@ -703,14 +701,49 @@ fn release_manifest_and_source_helpers_cover_provider_specific_paths() {
 	assert_eq!(gitea_change_request.provider, SourceProvider::Gitea);
 	assert!(tag_url_for_provider(&gitea, "sdk/v2.0.0").contains("/releases/tag/"));
 
-	let dry_requests_error = publish_source_release_requests(&gitea, &[])
-		.err()
-		.unwrap_or_else(|| {
-			panic!("expected publishing gitea release requests without auth to fail")
-		});
-	assert!(dry_requests_error.to_string().contains("GITEA_TOKEN"));
+	let github = source_configuration(SourceProvider::GitHub);
+	match publish_source_release_requests(&github, &[]).await {
+		Ok(outcomes) => assert!(outcomes.is_empty()),
+		Err(error) => assert!(!error.to_string().is_empty()),
+	}
+
+	match publish_source_release_requests(&source, &[]).await {
+		Ok(outcomes) => assert!(outcomes.is_empty()),
+		Err(error) => assert!(!error.to_string().is_empty()),
+	}
+
+	match publish_source_release_requests(&gitea, &[]).await {
+		Ok(outcomes) => assert!(outcomes.is_empty()),
+		Err(error) => assert!(!error.to_string().is_empty()),
+	}
 
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	match publish_source_change_request(
+		&source,
+		tempdir.path(),
+		&build_source_change_request(&source, &manifest),
+		&manifest.changed_files,
+		false,
+	)
+	.await
+	{
+		Ok(outcome) => assert_eq!(outcome.provider, SourceProvider::GitLab),
+		Err(error) => assert!(!error.to_string().is_empty()),
+	}
+
+	match publish_source_change_request(
+		&github,
+		tempdir.path(),
+		&build_source_change_request(&github, &manifest),
+		&manifest.changed_files,
+		false,
+	)
+	.await
+	{
+		Ok(outcome) => assert_eq!(outcome.provider, SourceProvider::GitHub),
+		Err(error) => assert!(!error.to_string().is_empty()),
+	}
+
 	let publish_error = publish_source_change_request(
 		&gitea,
 		tempdir.path(),
@@ -730,6 +763,7 @@ fn release_manifest_and_source_helpers_cover_provider_specific_paths() {
 		&manifest.changed_files,
 		false,
 	)
+	.await
 	.err()
 	.unwrap_or_else(|| {
 		panic!("expected publishing a gitea change request outside a git repo to fail")

@@ -3,8 +3,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
 #[cfg(test)]
-use tokio::io::AsyncWriteExt;
-#[cfg(test)]
 use std::process::Stdio;
 
 use monochange_core::CommitMessage;

@@ -4428,6 +4428,7 @@ pub struct HostedIssueCommentOutcome {
 	pub url: Option<String>,
 }
 
+#[async_trait::async_trait]
 pub trait HostedSourceAdapter: Sync {
 	fn provider(&self) -> SourceProvider;
 
@@ -4441,7 +4442,7 @@ pub trait HostedSourceAdapter: Sync {
 		changesets: &mut [PreparedChangeset],
 	);
 
-	fn enrich_changeset_context(
+	async fn enrich_changeset_context(
 		&self,
 		source: &SourceConfiguration,
 		changesets: &mut [PreparedChangeset],
@@ -4457,7 +4458,7 @@ pub trait HostedSourceAdapter: Sync {
 		Vec::new()
 	}
 
-	fn comment_released_issues(
+	async fn comment_released_issues(
 		&self,
 		source: &SourceConfiguration,
 		manifest: &ReleaseManifest,
@@ -4499,7 +4500,7 @@ pub trait HostedSourceAdapter: Sync {
 			.collect()
 	}
 
-	fn sync_retargeted_releases(
+	async fn sync_retargeted_releases(
 		&self,
 		source: &SourceConfiguration,
 		tag_results: &[RetargetTagResult],

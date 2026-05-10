@@ -101,7 +101,8 @@ pub(crate) async fn load_prepared_release_execution(
 		&artifact,
 		current_dry_run,
 		build_file_diffs,
-	).await?;
+	)
+	.await?;
 
 	// Transform persisted diffs into runtime format
 	let load_started_at = Instant::now();
@@ -146,7 +147,9 @@ pub(crate) async fn maybe_load_prepared_release_execution(
 		explicit_path,
 		current_dry_run,
 		build_file_diffs,
-	).await {
+	)
+	.await
+	{
 		Ok(Some(loaded)) => Ok(Some(loaded)),
 		Ok(None) => Ok(None),
 		Err(error) if explicit_path.is_none() => {
@@ -307,11 +310,15 @@ fn configuration_snapshot(configuration: &WorkspaceConfiguration) -> MonochangeR
 	})
 }
 
-async fn git_status_snapshot(root: &Path, excluded_path: Option<&Path>) -> MonochangeResult<Vec<String>> {
+async fn git_status_snapshot(
+	root: &Path,
+	excluded_path: Option<&Path>,
+) -> MonochangeResult<Vec<String>> {
 	let output = git_command_output(
 		root,
 		&["status", "--short", "--untracked-files=all", "--porcelain"],
-	).await
+	)
+	.await
 	.map_err(|error| MonochangeError::Io(format!("failed to read git status: {error}")))?;
 	if !output.status.success() {
 		return Err(MonochangeError::Config(format!(
@@ -353,33 +360,35 @@ async fn tracked_path_snapshots(
 	tracked_paths.sort();
 	tracked_paths.dedup();
 
-	tracked_paths
-		.into_iter()
-		.map(|path| {
-			let absolute_path = resolve_config_path(root, &path);
-			if absolute_path.exists() {
-				Ok(PreparedReleaseTrackedPath {
-					path,
-					state: PreparedReleaseTrackedPathState::File,
-					hash: Some(crate::cli_runtime::block_on_in_context(hash_file_at_path(root, &absolute_path))?),
-				})
-			} else {
-				Ok(PreparedReleaseTrackedPath {
-					path,
-					state: PreparedReleaseTrackedPathState::Deleted,
-					hash: None,
-				})
-			}
-		})
-		.collect()
+	let mut snapshots = Vec::with_capacity(tracked_paths.len());
+	for path in tracked_paths {
+		let absolute_path = resolve_config_path(root, &path);
+		if absolute_path.exists() {
+			let hash = hash_file_at_path(root, &absolute_path).await?;
+			snapshots.push(PreparedReleaseTrackedPath {
+				path,
+				state: PreparedReleaseTrackedPathState::File,
+				hash: Some(hash),
+			});
+		} else {
+			snapshots.push(PreparedReleaseTrackedPath {
+				path,
+				state: PreparedReleaseTrackedPathState::Deleted,
+				hash: None,
+			});
+		}
+	}
+	Ok(snapshots)
 }
 
 async fn hash_file_at_path(root: &Path, path: &Path) -> MonochangeResult<String> {
 	let relative_path = root_relative(root, path);
 	let relative = relative_path.to_string_lossy().into_owned();
-	let output = git_command_output(root, &["hash-object", "--", &relative]).await.map_err(|error| {
-		MonochangeError::Io(format!("failed to hash {}: {error}", path.display()))
-	})?;
+	let output = git_command_output(root, &["hash-object", "--", &relative])
+		.await
+		.map_err(|error| {
+			MonochangeError::Io(format!("failed to hash {}: {error}", path.display()))
+		})?;
 	if !output.status.success() {
 		return Err(MonochangeError::Config(format!(
 			"failed to hash {}: {}",
@@ -399,9 +408,11 @@ pub(crate) async fn ensure_monochange_artifact_ignored(
 		return Ok(());
 	}
 
-	let output = git_command_output(root, &["rev-parse", "--git-path", "info/exclude"]).await.map_err(
-		|error| MonochangeError::Io(format!("failed to resolve git exclude path: {error}")),
-	)?;
+	let output = git_command_output(root, &["rev-parse", "--git-path", "info/exclude"])
+		.await
+		.map_err(|error| {
+			MonochangeError::Io(format!("failed to resolve git exclude path: {error}"))
+		})?;
 	if !output.status.success() {
 		// Non-git workspaces can still use the artifact; the ignore rule is only
 		// needed to keep git status clean when a repository exists.

@@ -593,6 +593,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tinytemplate",
+ "tokio",
  "walkdir",
 ]
 
@@ -2333,6 +2334,7 @@ dependencies = [
 name = "monochange_core"
 version = "0.5.1"
 dependencies = [
+ "async-trait",
  "ignore",
  "insta",
  "monochange_schema",
@@ -2407,6 +2409,7 @@ dependencies = [
 name = "monochange_forgejo"
 version = "0.5.1"
 dependencies = [
+ "async-trait",
  "etest",
  "httpmock",
  "insta",
@@ -2427,6 +2430,7 @@ dependencies = [
 name = "monochange_gitea"
 version = "0.5.1"
 dependencies = [
+ "async-trait",
  "etest",
  "httpmock",
  "insta",
@@ -2447,6 +2451,7 @@ dependencies = [
 name = "monochange_github"
 version = "0.5.1"
 dependencies = [
+ "async-trait",
  "etest",
  "httpmock",
  "insta",
@@ -2470,6 +2475,7 @@ dependencies = [
 name = "monochange_gitlab"
 version = "0.5.1"
 dependencies = [
+ "async-trait",
  "etest",
  "httpmock",
  "insta",
@@ -2600,6 +2606,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "tokio",
  "tracing",
  "urlencoding",
 ]
@@ -4530,6 +4537,7 @@ version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96374855068f47402c3121c6eed88d29cb1de8f3ab27090e273e420bdabcf050"
 dependencies = [
+ "futures",
  "parking_lot",
 ]
 

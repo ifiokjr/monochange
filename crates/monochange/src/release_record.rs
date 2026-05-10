@@ -59,7 +59,8 @@ pub async fn discover_release_record(
 	from: &str,
 ) -> MonochangeResult<ReleaseRecordDiscovery> {
 	let resolved_commit = resolve_git_commit_ref(root, from).await?;
-	for (distance, commit) in first_parent_commits(root, &resolved_commit).await?
+	for (distance, commit) in first_parent_commits(root, &resolved_commit)
+		.await?
 		.into_iter()
 		.enumerate()
 	{
@@ -231,7 +232,7 @@ pub async fn execute_release_retarget(
 			)));
 		}
 	} else if let Some(source) = source {
-		sync_retargeted_provider_releases(source, &git_tag_results, plan.dry_run)?
+		sync_retargeted_provider_releases(source, &git_tag_results, plan.dry_run).await?
 	} else {
 		Vec::new()
 	};
@@ -265,7 +266,8 @@ pub async fn retarget_release(
 		sync_provider,
 		dry_run,
 		source,
-	).await?;
+	)
+	.await?;
 	execute_release_retarget(root, source, &plan).await
 }
 
@@ -297,16 +299,14 @@ fn validate_retarget_provider(
 	Ok(())
 }
 
-pub(crate) fn sync_retargeted_provider_releases(
+pub(crate) async fn sync_retargeted_provider_releases(
 	source: &SourceConfiguration,
 	tag_results: &[RetargetTagResult],
 	dry_run: bool,
 ) -> MonochangeResult<Vec<RetargetProviderResult>> {
-	hosted_sources::configured_hosted_source_adapter(source).sync_retargeted_releases(
-		source,
-		tag_results,
-		dry_run,
-	)
+	hosted_sources::configured_hosted_source_adapter(source)
+		.sync_retargeted_releases(source, tag_results, dry_run)
+		.await
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
@@ -380,8 +380,7 @@ pub(crate) async fn create_release_tags(
 	let mut tag_results = Vec::new();
 	for tag_name in release_record_tag_names(&discovery.record) {
 		let existing_commit = resolve_git_tag_commit(root, &tag_name).await.ok();
-		let operation = if existing_commit.as_deref() == Some(discovery.record_commit.as_str())
-		{
+		let operation = if existing_commit.as_deref() == Some(discovery.record_commit.as_str()) {
 			ReleaseTagOperation::AlreadyUpToDate
 		} else {
 			ReleaseTagOperation::Planned

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use super::*;
 
-pub(crate) fn diagnose_changesets(
+pub(crate) async fn diagnose_changesets(
 	root: &Path,
 	requested: &[String],
 ) -> MonochangeResult<ChangesetDiagnosticsReport> {
@@ -35,7 +35,8 @@ pub(crate) fn diagnose_changesets(
 
 	if let Some(source) = configuration.source.as_ref() {
 		hosted_sources::configured_hosted_source_adapter(source)
-			.enrich_changeset_context(source, &mut changesets);
+			.enrich_changeset_context(source, &mut changesets)
+			.await;
 	}
 
 	let requested_changesets = changeset_paths

@@ -17,6 +17,7 @@ http = ["reqwest"]
 schema = ["dep:schemars"]
 
 [dependencies]
+async-trait.workspace = true
 ignore = { workspace = true, default-features = true }
 monochange_schema = { workspace = true, default-features = true }
 reqwest = { workspace = true, optional = true, default-features = true }

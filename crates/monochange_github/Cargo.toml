@@ -13,6 +13,7 @@ rust-version = { workspace = true }
 description = "GitHub release payload rendering and publishing for monochange"
 
 [dependencies]
+async-trait.workspace = true
 monochange_core = { workspace = true }
 monochange_publish = { workspace = true }
 octocrab = { workspace = true, default-features = false }

@@ -1,3 +1,5 @@
+#![allow(clippy::large_futures)]
+#[allow(clippy::disallowed_methods)]
 #[tokio::main]
 async fn main() {
 	let quiet = std::env::args_os().any(|arg| matches!(arg.to_str(), Some("--quiet" | "-q")));

@@ -95,7 +95,6 @@ use std::fmt::Write as _;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::OnceLock;
-use std::thread;
 
 use monochange_core::CommitMessage;
 use monochange_core::HostedActorRef;
@@ -146,7 +145,6 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::json;
-use tokio::runtime::Builder as RuntimeBuilder;
 use urlencoding::encode;
 
 pub type GitHubReleaseRequest = SourceReleaseRequest;
@@ -201,6 +199,7 @@ pub static HOSTED_SOURCE_ADAPTER: GitHubHostedSourceAdapter = GitHubHostedSource
 /// Hosted-source adapter for GitHub repositories.
 pub struct GitHubHostedSourceAdapter;
 
+#[async_trait::async_trait]
 impl HostedSourceAdapter for GitHubHostedSourceAdapter {
 	fn provider(&self) -> SourceProvider {
 		SourceProvider::GitHub
@@ -222,12 +221,12 @@ impl HostedSourceAdapter for GitHubHostedSourceAdapter {
 		annotate_changeset_context(source, changesets);
 	}
 
-	fn enrich_changeset_context(
+	async fn enrich_changeset_context(
 		&self,
 		source: &SourceConfiguration,
 		changesets: &mut [PreparedChangeset],
 	) {
-		enrich_changeset_context(source, changesets);
+		enrich_changeset_context(source, changesets).await;
 	}
 
 	fn plan_released_issue_comments(
@@ -238,21 +237,21 @@ impl HostedSourceAdapter for GitHubHostedSourceAdapter {
 		plan_released_issue_comments(source, manifest)
 	}
 
-	fn comment_released_issues(
+	async fn comment_released_issues(
 		&self,
 		source: &SourceConfiguration,
 		manifest: &ReleaseManifest,
 	) -> MonochangeResult<Vec<HostedIssueCommentOutcome>> {
-		comment_released_issues(source, manifest)
+		comment_released_issues(source, manifest).await
 	}
 
-	fn sync_retargeted_releases(
+	async fn sync_retargeted_releases(
 		&self,
 		source: &SourceConfiguration,
 		tag_results: &[RetargetTagResult],
 		dry_run: bool,
 	) -> MonochangeResult<Vec<RetargetProviderResult>> {
-		sync_retargeted_releases(source, tag_results, dry_run)
+		sync_retargeted_releases(source, tag_results, dry_run).await
 	}
 }
 
@@ -594,7 +593,7 @@ pub fn annotate_changeset_context(
 
 /// Enrich changeset context with remote GitHub review-request and issue data.
 #[tracing::instrument(skip_all)]
-pub fn enrich_changeset_context(
+pub async fn enrich_changeset_context(
 	source: &SourceConfiguration,
 	changesets: &mut [PreparedChangeset],
 ) {
@@ -604,16 +603,11 @@ pub fn enrich_changeset_context(
 		tracing::debug!("skipping GitHub enrichment: no GITHUB_TOKEN or GH_TOKEN found");
 		return;
 	};
-	let Ok(runtime) = github_runtime() else {
+	let api_base_url = env::var("GITHUB_API_URL").ok();
+	let Ok(client) = build_github_client(&token, api_base_url.as_deref()) else {
 		return;
 	};
-	let api_base_url = env::var("GITHUB_API_URL").ok();
-	runtime.block_on(async {
-		let Ok(client) = build_github_client(&token, api_base_url.as_deref()) else {
-			return;
-		};
-		enrich_changeset_context_with_client(&client, source, changesets).await;
-	});
+	enrich_changeset_context_with_client(&client, source, changesets).await;
 }
 
 /// Convert releasable targets into provider-specific GitHub release requests.
@@ -712,7 +706,6 @@ async fn enrich_changeset_context_with_client(
 		load_review_requests_for_commits_with_client(client, source, &review_request_lookup_shas)
 			.await
 			.unwrap_or_else(|error| {
-				#[rustfmt::skip]
 				tracing::warn!(commits = review_request_lookup_shas.len(), %error, "failed to batch load GitHub review requests; continuing with commit annotations only");
 				BTreeMap::new()
 			});
@@ -781,8 +774,11 @@ async fn load_review_requests_for_commits_with_client(
 		return Ok(BTreeMap::new());
 	}
 
-	#[rustfmt::skip]
-	tracing::info!(commits = shas.len(), requests = 1, "loading GitHub review requests");
+	tracing::info!(
+		commits = shas.len(),
+		requests = 1,
+		"loading GitHub review requests"
+	);
 
 	let review_requests_by_sha =
 		load_review_request_batch_with_client(client, source, shas).await?;
@@ -792,8 +788,11 @@ async fn load_review_requests_for_commits_with_client(
 		.filter(|review_request| review_request.is_some())
 		.count();
 
-	#[rustfmt::skip]
-	tracing::debug!(commits = shas.len(), review_requests = review_requests_found, "resolved GitHub review requests");
+	tracing::debug!(
+		commits = shas.len(),
+		review_requests = review_requests_found,
+		"resolved GitHub review requests"
+	);
 
 	Ok(review_requests_by_sha)
 }
@@ -1024,7 +1023,8 @@ pub fn plan_released_issue_comments(
 /// Create release comments on linked GitHub issues when they have not been posted yet.
 #[tracing::instrument(skip_all)]
 #[must_use = "the comment result must be checked"]
-pub fn comment_released_issues(
+#[allow(clippy::let_and_return, tail_expr_drop_order)]
+pub async fn comment_released_issues(
 	source: &SourceConfiguration,
 	manifest: &ReleaseManifest,
 ) -> MonochangeResult<Vec<GitHubIssueCommentOutcome>> {
@@ -1032,12 +1032,8 @@ pub fn comment_released_issues(
 	if plans.is_empty() {
 		return Ok(Vec::new());
 	}
-	let runtime = github_runtime()?;
-	runtime.block_on(async {
-		let client = github_client_from_env(source)?;
-
-		comment_released_issues_with_client(&client, source, &plans).await
-	})
+	let client = github_client_from_env(source)?;
+	comment_released_issues_with_client(&client, source, &plans).await
 }
 
 async fn comment_released_issues_with_client(
@@ -1132,6 +1128,7 @@ pub async fn publish_release_requests(
 /// Commit, push, and publish the release pull request against GitHub.
 #[tracing::instrument(skip_all)]
 #[must_use = "the pull request result must be checked"]
+#[allow(clippy::let_and_return, tail_expr_drop_order)]
 pub async fn publish_release_pull_request(
 	source: &SourceConfiguration,
 	root: &Path,
@@ -1142,12 +1139,14 @@ pub async fn publish_release_pull_request(
 	let lookup_source = source.clone();
 	let lookup_request = request.clone();
 	let existing_pull_request =
-		thread::spawn(move || lookup_existing_pull_request(&lookup_source, &lookup_request));
+		tokio::spawn(
+			async move { lookup_existing_pull_request(&lookup_source, &lookup_request).await },
+		);
 	git_checkout_branch(root, &request.head_branch).await?;
 	git_stage_paths(root, tracked_paths).await?;
 	git_commit_paths(root, &request.commit_message, no_verify).await?;
 	let mut head_commit = git_head_commit(root).await?;
-	let existing = join_existing_pull_request_lookup(existing_pull_request)?;
+	let existing = join_existing_pull_request_lookup(existing_pull_request).await?;
 	let head_matches_existing = existing
 		.as_ref()
 		.and_then(|pull_request| pull_request.head.sha.as_deref())
@@ -1164,27 +1163,24 @@ pub async fn publish_release_pull_request(
 			root,
 			tracked_paths,
 		)
+		.await
 		.unwrap_or_else(|warning| {
 			tracing::warn!(%warning, commit = %head_commit, "falling back to regular release pull request commit");
 			head_commit.clone()
 		});
 	}
 
-	let runtime = github_runtime()?;
-	runtime.block_on(async {
-		let client = github_client_from_env(source)?;
-
-		publish_release_pull_request_with_existing_pull_request(
-			&client,
-			request,
-			existing.as_ref(),
-			&head_commit,
-		)
-		.await
-	})
+	let client = github_client_from_env(source)?;
+	publish_release_pull_request_with_existing_pull_request(
+		&client,
+		request,
+		existing.as_ref(),
+		&head_commit,
+	)
+	.await
 }
 
-fn maybe_replace_release_pull_request_commit_with_verified_github_commit(
+async fn maybe_replace_release_pull_request_commit_with_verified_github_commit(
 	source: &SourceConfiguration,
 	request: &GitHubPullRequestRequest,
 	fallback_commit: &str,
@@ -1195,27 +1191,23 @@ fn maybe_replace_release_pull_request_commit_with_verified_github_commit(
 		return Ok(fallback_commit.to_string());
 	}
 
-	let runtime = github_runtime().map_err(|error| error.to_string())?;
-	runtime.block_on(async {
-		let commit_client =
-			github_commit_client_from_env(source).map_err(|error| error.to_string())?;
-		let verified_commit = create_verified_github_commit_for_release_pull_request(
-			&commit_client,
-			request,
-			fallback_commit,
-			root,
-			tracked_paths,
-		)
-		.await?;
-		update_github_branch_ref_to_verified_commit(
-			&commit_client,
-			request,
-			fallback_commit,
-			&verified_commit,
-		)
-		.await?;
-		Ok(verified_commit)
-	})
+	let commit_client = github_commit_client_from_env(source).map_err(|error| error.to_string())?;
+	let verified_commit = create_verified_github_commit_for_release_pull_request(
+		&commit_client,
+		request,
+		fallback_commit,
+		root,
+		tracked_paths,
+	)
+	.await?;
+	update_github_branch_ref_to_verified_commit(
+		&commit_client,
+		request,
+		fallback_commit,
+		&verified_commit,
+	)
+	.await?;
+	Ok(verified_commit)
 }
 
 fn github_actions_release_commit_verification_enabled(source: &SourceConfiguration) -> bool {
@@ -1407,18 +1399,14 @@ fn github_head_ref_update_path(request: &GitHubPullRequestRequest) -> String {
 /// Sync existing GitHub releases so retargeted tags point at the new commits.
 #[tracing::instrument(skip_all)]
 #[must_use = "the sync result must be checked"]
-pub fn sync_retargeted_releases(
+#[allow(clippy::let_and_return, tail_expr_drop_order)]
+pub async fn sync_retargeted_releases(
 	source: &SourceConfiguration,
 	tag_updates: &[RetargetTagResult],
 	dry_run: bool,
 ) -> MonochangeResult<Vec<RetargetProviderResult>> {
-	let runtime = github_runtime()?;
-	runtime.block_on(async {
-		let client = github_client_from_env(source)?;
-		let outcomes =
-			sync_retargeted_releases_with_client(&client, source, tag_updates, dry_run).await?;
-		Ok(outcomes)
-	})
+	let client = github_client_from_env(source)?;
+	sync_retargeted_releases_with_client(&client, source, tag_updates, dry_run).await
 }
 
 async fn publish_release_requests_with_client(
@@ -1696,15 +1684,13 @@ async fn lookup_existing_pull_request_with_client(
 	Ok(pull_requests.into_iter().next())
 }
 
-fn lookup_existing_pull_request(
+#[allow(clippy::let_and_return)]
+async fn lookup_existing_pull_request(
 	source: &SourceConfiguration,
 	request: &GitHubPullRequestRequest,
 ) -> MonochangeResult<Option<GitHubExistingPullRequest>> {
-	let runtime = github_runtime()?;
-	runtime.block_on(async {
-		let client = github_client_from_env(source)?;
-		lookup_existing_pull_request_with_client(&client, request).await
-	})
+	let client = github_client_from_env(source)?;
+	lookup_existing_pull_request_with_client(&client, request).await
 }
 
 async fn enable_pull_request_auto_merge_with_client(
@@ -1736,8 +1722,9 @@ async fn enable_pull_request_auto_merge_with_client(
 	Ok(())
 }
 
+#[cfg(test)]
 fn github_runtime() -> MonochangeResult<tokio::runtime::Runtime> {
-	RuntimeBuilder::new_current_thread()
+	tokio::runtime::Builder::new_current_thread()
 		.enable_all()
 		.build()
 		.map_err(|error| MonochangeError::Io(format!("failed to build GitHub runtime: {error}")))
@@ -1873,11 +1860,11 @@ where
 		.map_err(|error| MonochangeError::Config(format_github_api_error("PATCH", path, &error)))
 }
 
-fn join_existing_pull_request_lookup(
-	handle: thread::JoinHandle<MonochangeResult<Option<GitHubExistingPullRequest>>>,
+async fn join_existing_pull_request_lookup(
+	handle: tokio::task::JoinHandle<MonochangeResult<Option<GitHubExistingPullRequest>>>,
 ) -> MonochangeResult<Option<GitHubExistingPullRequest>> {
-	handle.join().map_err(|_| {
-		MonochangeError::Config("failed to join GitHub pull request lookup thread".to_string())
+	handle.await.map_err(|_| {
+		MonochangeError::Config("failed to join GitHub pull request lookup task".to_string())
 	})?
 }
 
@@ -1953,8 +1940,7 @@ async fn git_path_is_tracked(root: &Path, path: &Path) -> MonochangeResult<bool>
 
 async fn git_path_is_ignored(root: &Path, path: &Path) -> MonochangeResult<bool> {
 	let relative = path.to_string_lossy();
-	let output =
-		git_command_output(root, &["check-ignore", "-q", "--", &relative])
+	let output = git_command_output(root, &["check-ignore", "-q", "--", &relative])
 		.await
 		.map_err(|error| {
 			MonochangeError::Config(format!(
@@ -1975,7 +1961,11 @@ async fn git_path_is_ignored(root: &Path, path: &Path) -> MonochangeResult<bool>
 	}
 }
 
-async fn git_commit_paths(root: &Path, message: &CommitMessage, no_verify: bool) -> MonochangeResult<()> {
+async fn git_commit_paths(
+	root: &Path,
+	message: &CommitMessage,
+	no_verify: bool,
+) -> MonochangeResult<()> {
 	run_git_commit_message(
 		root,
 		message,

@@ -91,6 +91,7 @@ pub static HOSTED_SOURCE_ADAPTER: GitLabHostedSourceAdapter = GitLabHostedSource
 /// Hosted-source adapter for GitLab repositories.
 pub struct GitLabHostedSourceAdapter;
 
+#[async_trait::async_trait]
 impl HostedSourceAdapter for GitLabHostedSourceAdapter {
 	fn provider(&self) -> SourceProvider {
 		SourceProvider::GitLab
@@ -112,7 +113,7 @@ impl HostedSourceAdapter for GitLabHostedSourceAdapter {
 		annotate_changeset_context(source, changesets);
 	}
 
-	fn enrich_changeset_context(
+	async fn enrich_changeset_context(
 		&self,
 		source: &SourceConfiguration,
 		changesets: &mut [PreparedChangeset],
@@ -399,7 +400,8 @@ pub async fn publish_release_requests(
 	let api_base = gitlab_api_base(source)?;
 	let mut outcomes = Vec::with_capacity(requests.len());
 	for request in requests {
-		outcomes.push(publish_release_request(&client, &headers, &api_base, source, request).await?);
+		outcomes
+			.push(publish_release_request(&client, &headers, &api_base, source, request).await?);
 	}
 	Ok(outcomes)
 }
@@ -426,14 +428,16 @@ pub async fn publish_release_pull_request(
 		root,
 		&request.head_branch,
 		"prepare release merge request branch",
-	).await?;
+	)
+	.await?;
 	git_stage_paths(root, tracked_paths, "stage release merge request files").await?;
 	git_commit_paths(
 		root,
 		&request.commit_message,
 		"commit release merge request changes",
 		no_verify,
-	).await?;
+	)
+	.await?;
 	let head_commit = git_head_commit(root).await?;
 	let existing = join_existing_merge_request_lookup(existing_merge_request).await?;
 	let head_matches_existing =
@@ -444,7 +448,8 @@ pub async fn publish_release_pull_request(
 			&request.head_branch,
 			"push release merge request branch",
 			no_verify,
-		).await?;
+		)
+		.await?;
 	}
 
 	let client = build_http_client("GitLab")?;
@@ -458,7 +463,8 @@ pub async fn publish_release_pull_request(
 		request,
 		existing.as_ref(),
 		&head_commit,
-	).await
+	)
+	.await
 }
 
 async fn publish_release_request(
@@ -490,7 +496,8 @@ async fn publish_release_request(
 				description: request.body.as_deref(),
 			},
 			"GitLab",
-		).await?
+		)
+		.await?
 	} else {
 		post_json(
 			client,
@@ -503,7 +510,8 @@ async fn publish_release_request(
 				ref_: &source.pull_requests.base,
 			},
 			"GitLab",
-		).await?
+		)
+		.await?
 	};
 	Ok(SourceReleaseOutcome {
 		provider: SourceProvider::GitLab,
@@ -526,7 +534,8 @@ async fn publish_merge_request(
 	request: &SourceChangeRequest,
 ) -> MonochangeResult<SourceChangeRequestOutcome> {
 	let existing = lookup_existing_merge_request(client, headers, api_base, request).await?;
-	publish_merge_request_with_existing(client, headers, api_base, request, existing.as_ref(), "").await
+	publish_merge_request_with_existing(client, headers, api_base, request, existing.as_ref(), "")
+		.await
 }
 
 async fn publish_merge_request_with_existing(
@@ -620,7 +629,8 @@ async fn lookup_existing_merge_request(
 		encode(&request.base_branch),
 	);
 	Ok(
-		get_json::<Vec<GitLabExistingMergeRequest>>(client, headers, &list_url, "GitLab").await?
+		get_json::<Vec<GitLabExistingMergeRequest>>(client, headers, &list_url, "GitLab")
+			.await?
 			.into_iter()
 			.next(),
 	)

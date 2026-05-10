@@ -36,24 +36,26 @@ fn publish_release_requests_reads_github_env_configuration() {
 
 	with_github_env(&server.base_url(), || {
 		let github = sample_github_source();
-		let outcomes = tokio::runtime::Runtime::new().unwrap().block_on(publish_release_requests(
-			&github,
-			&[GitHubReleaseRequest {
-				provider: SourceProvider::GitHub,
-				repository: "ifiokjr/monochange".to_string(),
-				owner: "ifiokjr".to_string(),
-				repo: "monochange".to_string(),
-				target_id: "sdk".to_string(),
-				target_kind: ReleaseOwnerKind::Group,
-				tag_name: "v1.2.0".to_string(),
-				name: "sdk 1.2.0".to_string(),
-				body: Some("release body".to_string()),
-				draft: false,
-				prerelease: false,
-				generate_release_notes: false,
-			}],
-		))
-		.unwrap_or_else(|error| panic!("publish releases: {error}"));
+		let outcomes = tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(publish_release_requests(
+				&github,
+				&[GitHubReleaseRequest {
+					provider: SourceProvider::GitHub,
+					repository: "ifiokjr/monochange".to_string(),
+					owner: "ifiokjr".to_string(),
+					repo: "monochange".to_string(),
+					target_id: "sdk".to_string(),
+					target_kind: ReleaseOwnerKind::Group,
+					tag_name: "v1.2.0".to_string(),
+					name: "sdk 1.2.0".to_string(),
+					body: Some("release body".to_string()),
+					draft: false,
+					prerelease: false,
+					generate_release_notes: false,
+				}],
+			))
+			.unwrap_or_else(|error| panic!("publish releases: {error}"));
 		let outcome = outcomes
 			.first()
 			.unwrap_or_else(|| panic!("missing release outcome"));
@@ -114,29 +116,31 @@ fn publish_release_pull_request_uses_git_and_github_env_configuration() {
 
 	with_github_env(&server.base_url(), || {
 		let github = sample_github_source();
-		let outcome = tokio::runtime::Runtime::new().unwrap().block_on(publish_release_pull_request(
-			&github,
-			&repo,
-			&GitHubPullRequestRequest {
-				provider: SourceProvider::GitHub,
-				repository: "ifiokjr/monochange".to_string(),
-				owner: "ifiokjr".to_string(),
-				repo: "monochange".to_string(),
-				base_branch: "main".to_string(),
-				head_branch: "monochange/release/release".to_string(),
-				title: "chore(release): prepare release".to_string(),
-				body: "release body".to_string(),
-				labels: vec!["release".to_string()],
-				auto_merge: false,
-				commit_message: CommitMessage {
-					subject: "chore(release): prepare release".to_string(),
-					body: None,
+		let outcome = tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(publish_release_pull_request(
+				&github,
+				&repo,
+				&GitHubPullRequestRequest {
+					provider: SourceProvider::GitHub,
+					repository: "ifiokjr/monochange".to_string(),
+					owner: "ifiokjr".to_string(),
+					repo: "monochange".to_string(),
+					base_branch: "main".to_string(),
+					head_branch: "monochange/release/release".to_string(),
+					title: "chore(release): prepare release".to_string(),
+					body: "release body".to_string(),
+					labels: vec!["release".to_string()],
+					auto_merge: false,
+					commit_message: CommitMessage {
+						subject: "chore(release): prepare release".to_string(),
+						body: None,
+					},
 				},
-			},
-			&[PathBuf::from("release.txt")],
-			false,
-		))
-		.unwrap_or_else(|error| panic!("publish release pull request: {error}"));
+				&[PathBuf::from("release.txt")],
+				false,
+			))
+			.unwrap_or_else(|error| panic!("publish release pull request: {error}"));
 		assert_eq!(outcome.operation, GitHubPullRequestOperation::Created);
 	});
 

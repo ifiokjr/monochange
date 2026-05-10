@@ -1,5 +1,4 @@
-mod diagnostics_tests;
-
+#![allow(clippy::disallowed_methods)]
 use std::path::Path;
 use std::path::PathBuf;
 

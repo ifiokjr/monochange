@@ -304,8 +304,9 @@ fn content_text_returns_empty_for_non_text_content() {
 #[test]
 fn manifest_helpers_expose_release_preview_shapes() {
 	let tempdir = setup_fixture("monochange/release-base");
-	let prepared = crate::prepare_release(tempdir.path(), true)
-		.unwrap_or_else(|error| panic!("prepare release: {error}"));
+	let prepared =
+		crate::cli_runtime::block_on_in_context(crate::prepare_release(tempdir.path(), true))
+			.unwrap_or_else(|error| panic!("prepare release: {error}"));
 	let manifest = super::manifest_for_prepared_release(&prepared);
 	assert_eq!(manifest.command, "release-manifest");
 	assert!(!manifest.release_targets.is_empty());
@@ -327,7 +328,7 @@ fn copy_directory_panics_when_destination_is_not_a_directory() {
 	assert!(result.is_err());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn validate_reports_success_for_valid_workspace_fixture() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -344,7 +345,7 @@ async fn validate_reports_success_for_valid_workspace_fixture() {
 	assert_snapshot!(content_text(&result));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn validate_reports_config_errors_for_invalid_workspace_fixture() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -361,7 +362,7 @@ async fn validate_reports_config_errors_for_invalid_workspace_fixture() {
 	assert_snapshot!(content_text(&result));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn discover_reports_workspace_packages() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -378,7 +379,7 @@ async fn discover_reports_workspace_packages() {
 	assert_snapshot!(content_text(&result));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn change_writes_markdown_changeset() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -432,7 +433,7 @@ fn mcp_change_bump_variants_map_to_change_bump_variants() {
 	);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn change_writes_type_only_markdown_changeset() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -466,7 +467,7 @@ async fn change_writes_type_only_markdown_changeset() {
 	assert_snapshot!("changeset", contents);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn discover_reports_config_errors_for_invalid_workspace_fixture() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -483,7 +484,7 @@ async fn discover_reports_config_errors_for_invalid_workspace_fixture() {
 	assert_snapshot!(content_text(&result));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn diagnostics_returns_changeset_context() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -501,7 +502,7 @@ async fn diagnostics_returns_changeset_context() {
 	assert_snapshot!(content_text(&result));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn diagnostics_reports_missing_requested_changesets() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -519,7 +520,7 @@ async fn diagnostics_reports_missing_requested_changesets() {
 	assert_snapshot!(content_text(&result));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn change_reports_errors_for_unknown_package_ids() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -544,7 +545,7 @@ async fn change_reports_errors_for_unknown_package_ids() {
 	assert_snapshot!(content_text(&result));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn release_preview_returns_dry_run_release_summary() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -561,7 +562,7 @@ async fn release_preview_returns_dry_run_release_summary() {
 	assert_snapshot!(content_text(&result));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn release_manifest_returns_dry_run_manifest() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -580,7 +581,7 @@ async fn release_manifest_returns_dry_run_manifest() {
 	assert_readable_json_snapshot!(value);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn release_preview_reports_config_errors_when_changesets_are_missing() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -597,7 +598,7 @@ async fn release_preview_reports_config_errors_when_changesets_are_missing() {
 	assert_snapshot!(content_text(&result));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn release_manifest_reports_config_errors_when_changesets_are_missing() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -614,7 +615,7 @@ async fn release_manifest_reports_config_errors_when_changesets_are_missing() {
 	assert_snapshot!(content_text(&result));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn affected_packages_reports_failed_policy_for_uncovered_changes() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -635,7 +636,7 @@ async fn affected_packages_reports_failed_policy_for_uncovered_changes() {
 	assert_readable_json_snapshot!(value);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn affected_packages_reports_success_for_documentation_only_changes() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -654,7 +655,7 @@ async fn affected_packages_reports_success_for_documentation_only_changes() {
 	assert_snapshot!(content_text(&result));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn affected_packages_reports_configuration_errors() {
 	let tempdir = setup_fixture("config/rejects-empty-step-id");
 	let result = MonochangeMcpServer::new()
@@ -672,7 +673,7 @@ async fn affected_packages_reports_configuration_errors() {
 	);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn lint_catalog_lists_rules_and_presets() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -686,7 +687,7 @@ async fn lint_catalog_lists_rules_and_presets() {
 	assert_snapshot!(content_text(&result));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn lint_explain_returns_rule_and_preset() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -716,7 +717,7 @@ async fn lint_explain_returns_rule_and_preset() {
 	assert_readable_json_snapshot!(combined);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn lint_explain_reports_unknown_ids() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -732,7 +733,7 @@ async fn lint_explain_reports_unknown_ids() {
 	assert_snapshot!(content_text(&result));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn agent_eval_release_workflow_stays_machine_readable() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -772,7 +773,7 @@ async fn agent_eval_release_workflow_stays_machine_readable() {
 	assert_readable_json_snapshot!(eval);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn analyze_changes_returns_semantic_diff_for_cargo_workspace() {
 	let tempdir = setup_analysis_workspace();
 	let result = MonochangeMcpServer::new()
@@ -790,7 +791,7 @@ async fn analyze_changes_returns_semantic_diff_for_cargo_workspace() {
 	});
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn validate_changeset_reports_stale_symbol_references() {
 	let tempdir = setup_analysis_workspace();
 	let changeset_dir = tempdir.path().join(".changeset");
@@ -893,7 +894,7 @@ fn validate_changeset_content_suggests_detected_items_when_summary_is_generic() 
 	}));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn validate_changeset_reports_frame_detection_errors() {
 	let tempdir = setup_analysis_workspace_without_git();
 	let changeset_dir = tempdir.path().join(".changeset");
@@ -917,7 +918,7 @@ async fn validate_changeset_reports_frame_detection_errors() {
 	assert!(rendered.contains("Failed to detect change frame"));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn validate_changeset_reports_semantic_analysis_errors() {
 	let tempdir = setup_analysis_workspace_without_commits();
 	let changeset_dir = tempdir.path().join(".changeset");
@@ -941,7 +942,7 @@ async fn validate_changeset_reports_semantic_analysis_errors() {
 	assert!(rendered.contains("Semantic analysis failed"));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn validate_changeset_reports_current_lifecycle_when_items_are_mentioned() {
 	let tempdir = setup_analysis_workspace();
 	let changeset_dir = tempdir.path().join(".changeset");
@@ -966,7 +967,7 @@ async fn validate_changeset_reports_current_lifecycle_when_items_are_mentioned()
 	assert!(rendered.contains("\"valid\": true"));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn validate_changeset_reports_incomplete_lifecycle_for_warning_only_results() {
 	let tempdir = setup_analysis_workspace();
 	let changeset_dir = tempdir.path().join(".changeset");

@@ -1,76 +1,5 @@
-pub(crate) fn validate_publish_readiness_artifact(
-	root: &Path,
-	configuration: &WorkspaceConfiguration,
-	prepared_release: Option<&PreparedRelease>,
-	selected_packages: &BTreeSet<String>,
-	artifact_path: &Path,
-) -> MonochangeResult<()> {
-	let artifact = read_report_artifact(artifact_path)?;
-	#[rustfmt::skip]
-	let current_report = build_publish_readiness_report_for_publish(root, configuration, prepared_release, selected_packages)?;
-	validate_publish_readiness_report(&artifact, &current_report)
-}
 
-fn validate_publish_readiness_report(
-	artifact: &PublishReadinessReport,
-	current: &PublishReadinessReport,
-) -> MonochangeResult<()> {
-	validate_readiness_artifact_header(artifact)?;
-	validate_readiness_artifact_status(artifact)?;
-	validate_readiness_current_status(current)?;
-	validate_readiness_release_commit(artifact, current)?;
-	validate_readiness_input_fingerprint(artifact, current)?;
-	validate_readiness_packages(artifact, current)
-}
-
-fn validate_readiness_artifact_status(report: &PublishReadinessReport) -> MonochangeResult<()> {
-	if report.status == PublishReadinessGlobalStatus::Ready {
-		return Ok(());
-	}
-	Err(MonochangeError::Config(
-		"publish readiness artifact is blocked; rerun `mc step:publish-readiness` and resolve blockers before `mc publish`".to_string(),
-	))
-}
-
-fn validate_readiness_current_status(report: &PublishReadinessReport) -> MonochangeResult<()> {
-	if report.status == PublishReadinessGlobalStatus::Ready {
-		return Ok(());
-	}
-	Err(MonochangeError::Config(
-		"current publish readiness is blocked; rerun `mc step:publish-readiness` and resolve blockers before `mc publish`".to_string(),
-	))
-}
-
-fn validate_readiness_packages(
-	artifact: &PublishReadinessReport,
-	current: &PublishReadinessReport,
-) -> MonochangeResult<()> {
-	let artifact_packages = package_identities(&artifact.packages)?;
-	let current_packages = package_identities(&current.packages)?;
-	if artifact.package_set_fingerprint != package_set_fingerprint(&artifact.packages) {
-		return Err(MonochangeError::Config(
-			"publish readiness artifact package fingerprint does not match its package list"
-				.to_string(),
-		));
-	}
-	if artifact_packages == current_packages {
-		return Ok(());
-	}
-	let missing = current_packages
-		.difference(&artifact_packages)
-		.map(render_package_identity)
-		.collect::<Vec<_>>();
-	let stale = artifact_packages
-		.difference(&current_packages)
-		.map(render_package_identity)
-		.collect::<Vec<_>>();
-	Err(MonochangeError::Config(format!(
-		"publish readiness artifact package set is stale or does not match selected packages (missing: {}; stale: {})",
-		render_package_identity_list(&missing),
-		render_package_identity_list(&stale)
-	)))
-}
-
+#![allow(clippy::disallowed_methods)]
 use super::*;
 
 fn sample_publish_outcome(
@@ -522,8 +451,8 @@ fn validate_publish_readiness_report_accepts_matching_ready_reports() {
 		.unwrap_or_else(|error| panic!("matching readiness artifact: {error}"));
 }
 
-#[test]
-fn validate_publish_readiness_artifact_accepts_prepared_release_reports() {
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_publish_readiness_artifact_accepts_prepared_release_reports() {
 	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	let artifact_path = root.join("readiness.json");
@@ -536,6 +465,7 @@ fn validate_publish_readiness_artifact_accepts_prepared_release_reports() {
 		Some(&prepared_release),
 		&selected_packages,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("prepared release readiness: {error}"));
 
 	assert_eq!(report.from, "prepared-release");
@@ -548,6 +478,7 @@ fn validate_publish_readiness_artifact_accepts_prepared_release_reports() {
 		&selected_packages,
 		&artifact_path,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("validate readiness artifact: {error}"));
 }
 
@@ -629,8 +560,8 @@ fn validate_publish_readiness_plan_artifact_rejects_tampering_and_missing_covera
 	);
 }
 
-#[test]
-fn publish_plan_package_filter_from_readiness_artifact_accepts_empty_prepared_release() {
+#[tokio::test(flavor = "multi_thread")]
+async fn publish_plan_package_filter_from_readiness_artifact_accepts_empty_prepared_release() {
 	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	let artifact_path = root.join("readiness.json");
@@ -643,6 +574,7 @@ fn publish_plan_package_filter_from_readiness_artifact_accepts_empty_prepared_re
 		Some(&prepared_release),
 		&selected_packages,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("prepared release readiness: {error}"));
 
 	write_report_artifact(&artifact_path, &report)
@@ -654,6 +586,7 @@ fn publish_plan_package_filter_from_readiness_artifact_accepts_empty_prepared_re
 		&selected_packages,
 		&artifact_path,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("publish plan readiness filter: {error}"));
 
 	assert!(planned_packages.is_empty());
@@ -761,4 +694,54 @@ fn render_package_identity_list_labels_empty_lists() {
 		render_package_identity_list(&["core Cargo crates.io 1.2.3".to_string()]),
 		"core Cargo crates.io 1.2.3"
 	);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn build_publish_readiness_for_publish_falls_back_to_head_without_prepared_release() {
+	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	std::process::Command::new("git")
+		.current_dir(root)
+		.args(["init"])
+		.output()
+		.unwrap_or_else(|error| panic!("git init: {error}"));
+	std::process::Command::new("git")
+		.current_dir(root)
+		.args(["config", "user.email", "monochange@example.com"])
+		.output()
+		.unwrap_or_else(|error| panic!("git config email: {error}"));
+	std::process::Command::new("git")
+		.current_dir(root)
+		.args(["config", "user.name", "monochange Tests"])
+		.output()
+		.unwrap_or_else(|error| panic!("git config name: {error}"));
+	std::process::Command::new("git")
+		.current_dir(root)
+		.args(["config", "commit.gpgsign", "false"])
+		.output()
+		.unwrap_or_else(|error| panic!("git config gpgsign: {error}"));
+	fs::write(root.join("README.md"), "readme\n")
+		.unwrap_or_else(|error| panic!("write readme: {error}"));
+	std::process::Command::new("git")
+		.current_dir(root)
+		.args(["add", "."])
+		.output()
+		.unwrap_or_else(|error| panic!("git add: {error}"));
+	std::process::Command::new("git")
+		.current_dir(root)
+		.args(["commit", "-m", "initial"])
+		.output()
+		.unwrap_or_else(|error| panic!("git commit: {error}"));
+
+	let error = build_publish_readiness_report_for_publish(
+		root,
+		&sample_configuration(root),
+		None,
+		&BTreeSet::new(),
+	)
+	.await
+	.err()
+	.unwrap_or_else(|| panic!("expected missing release record error"));
+
+	assert!(error.to_string().contains("no monochange release record"));
 }

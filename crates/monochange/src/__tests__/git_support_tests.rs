@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 use std::fs;
 use std::io::Write;
 use std::process::Stdio;
@@ -64,8 +65,8 @@ fn init_git_repo(root: &Path) {
 	git(root, &["config", "commit.gpgsign", "false"]);
 }
 
-#[test]
-fn git_commit_paths_supports_large_commit_message_bodies() {
+#[tokio::test(flavor = "multi_thread")]
+async fn git_commit_paths_supports_large_commit_message_bodies() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	init_git_repo(root);
@@ -86,6 +87,7 @@ fn git_commit_paths_supports_large_commit_message_bodies() {
 		},
 		false,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("git commit paths: {error}"));
 
 	let commit_body = git_output(root, &["log", "-1", "--format=%B"]);
@@ -93,8 +95,8 @@ fn git_commit_paths_supports_large_commit_message_bodies() {
 	assert!(commit_body.contains(body.trim_end()));
 }
 
-#[test]
-fn git_stage_paths_returns_ok_when_all_paths_are_non_stageable() {
+#[tokio::test(flavor = "multi_thread")]
+async fn git_stage_paths_returns_ok_when_all_paths_are_non_stageable() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	fs::write(root.join(".gitignore"), ".monochange/local/\n")
@@ -116,18 +118,20 @@ fn git_stage_paths_returns_ok_when_all_paths_are_non_stageable() {
 			PathBuf::from(".changeset/missing.md"),
 		],
 	)
+	.await
 	.unwrap_or_else(|error| panic!("git stage paths: {error}"));
 
 	assert_eq!(git_output(root, &["diff", "--cached", "--name-only"]), "");
 }
 
-#[test]
-fn git_path_is_tracked_reports_command_failures() {
+#[tokio::test(flavor = "multi_thread")]
+async fn git_path_is_tracked_reports_command_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path().to_path_buf();
 	drop(tempdir);
 
 	let error = git_path_is_tracked(&root, Path::new("release.txt"))
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected tracked inspection failure"));
 	assert!(
@@ -137,8 +141,8 @@ fn git_path_is_tracked_reports_command_failures() {
 	);
 }
 
-#[test]
-fn git_path_is_ignored_reports_false_for_unignored_paths() {
+#[tokio::test(flavor = "multi_thread")]
+async fn git_path_is_ignored_reports_false_for_unignored_paths() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	init_git_repo(root);
@@ -147,18 +151,20 @@ fn git_path_is_ignored_reports_false_for_unignored_paths() {
 
 	assert!(
 		!git_path_is_ignored(root, Path::new("release.txt"))
+			.await
 			.unwrap_or_else(|error| panic!("git path ignored: {error}"))
 	);
 }
 
-#[test]
-fn git_path_is_ignored_reports_inspection_failures() {
+#[tokio::test(flavor = "multi_thread")]
+async fn git_path_is_ignored_reports_inspection_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	fs::write(root.join("release.txt"), "release\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 
 	let error = git_path_is_ignored(root, Path::new("release.txt"))
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected ignored inspection failure"));
 	assert!(
@@ -168,13 +174,14 @@ fn git_path_is_ignored_reports_inspection_failures() {
 	);
 }
 
-#[test]
-fn git_path_is_ignored_reports_command_failures() {
+#[tokio::test(flavor = "multi_thread")]
+async fn git_path_is_ignored_reports_command_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path().to_path_buf();
 	drop(tempdir);
 
 	let error = git_path_is_ignored(&root, Path::new("release.txt"))
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected ignored command failure"));
 	assert!(
@@ -184,25 +191,27 @@ fn git_path_is_ignored_reports_command_failures() {
 	);
 }
 
-#[test]
-fn run_git_capture_includes_stderr_for_failed_commands() {
+#[tokio::test(flavor = "multi_thread")]
+async fn run_git_capture_includes_stderr_for_failed_commands() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	init_git_repo(root);
 
 	let error = run_git_capture(root, &["show", "missing-commit"], "capture failure")
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected failed git capture"));
 	assert!(error.to_string().contains("capture failure"));
 	assert!(error.to_string().contains("missing-commit"));
 }
 
-#[test]
-fn run_git_process_reports_nonzero_exit_status_details() {
+#[tokio::test(flavor = "multi_thread")]
+async fn run_git_process_reports_nonzero_exit_status_details() {
 	let mut command = ProcessCommand::new("git");
 	command.arg("definitely-not-a-real-git-command");
 
 	let error = run_git_process(command, "process failure")
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected failed git process"));
 	assert!(error.to_string().contains("process failure"));
@@ -213,33 +222,36 @@ fn run_git_process_reports_nonzero_exit_status_details() {
 	);
 }
 
-#[test]
-fn run_git_process_with_stdin_allows_commands_without_piped_stdin() {
+#[tokio::test(flavor = "multi_thread")]
+async fn run_git_process_with_stdin_allows_commands_without_piped_stdin() {
 	let mut command = ProcessCommand::new("git");
 	command.arg("--version");
 
 	run_git_process_with_stdin(command, b"message", "stdin process")
+		.await
 		.unwrap_or_else(|error| panic!("stdin process should succeed: {error}"));
 }
 
-#[test]
-fn run_git_process_with_stdin_reports_spawn_failures() {
+#[tokio::test(flavor = "multi_thread")]
+async fn run_git_process_with_stdin_reports_spawn_failures() {
 	let command = ProcessCommand::new("definitely-not-a-real-monochange-test-command");
 
 	let error = run_git_process_with_stdin(command, b"message", "stdin process failure")
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected failed stdin git process"));
 	assert!(error.to_string().contains("stdin process failure"));
 }
 
-#[test]
-fn run_git_process_with_stdin_reports_nonzero_exit_status_details() {
+#[tokio::test(flavor = "multi_thread")]
+async fn run_git_process_with_stdin_reports_nonzero_exit_status_details() {
 	let mut command = ProcessCommand::new("git");
 	command
 		.arg("definitely-not-a-real-git-command")
 		.stdin(Stdio::piped());
 
 	let error = run_git_process_with_stdin(command, b"message", "stdin process failure")
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected failed stdin git process"));
 	assert!(error.to_string().contains("stdin process failure"));

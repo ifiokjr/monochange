@@ -24,8 +24,8 @@ use monochange_core::SourceConfiguration;
 use monochange_core::TrustedPublishingSettings;
 use monochange_core::WorkspaceConfiguration;
 use monochange_core::default_publish_order_dependency_fields;
+use reqwest::Client;
 use reqwest::StatusCode;
-use reqwest::blocking::Client;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value as JsonValue;
@@ -555,7 +555,7 @@ pub trait PublishTrustHandler {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn execute_publish_requests_with_process(
+pub async fn execute_publish_requests_with_process(
 	root: &Path,
 	source: Option<&SourceConfiguration>,
 	mode: PackagePublishRunMode,
@@ -621,10 +621,11 @@ pub fn execute_publish_requests_with_process_and_progress(
 		trust_handler,
 		progress,
 	)
+	.await
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn execute_publish_requests(
+pub async fn execute_publish_requests(
 	root: &Path,
 	source: Option<&SourceConfiguration>,
 	mode: PackagePublishRunMode,
@@ -728,7 +729,7 @@ pub fn execute_publish_requests_with_progress(
 		progress.report(PublishProgressEvent::RegistryCheckStarted(
 			publish_progress_package(request),
 		));
-		let version_exists = registry_version_exists(client, endpoints, request)?;
+		let version_exists = registry_version_exists(client, endpoints, request).await?;
 		if version_exists {
 			info!(
 				package_name = request.package_name,
@@ -2604,14 +2605,14 @@ pub fn package_can_be_published(
 			PublishState::Private | PublishState::Excluded
 		)
 }
-pub fn filter_pending_publish_requests(
+pub async fn filter_pending_publish_requests(
 	requests: &[PublishRequest],
 ) -> MonochangeResult<Vec<PublishRequest>> {
 	let client = registry_client()?;
 	let endpoints = RegistryEndpoints::from_env();
-	filter_pending_publish_requests_with_transport(requests, &client, &endpoints)
+	filter_pending_publish_requests_with_transport(requests, &client, &endpoints).await
 }
-pub fn filter_pending_publish_requests_with_transport(
+pub async fn filter_pending_publish_requests_with_transport(
 	requests: &[PublishRequest],
 	client: &Client,
 	endpoints: &RegistryEndpoints,
@@ -2622,7 +2623,7 @@ pub fn filter_pending_publish_requests_with_transport(
 		if request.mode == PublishMode::External {
 			continue;
 		}
-		if registry_version_exists(client, endpoints, request)? {
+		if registry_version_exists(client, endpoints, request).await? {
 			continue;
 		}
 		pending_requests.push(request.clone());
@@ -2630,7 +2631,7 @@ pub fn filter_pending_publish_requests_with_transport(
 
 	Ok(pending_requests)
 }
-pub fn registry_version_exists(
+pub async fn registry_version_exists(
 	client: &Client,
 	endpoints: &RegistryEndpoints,
 	request: &PublishRequest,
@@ -2644,6 +2645,7 @@ pub fn registry_version_exists(
 		let response = client
 			.get(url)
 			.send()
+			.await
 			.map_err(http_error("npm registry lookup"))?;
 		if response.status() == StatusCode::NOT_FOUND {
 			return Ok(false);
@@ -2654,6 +2656,7 @@ pub fn registry_version_exists(
 			.map_err(http_error("npm registry lookup"))?;
 		let json = response
 			.json::<JsonValue>()
+			.await
 			.map_err(http_error("npm registry decode"))?;
 		let exists = json
 			.get("versions")
@@ -2666,7 +2669,7 @@ pub fn registry_version_exists(
 	}
 
 	if request.registry == RegistryKind::CratesIo {
-		return crates_io_version_exists(client, endpoints, request);
+		return crates_io_version_exists(client, endpoints, request).await;
 	}
 
 	if request.registry == RegistryKind::PubDev {
@@ -2678,6 +2681,7 @@ pub fn registry_version_exists(
 		let response = client
 			.get(url)
 			.send()
+			.await
 			.map_err(http_error("pub.dev lookup"))?;
 		if response.status() == StatusCode::NOT_FOUND {
 			return Ok(false);
@@ -2688,6 +2692,7 @@ pub fn registry_version_exists(
 			.map_err(http_error("pub.dev lookup"))?;
 		let json = response
 			.json::<JsonValue>()
+			.await
 			.map_err(http_error("pub.dev decode"))?;
 		let exists = json
 			.get("versions")
@@ -2708,7 +2713,11 @@ pub fn registry_version_exists(
 			endpoints.pypi_api.trim_end_matches('/'),
 			encode(&request.package_name)
 		);
-		let response = client.get(url).send().map_err(http_error("PyPI lookup"))?;
+		let response = client
+			.get(url)
+			.send()
+			.await
+			.map_err(http_error("PyPI lookup"))?;
 		if response.status() == StatusCode::NOT_FOUND {
 			return Ok(false);
 		}
@@ -2717,6 +2726,7 @@ pub fn registry_version_exists(
 			.map_err(http_error("PyPI lookup"))?;
 		let json = response
 			.json::<JsonValue>()
+			.await
 			.map_err(http_error("PyPI decode"))?;
 		let exists = json
 			.get("releases")
@@ -2738,6 +2748,7 @@ pub fn registry_version_exists(
 		let response = client
 			.get(url)
 			.send()
+			.await
 			.map_err(http_error("Go proxy version lookup"))?;
 		if response.status() == StatusCode::NOT_FOUND || response.status() == StatusCode::GONE {
 			return Ok(false);
@@ -2753,7 +2764,11 @@ pub fn registry_version_exists(
 		endpoints.jsr_base.trim_end_matches('/'),
 		request.package_name
 	);
-	let response = client.get(url).send().map_err(http_error("jsr lookup"))?;
+	let response = client
+		.get(url)
+		.send()
+		.await
+		.map_err(http_error("jsr lookup"))?;
 	if response.status() == StatusCode::NOT_FOUND {
 		return Ok(false);
 	}
@@ -2763,6 +2778,7 @@ pub fn registry_version_exists(
 		.map_err(http_error("jsr lookup"))?;
 	let json = response
 		.json::<JsonValue>()
+		.await
 		.map_err(http_error("jsr decode"))?;
 	let exists = json
 		.get("versions")
@@ -2772,7 +2788,7 @@ pub fn registry_version_exists(
 		});
 	Ok(exists)
 }
-pub fn crates_io_version_exists(
+pub async fn crates_io_version_exists(
 	client: &Client,
 	endpoints: &RegistryEndpoints,
 	request: &PublishRequest,
@@ -2785,6 +2801,7 @@ pub fn crates_io_version_exists(
 	let response = client
 		.get(url)
 		.send()
+		.await
 		.map_err(http_error("crates.io lookup"))?;
 	let status = response.status();
 
@@ -2795,6 +2812,7 @@ pub fn crates_io_version_exists(
 	if status.is_success() {
 		let json = response
 			.json::<JsonValue>()
+			.await
 			.map_err(http_error("crates.io decode"))?;
 		let exists = json
 			.get("versions")
@@ -2809,13 +2827,15 @@ pub fn crates_io_version_exists(
 		return Ok(exists);
 	}
 
-	crates_io_index_version_exists(client, endpoints, request).map_err(|error| {
-		MonochangeError::Discovery(format!(
-			"crates.io lookup failed with http status {status}; crates.io index fallback failed: {error}"
-		))
-	})
+	crates_io_index_version_exists(client, endpoints, request)
+		.await
+		.map_err(|error| {
+			MonochangeError::Discovery(format!(
+				"crates.io lookup failed with http status {status}; crates.io index fallback failed: {error}"
+			))
+		})
 }
-pub fn crates_io_index_version_exists(
+pub async fn crates_io_index_version_exists(
 	client: &Client,
 	endpoints: &RegistryEndpoints,
 	request: &PublishRequest,
@@ -2828,6 +2848,7 @@ pub fn crates_io_index_version_exists(
 	let response = client
 		.get(url)
 		.send()
+		.await
 		.map_err(http_error("crates.io index lookup"))?;
 
 	if response.status() == StatusCode::NOT_FOUND {
@@ -2839,6 +2860,7 @@ pub fn crates_io_index_version_exists(
 		.map_err(http_error("crates.io index lookup"))?;
 	let body = response
 		.text()
+		.await
 		.map_err(http_error("crates.io index decode"))?;
 
 	for line in body.lines().filter(|line| !line.trim().is_empty()) {

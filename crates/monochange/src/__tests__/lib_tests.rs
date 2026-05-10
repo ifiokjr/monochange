@@ -1,3 +1,5 @@
+#![allow(clippy::large_futures)]
+#![allow(clippy::disallowed_methods)]
 use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
@@ -108,6 +110,7 @@ use crate::render_change_target_markdown;
 use crate::run_with_args;
 use crate::run_with_args_in_dir;
 use crate::workspace_ops::build_lockfile_command_executions;
+use crate::workspace_ops::prepare_release_execution;
 use crate::workspace_ops::change_type_default_bump;
 use crate::workspace_ops::render_cli_commands_toml;
 use crate::workspace_ops::render_interactive_changeset_markdown;
@@ -207,9 +210,10 @@ fn run_cli<I>(root: &Path, args: I) -> monochange_core::MonochangeResult<String>
 where
 	I: IntoIterator<Item = OsString>,
 {
-	temp_env::with_var("MONOCHANGE_PROGRESS_FORMAT", None::<&str>, || {
-		run_with_args_in_dir("mc", args, root)
-	})
+	crate::cli_runtime::block_on_in_context(temp_env::async_with_vars(
+		[("MONOCHANGE_PROGRESS_FORMAT", None::<&str>)],
+		async { run_with_args_in_dir("mc", args, root).await },
+	))
 }
 
 #[test]
@@ -899,9 +903,10 @@ fn cli_parses_discover_command() {
 	assert_eq!(matches.subcommand_name(), Some("step:discover"));
 }
 
-#[test]
-fn cli_help_returns_success_output() {
+#[tokio::test(flavor = "multi_thread")]
+async fn cli_help_returns_success_output() {
 	let output = run_with_args("mc", [OsString::from("mc"), OsString::from("--help")])
+		.await
 		.unwrap_or_else(|error| panic!("help output: {error}"));
 
 	assert!(output.contains("Usage: mc"));
@@ -922,8 +927,8 @@ fn cli_help_returns_success_output() {
 	assert!(output.contains("step:tag-release"));
 }
 
-#[test]
-fn cli_configured_command_help_groups_generated_configured_and_global_options() {
+#[tokio::test(flavor = "multi_thread")]
+async fn cli_configured_command_help_groups_generated_configured_and_global_options() {
 	let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
 	let output = run_with_args_in_dir(
 		"mc",
@@ -934,6 +939,7 @@ fn cli_configured_command_help_groups_generated_configured_and_global_options() 
 		],
 		&root,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("release help: {error}"));
 
 	assert!(output.contains("Release Options:"));
@@ -946,8 +952,8 @@ fn cli_configured_command_help_groups_generated_configured_and_global_options() 
 	assert!(output.contains("      --jq <EXPRESSION>"));
 }
 
-#[test]
-fn publish_release_help_documents_draft_release_options() {
+#[tokio::test(flavor = "multi_thread")]
+async fn publish_release_help_documents_draft_release_options() {
 	let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
 	let output = run_with_args_in_dir(
 		"mc",
@@ -958,6 +964,7 @@ fn publish_release_help_documents_draft_release_options() {
 		],
 		&root,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("publish-release help: {error}"));
 
 	assert!(output.contains("Publish provider release objects from a prepared release artifact"));
@@ -966,8 +973,8 @@ fn publish_release_help_documents_draft_release_options() {
 	assert!(output.contains("--format <FORMAT>"));
 }
 
-#[test]
-fn comment_released_issues_help_documents_post_merge_options() {
+#[tokio::test(flavor = "multi_thread")]
+async fn comment_released_issues_help_documents_post_merge_options() {
 	let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
 	let output = run_with_args_in_dir(
 		"mc",
@@ -978,6 +985,7 @@ fn comment_released_issues_help_documents_post_merge_options() {
 		],
 		&root,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("comment-released-issues help: {error}"));
 
 	assert!(output.contains("Run the built-in comment-released-issues release workflow step"));
@@ -985,8 +993,8 @@ fn comment_released_issues_help_documents_post_merge_options() {
 	assert!(output.contains("--auto-close-issues"));
 }
 
-#[test]
-fn repair_release_help_describes_retargeting_workflow() {
+#[tokio::test(flavor = "multi_thread")]
+async fn repair_release_help_describes_retargeting_workflow() {
 	let output = run_with_args(
 		"mc",
 		[
@@ -995,6 +1003,7 @@ fn repair_release_help_describes_retargeting_workflow() {
 			OsString::from("--help"),
 		],
 	)
+	.await
 	.unwrap_or_else(|error| panic!("repair-release help: {error}"));
 
 	assert!(output.contains("Run the built-in retarget-release release workflow step"));
@@ -1021,7 +1030,7 @@ fn boolean_cli_inputs_support_explicit_false_values() {
 		steps: vec![],
 		dry_run: false,
 	};
-	let subcommand = build_cli_command_subcommand(&cli_command);
+	let subcommand = crate::build_cli_command_subcommand(&cli_command);
 	let matches = Command::new("mc")
 		.subcommand(subcommand)
 		.try_get_matches_from(["mc", "test-bool", "--flag=false"])
@@ -1037,8 +1046,8 @@ fn boolean_cli_inputs_support_explicit_false_values() {
 	);
 }
 
-#[test]
-fn analyze_help_documents_package_scoped_release_trajectory_defaults() {
+#[tokio::test(flavor = "multi_thread")]
+async fn analyze_help_documents_package_scoped_release_trajectory_defaults() {
 	let output = run_with_args(
 		"mc",
 		[
@@ -1047,6 +1056,7 @@ fn analyze_help_documents_package_scoped_release_trajectory_defaults() {
 			OsString::from("--help"),
 		],
 	)
+	.await
 	.unwrap_or_else(|error| panic!("analyze help: {error}"));
 
 	assert!(output.contains("Analyze semantic changes for one package"));
@@ -1109,8 +1119,8 @@ fn analyze_matches_capture_package_refs_and_detection_level() {
 	);
 }
 
-#[test]
-fn versions_help_and_matches_document_dedicated_versions_command() {
+#[tokio::test(flavor = "multi_thread")]
+async fn versions_help_and_matches_document_dedicated_versions_command() {
 	let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/mixed");
 	let release_help = run_with_args(
 		"mc",
@@ -1120,6 +1130,7 @@ fn versions_help_and_matches_document_dedicated_versions_command() {
 			OsString::from("--help"),
 		],
 	)
+	.await
 	.unwrap_or_else(|error| panic!("release help: {error}"));
 	assert!(!release_help.contains("--versions"));
 
@@ -1131,6 +1142,7 @@ fn versions_help_and_matches_document_dedicated_versions_command() {
 			OsString::from("--help"),
 		],
 	)
+	.await
 	.unwrap_or_else(|error| panic!("versions help: {error}"));
 	assert!(versions_help.contains("Run the built-in display-versions release workflow step"));
 	assert!(versions_help.contains("--format <FORMAT>"));
@@ -1154,8 +1166,8 @@ fn versions_help_and_matches_document_dedicated_versions_command() {
 	);
 }
 
-#[test]
-fn release_record_help_describes_first_parent_discovery() {
+#[tokio::test(flavor = "multi_thread")]
+async fn release_record_help_describes_first_parent_discovery() {
 	let output = run_with_args(
 		"mc",
 		[
@@ -1164,14 +1176,15 @@ fn release_record_help_describes_first_parent_discovery() {
 			OsString::from("--help"),
 		],
 	)
+	.await
 	.unwrap_or_else(|error| panic!("release-record help: {error}"));
 
 	assert!(output.contains("Inspect the release record associated with a tag or commit"));
 	assert!(output.contains("--from <FROM>"));
 }
 
-#[test]
-fn tag_release_help_describes_post_merge_tagging_workflow() {
+#[tokio::test(flavor = "multi_thread")]
+async fn tag_release_help_describes_post_merge_tagging_workflow() {
 	let output = run_with_args(
 		"mc",
 		[
@@ -1180,6 +1193,7 @@ fn tag_release_help_describes_post_merge_tagging_workflow() {
 			OsString::from("--help"),
 		],
 	)
+	.await
 	.unwrap_or_else(|error| panic!("tag-release help: {error}"));
 
 	assert!(output.contains("Create and push release tags from a release record"));
@@ -1187,8 +1201,8 @@ fn tag_release_help_describes_post_merge_tagging_workflow() {
 	assert!(output.contains("reruns on the same commit as already up to date"));
 }
 
-#[test]
-fn subagents_help_describes_supported_targets() {
+#[tokio::test(flavor = "multi_thread")]
+async fn subagents_help_describes_supported_targets() {
 	let _guard = snapshot_settings().bind_to_scope();
 	let output = run_with_args(
 		"mc",
@@ -1198,6 +1212,7 @@ fn subagents_help_describes_supported_targets() {
 			OsString::from("--help"),
 		],
 	)
+	.await
 	.unwrap_or_else(|error| panic!("subagents help output: {error}"));
 
 	insta::assert_snapshot!(output);
@@ -1516,8 +1531,8 @@ fn release_record_supports_json_output() {
 	assert!(output.contains("\"resolvedCommit\""));
 }
 
-#[test]
-fn release_record_jq_filters_json_output_for_ci() {
+#[tokio::test(flavor = "multi_thread")]
+async fn release_record_jq_filters_json_output_for_ci() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	let mut record = sample_release_record_for_retarget();
@@ -1530,6 +1545,7 @@ fn release_record_jq_filters_json_output_for_ci() {
 	let traced_discovery = tracing::subscriber::with_default(subscriber, || {
 		crate::release_record::discover_release_record(root, "HEAD")
 	})
+	.await
 	.unwrap_or_else(|error| panic!("trace release-record discovery: {error}"));
 	assert_eq!(traced_discovery.record.release_targets[0].id, "main");
 
@@ -1861,7 +1877,7 @@ fn populate_adds_default_cli_commands_to_an_empty_configuration_file() {
 
 #[test]
 fn render_cli_commands_toml_handles_release_and_command_step_variants() {
-	let rendered = render_cli_commands_toml(&[CliCommandDefinition {
+	let rendered = crate::render_cli_commands_toml(&[CliCommandDefinition {
 		name: "custom".to_string(),
 		help_text: None,
 		inputs: vec![CliInputDefinition {
@@ -2351,7 +2367,7 @@ fn change_command_sources_type_choices_from_workspace_configuration() {
 		}],
 		dry_run: false,
 	}];
-	apply_runtime_change_type_choices(&mut cli, &configuration);
+	crate::apply_runtime_change_type_choices(&mut cli, &configuration);
 	let change = cli
 		.iter()
 		.find(|c| c.name == "change")
@@ -2367,7 +2383,7 @@ fn change_command_sources_type_choices_from_workspace_configuration() {
 	);
 
 	let error = Command::new("mc")
-		.subcommand(build_cli_command_subcommand(&cli[0]))
+		.subcommand(crate::build_cli_command_subcommand(&cli[0]))
 		.try_get_matches_from([
 			OsString::from("mc"),
 			OsString::from("change"),
@@ -2783,15 +2799,15 @@ fn change_type_default_bump_resolves_package_group_and_unknown_targets() {
 	let configuration =
 		load_workspace_configuration(&root).unwrap_or_else(|error| panic!("config: {error}"));
 	assert_eq!(
-		change_type_default_bump(&configuration, "core", "security"),
+		crate::change_type_default_bump(&configuration, "core", "security"),
 		Some(BumpSeverity::Patch)
 	);
 	assert_eq!(
-		change_type_default_bump(&configuration, "sdk", "test"),
+		crate::change_type_default_bump(&configuration, "sdk", "test"),
 		Some(BumpSeverity::Minor)
 	);
 	assert_eq!(
-		change_type_default_bump(&configuration, "unknown", "test"),
+		crate::change_type_default_bump(&configuration, "unknown", "test"),
 		Some(BumpSeverity::Minor) // unknown targets inherit workspace defaults
 	);
 }
@@ -2996,18 +3012,21 @@ fn prepare_release_allows_empty_changesets_when_configured() {
 	fs::remove_dir_all(tempdir.path().join(".changeset"))
 		.unwrap_or_else(|error| panic!("remove changesets: {error}"));
 
-	let strict_error =
-		prepare_release_execution_with_file_diffs(tempdir.path(), true, false, false)
-			.err()
-			.unwrap_or_else(|| panic!("expected missing changeset error"));
+	let strict_error = crate::cli_runtime::block_on_in_context(
+		crate::prepare_release_execution_with_file_diffs(tempdir.path(), true, false, false),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected missing changeset error"));
 	assert!(
 		strict_error
 			.to_string()
 			.contains("no markdown changesets found under .changeset")
 	);
 
-	let execution = prepare_release_execution_with_file_diffs(tempdir.path(), true, true, true)
-		.unwrap_or_else(|error| panic!("prepare release execution: {error}"));
+	let execution = crate::cli_runtime::block_on_in_context(
+		crate::prepare_release_execution_with_file_diffs(tempdir.path(), true, true, true),
+	)
+	.unwrap_or_else(|error| panic!("prepare release execution: {error}"));
 
 	assert_eq!(
 		execution.prepared_release.plan.workspace_root,
@@ -3020,8 +3039,8 @@ fn prepare_release_allows_empty_changesets_when_configured() {
 	assert!(execution.file_diffs.is_empty());
 }
 
-#[test]
-fn command_versions_reports_planned_versions_without_mutating_files() {
+#[tokio::test(flavor = "multi_thread")]
+async fn command_versions_reports_planned_versions_without_mutating_files() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_release_fixture(tempdir.path(), None, false);
 	let workspace_manifest = tempdir.path().join("Cargo.toml");
@@ -3045,6 +3064,7 @@ fn command_versions_reports_planned_versions_without_mutating_files() {
 		versions_matches,
 		false,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("versions output: {error}"));
 
 	assert!(output.contains("group versions:"));
@@ -3120,7 +3140,7 @@ fn template_context_exposes_resolved_config_by_default() {
 	let mut context = cli_context_for_when_evaluation_tests();
 	context.root = tempdir.path().to_path_buf();
 
-	let template_context = build_cli_template_context(&context, &BTreeMap::new(), None);
+	let template_context = crate::build_cli_template_context(&context, &BTreeMap::new(), None);
 	let project_root = tempdir
 		.path()
 		.canonicalize()
@@ -3166,7 +3186,7 @@ fn render_interactive_changeset_markdown_uses_natural_summary_heading() {
 		reason: "interactive heading".to_string(),
 		details: Some("Details body".to_string()),
 	};
-	let rendered = render_interactive_changeset_markdown(&configuration, &result)
+	let rendered = crate::render_interactive_changeset_markdown(&configuration, &result)
 		.unwrap_or_else(|error| panic!("render interactive markdown: {error}"));
 	assert!(rendered.contains("# interactive heading"));
 	assert!(rendered.contains("Details body"));
@@ -3188,7 +3208,7 @@ fn render_interactive_changeset_markdown_renders_caused_by_context() {
 		reason: "interactive caused_by".to_string(),
 		details: None,
 	};
-	let rendered = render_interactive_changeset_markdown(&configuration, &result)
+	let rendered = crate::render_interactive_changeset_markdown(&configuration, &result)
 		.unwrap_or_else(|error| panic!("render interactive caused_by markdown: {error}"));
 	assert!(rendered.contains("core:"));
 	assert!(rendered.contains("  bump: none"));
@@ -3381,7 +3401,7 @@ fn prepare_release_execution_dry_run_skips_lockfile_commands_for_performance() {
 		.unwrap_or_else(|error| panic!("package lock before dry-run: {error}"));
 
 	let prepared = with_path_prefixed(tempdir.path(), || {
-		prepare_release_execution_with_file_diffs(tempdir.path(), true, true, false)
+		crate::cli_runtime::block_on_in_context(prepare_release_execution(tempdir.path(), true))
 			.unwrap_or_else(|error| panic!("prepare release execution: {error}"))
 	});
 	let after = fs::read_to_string(tempdir.path().join("packages/app/package-lock.json"))
@@ -3736,8 +3756,8 @@ fn cli_command_command_steps_expose_namespaced_inputs_and_step_overrides() {
 	assert_eq!(command_output, "hello-world");
 }
 
-#[test]
-fn command_step_without_dry_run_override_reports_skipped_command() {
+#[tokio::test(flavor = "multi_thread")]
+async fn command_step_without_dry_run_override_reports_skipped_command() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_blank_monochange_config(tempdir.path());
 	let configuration = load_workspace_configuration(tempdir.path())
@@ -3767,12 +3787,13 @@ fn command_step_without_dry_run_override_reports_skipped_command() {
 		true,
 		BTreeMap::new(),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("dry-run output: {error}"));
 	assert!(output.contains("skipped command `echo hello` (dry-run)"));
 }
 
-#[test]
-fn command_step_rejects_unparseable_commands() {
+#[tokio::test(flavor = "multi_thread")]
+async fn command_step_rejects_unparseable_commands() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_blank_monochange_config(tempdir.path());
 	let configuration = load_workspace_configuration(tempdir.path())
@@ -3802,6 +3823,7 @@ fn command_step_rejects_unparseable_commands() {
 		false,
 		BTreeMap::new(),
 	)
+	.await
 	.err()
 	.unwrap_or_else(|| panic!("expected parse failure"));
 	assert!(
@@ -3811,8 +3833,8 @@ fn command_step_rejects_unparseable_commands() {
 	);
 }
 
-#[test]
-fn command_step_rejects_empty_commands() {
+#[tokio::test(flavor = "multi_thread")]
+async fn command_step_rejects_empty_commands() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_blank_monochange_config(tempdir.path());
 	let configuration = load_workspace_configuration(tempdir.path())
@@ -3842,13 +3864,14 @@ fn command_step_rejects_empty_commands() {
 		false,
 		BTreeMap::new(),
 	)
+	.await
 	.err()
 	.unwrap_or_else(|| panic!("expected empty command failure"));
 	assert!(error.to_string().contains("command must not be empty"));
 }
 
-#[test]
-fn command_step_reports_process_spawn_failures() {
+#[tokio::test(flavor = "multi_thread")]
+async fn command_step_reports_process_spawn_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_blank_monochange_config(tempdir.path());
 	let configuration = load_workspace_configuration(tempdir.path())
@@ -3878,6 +3901,7 @@ fn command_step_reports_process_spawn_failures() {
 		false,
 		BTreeMap::new(),
 	)
+	.await
 	.err()
 	.unwrap_or_else(|| panic!("expected process spawn failure"));
 	assert!(
@@ -3887,8 +3911,8 @@ fn command_step_reports_process_spawn_failures() {
 	);
 }
 
-#[test]
-fn command_step_reports_nonzero_exit_status_without_stderr() {
+#[tokio::test(flavor = "multi_thread")]
+async fn command_step_reports_nonzero_exit_status_without_stderr() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_blank_monochange_config(tempdir.path());
 	let configuration = load_workspace_configuration(tempdir.path())
@@ -3918,6 +3942,7 @@ fn command_step_reports_nonzero_exit_status_without_stderr() {
 		false,
 		BTreeMap::new(),
 	)
+	.await
 	.err()
 	.unwrap_or_else(|| panic!("expected exit-status failure"));
 	assert!(
@@ -3926,8 +3951,8 @@ fn command_step_reports_nonzero_exit_status_without_stderr() {
 	);
 }
 
-#[test]
-fn command_step_reports_stderr_text_for_nonzero_exit_status() {
+#[tokio::test(flavor = "multi_thread")]
+async fn command_step_reports_stderr_text_for_nonzero_exit_status() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_blank_monochange_config(tempdir.path());
 	let configuration = load_workspace_configuration(tempdir.path())
@@ -3957,13 +3982,14 @@ fn command_step_reports_stderr_text_for_nonzero_exit_status() {
 		false,
 		BTreeMap::new(),
 	)
+	.await
 	.err()
 	.unwrap_or_else(|| panic!("expected stderr failure"));
 	assert!(error.to_string().contains("boom"), "error: {error}");
 }
 
-#[test]
-fn execute_cli_command_without_steps_reports_completion_status() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_without_steps_reports_completion_status() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_blank_monochange_config(tempdir.path());
 	let configuration = load_workspace_configuration(tempdir.path())
@@ -3982,6 +4008,7 @@ fn execute_cli_command_without_steps_reports_completion_status() {
 		false,
 		BTreeMap::new(),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("noop output: {error}"));
 	assert_eq!(output, "command `noop` completed");
 	let dry_run_output = crate::execute_cli_command(
@@ -3991,12 +4018,13 @@ fn execute_cli_command_without_steps_reports_completion_status() {
 		true,
 		BTreeMap::new(),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("noop dry-run output: {error}"));
 	assert_eq!(dry_run_output, "command `noop` completed (dry-run)");
 }
 
-#[test]
-fn affected_packages_requires_attached_coverage_for_changed_packages() {
+#[tokio::test(flavor = "multi_thread")]
+async fn affected_packages_requires_attached_coverage_for_changed_packages() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_changeset_policy_fixture(tempdir.path(), false);
 
@@ -4005,6 +4033,7 @@ fn affected_packages_requires_attached_coverage_for_changed_packages() {
 		&["crates/core/src/lib.rs".to_string()],
 		&Vec::new(),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("verification: {error}"));
 
 	assert_eq!(
@@ -4017,8 +4046,8 @@ fn affected_packages_requires_attached_coverage_for_changed_packages() {
 	assert_eq!(evaluation.uncovered_package_ids, vec!["core"]);
 }
 
-#[test]
-fn affected_packages_skips_when_allowed_label_is_present() {
+#[tokio::test(flavor = "multi_thread")]
+async fn affected_packages_skips_when_allowed_label_is_present() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	seed_changeset_policy_fixture(tempdir.path(), false);
 
@@ -4027,6 +4056,7 @@ fn affected_packages_skips_when_allowed_label_is_present() {
 		&["crates/core/src/lib.rs".to_string()],
 		&["no-changeset-required".to_string()],
 	)
+	.await
 	.unwrap_or_else(|error| panic!("verification: {error}"));
 
 	assert_eq!(
@@ -4619,6 +4649,7 @@ fn step_override_missing_template_reference_produces_empty_changed_paths() {
 
 #[test]
 fn parse_direct_template_reference_returns_inner_path_for_valid_refs() {
+	use super::parse_direct_template_reference;
 	assert_eq!(
 		parse_direct_template_reference("{{ inputs.message }}"),
 		Some("inputs.message")
@@ -4631,24 +4662,28 @@ fn parse_direct_template_reference_returns_inner_path_for_valid_refs() {
 
 #[test]
 fn parse_direct_template_reference_returns_none_for_empty_inner() {
+	use super::parse_direct_template_reference;
 	assert_eq!(parse_direct_template_reference("{{  }}"), None);
 	assert_eq!(parse_direct_template_reference("{{}}"), None);
 }
 
 #[test]
 fn parse_direct_template_reference_returns_none_for_invalid_chars() {
+	use super::parse_direct_template_reference;
 	assert_eq!(parse_direct_template_reference("{{ foo-bar }}"), None);
 	assert_eq!(parse_direct_template_reference("{{ foo bar }}"), None);
 }
 
 #[test]
 fn parse_direct_template_reference_returns_none_for_literals() {
+	use super::parse_direct_template_reference;
 	assert_eq!(parse_direct_template_reference("{{ false }}"), None);
 	assert_eq!(parse_direct_template_reference("{{ 1 }}"), None);
 }
 
 #[test]
 fn parse_direct_template_reference_returns_none_when_not_a_bare_ref() {
+	use super::parse_direct_template_reference;
 	assert_eq!(parse_direct_template_reference("prefix-{{ foo }}"), None);
 	assert_eq!(parse_direct_template_reference("hello world"), None);
 }
@@ -4932,6 +4967,7 @@ fn should_execute_cli_step_rejects_non_scalar_condition_value() {
 fn lookup_template_value_traverses_nested_objects() {
 	use serde_json::json;
 
+	use super::lookup_template_value;
 	let v = json!({"inputs": {"message": "hello"}});
 	assert_eq!(
 		lookup_template_value(&v, "inputs.message"),
@@ -4943,6 +4979,7 @@ fn lookup_template_value_traverses_nested_objects() {
 fn lookup_template_value_traverses_array_by_index() {
 	use serde_json::json;
 
+	use super::lookup_template_value;
 	let v = json!({"items": ["a", "b", "c"]});
 	assert_eq!(lookup_template_value(&v, "items.1"), Some(&json!("b")));
 }
@@ -4951,6 +4988,7 @@ fn lookup_template_value_traverses_array_by_index() {
 fn lookup_template_value_returns_none_for_missing_key() {
 	use serde_json::json;
 
+	use super::lookup_template_value;
 	let v = json!({"inputs": {}});
 	assert_eq!(lookup_template_value(&v, "inputs.missing"), None);
 }
@@ -4959,12 +4997,14 @@ fn lookup_template_value_returns_none_for_missing_key() {
 fn lookup_template_value_returns_none_for_primitive_descent() {
 	use serde_json::json;
 
+	use super::lookup_template_value;
 	let v = json!({"foo": "string_value"});
 	assert_eq!(lookup_template_value(&v, "foo.nested"), None);
 }
 
 #[test]
 fn template_value_to_input_values_null_returns_empty() {
+	use super::template_value_to_input_values;
 	assert_eq!(
 		template_value_to_input_values(&serde_json::Value::Null),
 		Vec::<String>::new()
@@ -4975,6 +5015,7 @@ fn template_value_to_input_values_null_returns_empty() {
 fn template_value_to_input_values_number_returns_string() {
 	use serde_json::json;
 
+	use super::template_value_to_input_values;
 	assert_eq!(
 		template_value_to_input_values(&json!(42)),
 		vec!["42".to_string()]
@@ -4989,6 +5030,7 @@ fn template_value_to_input_values_number_returns_string() {
 fn template_value_to_input_values_array_flattens_elements() {
 	use serde_json::json;
 
+	use super::template_value_to_input_values;
 	assert_eq!(
 		template_value_to_input_values(&json!(["a", "b", "c"])),
 		vec!["a", "b", "c"]
@@ -5003,6 +5045,7 @@ fn template_value_to_input_values_array_flattens_elements() {
 fn template_value_to_input_values_object_returns_json_serialization() {
 	use serde_json::json;
 
+	use super::template_value_to_input_values;
 	let obj = json!({"k": "v"});
 	let result = template_value_to_input_values(&obj);
 	assert_eq!(result.len(), 1);
@@ -5748,12 +5791,12 @@ fn write_release_record_file_reports_error_when_dedupe_cannot_remove_stale_dir()
 		.unwrap_or_else(|error| panic!("restore permissions: {error}"));
 }
 
-#[test]
-fn find_release_record_files_at_commit_reports_git_errors() {
+#[tokio::test(flavor = "multi_thread")]
+async fn find_release_record_files_at_commit_reports_git_errors() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	// Not a git repo — calling git should error
-	let result = crate::git_support::find_release_record_files_at_commit(root, "HEAD");
+	let result = crate::git_support::find_release_record_files_at_commit(root, "HEAD").await;
 	assert!(
 		result.is_err(),
 		"expected error for non-git directory, got: {result:?}"
@@ -6062,14 +6105,15 @@ fn repair_release_command_dry_run_reports_text_output() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
-fn repair_release_command_emits_retarget_progress_statuses() {
+#[allow(clippy::large_futures)]
+#[tokio::test(flavor = "multi_thread")]
+async fn repair_release_command_emits_retarget_progress_statuses() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	write_blank_monochange_config(root);
 	create_release_record_history(root);
 
-	let output = temp_env::with_var("MONOCHANGE_PROGRESS_FORMAT", Some("json"), || {
+	let output = temp_env::async_with_vars([("MONOCHANGE_PROGRESS_FORMAT", Some("json"))], async {
 		run_with_args_in_dir(
 			"mc",
 			[
@@ -6084,7 +6128,9 @@ fn repair_release_command_emits_retarget_progress_statuses() {
 			],
 			root,
 		)
+		.await
 	})
+	.await
 	.unwrap_or_else(|error| panic!("repair-release output: {error}"));
 
 	assert!(output.contains("repair release:"));
@@ -6246,7 +6292,7 @@ fn template_context_exposes_release_commit_namespace() {
 		step_outputs: BTreeMap::new(),
 		command_logs: Vec::new(),
 	};
-	let template_context = build_cli_template_context(&context, &BTreeMap::new(), None);
+	let template_context = crate::build_cli_template_context(&context, &BTreeMap::new(), None);
 	assert_eq!(
 		template_context
 			.get("release_commit")
@@ -6283,7 +6329,7 @@ fn template_context_exposes_retarget_namespace() {
 		step_outputs: BTreeMap::new(),
 		command_logs: Vec::new(),
 	};
-	let template_context = build_cli_template_context(&context, &BTreeMap::new(), None);
+	let template_context = crate::build_cli_template_context(&context, &BTreeMap::new(), None);
 	assert_eq!(
 		template_context
 			.get("retarget")
@@ -6368,7 +6414,7 @@ fn template_context_exposes_publish_namespace() {
 		step_outputs: BTreeMap::new(),
 		command_logs: Vec::new(),
 	};
-	let template_context = build_cli_template_context(&context, &BTreeMap::new(), None);
+	let template_context = crate::build_cli_template_context(&context, &BTreeMap::new(), None);
 	assert_eq!(
 		template_context
 			.get("publish")
@@ -6461,7 +6507,7 @@ fn template_context_exposes_manifest_affected_steps_and_custom_variables() {
 			monochange_core::CommandVariable::Changesets,
 		),
 	]);
-	let template_context = build_cli_template_context(&context, &inputs, Some(&variables));
+	let template_context = crate::build_cli_template_context(&context, &inputs, Some(&variables));
 	assert_eq!(
 		template_context
 			.get("manifest")
@@ -6561,7 +6607,7 @@ fn render_cli_command_result_prefers_retarget_report() {
 		step_outputs: BTreeMap::new(),
 		command_logs: Vec::new(),
 	};
-	let rendered = render_cli_command_result(&cli_command, &context);
+	let rendered = crate::render_cli_command_result(&cli_command, &context);
 	assert!(rendered.contains("repair release:"));
 	assert!(rendered.contains("status: dry-run"));
 }
@@ -6602,7 +6648,7 @@ fn render_cli_command_result_renders_release_follow_up_sections() {
 		step_outputs: BTreeMap::new(),
 		command_logs: Vec::new(),
 	};
-	let rendered = render_cli_command_result(&cli_command, &context);
+	let rendered = crate::render_cli_command_result(&cli_command, &context);
 	assert!(rendered.contains("release manifest: target/release-manifest.json"));
 	assert!(rendered.contains("releases:"));
 	assert!(rendered.contains("release request:"));
@@ -6648,7 +6694,7 @@ fn render_cli_command_markdown_result_uses_markdown_sections_for_prepare_release
 		step_outputs: BTreeMap::new(),
 		command_logs: vec!["skipped command `cargo publish` (dry-run)".to_string()],
 	};
-	let rendered = render_cli_command_markdown_result(&cli_command, &context);
+	let rendered = crate::render_cli_command_markdown_result(&cli_command, &context);
 	assert!(rendered.contains("# `release` (dry-run)"));
 	assert!(rendered.contains("## Summary"));
 	assert!(rendered.contains("## Release targets"));
@@ -6704,7 +6750,7 @@ fn render_cli_command_markdown_result_renders_release_follow_up_sections() {
 		command_logs: vec!["executed release workflow".to_string()],
 	};
 
-	let rendered = render_cli_command_markdown_result(&cli_command, &context);
+	let rendered = crate::render_cli_command_markdown_result(&cli_command, &context);
 	assert!(rendered.contains("## Releases"));
 	assert!(rendered.contains("published monochange v1.2.3"));
 	assert!(rendered.contains("## Release commit"));
@@ -6718,8 +6764,8 @@ fn render_cli_command_markdown_result_renders_release_follow_up_sections() {
 	assert!(rendered.contains("CHANGELOG.md"));
 }
 
-#[test]
-fn execute_cli_command_retarget_release_requires_from_input() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_retarget_release_requires_from_input() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_blank_monochange_config(tempdir.path());
 	let configuration = load_workspace_configuration(tempdir.path())
@@ -6743,6 +6789,7 @@ fn execute_cli_command_retarget_release_requires_from_input() {
 		true,
 		BTreeMap::new(),
 	)
+	.await
 	.err()
 	.unwrap_or_else(|| panic!("expected missing from input error"));
 	assert!(
@@ -6752,8 +6799,9 @@ fn execute_cli_command_retarget_release_requires_from_input() {
 	);
 }
 
-#[test]
-fn execute_cli_command_builtin_release_steps_require_from_input() {
+
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_builtin_release_steps_require_from_input() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_blank_monochange_config(tempdir.path());
 	let configuration = load_workspace_configuration(tempdir.path())
@@ -6807,6 +6855,7 @@ fn execute_cli_command_builtin_release_steps_require_from_input() {
 			true,
 			BTreeMap::new(),
 		)
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected missing from input error for {name}"));
 		assert!(
@@ -6816,8 +6865,8 @@ fn execute_cli_command_builtin_release_steps_require_from_input() {
 	}
 }
 
-#[test]
-fn execute_cli_command_tag_release_verification_errors_before_rendering() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_tag_release_verification_errors_before_rendering() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	fs::write(
 		tempdir.path().join("monochange.toml"),
@@ -6872,6 +6921,7 @@ branches = ["release/*"]
 		true,
 		BTreeMap::new(),
 	)
+	.await
 	.err()
 	.unwrap_or_else(|| panic!("expected tag verification error"));
 	assert!(!error.to_string().contains("missing tag-release ref"));
@@ -6883,8 +6933,8 @@ branches = ["release/*"]
 	);
 }
 
-#[test]
-fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_blank_monochange_config(tempdir.path());
 	std::process::Command::new("git")
@@ -6899,14 +6949,14 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 		.unwrap_or_else(|error| panic!("git config email: {error}"));
 	std::process::Command::new("git")
 		.current_dir(tempdir.path())
-		.args(["config", "user.name", "Test User"])
-		.output()
-		.unwrap_or_else(|error| panic!("git config name: {error}"));
-	std::process::Command::new("git")
-		.current_dir(tempdir.path())
 		.args(["config", "commit.gpgsign", "false"])
 		.output()
 		.unwrap_or_else(|error| panic!("git config gpgsign: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["config", "user.name", "Test User"])
+		.output()
+		.unwrap_or_else(|error| panic!("git config name: {error}"));
 	fs::write(tempdir.path().join("tracked.txt"), "test\n")
 		.unwrap_or_else(|error| panic!("write tracked: {error}"));
 	std::process::Command::new("git")
@@ -6969,19 +7019,18 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 			true,
 			BTreeMap::new(),
 		)
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected missing PrepareRelease error for {name}"));
 		assert!(error.to_string().contains(expected), "error: {error}");
 	}
 }
 
-#[test]
-fn execute_cli_command_source_follow_up_steps_require_source_configuration() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	copy_fixture("monochange/release-base", tempdir.path());
-	let root = tempdir.path();
-	let mut configuration =
-		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_source_follow_up_steps_require_source_configuration() {
+	let root = fixture_path("monochange/release-base");
+	let mut configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	configuration.source = Some(monochange_core::SourceConfiguration {
 		provider: monochange_core::SourceProvider::GitLab,
 		host: Some("https://gitlab.example.com".to_string()),
@@ -7013,12 +7062,13 @@ fn execute_cli_command_source_follow_up_steps_require_source_configuration() {
 		dry_run: false,
 	};
 	let error = crate::execute_cli_command(
-		root,
+		&root,
 		&configuration,
 		&prepare_and_publish,
 		true,
 		BTreeMap::new(),
 	)
+	.await
 	.err()
 	.unwrap_or_else(|| panic!("expected github source requirement error"));
 	assert!(
@@ -7028,13 +7078,11 @@ fn execute_cli_command_source_follow_up_steps_require_source_configuration() {
 	);
 }
 
-#[test]
-fn execute_cli_command_comment_released_issues_requires_source_configuration() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	copy_fixture("monochange/release-base", tempdir.path());
-	let root = tempdir.path();
-	let mut configuration =
-		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_comment_released_issues_requires_source_configuration() {
+	let root = fixture_path("monochange/release-base");
+	let mut configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	configuration.source = None;
 	let cli_command = CliCommandDefinition {
 		name: "release-comments".to_string(),
@@ -7059,7 +7107,8 @@ fn execute_cli_command_comment_released_issues_requires_source_configuration() {
 	};
 
 	let error =
-		crate::execute_cli_command(root, &configuration, &cli_command, true, BTreeMap::new())
+		crate::execute_cli_command(&root, &configuration, &cli_command, true, BTreeMap::new())
+			.await
 			.err()
 			.unwrap_or_else(|| panic!("expected missing source configuration error"));
 
@@ -7070,13 +7119,11 @@ fn execute_cli_command_comment_released_issues_requires_source_configuration() {
 	);
 }
 
-#[test]
-fn execute_cli_command_publish_and_request_steps_require_source_configuration() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	copy_fixture("monochange/release-base", tempdir.path());
-	let root = tempdir.path();
-	let mut configuration =
-		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_publish_and_request_steps_require_source_configuration() {
+	let root = fixture_path("monochange/release-base");
+	let mut configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	configuration.source = None;
 
 	let cases = [
@@ -7121,20 +7168,19 @@ fn execute_cli_command_publish_and_request_steps_require_source_configuration() 
 			dry_run: false,
 		};
 		let error =
-			crate::execute_cli_command(root, &configuration, &cli_command, true, BTreeMap::new())
+			crate::execute_cli_command(&root, &configuration, &cli_command, true, BTreeMap::new())
+				.await
 				.err()
 				.unwrap_or_else(|| panic!("expected missing source error for {name}"));
 		assert!(error.to_string().contains(expected), "error: {error}");
 	}
 }
 
-#[test]
-fn execute_cli_command_change_step_requires_reason_input() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	copy_fixture("monochange/release-base", tempdir.path());
-	let root = tempdir.path();
-	let configuration =
-		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_change_step_requires_reason_input() {
+	let root = fixture_path("monochange/release-base");
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
 	let cli_command = CliCommandDefinition {
 		name: "change".to_string(),
 		help_text: None,
@@ -7152,12 +7198,13 @@ fn execute_cli_command_change_step_requires_reason_input() {
 		dry_run: false,
 	};
 	let error = crate::execute_cli_command(
-		root,
+		&root,
 		&configuration,
 		&cli_command,
 		true,
 		BTreeMap::from([("package".to_string(), vec!["core".to_string()])]),
 	)
+	.await
 	.err()
 	.unwrap_or_else(|| panic!("expected missing reason error"));
 	assert!(
@@ -7167,8 +7214,8 @@ fn execute_cli_command_change_step_requires_reason_input() {
 	);
 }
 
-#[test]
-fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_up_steps_render_dry_run_outputs()
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_up_steps_render_dry_run_outputs()
  {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_fixture("monochange/release-base", tempdir.path());
@@ -7208,6 +7255,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 		true,
 		BTreeMap::from([("format".to_string(), vec!["text".to_string()])]),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("prepare release: {error}"));
 	assert!(render_output.contains("release manifest: .monochange/local/release-manifest.json"));
 	let manifest_contents =
@@ -7242,6 +7290,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 		true,
 		BTreeMap::from([("format".to_string(), vec!["text".to_string()])]),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("publish release: {error}"));
 	assert!(publish_output.contains("releases:"));
 	assert!(publish_output.contains("dry-run"));
@@ -7275,6 +7324,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 		true,
 		BTreeMap::from([("format".to_string(), vec!["text".to_string()])]),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("open release request: {error}"));
 	assert!(request_output.contains("release request:"));
 	assert!(request_output.contains("dry-run"));
@@ -7302,12 +7352,13 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 	};
 	let comments_output =
 		crate::execute_cli_command(root, &configuration, &issue_comments, true, BTreeMap::new())
+			.await
 			.unwrap_or_else(|error| panic!("comment released issues: {error}"));
 	assert!(!comments_output.is_empty());
 }
 
-#[test]
-fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_fixture("monochange/release-base", tempdir.path());
 	let root = tempdir.path();
@@ -7369,10 +7420,9 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 		then.status(404);
 	});
 
-	temp_env::with_var(
-		"MONOCHANGE_CRATES_IO_API_URL",
-		Some(server.base_url()),
-		|| {
+	temp_env::async_with_vars(
+		[("MONOCHANGE_CRATES_IO_API_URL", Some(server.base_url()))],
+		async {
 			let placeholder_command = CliCommandDefinition {
 				name: "placeholder-publish".to_string(),
 				help_text: None,
@@ -7392,6 +7442,7 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 				true,
 				BTreeMap::from([("format".to_string(), vec!["text".to_string()])]),
 			)
+			.await
 			.unwrap_or_else(|error| panic!("placeholder publish: {error}"));
 			assert!(placeholder_output.contains("placeholder publishing:"));
 			assert!(placeholder_output.contains("would publish placeholder"));
@@ -7428,6 +7479,7 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 					("package".to_string(), vec!["core".to_string()]),
 				]),
 			)
+			.await
 			.unwrap_or_else(|error| panic!("publish packages: {error}"));
 			assert!(publish_output.contains("package publishing:"));
 			assert!(
@@ -7436,11 +7488,12 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 			);
 			assert!(publish_output.contains("publish rate limits:"));
 		},
-	);
+	)
+	.await;
 }
 
-#[test]
-fn execute_cli_command_allows_package_publish_steps_without_readiness_or_matching_packages() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_allows_package_publish_steps_without_readiness_or_matching_packages() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_fixture("monochange/release-base", tempdir.path());
 	let root = tempdir.path();
@@ -7451,10 +7504,9 @@ fn execute_cli_command_allows_package_publish_steps_without_readiness_or_matchin
 		when.method(GET);
 		then.status(404);
 	});
-	temp_env::with_var(
-		"MONOCHANGE_CRATES_IO_API_URL",
-		Some(server.base_url()),
-		|| {
+	temp_env::async_with_vars(
+		[("MONOCHANGE_CRATES_IO_API_URL", Some(server.base_url()))],
+		async {
 			let placeholder_command = CliCommandDefinition {
 				name: "placeholder-publish".to_string(),
 				help_text: None,
@@ -7477,6 +7529,7 @@ fn execute_cli_command_allows_package_publish_steps_without_readiness_or_matchin
 					("package".to_string(), vec!["missing-package".to_string()]),
 				]),
 			)
+			.await
 			.unwrap_or_else(|error| panic!("non-dry-run placeholder publish: {error}"));
 			assert!(placeholder_output.contains("placeholder publishing:"));
 			assert!(placeholder_output.contains("no packages matched the publishing criteria"));
@@ -7513,6 +7566,7 @@ fn execute_cli_command_allows_package_publish_steps_without_readiness_or_matchin
 					("package".to_string(), vec!["missing-package".to_string()]),
 				]),
 			)
+			.await
 			.unwrap_or_else(|error| {
 				panic!("non-dry-run publish packages without readiness: {error}")
 			});
@@ -7552,6 +7606,7 @@ fn execute_cli_command_allows_package_publish_steps_without_readiness_or_matchin
 					),
 				]),
 			)
+			.await
 			.unwrap_or_else(|error| panic!("publish packages without readiness: {error}"));
 			assert!(publish_output.contains("package publishing:"));
 			assert!(publish_output.contains("no packages matched the publishing criteria"));
@@ -7581,15 +7636,17 @@ fn execute_cli_command_allows_package_publish_steps_without_readiness_or_matchin
 					("mode".to_string(), vec!["placeholder".to_string()]),
 				]),
 			)
+			.await
 			.unwrap_or_else(|error| panic!("publish plan without matches: {error}"));
 			assert!(plan_output.contains("publish rate limits:"));
 			assert!(plan_output.contains("no publish operations matched the current plan"));
 		},
-	);
+	)
+	.await;
 }
 
-#[test]
-fn release_follow_up_helpers_render_real_operation_outputs() {
+#[tokio::test(flavor = "multi_thread")]
+async fn release_follow_up_helpers_render_real_operation_outputs() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let manifest = sample_release_manifest_for_commit_message(true, true);
 	let written_path = crate::cli_runtime::write_release_manifest_file(
@@ -7597,6 +7654,7 @@ fn release_follow_up_helpers_render_real_operation_outputs() {
 		Path::new("target/release-manifest.json"),
 		&manifest,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("write manifest: {error}"));
 	assert_eq!(written_path, PathBuf::from("target/release-manifest.json"));
 	let manifest_contents =
@@ -7702,8 +7760,8 @@ fn release_follow_up_helpers_render_real_operation_outputs() {
 	);
 }
 
-#[test]
-fn execute_matches_rejects_unknown_cli_command_names() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_matches_rejects_unknown_cli_command_names() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_blank_monochange_config(tempdir.path());
 	let configuration = load_workspace_configuration(tempdir.path())
@@ -7712,23 +7770,26 @@ fn execute_matches_rejects_unknown_cli_command_names() {
 		.try_get_matches_from(["dummy"])
 		.unwrap_or_else(|error| panic!("matches: {error}"));
 	let error = crate::execute_matches(tempdir.path(), &configuration, "missing", &matches, false)
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected unknown command error"));
 	assert!(error.to_string().contains("unknown command `missing`"));
 }
 
-#[test]
-fn run_git_capture_and_process_report_io_failures_for_missing_worktrees() {
+#[tokio::test(flavor = "multi_thread")]
+async fn run_git_capture_and_process_report_io_failures_for_missing_worktrees() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let missing = tempdir.path().join("missing");
-	let capture_error = run_git_capture(&missing, &["status"], "capture failure")
+	let capture_error = crate::run_git_capture(&missing, &["status"], "capture failure")
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected capture error"));
 	assert!(capture_error.to_string().contains("capture failure"));
 
 	let mut command = std::process::Command::new("git");
 	command.current_dir(&missing).arg("status");
-	let process_error = run_git_process(command, "process failure")
+	let process_error = crate::run_git_process(command, "process failure")
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected process error"));
 	assert!(process_error.to_string().contains("process failure"));
@@ -7737,7 +7798,7 @@ fn run_git_capture_and_process_report_io_failures_for_missing_worktrees() {
 #[test]
 fn parse_boolean_step_input_rejects_invalid_values() {
 	let inputs = BTreeMap::from([("force".to_string(), vec!["maybe".to_string()])]);
-	let error = parse_boolean_step_input(&inputs, "force")
+	let error = crate::parse_boolean_step_input(&inputs, "force")
 		.err()
 		.unwrap_or_else(|| panic!("expected invalid boolean error"));
 	assert!(
@@ -7747,28 +7808,30 @@ fn parse_boolean_step_input_rejects_invalid_values() {
 	);
 }
 
-#[test]
-fn run_mcp_command_with_skips_server_when_quiet() {
+#[tokio::test(flavor = "multi_thread")]
+async fn run_mcp_command_with_skips_server_when_quiet() {
 	let called = Cell::new(false);
 	let output = crate::run_mcp_command_with(true, || {
 		async {
 			called.set(true);
 		}
 	})
+	.await
 	.unwrap_or_else(|error| panic!("quiet mcp helper: {error}"));
 
 	assert!(output.is_empty());
 	assert!(!called.get());
 }
 
-#[test]
-fn run_mcp_command_with_runs_server_when_not_quiet() {
+#[tokio::test(flavor = "multi_thread")]
+async fn run_mcp_command_with_runs_server_when_not_quiet() {
 	let called = Cell::new(false);
 	let output = crate::run_mcp_command_with(false, || {
 		async {
 			called.set(true);
 		}
 	})
+	.await
 	.unwrap_or_else(|error| panic!("non-quiet mcp helper: {error}"));
 
 	assert!(output.is_empty());
@@ -7849,8 +7912,9 @@ fn inferred_retarget_source_configuration_prefers_configured_source() {
 		distance: 0,
 		record: sample_release_record_for_retarget(),
 	};
-	let inferred = inferred_retarget_source_configuration(Some(&configured), &discovery, true)
-		.unwrap_or_else(|| panic!("expected configured source"));
+	let inferred =
+		crate::inferred_retarget_source_configuration(Some(&configured), &discovery, true)
+			.unwrap_or_else(|| panic!("expected configured source"));
 	assert_eq!(inferred, configured);
 }
 
@@ -7863,7 +7927,7 @@ fn inferred_retarget_source_configuration_infers_from_release_record_provider() 
 		distance: 0,
 		record: sample_release_record_for_retarget(),
 	};
-	let inferred = inferred_retarget_source_configuration(None, &discovery, true)
+	let inferred = crate::inferred_retarget_source_configuration(None, &discovery, true)
 		.unwrap_or_else(|| panic!("expected inferred source"));
 	assert_eq!(inferred.provider, monochange_core::SourceProvider::GitHub);
 	assert_eq!(inferred.owner, "ifiokjr");
@@ -7879,7 +7943,7 @@ fn inferred_retarget_source_configuration_returns_none_when_sync_is_disabled() {
 		distance: 0,
 		record: sample_release_record_for_retarget(),
 	};
-	assert!(inferred_retarget_source_configuration(None, &discovery, false).is_none());
+	assert!(crate::inferred_retarget_source_configuration(None, &discovery, false).is_none());
 }
 
 #[test]
@@ -7913,7 +7977,7 @@ fn build_retarget_release_report_marks_completed_status() {
 		sync_provider: true,
 		dry_run: false,
 	};
-	let report = build_retarget_release_report("v1.2.3", "HEAD", &discovery, false, &result);
+	let report = crate::build_retarget_release_report("v1.2.3", "HEAD", &discovery, false, &result);
 	assert_eq!(report.status, "completed");
 	assert!(!report.is_descendant);
 }
@@ -7930,7 +7994,7 @@ fn render_retarget_release_report_handles_provider_sync_variants() {
 		url: None,
 		message: None,
 	}];
-	let rendered = render_retarget_release_report(&report);
+	let rendered = crate::render_retarget_release_report(&report);
 	assert!(rendered.contains("provider sync: github"));
 	assert!(rendered.contains("[planned]"));
 
@@ -7938,36 +8002,36 @@ fn render_retarget_release_report_handles_provider_sync_variants() {
 	no_provider_report.sync_provider = true;
 	no_provider_report.provider_results = Vec::new();
 	no_provider_report.git_tag_results = Vec::new();
-	let rendered = render_retarget_release_report(&no_provider_report);
+	let rendered = crate::render_retarget_release_report(&no_provider_report);
 	assert!(rendered.contains("provider sync: none"));
 }
 
 #[test]
 fn retarget_operation_label_covers_all_variants() {
 	assert_eq!(
-		retarget_operation_label(monochange_core::RetargetOperation::Planned),
+		crate::retarget_operation_label(monochange_core::RetargetOperation::Planned),
 		"planned"
 	);
 	assert_eq!(
-		retarget_operation_label(monochange_core::RetargetOperation::Moved),
+		crate::retarget_operation_label(monochange_core::RetargetOperation::Moved),
 		"moved"
 	);
 	assert_eq!(
-		retarget_operation_label(monochange_core::RetargetOperation::AlreadyUpToDate),
+		crate::retarget_operation_label(monochange_core::RetargetOperation::AlreadyUpToDate),
 		"already_up_to_date"
 	);
 	assert_eq!(
-		retarget_operation_label(monochange_core::RetargetOperation::Skipped),
+		crate::retarget_operation_label(monochange_core::RetargetOperation::Skipped),
 		"skipped"
 	);
 	assert_eq!(
-		retarget_operation_label(monochange_core::RetargetOperation::Failed),
+		crate::retarget_operation_label(monochange_core::RetargetOperation::Failed),
 		"failed"
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
-fn plan_release_retarget_collects_tag_and_provider_updates() {
+#[tokio::test(flavor = "multi_thread")]
+async fn plan_release_retarget_collects_tag_and_provider_updates() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	init_git_repo(root);
@@ -7993,6 +8057,7 @@ fn plan_release_retarget_collects_tag_and_provider_updates() {
 
 	let plan =
 		crate::plan_release_retarget(root, &discovery, "HEAD", false, true, true, Some(&source))
+			.await
 			.unwrap_or_else(|error| panic!("plan retarget: {error}"));
 
 	assert!(plan.is_descendant);
@@ -8009,8 +8074,8 @@ fn plan_release_retarget_collects_tag_and_provider_updates() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
-fn plan_release_retarget_rejects_non_descendant_without_force() {
+#[tokio::test(flavor = "multi_thread")]
+async fn plan_release_retarget_rejects_non_descendant_without_force() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	init_git_repo(root);
@@ -8044,6 +8109,7 @@ fn plan_release_retarget_rejects_non_descendant_without_force() {
 
 	let error =
 		crate::plan_release_retarget(root, &discovery, &branch_commit, false, false, true, None)
+			.await
 			.err()
 			.unwrap_or_else(|| panic!("expected non-descendant error"));
 	assert!(
@@ -8053,8 +8119,8 @@ fn plan_release_retarget_rejects_non_descendant_without_force() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
-fn execute_release_retarget_moves_tags_and_pushes_origin_refs() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_release_retarget_moves_tags_and_pushes_origin_refs() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let remote = tempdir.path().join("remote.git");
 	git_in_dir(
@@ -8102,9 +8168,11 @@ fn execute_release_retarget_moves_tags_and_pushes_origin_refs() {
 		record: sample_release_record_for_retarget(),
 	};
 	let plan = crate::plan_release_retarget(&repo, &discovery, "HEAD", false, false, false, None)
+		.await
 		.unwrap_or_else(|error| panic!("plan retarget: {error}"));
 
 	let result = crate::execute_release_retarget(&repo, None, &plan)
+		.await
 		.unwrap_or_else(|error| panic!("execute retarget: {error}"));
 	let head = git_output_in_temp_repo(&repo, &["rev-parse", "HEAD"]);
 	let local_tag = git_output_in_temp_repo(&repo, &["rev-parse", "refs/tags/v1.2.3^{commit}"]);
@@ -8118,8 +8186,8 @@ fn execute_release_retarget_moves_tags_and_pushes_origin_refs() {
 	assert_eq!(remote_tag, head);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
-fn retarget_release_reports_missing_tags() {
+#[tokio::test(flavor = "multi_thread")]
+async fn retarget_release_reports_missing_tags() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	init_git_repo(root);
@@ -8138,6 +8206,7 @@ fn retarget_release_reports_missing_tags() {
 	};
 
 	let error = crate::retarget_release(root, &discovery, "HEAD", false, false, true, None)
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected missing tag error"));
 	assert!(
@@ -8147,8 +8216,8 @@ fn retarget_release_reports_missing_tags() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
-fn plan_release_retarget_marks_existing_target_tag_as_up_to_date() {
+#[tokio::test(flavor = "multi_thread")]
+async fn plan_release_retarget_marks_existing_target_tag_as_up_to_date() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	init_git_repo(root);
@@ -8168,6 +8237,7 @@ fn plan_release_retarget_marks_existing_target_tag_as_up_to_date() {
 
 	let plan =
 		crate::plan_release_retarget(root, &discovery, &record_commit, false, false, false, None)
+			.await
 			.unwrap_or_else(|error| panic!("plan retarget: {error}"));
 	assert_eq!(
 		plan.git_tag_updates
@@ -8178,6 +8248,7 @@ fn plan_release_retarget_marks_existing_target_tag_as_up_to_date() {
 	);
 
 	let result = crate::execute_release_retarget(root, None, &plan)
+		.await
 		.unwrap_or_else(|error| panic!("execute retarget: {error}"));
 	assert_eq!(
 		result
@@ -8189,8 +8260,8 @@ fn plan_release_retarget_marks_existing_target_tag_as_up_to_date() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
-fn plan_release_retarget_marks_unsupported_provider_sync_in_dry_run() {
+#[tokio::test(flavor = "multi_thread")]
+async fn plan_release_retarget_marks_unsupported_provider_sync_in_dry_run() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	init_git_repo(root);
@@ -8226,6 +8297,7 @@ fn plan_release_retarget_marks_unsupported_provider_sync_in_dry_run() {
 
 	let plan =
 		crate::plan_release_retarget(root, &discovery, "HEAD", false, true, true, Some(&source))
+			.await
 			.unwrap_or_else(|error| panic!("plan retarget: {error}"));
 	let provider_update = plan
 		.provider_updates
@@ -8244,6 +8316,7 @@ fn plan_release_retarget_marks_unsupported_provider_sync_in_dry_run() {
 	);
 
 	let result = crate::execute_release_retarget(root, Some(&source), &plan)
+		.await
 		.unwrap_or_else(|error| panic!("execute retarget: {error}"));
 	assert_eq!(
 		result
@@ -8255,8 +8328,8 @@ fn plan_release_retarget_marks_unsupported_provider_sync_in_dry_run() {
 	);
 }
 
-#[test]
-fn execute_release_retarget_returns_empty_provider_results_without_source() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_release_retarget_returns_empty_provider_results_without_source() {
 	let plan = monochange_core::RetargetPlan {
 		record_commit: "abc1234".to_string(),
 		target_commit: "def5678".to_string(),
@@ -8276,12 +8349,13 @@ fn execute_release_retarget_returns_empty_provider_results_without_source() {
 	};
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let result = crate::execute_release_retarget(tempdir.path(), None, &plan)
+		.await
 		.unwrap_or_else(|error| panic!("execute retarget: {error}"));
 	assert!(result.provider_results.is_empty());
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
-fn plan_release_retarget_rejects_provider_kind_mismatches() {
+#[tokio::test(flavor = "multi_thread")]
+async fn plan_release_retarget_rejects_provider_kind_mismatches() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	init_git_repo(root);
@@ -8310,6 +8384,7 @@ fn plan_release_retarget_rejects_provider_kind_mismatches() {
 
 	let error =
 		crate::plan_release_retarget(root, &discovery, "HEAD", false, false, true, Some(&source))
+			.await
 			.err()
 			.unwrap_or_else(|| panic!("expected provider mismatch error"));
 	assert!(
@@ -8319,8 +8394,8 @@ fn plan_release_retarget_rejects_provider_kind_mismatches() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
-fn plan_release_retarget_rejects_repository_mismatches() {
+#[tokio::test(flavor = "multi_thread")]
+async fn plan_release_retarget_rejects_repository_mismatches() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	init_git_repo(root);
@@ -8348,6 +8423,7 @@ fn plan_release_retarget_rejects_repository_mismatches() {
 
 	let error =
 		crate::plan_release_retarget(root, &discovery, "HEAD", false, false, true, Some(&source))
+			.await
 			.err()
 			.unwrap_or_else(|| panic!("expected repository mismatch error"));
 	assert!(
@@ -8357,8 +8433,8 @@ fn plan_release_retarget_rejects_repository_mismatches() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
-fn plan_release_retarget_skips_provider_updates_when_no_provider_is_available() {
+#[tokio::test(flavor = "multi_thread")]
+async fn plan_release_retarget_skips_provider_updates_when_no_provider_is_available() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	init_git_repo(root);
@@ -8378,12 +8454,13 @@ fn plan_release_retarget_skips_provider_updates_when_no_provider_is_available() 
 		record,
 	};
 	let plan = crate::plan_release_retarget(root, &discovery, "HEAD", false, true, true, None)
+		.await
 		.unwrap_or_else(|error| panic!("plan retarget: {error}"));
 	assert!(plan.provider_updates.is_empty());
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
-fn plan_release_retarget_accepts_missing_record_provider_with_configured_source() {
+#[tokio::test(flavor = "multi_thread")]
+async fn plan_release_retarget_accepts_missing_record_provider_with_configured_source() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	init_git_repo(root);
@@ -8405,12 +8482,13 @@ fn plan_release_retarget_accepts_missing_record_provider_with_configured_source(
 	let source = sample_github_source_configuration("https://example.com");
 	let plan =
 		crate::plan_release_retarget(root, &discovery, "HEAD", false, false, true, Some(&source))
+			.await
 			.unwrap_or_else(|error| panic!("plan retarget: {error}"));
 	assert_eq!(plan.git_tag_updates.len(), 1);
 }
 
-#[test]
-fn execute_release_retarget_delegates_github_provider_sync() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_release_retarget_delegates_github_provider_sync() {
 	let server = MockServer::start();
 	let release_lookup = server.mock(|when, then| {
 		when.method(GET)
@@ -8454,9 +8532,10 @@ fn execute_release_retarget_delegates_github_provider_sync() {
 		dry_run: false,
 	};
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let result = temp_env::with_var("GITHUB_TOKEN", Some("token"), || {
-		crate::execute_release_retarget(tempdir.path(), Some(&source), &plan)
+	let result = temp_env::async_with_vars([("GITHUB_TOKEN", Some("token"))], async {
+		crate::execute_release_retarget(tempdir.path(), Some(&source), &plan).await
 	})
+	.await
 	.unwrap_or_else(|error| panic!("execute retarget: {error}"));
 	assert_eq!(result.provider_results.len(), 1);
 	release_lookup.assert();
@@ -8471,8 +8550,8 @@ fn execute_release_retarget_delegates_github_provider_sync() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some() || std::env::var_os("CARGO_LLVM_COV").is_some())]
-fn retarget_release_succeeds_end_to_end_without_provider_sync() {
+#[tokio::test(flavor = "multi_thread")]
+async fn retarget_release_succeeds_end_to_end_without_provider_sync() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	let remote = root.join("remote.git");
@@ -8521,24 +8600,27 @@ fn retarget_release_succeeds_end_to_end_without_provider_sync() {
 	};
 	let result =
 		crate::retarget_release(&repo, &discovery, &target_commit, false, false, false, None)
+			.await
 			.unwrap_or_else(|error| panic!("retarget release: {error}"));
 	assert_eq!(result.git_tag_results.len(), 1);
 }
 
-#[test]
-fn git_is_ancestor_reports_git_failures() {
+#[tokio::test(flavor = "multi_thread")]
+async fn git_is_ancestor_reports_git_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let error = crate::git_support::git_is_ancestor(tempdir.path(), "abc", "def")
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected git ancestry error"));
 	assert!(error.to_string().contains("discovery error"));
 }
 
-#[test]
-fn git_is_ancestor_reports_missing_worktree_directory_errors() {
+#[tokio::test(flavor = "multi_thread")]
+async fn git_is_ancestor_reports_missing_worktree_directory_errors() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let missing = tempdir.path().join("missing");
 	let error = crate::git_support::git_is_ancestor(&missing, "abc", "def")
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected git spawn error"));
 	assert!(
@@ -8548,8 +8630,8 @@ fn git_is_ancestor_reports_missing_worktree_directory_errors() {
 	);
 }
 
-#[test]
-fn sync_retargeted_provider_releases_reports_unsupported_provider_in_dry_run() {
+#[tokio::test(flavor = "multi_thread")]
+async fn sync_retargeted_provider_releases_reports_unsupported_provider_in_dry_run() {
 	let source = monochange_core::SourceConfiguration {
 		provider: monochange_core::SourceProvider::Gitea,
 		host: None,
@@ -8567,6 +8649,7 @@ fn sync_retargeted_provider_releases_reports_unsupported_provider_in_dry_run() {
 		message: None,
 	}];
 	let results = crate::release_record::sync_retargeted_provider_releases(&source, &updates, true)
+		.await
 		.unwrap_or_else(|error| panic!("expected dry-run provider results: {error}"));
 	assert_eq!(results.len(), 1);
 	assert_eq!(
@@ -8578,8 +8661,8 @@ fn sync_retargeted_provider_releases_reports_unsupported_provider_in_dry_run() {
 	);
 }
 
-#[test]
-fn sync_retargeted_provider_releases_rejects_unsupported_provider_in_real_mode() {
+#[tokio::test(flavor = "multi_thread")]
+async fn sync_retargeted_provider_releases_rejects_unsupported_provider_in_real_mode() {
 	let source = monochange_core::SourceConfiguration {
 		provider: monochange_core::SourceProvider::Gitea,
 		host: None,
@@ -8597,13 +8680,14 @@ fn sync_retargeted_provider_releases_rejects_unsupported_provider_in_real_mode()
 		message: None,
 	}];
 	let error = crate::release_record::sync_retargeted_provider_releases(&source, &updates, false)
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected unsupported provider error"));
 	assert!(error.to_string().contains("gitea"));
 }
 
-#[test]
-fn execute_release_retarget_rejects_unsupported_provider_sync_in_real_mode() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_release_retarget_rejects_unsupported_provider_sync_in_real_mode() {
 	let plan = monochange_core::RetargetPlan {
 		record_commit: "abc1234".to_string(),
 		target_commit: "def5678".to_string(),
@@ -8634,6 +8718,7 @@ fn execute_release_retarget_rejects_unsupported_provider_sync_in_real_mode() {
 	};
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let error = crate::execute_release_retarget(tempdir.path(), Some(&source), &plan)
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected unsupported provider error"));
 	assert!(
@@ -8643,8 +8728,8 @@ fn execute_release_retarget_rejects_unsupported_provider_sync_in_real_mode() {
 	);
 }
 
-#[test]
-fn execute_cli_command_commit_release_requires_prepare_release() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_commit_release_requires_prepare_release() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let configuration = load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("configuration: {error}"));
@@ -8670,6 +8755,7 @@ fn execute_cli_command_commit_release_requires_prepare_release() {
 		false,
 		BTreeMap::new(),
 	)
+	.await
 	.err()
 	.unwrap_or_else(|| panic!("expected missing PrepareRelease error"));
 	assert!(
@@ -8679,10 +8765,11 @@ fn execute_cli_command_commit_release_requires_prepare_release() {
 	);
 }
 
-#[test]
-fn git_stage_paths_reports_git_inspection_failures() {
+#[tokio::test(flavor = "multi_thread")]
+async fn git_stage_paths_reports_git_inspection_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let error = crate::git_stage_paths(tempdir.path(), &[PathBuf::from("release.txt")])
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected git stage failure"));
 	assert!(
@@ -8692,8 +8779,8 @@ fn git_stage_paths_reports_git_inspection_failures() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
-fn git_stage_paths_skips_missing_untracked_paths_and_ignored_untracked_files() {
+#[tokio::test(flavor = "multi_thread")]
+async fn git_stage_paths_skips_missing_untracked_paths_and_ignored_untracked_files() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	copy_fixture("prepared-release/commit-release-flexible/workspace", root);
@@ -8719,6 +8806,7 @@ fn git_stage_paths_skips_missing_untracked_paths_and_ignored_untracked_files() {
 			PathBuf::from(".changeset/001-release-foundation.md"),
 		],
 	)
+	.await
 	.unwrap_or_else(|error| panic!("git stage paths: {error}"));
 
 	assert_eq!(
@@ -8727,8 +8815,8 @@ fn git_stage_paths_skips_missing_untracked_paths_and_ignored_untracked_files() {
 	);
 }
 
-#[test]
-fn git_stage_paths_stages_ignored_release_record_file() {
+#[tokio::test(flavor = "multi_thread")]
+async fn git_stage_paths_stages_ignored_release_record_file() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	init_git_repo(root);
@@ -8746,6 +8834,7 @@ fn git_stage_paths_stages_ignored_release_record_file() {
 		root,
 		&[PathBuf::from(".monochange/releases/abc123/release.json")],
 	)
+	.await
 	.unwrap_or_else(|error| panic!("git stage paths: {error}"));
 
 	assert_eq!(
@@ -8754,8 +8843,8 @@ fn git_stage_paths_stages_ignored_release_record_file() {
 	);
 }
 
-#[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
-fn first_parent_commits_returns_head_then_ancestors() {
+#[tokio::test(flavor = "multi_thread")]
+async fn first_parent_commits_returns_head_then_ancestors() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	git_in_temp_repo(root, &["init"]);
@@ -8773,13 +8862,14 @@ fn first_parent_commits_returns_head_then_ancestors() {
 
 	let head = git_output_in_temp_repo(root, &["rev-parse", "HEAD"]);
 	let commits = crate::git_support::first_parent_commits(root, &head)
+		.await
 		.unwrap_or_else(|error| panic!("first parent commits: {error}"));
 	assert_eq!(commits.first().map(String::as_str), Some(head.as_str()));
 	assert_eq!(commits.len(), 2);
 }
 
-#[test]
-fn git_head_commit_and_read_commit_message_roundtrip() {
+#[tokio::test(flavor = "multi_thread")]
+async fn git_head_commit_and_read_commit_message_roundtrip() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	init_git_repo(root);
@@ -8788,22 +8878,26 @@ fn git_head_commit_and_read_commit_message_roundtrip() {
 	git_in_temp_repo(root, &["add", "release.txt"]);
 	git_in_temp_repo(root, &["commit", "-m", "subject line", "-m", "body line"]);
 
-	let head = crate::git_head_commit(root).unwrap_or_else(|error| panic!("head commit: {error}"));
-	let message = read_git_commit_message(root, &head)
+	let head = crate::git_head_commit(root)
+		.await
+		.unwrap_or_else(|error| panic!("head commit: {error}"));
+	let message = crate::read_git_commit_message(root, &head)
+		.await
 		.unwrap_or_else(|error| panic!("read commit message: {error}"));
 	assert!(message.contains("subject line"));
 	assert!(message.contains("body line"));
 }
 
-#[test]
-fn run_git_status_reports_nonzero_exit_failures() {
+#[tokio::test(flavor = "multi_thread")]
+async fn run_git_status_reports_nonzero_exit_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	init_git_repo(tempdir.path());
-	let error = run_git_status(
+	let error = crate::run_git_status(
 		tempdir.path(),
 		&["definitely-not-a-real-git-command"],
 		"git status failure",
 	)
+	.await
 	.err()
 	.unwrap_or_else(|| panic!("expected git status failure"));
 	assert!(error.to_string().contains("git status failure"));
@@ -10644,8 +10738,8 @@ dependencies = ["python-core>=1.0.0"]
 	));
 }
 
-#[test]
-fn apply_versioned_file_definition_reports_python_error_paths() {
+#[tokio::test(flavor = "multi_thread")]
+async fn apply_versioned_file_definition_reports_python_error_paths() {
 	let configuration = versioned_test_configuration();
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let context = versioned_test_context(
@@ -11205,7 +11299,7 @@ fn filter_group_release_note_change_respects_member_allowlists() {
 		.is_none()
 	);
 
-	let message = render_group_filtered_update_message("sdk");
+	let message = crate::render_group_filtered_update_message("sdk");
 	assert!(message.contains("No group-facing notes were recorded for this release."));
 	assert!(message.contains("synchronized group `sdk`"));
 }
@@ -11315,7 +11409,7 @@ fn build_command_and_configured_change_type_choices_include_runtime_metadata() {
 		go: monochange_core::EcosystemSettings::default(),
 	};
 	assert_eq!(
-		configured_change_type_choices(&configuration),
+		crate::configured_change_type_choices(&configuration),
 		vec![
 			"breaking".to_string(),
 			"change".to_string(),
@@ -11364,7 +11458,7 @@ fn apply_runtime_prepare_release_markdown_defaults_promotes_release_format_defau
 	release.inputs[0].default = Some("text".to_string());
 	release.inputs[0].choices = vec!["text".to_string(), "json".to_string()];
 
-	apply_runtime_prepare_release_markdown_defaults(&mut cli);
+	crate::apply_runtime_prepare_release_markdown_defaults(&mut cli);
 
 	let release = cli
 		.iter()
@@ -11448,7 +11542,7 @@ fn apply_runtime_change_type_choices_updates_only_unconfigured_change_inputs() {
 		},
 	];
 
-	apply_runtime_change_type_choices(&mut cli, &configuration);
+	crate::apply_runtime_change_type_choices(&mut cli, &configuration);
 
 	assert_eq!(cli[0].inputs[0].kind, CliInputKind::Choice);
 	assert_eq!(
@@ -11495,14 +11589,14 @@ fn apply_runtime_change_type_choices_preserves_existing_choice_inputs_and_empty_
 		steps: Vec::new(),
 		dry_run: false,
 	}];
-	apply_runtime_change_type_choices(&mut cli, &configuration);
+	crate::apply_runtime_change_type_choices(&mut cli, &configuration);
 	assert_eq!(cli[0].inputs[0].choices, vec!["existing"]);
 	assert_eq!(cli[0].inputs[0].kind, CliInputKind::Choice);
 }
 
 #[test]
 fn cli_commands_for_root_uses_workspace_cli_when_configuration_load_succeeds() {
-	let cli = cli_commands_for_root(&fixture_path("config/package-group-and-cli"));
+	let cli = crate::cli_commands_for_root(&fixture_path("config/package-group-and-cli"));
 	let command_names = cli
 		.iter()
 		.map(|command| command.name.as_str())
@@ -11520,7 +11614,7 @@ fn cli_commands_for_root_uses_workspace_cli_when_configuration_load_succeeds() {
 
 #[test]
 fn build_skill_subcommand_forwards_native_add_flags() {
-	let command = Command::new("mc").subcommand(build_skill_subcommand());
+	let command = Command::new("mc").subcommand(crate::build_skill_subcommand());
 	let matches = command
 		.clone()
 		.try_get_matches_from([
@@ -11604,22 +11698,25 @@ fn skill_command_falls_back_to_pnpm_dlx_when_npx_is_missing() {
 		.unwrap_or_else(|error| panic!("remove fake npx {}: {error}", npx.display()));
 	let source = fixture.path().join("skill-source");
 	with_path_prefixed(fixture.path(), || {
-		temp_env::with_var("MONOCHANGE_SKILL_RUNNER", Some("pnpm"), || {
-			temp_env::with_var(
-				"MONOCHANGE_SKILL_SOURCE",
-				Some(source.to_string_lossy().to_string()),
-				|| {
-					run_cli(
-						fixture.path(),
-						[
-							OsString::from("mc"),
-							OsString::from("skill"),
-							OsString::from("-y"),
-						],
-					)
-				},
-			)
-		})
+		temp_env::with_vars(
+			[
+				("MONOCHANGE_SKILL_RUNNER", Some("pnpm".to_string())),
+				(
+					"MONOCHANGE_SKILL_SOURCE",
+					Some(source.to_string_lossy().to_string()),
+				),
+			],
+			|| {
+				run_cli(
+					fixture.path(),
+					[
+						OsString::from("mc"),
+						OsString::from("skill"),
+						OsString::from("-y"),
+					],
+				)
+			},
+		)
 	})
 	.unwrap_or_else(|error| panic!("run skill through pnpm dlx: {error}"));
 	let log = fs::read_to_string(fixture.path().join(".skill-command.log"))
@@ -11642,18 +11739,21 @@ fn skill_command_reports_invalid_runner_override() {
 	let fixture = setup_scenario_workspace("skill/basic");
 	let source = fixture.path().join("skill-source");
 	let error = with_path_prefixed(fixture.path(), || {
-		temp_env::with_var("MONOCHANGE_SKILL_RUNNER", Some("nope"), || {
-			temp_env::with_var(
-				"MONOCHANGE_SKILL_SOURCE",
-				Some(source.to_string_lossy().to_string()),
-				|| {
-					run_cli(
-						fixture.path(),
-						[OsString::from("mc"), OsString::from("skill")],
-					)
-				},
-			)
-		})
+		temp_env::with_vars(
+			[
+				("MONOCHANGE_SKILL_RUNNER", Some("nope".to_string())),
+				(
+					"MONOCHANGE_SKILL_SOURCE",
+					Some(source.to_string_lossy().to_string()),
+				),
+			],
+			|| {
+				run_cli(
+					fixture.path(),
+					[OsString::from("mc"), OsString::from("skill")],
+				)
+			},
+		)
 	})
 	.err()
 	.unwrap_or_else(|| panic!("expected invalid skill runner override error"));
@@ -11672,18 +11772,21 @@ fn skill_command_reports_missing_forced_runner() {
 		.unwrap_or_else(|error| panic!("remove fake npx {}: {error}", npx.display()));
 	let source = fixture.path().join("skill-source");
 	let error = with_fixture_path_only(fixture.path(), || {
-		temp_env::with_var("MONOCHANGE_SKILL_RUNNER", Some("npx"), || {
-			temp_env::with_var(
-				"MONOCHANGE_SKILL_SOURCE",
-				Some(source.to_string_lossy().to_string()),
-				|| {
-					run_cli(
-						fixture.path(),
-						[OsString::from("mc"), OsString::from("skill")],
-					)
-				},
-			)
-		})
+		temp_env::with_vars(
+			[
+				("MONOCHANGE_SKILL_RUNNER", Some("npx".to_string())),
+				(
+					"MONOCHANGE_SKILL_SOURCE",
+					Some(source.to_string_lossy().to_string()),
+				),
+			],
+			|| {
+				run_cli(
+					fixture.path(),
+					[OsString::from("mc"), OsString::from("skill")],
+				)
+			},
+		)
 	})
 	.err()
 	.unwrap_or_else(|| panic!("expected missing forced skill runner error"));
@@ -11699,22 +11802,25 @@ fn skill_command_runs_skills_add_with_bunx_when_forced() {
 	let fixture = setup_scenario_workspace("skill/basic");
 	let source = fixture.path().join("skill-source");
 	with_path_prefixed(fixture.path(), || {
-		temp_env::with_var("MONOCHANGE_SKILL_RUNNER", Some("bunx"), || {
-			temp_env::with_var(
-				"MONOCHANGE_SKILL_SOURCE",
-				Some(source.to_string_lossy().to_string()),
-				|| {
-					run_cli(
-						fixture.path(),
-						[
-							OsString::from("mc"),
-							OsString::from("skill"),
-							OsString::from("--list"),
-						],
-					)
-				},
-			)
-		})
+		temp_env::with_vars(
+			[
+				("MONOCHANGE_SKILL_RUNNER", Some("bunx".to_string())),
+				(
+					"MONOCHANGE_SKILL_SOURCE",
+					Some(source.to_string_lossy().to_string()),
+				),
+			],
+			|| {
+				run_cli(
+					fixture.path(),
+					[
+						OsString::from("mc"),
+						OsString::from("skill"),
+						OsString::from("--list"),
+					],
+				)
+			},
+		)
 	})
 	.unwrap_or_else(|error| panic!("run skill through bunx: {error}"));
 	let log = fs::read_to_string(fixture.path().join(".skill-command.log"))
@@ -11736,20 +11842,23 @@ fn skill_command_reports_nonzero_exit_status_from_runner() {
 	let fixture = setup_scenario_workspace("skill/basic");
 	let source = fixture.path().join("skill-source");
 	let error = with_path_prefixed(fixture.path(), || {
-		temp_env::with_var(
-			"MONOCHANGE_SKILL_SOURCE",
-			Some(source.to_string_lossy().to_string()),
+		temp_env::with_vars(
+			[
+				(
+					"MONOCHANGE_SKILL_SOURCE",
+					Some(source.to_string_lossy().to_string()),
+				),
+				("MONOCHANGE_SKILL_FAKE_EXIT", Some("7".to_string())),
+			],
 			|| {
-				temp_env::with_var("MONOCHANGE_SKILL_FAKE_EXIT", Some("7"), || {
-					run_cli(
-						fixture.path(),
-						[
-							OsString::from("mc"),
-							OsString::from("skill"),
-							OsString::from("--list"),
-						],
-					)
-				})
+				run_cli(
+					fixture.path(),
+					[
+						OsString::from("mc"),
+						OsString::from("skill"),
+						OsString::from("--list"),
+					],
+				)
 			},
 		)
 	})
@@ -11761,7 +11870,7 @@ fn skill_command_reports_nonzero_exit_status_from_runner() {
 
 #[test]
 fn build_subagents_subcommand_parses_valid_inputs_and_rejects_invalid_targets() {
-	let command = Command::new("mc").subcommand(build_subagents_subcommand());
+	let command = Command::new("mc").subcommand(crate::build_subagents_subcommand());
 	let matches = command
 		.clone()
 		.try_get_matches_from([
@@ -11925,6 +12034,7 @@ fn subagents_command_supports_all_targets_in_default_text_output() {
 }
 
 #[test]
+
 fn build_command_with_cli_registers_custom_subcommands_and_default_help_text() {
 	let cli = vec![CliCommandDefinition {
 		name: "custom".to_string(),
@@ -11962,7 +12072,7 @@ fn cli_command_after_help_covers_supported_commands_and_custom_commands() {
 		),
 	];
 	for (name, expected) in cases {
-		let after_help = cli_command_after_help(&CliCommandDefinition {
+		let after_help = crate::cli_command_after_help(&CliCommandDefinition {
 			name: name.to_string(),
 			help_text: None,
 			inputs: Vec::new(),
@@ -11973,7 +12083,7 @@ fn cli_command_after_help_covers_supported_commands_and_custom_commands() {
 		assert!(after_help.contains(expected));
 	}
 	assert!(
-		cli_command_after_help(&CliCommandDefinition {
+		crate::cli_command_after_help(&CliCommandDefinition {
 			name: "custom".to_string(),
 			help_text: None,
 			inputs: Vec::new(),
@@ -12049,7 +12159,7 @@ fn build_cli_command_subcommand_parses_supported_input_kinds() {
 		dry_run: false,
 	};
 
-	let command = Command::new("mc").subcommand(build_cli_command_subcommand(&cli_command));
+	let command = Command::new("mc").subcommand(crate::build_cli_command_subcommand(&cli_command));
 	let matches = command
 		.try_get_matches_from([
 			OsString::from("mc"),
@@ -12104,25 +12214,27 @@ fn build_cli_command_subcommand_parses_supported_input_kinds() {
 	);
 }
 
-#[test]
-fn render_release_record_discovery_supports_text_and_json_formats() {
+#[tokio::test(flavor = "multi_thread")]
+async fn render_release_record_discovery_supports_text_and_json_formats() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	write_blank_monochange_config(root);
 	create_release_record_history(root);
 	let text = crate::render_release_record_discovery(root, "HEAD", crate::OutputFormat::Text)
+		.await
 		.unwrap_or_else(|error| panic!("release-record text: {error}"));
 	assert!(text.contains("release record:"));
 	assert!(text.contains("input ref: HEAD"));
 	let json = crate::render_release_record_discovery(root, "HEAD", crate::OutputFormat::Json)
+		.await
 		.unwrap_or_else(|error| panic!("release-record json: {error}"));
 	assert!(json.contains("\"record\""));
 	assert!(json.contains("\"resolvedCommit\""));
 	assert!(json.contains("\"inputRef\": "));
 }
 
-#[test]
-fn render_release_tag_report_supports_text_and_json_formats() {
+#[tokio::test(flavor = "multi_thread")]
+async fn render_release_tag_report_supports_text_and_json_formats() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	let release_commit = create_release_record_commit(root);
@@ -12134,6 +12246,7 @@ fn render_release_tag_report_supports_text_and_json_formats() {
 		false,
 		true,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("tag-release text: {error}"));
 	assert!(text.contains("release tags:"));
 	assert!(text.contains("push: no"));
@@ -12147,6 +12260,7 @@ fn render_release_tag_report_supports_text_and_json_formats() {
 		false,
 		true,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("tag-release json: {error}"));
 	assert!(json.contains("\"recordCommit\": "));
 	assert!(json.contains("\"push\": false"));
@@ -12156,17 +12270,19 @@ fn render_release_tag_report_supports_text_and_json_formats() {
 	assert!(json.contains(&release_commit[..7]));
 }
 
-#[test]
-fn create_release_tags_creates_and_pushes_tags_in_process() {
+#[tokio::test(flavor = "multi_thread")]
+async fn create_release_tags_creates_and_pushes_tags_in_process() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	let release_commit = create_release_record_commit(root);
 	configure_origin_remote(root);
 	git_in_temp_repo(root, &["push", "-u", "origin", "HEAD:main"]);
 	let discovery = crate::discover_release_record(root, "HEAD")
+		.await
 		.unwrap_or_else(|error| panic!("discover release record: {error}"));
 
 	let report = crate::release_record::create_release_tags(root, &discovery, true, false)
+		.await
 		.unwrap_or_else(|error| panic!("create release tags: {error}"));
 	assert_eq!(report.status, "completed");
 	assert_eq!(report.tag_results.len(), 1);
@@ -12345,20 +12461,23 @@ fn build_file_diff_previews_handles_missing_files_and_color_modes() {
 		.join("\n---\n");
 	assert!(rendered_plain_diffs.contains("new-file.md"));
 
-	let colored_previews = temp_env::with_var("NO_COLOR", None::<&str>, || {
-		temp_env::with_var("CLICOLOR", None::<&str>, || {
-			temp_env::with_var("CLICOLOR_FORCE", Some("1"), || {
-				crate::build_file_diff_previews(
-					tempdir.path(),
-					&[crate::FileUpdate {
-						path: existing_path.clone(),
-						content: updated_existing_content,
-					}],
-				)
-				.unwrap_or_else(|error| panic!("colored previews: {error}"))
-			})
-		})
-	});
+	let colored_previews = temp_env::with_vars(
+		[
+			("NO_COLOR", None::<&str>),
+			("CLICOLOR", None::<&str>),
+			("CLICOLOR_FORCE", Some("1")),
+		],
+		|| {
+			crate::build_file_diff_previews(
+				tempdir.path(),
+				&[crate::FileUpdate {
+					path: existing_path.clone(),
+					content: updated_existing_content,
+				}],
+			)
+			.unwrap_or_else(|error| panic!("colored previews: {error}"))
+		},
+	);
 	assert_eq!(colored_previews.len(), 1);
 	assert!(colored_previews[0].display_diff.contains("\u{1b}["));
 	assert!(!colored_previews[0].diff.contains("\u{1b}["));
@@ -12388,7 +12507,7 @@ fn build_file_diff_previews_reports_directory_read_errors() {
 fn prepare_release_execution_collects_file_diffs_for_dry_runs() {
 	let tempdir = setup_scenario_workspace("cli-output/group-basic");
 	let prepared = temp_env::with_var("NO_COLOR", Some("1"), || {
-		prepare_release_execution_with_file_diffs(tempdir.path(), true, true, false)
+		crate::cli_runtime::block_on_in_context(prepare_release_execution(tempdir.path(), true))
 			.unwrap_or_else(|error| panic!("prepare release execution: {error}"))
 	});
 	assert!(!prepared.prepared_release.changed_files.is_empty());
@@ -12405,8 +12524,9 @@ fn prepare_release_execution_collects_file_diffs_for_dry_runs() {
 fn prepare_release_skips_file_diff_previews_when_callers_do_not_need_them() {
 	let tempdir = setup_scenario_workspace("cli-output/group-basic");
 	set_force_build_file_diff_previews_error(true);
-	let prepared = crate::prepare_release(tempdir.path(), true)
-		.unwrap_or_else(|error| panic!("prepare release without diffs: {error}"));
+	let prepared =
+		crate::cli_runtime::block_on_in_context(crate::prepare_release(tempdir.path(), true))
+			.unwrap_or_else(|error| panic!("prepare release without diffs: {error}"));
 	set_force_build_file_diff_previews_error(false);
 	assert!(!prepared.changed_files.is_empty());
 }
@@ -12428,9 +12548,10 @@ fn command_release_without_diff_skips_file_diff_previews() {
 fn prepare_release_execution_propagates_file_diff_preview_errors() {
 	let tempdir = setup_scenario_workspace("cli-output/group-basic");
 	set_force_build_file_diff_previews_error(true);
-	let error = prepare_release_execution_with_file_diffs(tempdir.path(), true, true, false)
-		.err()
-		.unwrap_or_else(|| panic!("expected forced file diff preview error"));
+	let error =
+		crate::cli_runtime::block_on_in_context(prepare_release_execution(tempdir.path(), true))
+			.err()
+			.unwrap_or_else(|| panic!("expected forced file diff preview error"));
 	set_force_build_file_diff_previews_error(false);
 	assert!(
 		error
@@ -12532,7 +12653,7 @@ fn maybe_render_markdown_for_terminal_returns_original_when_not_tty() {
 #[test]
 fn render_markdown_if_terminal_returns_styled_when_terminal() {
 	let markdown = "# Hello\n\n**bold** text";
-	let result = render_markdown_if_terminal(markdown, true);
+	let result = crate::render_markdown_if_terminal(markdown, true);
 	// termimad produces ANSI-styled output when terminal is true
 	assert!(result.contains("Hello"));
 	assert_ne!(result, markdown);
@@ -12541,7 +12662,7 @@ fn render_markdown_if_terminal_returns_styled_when_terminal() {
 #[test]
 fn render_markdown_if_terminal_returns_original_when_not_terminal() {
 	let markdown = "# Hello\n\n**bold** text";
-	let result = render_markdown_if_terminal(markdown, false);
+	let result = crate::render_markdown_if_terminal(markdown, false);
 	assert_eq!(result, markdown);
 }
 
@@ -12696,8 +12817,8 @@ fn render_discovery_report_supports_json_and_text_formats() {
 	assert!(text.contains("Warnings:"));
 }
 
-#[test]
-fn find_previous_tag_returns_previous_matching_prefix() {
+#[tokio::test(flavor = "multi_thread")]
+async fn find_previous_tag_returns_previous_matching_prefix() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	init_git_repo(tempdir.path());
 	fs::write(tempdir.path().join("release.txt"), "first\n")
@@ -12712,10 +12833,13 @@ fn find_previous_tag_returns_previous_matching_prefix() {
 	git_in_temp_repo(tempdir.path(), &["tag", "core/v1.2.0"]);
 	git_in_temp_repo(tempdir.path(), &["tag", "app/v9.9.9"]);
 	assert_eq!(
-		find_previous_tag(tempdir.path(), "core/v1.2.0"),
+		crate::find_previous_tag(tempdir.path(), "core/v1.2.0").await,
 		Some("core/v1.0.0".to_string())
 	);
-	assert_eq!(find_previous_tag(tempdir.path(), "core/v1.0.0"), None);
+	assert_eq!(
+		crate::find_previous_tag(tempdir.path(), "core/v1.0.0").await,
+		None
+	);
 }
 
 fn sample_planned_group() -> monochange_core::PlannedVersionGroup {
@@ -12803,8 +12927,8 @@ fn build_source_release_requests_and_change_request_cover_gitea_dispatch() {
 	assert!(!request.commit_message.subject.is_empty());
 }
 
-#[test]
-fn build_source_release_requests_and_change_request_cover_forgejo_dispatch() {
+#[tokio::test(flavor = "multi_thread")]
+async fn build_source_release_requests_and_change_request_cover_forgejo_dispatch() {
 	let source = monochange_core::SourceConfiguration {
 		provider: monochange_core::SourceProvider::Forgejo,
 		host: Some("https://codeberg.org".to_string()),
@@ -12827,10 +12951,12 @@ fn build_source_release_requests_and_change_request_cover_forgejo_dispatch() {
 		crate::compare_url_for_provider(&source, "v1.2.2", "v1.2.3"),
 		"https://codeberg.org/ifiokjr/monochange/compare/v1.2.2...v1.2.3"
 	);
-	let empty_publish = temp_env::with_var("FORGEJO_TOKEN", Some("token"), || {
+	let empty_publish = temp_env::async_with_vars([("FORGEJO_TOKEN", Some("token"))], async {
 		crate::publish_source_release_requests(&source, &[])
+			.await
 			.unwrap_or_else(|error| panic!("publish empty Forgejo releases: {error}"))
-	});
+	})
+	.await;
 	assert!(empty_publish.is_empty());
 
 	let manifest = sample_release_manifest_for_commit_message(true, true);
@@ -12847,15 +12973,18 @@ fn build_source_release_requests_and_change_request_cover_forgejo_dispatch() {
 	assert!(!request.commit_message.subject.is_empty());
 
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let publish_error = temp_env::with_var("FORGEJO_TOKEN", Some("invalid\n"), || {
+	let publish_error = temp_env::async_with_vars([("FORGEJO_TOKEN", Some("invalid\n"))], async {
 		crate::publish_source_change_request(&source, tempdir.path(), &request, &[], true)
+			.await
 			.err()
 			.unwrap_or_else(|| panic!("expected invalid git repository error"))
-	});
+	})
+	.await;
+	let error_string = publish_error.to_string();
 	assert!(
-		publish_error
-			.to_string()
-			.contains("prepare release pull request branch")
+		error_string.contains("failed to read current git branch")
+			|| error_string.contains("prepare release pull request branch"),
+		"expected error to contain git branch or pull request message, got: {error_string}"
 	);
 }
 
@@ -13004,7 +13133,6 @@ fn sanitized_git_command() -> std::process::Command {
 fn git_in_dir(root: &Path, args: &[&str]) {
 	let status = sanitized_git_command()
 		.current_dir(root)
-		.args(["-c", "commit.gpgsign=false"])
 		.args(args)
 		.status()
 		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
@@ -13015,7 +13143,6 @@ fn git_output_in_git_dir(git_dir: &Path, args: &[&str]) -> String {
 	let output = sanitized_git_command()
 		.arg("--git-dir")
 		.arg(git_dir)
-		.args(["-c", "commit.gpgsign=false"])
 		.args(args)
 		.output()
 		.unwrap_or_else(|error| panic!("git --git-dir {args:?}: {error}"));
@@ -13029,7 +13156,6 @@ fn git_output_in_git_dir(git_dir: &Path, args: &[&str]) -> String {
 fn git_in_temp_repo(root: &Path, args: &[&str]) {
 	let status = sanitized_git_command()
 		.current_dir(root)
-		.args(["-c", "commit.gpgsign=false"])
 		.args(args)
 		.status()
 		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
@@ -13039,7 +13165,6 @@ fn git_in_temp_repo(root: &Path, args: &[&str]) {
 fn git_output_in_temp_repo(root: &Path, args: &[&str]) -> String {
 	let output = sanitized_git_command()
 		.current_dir(root)
-		.args(["-c", "commit.gpgsign=false"])
 		.args(args)
 		.output()
 		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
@@ -13296,7 +13421,8 @@ fn batch_changeset_contexts_returns_empty_without_git_repo() {
 	)
 	.unwrap();
 
-	let result = crate::prepare_release(root, true).unwrap();
+	let result =
+		crate::cli_runtime::block_on_in_context(crate::prepare_release(root, true)).unwrap();
 	// With no .git, changeset context fields should all be None.
 	for changeset in &result.changesets {
 		if let Some(ctx) = &changeset.context {
@@ -13314,7 +13440,7 @@ fn batch_changeset_contexts_returns_empty_without_git_repo() {
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn batch_changeset_contexts_resolves_introduced_and_updated_commits() {
-	let _env_lock = TEST_ENV_LOCK
+	let _env_lock = crate::TEST_ENV_LOCK
 		.lock()
 		.unwrap_or_else(std::sync::PoisonError::into_inner);
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
@@ -13366,7 +13492,8 @@ fn batch_changeset_contexts_resolves_introduced_and_updated_commits() {
 	let mut observed_updated = None;
 
 	for _attempt in 0..3 {
-		let result = crate::prepare_release(root, true).unwrap();
+		let result =
+			crate::cli_runtime::block_on_in_context(crate::prepare_release(root, true)).unwrap();
 		let changeset = result
 			.changesets
 			.iter()
@@ -13481,8 +13608,8 @@ fn init_tracing_with_valid_filter_does_not_panic() {
 	crate::tracing_setup::init_tracing(Some("monochange=debug"));
 }
 
-#[test]
-fn cli_accepts_log_level_flag_without_error() {
+#[tokio::test(flavor = "multi_thread")]
+async fn cli_accepts_log_level_flag_without_error() {
 	let output = run_with_args(
 		"mc",
 		[
@@ -13492,13 +13619,14 @@ fn cli_accepts_log_level_flag_without_error() {
 			OsString::from("--help"),
 		],
 	)
+	.await
 	.unwrap_or_else(|error| panic!("log-level with help: {error}"));
 
 	assert!(output.contains("Usage: mc"));
 }
 
-#[test]
-fn cli_accepts_log_level_equals_syntax_without_error() {
+#[tokio::test(flavor = "multi_thread")]
+async fn cli_accepts_log_level_equals_syntax_without_error() {
 	let output = run_with_args(
 		"mc",
 		[
@@ -13507,24 +13635,28 @@ fn cli_accepts_log_level_equals_syntax_without_error() {
 			OsString::from("--help"),
 		],
 	)
+	.await
 	.unwrap_or_else(|error| panic!("log-level equals with help: {error}"));
 
 	assert!(output.contains("Usage: mc"));
 }
 
-#[test]
-fn cli_root_help_matches_help_subcommand_overview() {
+#[tokio::test(flavor = "multi_thread")]
+async fn cli_root_help_matches_help_subcommand_overview() {
 	let root_help = run_with_args("mc", [OsString::from("mc"), OsString::from("--help")])
+		.await
 		.unwrap_or_else(|error| panic!("root help output: {error}"));
 	let help_subcommand = run_with_args("mc", [OsString::from("mc"), OsString::from("help")])
+		.await
 		.unwrap_or_else(|error| panic!("help subcommand output: {error}"));
 
 	assert_eq!(root_help, help_subcommand);
 }
 
-#[test]
-fn cli_help_does_not_show_log_level_flag() {
+#[tokio::test(flavor = "multi_thread")]
+async fn cli_help_does_not_show_log_level_flag() {
 	let output = run_with_args("mc", [OsString::from("mc"), OsString::from("--help")])
+		.await
 		.unwrap_or_else(|error| panic!("help output: {error}"));
 
 	assert!(
@@ -13533,8 +13665,8 @@ fn cli_help_does_not_show_log_level_flag() {
 	);
 }
 
-#[test]
-fn cli_help_subcommand_renders_detailed_command_help() {
+#[tokio::test(flavor = "multi_thread")]
+async fn cli_help_subcommand_renders_detailed_command_help() {
 	let output = run_with_args(
 		"mc",
 		[
@@ -13543,6 +13675,7 @@ fn cli_help_subcommand_renders_detailed_command_help() {
 			OsString::from("step:validate"),
 		],
 	)
+	.await
 	.unwrap_or_else(|error| panic!("help step:validate output: {error}"));
 
 	assert!(output.contains("validate"));
@@ -13550,9 +13683,10 @@ fn cli_help_subcommand_renders_detailed_command_help() {
 	assert!(output.contains("Usage"));
 }
 
-#[test]
-fn cli_help_subcommand_overview_without_argument() {
+#[tokio::test(flavor = "multi_thread")]
+async fn cli_help_subcommand_overview_without_argument() {
 	let output = run_with_args("mc", [OsString::from("mc"), OsString::from("help")])
+		.await
 		.unwrap_or_else(|error| panic!("help overview output: {error}"));
 
 	assert!(output.contains("mc help"));
@@ -14147,8 +14281,8 @@ fn build_issue_comment_results_includes_closed_operation() {
 	);
 }
 
-#[test]
-fn execute_cli_command_publish_release_falls_back_to_release_record_from_git() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_publish_release_falls_back_to_release_record_from_git() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	fs::write(
 		tempdir.path().join("monochange.toml"),
@@ -14172,6 +14306,11 @@ branches = ["release/*"]
 		.args(["config", "user.email", "test@example.com"])
 		.output()
 		.unwrap_or_else(|error| panic!("git config email: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["config", "commit.gpgsign", "false"])
+		.output()
+		.unwrap_or_else(|error| panic!("git config gpgsign: {error}"));
 	std::process::Command::new("git")
 		.current_dir(tempdir.path())
 		.args(["config", "user.name", "Test User"])
@@ -14294,7 +14433,10 @@ branches = ["release/*"]
 		BTreeMap::new(),
 	);
 	// It will fail on release branch policy, but it should get past the fallback.
-	let error = result.err().unwrap_or_else(|| panic!("expected error"));
+	let error = result
+		.await
+		.err()
+		.unwrap_or_else(|| panic!("expected error"));
 	let message = error.to_string();
 	assert!(
 		message.contains("configured release branch pattern [release/*]"),
@@ -14302,8 +14444,8 @@ branches = ["release/*"]
 	);
 }
 
-#[test]
-fn execute_cli_command_comment_released_issues_falls_back_to_release_record_from_git() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_comment_released_issues_falls_back_to_release_record_from_git() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	fs::write(
 		tempdir.path().join("monochange.toml"),
@@ -14326,14 +14468,14 @@ repo = "monochange"
 		.unwrap_or_else(|error| panic!("git config email: {error}"));
 	std::process::Command::new("git")
 		.current_dir(tempdir.path())
-		.args(["config", "user.name", "Test User"])
-		.output()
-		.unwrap_or_else(|error| panic!("git config name: {error}"));
-	std::process::Command::new("git")
-		.current_dir(tempdir.path())
 		.args(["config", "commit.gpgsign", "false"])
 		.output()
 		.unwrap_or_else(|error| panic!("git config gpgsign: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["config", "user.name", "Test User"])
+		.output()
+		.unwrap_or_else(|error| panic!("git config name: {error}"));
 	fs::write(tempdir.path().join("tracked.txt"), "test\n")
 		.unwrap_or_else(|error| panic!("write tracked: {error}"));
 	std::process::Command::new("git")
@@ -14444,7 +14586,9 @@ repo = "monochange"
 		true,
 		BTreeMap::new(),
 	);
-	result.unwrap_or_else(|error| panic!("unexpected error: {error}"));
+	result
+		.await
+		.unwrap_or_else(|error| panic!("unexpected error: {error}"));
 }
 
 #[test]
@@ -14577,8 +14721,8 @@ fn validate_release_record_file_reports_error_when_dedupe_cannot_read_releases_d
 		.unwrap_or_else(|error| panic!("restore permissions: {error}"));
 }
 
-#[test]
-fn cli_command_dry_run_field_runs_command_in_dry_run_without_flag() {
+#[tokio::test(flavor = "multi_thread")]
+async fn cli_command_dry_run_field_runs_command_in_dry_run_without_flag() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_blank_monochange_config(tempdir.path());
 	let mut configuration = load_workspace_configuration(tempdir.path())
@@ -14614,9 +14758,85 @@ fn cli_command_dry_run_field_runs_command_in_dry_run_without_flag() {
 		announce_matches,
 		false,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("execute_matches: {error}"));
 	assert!(
 		!tempdir.path().join("ran.txt").exists(),
 		"command with dry_run=true should run in dry-run mode and skip the step"
+	);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_retarget_release_applies_git_updates_without_provider_sync() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let remote = tempdir.path().join("remote.git");
+	git_in_dir(
+		tempdir.path(),
+		&["init", "--bare", remote.to_str().unwrap_or("remote.git")],
+	);
+	let root = tempdir.path().join("repo");
+	fs::create_dir_all(&root).unwrap_or_else(|error| panic!("create repo dir: {error}"));
+	init_git_repo(&root);
+	git_in_temp_repo(
+		&root,
+		&[
+			"remote",
+			"add",
+			"origin",
+			remote.to_str().unwrap_or("remote.git"),
+		],
+	);
+	fs::write(root.join("release.txt"), "initial\n")
+		.unwrap_or_else(|error| panic!("write initial release file: {error}"));
+	git_in_temp_repo(&root, &["add", "release.txt"]);
+	let record_commit = create_release_record_commit(&root);
+	git_in_temp_repo(&root, &["tag", "v1.2.3"]);
+	git_in_temp_repo(
+		&root,
+		&[
+			"push",
+			"origin",
+			"HEAD",
+			"refs/tags/v1.2.3:refs/tags/v1.2.3",
+		],
+	);
+	fs::write(root.join("release.txt"), "retarget\n")
+		.unwrap_or_else(|error| panic!("write retarget release file: {error}"));
+	git_in_temp_repo(&root, &["add", "release.txt"]);
+	git_in_temp_repo(&root, &["commit", "-m", "retarget"]);
+	let target_commit = git_output_in_temp_repo(&root, &["rev-parse", "HEAD"]);
+	write_blank_monochange_config(&root);
+	let configuration = load_workspace_configuration(&root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let cli_command = CliCommandDefinition {
+		name: "repair-release".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![monochange_core::CliStepDefinition::RetargetRelease {
+			name: None,
+			when: None,
+			always_run: false,
+			inputs: BTreeMap::new(),
+		}],
+		dry_run: false,
+	};
+	let result = crate::execute_cli_command(
+		&root,
+		&configuration,
+		&cli_command,
+		false,
+		BTreeMap::from([
+			("from".to_string(), vec![record_commit.clone()]),
+			("target".to_string(), vec![target_commit.clone()]),
+			("sync_provider".to_string(), vec!["false".to_string()]),
+		]),
+	)
+	.await
+	.unwrap_or_else(|error| panic!("execute retarget command: {error}"));
+
+	assert!(result.contains("repair release:"));
+	assert_eq!(
+		git_output_in_temp_repo(&root, &["rev-parse", "v1.2.3"]),
+		target_commit
 	);
 }

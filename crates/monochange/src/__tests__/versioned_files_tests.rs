@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;

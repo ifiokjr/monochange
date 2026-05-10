@@ -530,6 +530,7 @@ const CHANGESET_DIR: &str = ".changeset";
 /// matching subcommand, and prints any non-empty stdout payload unless
 /// `--quiet` was requested.
 #[must_use = "the run result must be checked"]
+#[allow(clippy::large_futures)]
 pub async fn run_from_env(bin_name: &'static str) -> MonochangeResult<()> {
 	let log_level = extract_log_level_from_args();
 	tracing_setup::init_tracing(log_level.as_deref());
@@ -834,10 +835,12 @@ where
 				head_ref,
 				detection_level,
 				format,
-			).await
+			)
+			.await
 		}
 		Some(("migrate", migrate_matches)) => run_migration_command(root, quiet, migrate_matches),
 		Some(("mcp", _)) => run_mcp_command_with(quiet, mcp::run_server).await,
+
 		Some(("check", check_matches)) => {
 			if quiet {
 				return Ok(String::new());
@@ -917,7 +920,6 @@ fn run_command_wizard_for_cli(root: &Path, quiet: bool) -> MonochangeResult<Stri
 	run_command_wizard(root)
 }
 
-#[allow(clippy::unused_async)]
 async fn run_mcp_command_with<F, Fut>(quiet: bool, run_server: F) -> MonochangeResult<String>
 where
 	F: FnOnce() -> Fut,
@@ -927,9 +929,7 @@ where
 		return Ok(String::new());
 	}
 
-	let runtime = tokio::runtime::Runtime::new()
-		.map_err(|error| MonochangeError::Config(error.to_string()))?;
-	runtime.block_on(run_server());
+	run_server().await;
 	Ok(String::new())
 }
 

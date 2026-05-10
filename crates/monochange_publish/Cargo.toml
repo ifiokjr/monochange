@@ -14,10 +14,11 @@ description = "Publishing support and trusted-publishing capabilities for monoch
 
 [dependencies]
 monochange_core = { workspace = true }
-reqwest = { workspace = true, features = ["blocking", "json"] }
+reqwest = { workspace = true, features = ["json"] }
 serde = { workspace = true, default-features = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread"] }
 tracing = { workspace = true, default-features = true }
 urlencoding = { workspace = true }
 
