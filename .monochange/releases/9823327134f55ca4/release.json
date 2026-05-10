@@ -1,0 +1,1492 @@
+{
+	"schemaVersion": "0.1",
+	"kind": "monochange.releaseRecord",
+	"createdAt": "2026-05-10T20:39:34Z",
+	"command": "release-pr",
+	"version": "0.4.2",
+	"versions": {
+		"main": "0.4.2"
+	},
+	"releaseTargets": [
+		{
+			"id": "main",
+			"kind": "group",
+			"version": "0.4.2",
+			"versionFormat": "primary",
+			"tag": true,
+			"release": true,
+			"tagName": "v0.4.2",
+			"members": [
+				"@monochange/cli",
+				"@monochange/cli-darwin-arm64",
+				"@monochange/cli-darwin-x64",
+				"@monochange/cli-linux-arm64-gnu",
+				"@monochange/cli-linux-arm64-musl",
+				"@monochange/cli-linux-x64-gnu",
+				"@monochange/cli-linux-x64-musl",
+				"@monochange/cli-win32-arm64-msvc",
+				"@monochange/cli-win32-x64-msvc",
+				"@monochange/skill",
+				"monochange",
+				"monochange_analysis",
+				"monochange_cargo",
+				"monochange_changelog",
+				"monochange_config",
+				"monochange_core",
+				"monochange_dart",
+				"monochange_deno",
+				"monochange_ecmascript",
+				"monochange_forgejo",
+				"monochange_gitea",
+				"monochange_github",
+				"monochange_gitlab",
+				"monochange_go",
+				"monochange_graph",
+				"monochange_hosting",
+				"monochange_lint",
+				"monochange_lint_testing",
+				"monochange_linting",
+				"monochange_npm",
+				"monochange_publish",
+				"monochange_python",
+				"monochange_semver",
+				"monochange_telemetry",
+				"monochange_test_helpers"
+			]
+		}
+	],
+	"releasedPackages": [
+		"@monochange/cli",
+		"@monochange/cli-darwin-arm64",
+		"@monochange/cli-darwin-x64",
+		"@monochange/cli-linux-arm64-gnu",
+		"@monochange/cli-linux-arm64-musl",
+		"@monochange/cli-linux-x64-gnu",
+		"@monochange/cli-linux-x64-musl",
+		"@monochange/cli-win32-arm64-msvc",
+		"@monochange/cli-win32-x64-msvc",
+		"@monochange/skill",
+		"monochange",
+		"monochange_analysis",
+		"monochange_cargo",
+		"monochange_changelog",
+		"monochange_config",
+		"monochange_core",
+		"monochange_dart",
+		"monochange_deno",
+		"monochange_ecmascript",
+		"monochange_forgejo",
+		"monochange_gitea",
+		"monochange_github",
+		"monochange_gitlab",
+		"monochange_go",
+		"monochange_graph",
+		"monochange_hosting",
+		"monochange_lint",
+		"monochange_lint_testing",
+		"monochange_linting",
+		"monochange_npm",
+		"monochange_publish",
+		"monochange_python",
+		"monochange_semver",
+		"monochange_telemetry",
+		"monochange_test_helpers"
+	],
+	"changedFiles": [
+		"Cargo.lock",
+		"Cargo.toml",
+		"changelog.md",
+		"crates/monochange/Cargo.toml",
+		"crates/monochange/changelog.md",
+		"crates/monochange_analysis/Cargo.toml",
+		"crates/monochange_analysis/changelog.md",
+		"crates/monochange_cargo/Cargo.toml",
+		"crates/monochange_cargo/changelog.md",
+		"crates/monochange_changelog/Cargo.toml",
+		"crates/monochange_changelog/changelog.md",
+		"crates/monochange_config/Cargo.toml",
+		"crates/monochange_config/changelog.md",
+		"crates/monochange_core/Cargo.toml",
+		"crates/monochange_core/changelog.md",
+		"crates/monochange_dart/Cargo.toml",
+		"crates/monochange_dart/changelog.md",
+		"crates/monochange_deno/Cargo.toml",
+		"crates/monochange_deno/changelog.md",
+		"crates/monochange_ecmascript/Cargo.toml",
+		"crates/monochange_ecmascript/changelog.md",
+		"crates/monochange_forgejo/Cargo.toml",
+		"crates/monochange_forgejo/changelog.md",
+		"crates/monochange_gitea/Cargo.toml",
+		"crates/monochange_gitea/changelog.md",
+		"crates/monochange_github/Cargo.toml",
+		"crates/monochange_github/changelog.md",
+		"crates/monochange_gitlab/Cargo.toml",
+		"crates/monochange_gitlab/changelog.md",
+		"crates/monochange_go/Cargo.toml",
+		"crates/monochange_go/changelog.md",
+		"crates/monochange_graph/Cargo.toml",
+		"crates/monochange_graph/changelog.md",
+		"crates/monochange_hosting/Cargo.toml",
+		"crates/monochange_hosting/changelog.md",
+		"crates/monochange_lint/Cargo.toml",
+		"crates/monochange_lint/changelog.md",
+		"crates/monochange_lint_testing/Cargo.toml",
+		"crates/monochange_lint_testing/changelog.md",
+		"crates/monochange_linting/Cargo.toml",
+		"crates/monochange_linting/changelog.md",
+		"crates/monochange_npm/Cargo.toml",
+		"crates/monochange_npm/changelog.md",
+		"crates/monochange_publish/Cargo.toml",
+		"crates/monochange_publish/changelog.md",
+		"crates/monochange_python/Cargo.toml",
+		"crates/monochange_python/changelog.md",
+		"crates/monochange_semver/Cargo.toml",
+		"crates/monochange_semver/changelog.md",
+		"crates/monochange_telemetry/Cargo.toml",
+		"crates/monochange_telemetry/changelog.md",
+		"crates/monochange_test_helpers/Cargo.toml",
+		"crates/monochange_test_helpers/changelog.md",
+		"packages/monochange__cli/changelog.md",
+		"packages/monochange__cli/package.json",
+		"packages/monochange__cli-darwin-arm64/changelog.md",
+		"packages/monochange__cli-darwin-arm64/package.json",
+		"packages/monochange__cli-darwin-x64/changelog.md",
+		"packages/monochange__cli-darwin-x64/package.json",
+		"packages/monochange__cli-linux-arm64-gnu/changelog.md",
+		"packages/monochange__cli-linux-arm64-gnu/package.json",
+		"packages/monochange__cli-linux-arm64-musl/changelog.md",
+		"packages/monochange__cli-linux-arm64-musl/package.json",
+		"packages/monochange__cli-linux-x64-gnu/changelog.md",
+		"packages/monochange__cli-linux-x64-gnu/package.json",
+		"packages/monochange__cli-linux-x64-musl/changelog.md",
+		"packages/monochange__cli-linux-x64-musl/package.json",
+		"packages/monochange__cli-win32-arm64-msvc/changelog.md",
+		"packages/monochange__cli-win32-arm64-msvc/package.json",
+		"packages/monochange__cli-win32-x64-msvc/changelog.md",
+		"packages/monochange__cli-win32-x64-msvc/package.json",
+		"packages/monochange__skill/changelog.md",
+		"packages/monochange__skill/package.json"
+	],
+	"packagePublications": [
+		{
+			"package": "@monochange/cli",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "@monochange/cli-darwin-arm64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "@monochange/cli-darwin-x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "@monochange/cli-linux-arm64-gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "@monochange/cli-linux-arm64-musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "@monochange/cli-linux-x64-gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "@monochange/cli-linux-x64-musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "@monochange/cli-win32-arm64-msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "@monochange/cli-win32-x64-msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "@monochange/skill",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_analysis",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_cargo",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_changelog",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_config",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_core",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_dart",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_deno",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_ecmascript",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_forgejo",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_gitea",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_github",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_gitlab",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_go",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_graph",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_hosting",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_lint",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_linting",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_npm",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_publish",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_python",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_semver",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_telemetry",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_test_helpers",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.2",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		}
+	],
+	"updatedChangelogs": [
+		"changelog.md",
+		"crates/monochange/changelog.md",
+		"crates/monochange_analysis/changelog.md",
+		"crates/monochange_cargo/changelog.md",
+		"crates/monochange_changelog/changelog.md",
+		"crates/monochange_config/changelog.md",
+		"crates/monochange_core/changelog.md",
+		"crates/monochange_dart/changelog.md",
+		"crates/monochange_deno/changelog.md",
+		"crates/monochange_ecmascript/changelog.md",
+		"crates/monochange_forgejo/changelog.md",
+		"crates/monochange_gitea/changelog.md",
+		"crates/monochange_github/changelog.md",
+		"crates/monochange_gitlab/changelog.md",
+		"crates/monochange_go/changelog.md",
+		"crates/monochange_graph/changelog.md",
+		"crates/monochange_hosting/changelog.md",
+		"crates/monochange_lint/changelog.md",
+		"crates/monochange_lint_testing/changelog.md",
+		"crates/monochange_linting/changelog.md",
+		"crates/monochange_npm/changelog.md",
+		"crates/monochange_publish/changelog.md",
+		"crates/monochange_python/changelog.md",
+		"crates/monochange_semver/changelog.md",
+		"crates/monochange_telemetry/changelog.md",
+		"crates/monochange_test_helpers/changelog.md",
+		"packages/monochange__cli/changelog.md",
+		"packages/monochange__cli-darwin-arm64/changelog.md",
+		"packages/monochange__cli-darwin-x64/changelog.md",
+		"packages/monochange__cli-linux-arm64-gnu/changelog.md",
+		"packages/monochange__cli-linux-arm64-musl/changelog.md",
+		"packages/monochange__cli-linux-x64-gnu/changelog.md",
+		"packages/monochange__cli-linux-x64-musl/changelog.md",
+		"packages/monochange__cli-win32-arm64-msvc/changelog.md",
+		"packages/monochange__cli-win32-x64-msvc/changelog.md",
+		"packages/monochange__skill/changelog.md"
+	],
+	"deletedChangesets": [
+		".changeset/publish-dependency-order.md"
+	],
+	"changesets": [
+		{
+			"path": ".changeset/publish-dependency-order.md",
+			"summary": "Order publish plans by dependencies",
+			"details": "Order publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.",
+			"targets": [
+				{
+					"id": "main",
+					"kind": "group",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "minor"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commitWebUrls": true,
+					"actorProfiles": true,
+					"reviewRequestLookup": true,
+					"relatedIssues": true,
+					"issueComments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "67eae951e6a35a9b4c7c6489e89cd4779e44234e",
+						"shortSha": "67eae95",
+						"url": "https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e",
+						"authoredAt": "2026-05-01T06:24:25+01:00",
+						"committedAt": "2026-05-01T06:24:25+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#364",
+						"title": "fix: publish packages in dependency order without readiness",
+						"url": "https://github.com/monochange/monochange/pull/364",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"lastUpdated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "2392845ec29289e3f219aca20ac343cf79ee965e",
+						"shortSha": "2392845",
+						"url": "https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e",
+						"authoredAt": "2026-05-10T21:33:22+01:00",
+						"committedAt": "2026-05-10T21:33:22+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#451",
+						"title": "fix: order publish plans by dependencies",
+						"url": "https://github.com/monochange/monochange/pull/451",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"relatedIssues": []
+			}
+		}
+	],
+	"changelogs": [
+		{
+			"ownerId": "main",
+			"ownerKind": "group",
+			"path": "changelog.md",
+			"format": "monochange",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [
+					"Grouped release for `main`."
+				],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"> [!NOTE]\n> *main*\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\nGrouped release for `main`.\n\n### Added\n\n> [!NOTE]\n> *main*\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange",
+			"ownerKind": "package",
+			"path": "crates/monochange/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_analysis",
+			"ownerKind": "package",
+			"path": "crates/monochange_analysis/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_cargo",
+			"ownerKind": "package",
+			"path": "crates/monochange_cargo/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_changelog",
+			"ownerKind": "package",
+			"path": "crates/monochange_changelog/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_config",
+			"ownerKind": "package",
+			"path": "crates/monochange_config/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_core",
+			"ownerKind": "package",
+			"path": "crates/monochange_core/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_dart",
+			"ownerKind": "package",
+			"path": "crates/monochange_dart/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_deno",
+			"ownerKind": "package",
+			"path": "crates/monochange_deno/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_ecmascript",
+			"ownerKind": "package",
+			"path": "crates/monochange_ecmascript/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_forgejo",
+			"ownerKind": "package",
+			"path": "crates/monochange_forgejo/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_gitea",
+			"ownerKind": "package",
+			"path": "crates/monochange_gitea/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_github",
+			"ownerKind": "package",
+			"path": "crates/monochange_github/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_gitlab",
+			"ownerKind": "package",
+			"path": "crates/monochange_gitlab/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_go",
+			"ownerKind": "package",
+			"path": "crates/monochange_go/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_graph",
+			"ownerKind": "package",
+			"path": "crates/monochange_graph/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_hosting",
+			"ownerKind": "package",
+			"path": "crates/monochange_hosting/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_lint",
+			"ownerKind": "package",
+			"path": "crates/monochange_lint/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_lint_testing",
+			"ownerKind": "package",
+			"path": "crates/monochange_lint_testing/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_linting",
+			"ownerKind": "package",
+			"path": "crates/monochange_linting/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_npm",
+			"ownerKind": "package",
+			"path": "crates/monochange_npm/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_publish",
+			"ownerKind": "package",
+			"path": "crates/monochange_publish/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_python",
+			"ownerKind": "package",
+			"path": "crates/monochange_python/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_semver",
+			"ownerKind": "package",
+			"path": "crates/monochange_semver/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_telemetry",
+			"ownerKind": "package",
+			"path": "crates/monochange_telemetry/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "monochange_test_helpers",
+			"ownerKind": "package",
+			"path": "crates/monochange_test_helpers/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "@monochange/cli",
+			"ownerKind": "package",
+			"path": "packages/monochange__cli/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "@monochange/cli-darwin-arm64",
+			"ownerKind": "package",
+			"path": "packages/monochange__cli-darwin-arm64/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "@monochange/cli-darwin-x64",
+			"ownerKind": "package",
+			"path": "packages/monochange__cli-darwin-x64/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "@monochange/cli-linux-arm64-gnu",
+			"ownerKind": "package",
+			"path": "packages/monochange__cli-linux-arm64-gnu/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "@monochange/cli-linux-arm64-musl",
+			"ownerKind": "package",
+			"path": "packages/monochange__cli-linux-arm64-musl/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "@monochange/cli-linux-x64-gnu",
+			"ownerKind": "package",
+			"path": "packages/monochange__cli-linux-x64-gnu/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "@monochange/cli-linux-x64-musl",
+			"ownerKind": "package",
+			"path": "packages/monochange__cli-linux-x64-musl/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "@monochange/cli-win32-arm64-msvc",
+			"ownerKind": "package",
+			"path": "packages/monochange__cli-win32-arm64-msvc/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "@monochange/cli-win32-x64-msvc",
+			"ownerKind": "package",
+			"path": "packages/monochange__cli-win32-x64-msvc/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		},
+		{
+			"ownerId": "@monochange/skill",
+			"ownerKind": "package",
+			"path": "packages/monochange__skill/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)\n\n### Added\n\n#### Order publish plans by dependencies\n\nOrder publish plans by workspace dependencies before applying registry rate-limit windows, and run CI publishing as one dependency-ordered publish operation.\n\nThis keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364)\n> _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)\n> _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)"
+		}
+	],
+	"provider": {
+		"kind": "github",
+		"owner": "monochange",
+		"repo": "monochange",
+		"host": null
+	}
+}
