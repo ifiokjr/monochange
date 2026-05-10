@@ -880,7 +880,11 @@ pub(crate) fn execute_cli_command_with_options(
 					output = None;
 					Ok(())
 				}
-				CliStepDefinition::CommitRelease { no_verify, .. } => {
+				CliStepDefinition::CommitRelease {
+					no_verify,
+					update_release_json,
+					..
+				} => {
 					#[rustfmt::skip]
 					release_branch_policy::verify_release_ref_for_commit(root, configuration.source.as_ref(), "HEAD")?;
 					ensure_prepared_release_for_consumer_step(
@@ -903,9 +907,12 @@ pub(crate) fn execute_cli_command_with_options(
 					);
 					let no_verify =
 						parse_boolean_step_input(&step_inputs, "no_verify")?.unwrap_or(*no_verify);
+					let update_release_json =
+						parse_boolean_step_input(&step_inputs, "update_release_json")?
+							.unwrap_or(*update_release_json);
 					#[rustfmt::skip]
 				let release_commit_report =
-					commit_release(root, &context, configuration.source.as_ref(), &manifest, no_verify)?;
+					commit_release(root, &context, configuration.source.as_ref(), &manifest, no_verify, update_release_json)?;
 					context.release_commit_report = Some(release_commit_report);
 					output = None;
 					Ok(())

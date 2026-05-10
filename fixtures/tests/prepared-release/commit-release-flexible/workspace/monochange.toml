@@ -46,6 +46,7 @@ default = "text"
 
 [[cli.commit-from-cache.steps]]
 type = "CommitRelease"
+update_release_json = true
 
 [cli.release-with-manifest]
 
@@ -60,3 +61,4 @@ type = "PrepareRelease"
 
 [[cli.release-with-manifest.steps]]
 type = "CommitRelease"
+update_release_json = true

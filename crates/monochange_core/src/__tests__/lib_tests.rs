@@ -890,6 +890,7 @@ fn cli_step_definition_kind_name_covers_all_variants() {
 				when: None,
 				always_run: false,
 				no_verify: false,
+				update_release_json: false,
 				inputs: BTreeMap::new(),
 			},
 			"CommitRelease",
@@ -1057,6 +1058,7 @@ fn cli_step_name_returns_explicit_names_for_all_variants() {
 			when: None,
 			always_run: false,
 			no_verify: false,
+			update_release_json: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::PublishRelease {
@@ -1143,15 +1145,19 @@ fn valid_input_names_returns_fix_for_validate() {
 }
 
 #[test]
-fn valid_input_names_returns_empty_for_commit_release() {
+fn valid_input_names_returns_no_verify_and_update_release_json_for_commit_release() {
 	let step = CliStepDefinition::CommitRelease {
 		name: None,
 		when: None,
 		always_run: false,
 		no_verify: false,
+		update_release_json: false,
 		inputs: BTreeMap::new(),
 	};
-	assert_eq!(step.valid_input_names(), Some(["no_verify"].as_slice()));
+	assert_eq!(
+		step.valid_input_names(),
+		Some(["no_verify", "update_release_json"].as_slice())
+	);
 }
 
 #[test]
@@ -1342,6 +1348,7 @@ fn always_run_accessor_returns_value_for_all_variants() {
 		always_run: false,
 		inputs: BTreeMap::new(),
 		no_verify: false,
+		update_release_json: false,
 	};
 	assert!(!commit.always_run());
 
@@ -1496,6 +1503,7 @@ fn expected_input_kind_returns_none_for_commit_release() {
 		when: None,
 		always_run: false,
 		no_verify: false,
+		update_release_json: false,
 		inputs: BTreeMap::new(),
 	};
 	assert_eq!(step.expected_input_kind("format"), None);

@@ -49,6 +49,7 @@ type = "PrepareRelease"
 
 [[cli.commit-release.steps]]
 type = "CommitRelease"
+update_release_json = true
 
 [cli.release-pr]
 

@@ -1453,6 +1453,7 @@ pub(crate) fn validate_release_record_file(
 	root: &Path,
 	source: Option<&SourceConfiguration>,
 	manifest: &ReleaseManifest,
+	update_release_json: bool,
 ) -> MonochangeResult<PathBuf> {
 	let record = build_release_record(source, manifest);
 	let paths = ReleasePaths::from_record(root, &record);
@@ -1461,17 +1462,30 @@ pub(crate) fn validate_release_record_file(
 		&record.release_targets,
 		paths.absolute.parent().unwrap_or(root),
 	)?;
+	let json = serde_json::to_string_pretty(&record).unwrap_or_default();
 	if paths.absolute.is_file() {
-		let json = serde_json::to_string_pretty(&record).unwrap_or_default();
 		let existing = fs::read_to_string(&paths.absolute)
 			.map_err(|error| MonochangeError::Io(format!("read release record: {error}")))?;
-		if existing != json && !compare_json_strings(&existing, &json) {
-			fs::write(&paths.absolute, json)
-				.map_err(|error| MonochangeError::Io(format!("update release record: {error}")))?;
+		if !compare_json_strings(&existing, &json) {
+			if update_release_json {
+				fs::write(&paths.absolute, json).map_err(|error| {
+					MonochangeError::Io(format!("update release record: {error}"))
+				})?;
+			} else {
+				return Err(MonochangeError::Io(format!(
+					"release record at {} does not match expected content — the file has been modified since it was prepared. Set `update_release_json = true` on the CommitRelease step to allow overwriting.",
+					paths.absolute.display()
+				)));
+			}
 		}
+	} else if update_release_json {
+		fs::create_dir_all(paths.absolute.parent().unwrap_or(root))
+			.map_err(|error| MonochangeError::Io(format!("create release record dir: {error}")))?;
+		fs::write(&paths.absolute, json)
+			.map_err(|error| MonochangeError::Io(format!("write release record: {error}")))?;
 	} else {
 		return Err(MonochangeError::Io(format!(
-			"release record missing at {} — was it removed by deduplication or never written?",
+			"no release record found at {} — was it removed by deduplication or never written?",
 			paths.absolute.display()
 		)));
 	}
@@ -1664,10 +1678,12 @@ pub(crate) fn commit_release(
 	source: Option<&SourceConfiguration>,
 	manifest: &ReleaseManifest,
 	no_verify: bool,
+	update_release_json: bool,
 ) -> MonochangeResult<CommitReleaseReport> {
 	let tracked_paths = tracked_release_pull_request_paths(context, manifest);
 	let message = build_release_commit_message(source, manifest);
-	let release_record_path = validate_release_record_file(root, source, manifest)?;
+	let release_record_path =
+		validate_release_record_file(root, source, manifest, update_release_json)?;
 	let mut tracked_paths = tracked_paths;
 	tracked_paths.push(release_record_path);
 	if !context.dry_run {
