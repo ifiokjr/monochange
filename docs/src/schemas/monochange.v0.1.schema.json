@@ -17,6 +17,7 @@
 			"type": "string"
 		},
 		"ChangelogSectionDef": {
+			"additionalProperties": false,
 			"properties": {
 				"description": {
 					"default": null,
@@ -45,6 +46,7 @@
 			"type": "object"
 		},
 		"ChangelogSectionThresholds": {
+			"additionalProperties": false,
 			"properties": {
 				"collapse": {
 					"default": 127,
@@ -66,6 +68,7 @@
 			"type": "object"
 		},
 		"ChangelogType": {
+			"additionalProperties": false,
 			"properties": {
 				"bump": {
 					"$ref": "#/$defs/BumpSeverity",
@@ -91,6 +94,7 @@
 			"type": "object"
 		},
 		"ChangesetAffectedSettings": {
+			"additionalProperties": false,
 			"properties": {
 				"changed_paths": {
 					"default": [],
@@ -129,6 +133,7 @@
 			"type": "object"
 		},
 		"ChangesetSettings": {
+			"additionalProperties": false,
 			"properties": {
 				"affected": {
 					"$ref": "#/$defs/ChangesetAffectedSettings",
@@ -145,6 +150,7 @@
 			"type": "object"
 		},
 		"CliInputDefinition": {
+			"additionalProperties": false,
 			"properties": {
 				"choices": {
 					"default": [],
@@ -1007,6 +1013,7 @@
 			"type": "string"
 		},
 		"LockfileCommandDefinition": {
+			"additionalProperties": false,
 			"properties": {
 				"command": {
 					"type": "string"
@@ -1041,6 +1048,7 @@
 			"type": "string"
 		},
 		"ProviderMergeRequestSettings": {
+			"additionalProperties": false,
 			"properties": {
 				"auto_merge": {
 					"default": false,
@@ -1087,6 +1095,7 @@
 			"type": "string"
 		},
 		"ProviderReleaseSettings": {
+			"additionalProperties": false,
 			"properties": {
 				"attestations": {
 					"$ref": "#/$defs/ReleaseAttestationSettings"
@@ -1152,291 +1161,6 @@
 				}
 			]
 		},
-		"RawChangelogConfig": {
-			"anyOf": [
-				{
-					"$ref": "#/$defs/RawChangelogDefinition"
-				},
-				{
-					"$ref": "#/$defs/RawChangelogTable"
-				}
-			]
-		},
-		"RawChangelogDefinition": {
-			"anyOf": [
-				{
-					"type": "boolean"
-				},
-				{
-					"type": "string"
-				}
-			]
-		},
-		"RawChangelogSettings": {
-			"properties": {
-				"section_thresholds": {
-					"$ref": "#/$defs/ChangelogSectionThresholds",
-					"default": {
-						"collapse": 127,
-						"ignored": 127
-					}
-				},
-				"sections": {
-					"additionalProperties": {
-						"$ref": "#/$defs/ChangelogSectionDef"
-					},
-					"default": {},
-					"type": "object"
-				},
-				"templates": {
-					"default": [],
-					"items": {
-						"type": "string"
-					},
-					"type": "array"
-				},
-				"types": {
-					"additionalProperties": {
-						"$ref": "#/$defs/ChangelogType"
-					},
-					"default": {},
-					"type": "object"
-				}
-			},
-			"type": "object"
-		},
-		"RawChangelogTable": {
-			"properties": {
-				"enabled": {
-					"default": null,
-					"type": [
-						"boolean",
-						"null"
-					]
-				},
-				"format": {
-					"anyOf": [
-						{
-							"$ref": "#/$defs/ChangelogFormat"
-						},
-						{
-							"type": "null"
-						}
-					],
-					"default": null
-				},
-				"include": {
-					"anyOf": [
-						{
-							"$ref": "#/$defs/RawGroupChangelogInclude"
-						},
-						{
-							"type": "null"
-						}
-					]
-				},
-				"initial_header": {
-					"default": null,
-					"type": [
-						"string",
-						"null"
-					]
-				},
-				"path": {
-					"default": null,
-					"type": [
-						"string",
-						"null"
-					]
-				}
-			},
-			"type": "object"
-		},
-		"RawEcosystems": {
-			"properties": {
-				"cargo": {
-					"$ref": "#/$defs/ecosystemSettings"
-				},
-				"dart": {
-					"$ref": "#/$defs/ecosystemSettings"
-				},
-				"deno": {
-					"$ref": "#/$defs/ecosystemSettings"
-				},
-				"go": {
-					"$ref": "#/$defs/ecosystemSettings"
-				},
-				"npm": {
-					"$ref": "#/$defs/ecosystemSettings"
-				},
-				"python": {
-					"$ref": "#/$defs/ecosystemSettings"
-				}
-			},
-			"type": "object"
-		},
-		"RawGroupChangelogInclude": {
-			"anyOf": [
-				{
-					"type": "string"
-				},
-				{
-					"items": {
-						"type": "string"
-					},
-					"type": "array"
-				}
-			]
-		},
-		"RawPlaceholderSettings": {
-			"properties": {
-				"readme": {
-					"default": null,
-					"type": [
-						"string",
-						"null"
-					]
-				},
-				"readme_file": {
-					"default": null,
-					"type": [
-						"string",
-						"null"
-					]
-				}
-			},
-			"type": "object"
-		},
-		"RawPublishAttestationSettings": {
-			"properties": {
-				"require_registry_provenance": {
-					"default": null,
-					"type": [
-						"boolean",
-						"null"
-					]
-				}
-			},
-			"type": "object"
-		},
-		"RawPublishRateLimitSettings": {
-			"properties": {
-				"enforce": {
-					"default": null,
-					"type": [
-						"boolean",
-						"null"
-					]
-				}
-			},
-			"type": "object"
-		},
-		"RawPublishSettings": {
-			"properties": {
-				"attestations": {
-					"$ref": "#/$defs/RawPublishAttestationSettings"
-				},
-				"enabled": {
-					"default": null,
-					"type": [
-						"boolean",
-						"null"
-					]
-				},
-				"mode": {
-					"anyOf": [
-						{
-							"$ref": "#/$defs/PublishMode"
-						},
-						{
-							"type": "null"
-						}
-					],
-					"default": null
-				},
-				"placeholder": {
-					"$ref": "#/$defs/RawPlaceholderSettings"
-				},
-				"rate_limits": {
-					"$ref": "#/$defs/RawPublishRateLimitSettings"
-				},
-				"registry": {
-					"anyOf": [
-						{
-							"$ref": "#/$defs/PublishRegistry"
-						},
-						{
-							"type": "null"
-						}
-					],
-					"default": null
-				},
-				"trusted_publishing": {
-					"anyOf": [
-						{
-							"$ref": "#/$defs/RawTrustedPublishingSettings"
-						},
-						{
-							"type": "null"
-						}
-					]
-				}
-			},
-			"type": "object"
-		},
-		"RawTrustedPublishingDetails": {
-			"properties": {
-				"enabled": {
-					"default": null,
-					"type": [
-						"boolean",
-						"null"
-					]
-				},
-				"environment": {
-					"default": null,
-					"type": [
-						"string",
-						"null"
-					]
-				},
-				"repository": {
-					"default": null,
-					"type": [
-						"string",
-						"null"
-					]
-				},
-				"workflow": {
-					"default": null,
-					"type": [
-						"string",
-						"null"
-					]
-				}
-			},
-			"type": "object"
-		},
-		"RawTrustedPublishingSettings": {
-			"anyOf": [
-				{
-					"type": "boolean"
-				},
-				{
-					"$ref": "#/$defs/RawTrustedPublishingDetails"
-				}
-			]
-		},
-		"RawVersionedFileDefinition": {
-			"anyOf": [
-				{
-					"type": "string"
-				},
-				{
-					"$ref": "#/$defs/VersionedFileDefinition"
-				}
-			]
-		},
 		"RegistryKind": {
 			"enum": [
 				"crates_io",
@@ -1449,6 +1173,7 @@
 			"type": "string"
 		},
 		"ReleaseAttestationSettings": {
+			"additionalProperties": false,
 			"properties": {
 				"require_github_artifact_attestations": {
 					"default": false,
@@ -1498,6 +1223,7 @@
 			"type": "string"
 		},
 		"VersionedFileDefinition": {
+			"additionalProperties": false,
 			"properties": {
 				"fields": {
 					"default": null,
@@ -1550,6 +1276,108 @@
 			],
 			"type": "object"
 		},
+		"changelogConfig": {
+			"anyOf": [
+				{
+					"$ref": "#/$defs/changelogDefinition"
+				},
+				{
+					"$ref": "#/$defs/changelogTable"
+				}
+			]
+		},
+		"changelogDefinition": {
+			"anyOf": [
+				{
+					"type": "boolean"
+				},
+				{
+					"type": "string"
+				}
+			]
+		},
+		"changelogSettings": {
+			"additionalProperties": false,
+			"properties": {
+				"section_thresholds": {
+					"$ref": "#/$defs/ChangelogSectionThresholds",
+					"default": {
+						"collapse": 127,
+						"ignored": 127
+					}
+				},
+				"sections": {
+					"additionalProperties": {
+						"$ref": "#/$defs/ChangelogSectionDef"
+					},
+					"default": {},
+					"type": "object"
+				},
+				"templates": {
+					"default": [],
+					"items": {
+						"type": "string"
+					},
+					"type": "array"
+				},
+				"types": {
+					"additionalProperties": {
+						"$ref": "#/$defs/ChangelogType"
+					},
+					"default": {},
+					"type": "object"
+				}
+			},
+			"type": "object"
+		},
+		"changelogTable": {
+			"additionalProperties": false,
+			"properties": {
+				"enabled": {
+					"default": null,
+					"type": [
+						"boolean",
+						"null"
+					]
+				},
+				"format": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/ChangelogFormat"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"include": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/groupChangelogInclude"
+						},
+						{
+							"type": "null"
+						}
+					]
+				},
+				"initial_header": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"path": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				}
+			},
+			"type": "object"
+		},
 		"cliCommand": {
 			"additionalProperties": false,
 			"properties": {
@@ -1587,7 +1415,7 @@
 				"changelog": {
 					"anyOf": [
 						{
-							"$ref": "#/$defs/RawChangelogConfig"
+							"$ref": "#/$defs/changelogConfig"
 						},
 						{
 							"type": "null"
@@ -1677,7 +1505,7 @@
 					"type": "array"
 				},
 				"publish": {
-					"$ref": "#/$defs/RawPublishSettings"
+					"$ref": "#/$defs/publishSettings"
 				},
 				"roots": {
 					"default": [],
@@ -1688,12 +1516,49 @@
 				},
 				"versioned_files": {
 					"items": {
-						"$ref": "#/$defs/RawVersionedFileDefinition"
+						"$ref": "#/$defs/versionedFileDefinition"
 					},
 					"type": "array"
 				}
 			},
 			"type": "object"
+		},
+		"ecosystems": {
+			"additionalProperties": false,
+			"properties": {
+				"cargo": {
+					"$ref": "#/$defs/ecosystemSettings"
+				},
+				"dart": {
+					"$ref": "#/$defs/ecosystemSettings"
+				},
+				"deno": {
+					"$ref": "#/$defs/ecosystemSettings"
+				},
+				"go": {
+					"$ref": "#/$defs/ecosystemSettings"
+				},
+				"npm": {
+					"$ref": "#/$defs/ecosystemSettings"
+				},
+				"python": {
+					"$ref": "#/$defs/ecosystemSettings"
+				}
+			},
+			"type": "object"
+		},
+		"groupChangelogInclude": {
+			"anyOf": [
+				{
+					"type": "string"
+				},
+				{
+					"items": {
+						"type": "string"
+					},
+					"type": "array"
+				}
+			]
 		},
 		"groupDefinition": {
 			"additionalProperties": false,
@@ -1701,7 +1566,7 @@
 				"changelog": {
 					"anyOf": [
 						{
-							"$ref": "#/$defs/RawChangelogConfig"
+							"$ref": "#/$defs/changelogConfig"
 						},
 						{
 							"type": "null"
@@ -1756,7 +1621,7 @@
 				},
 				"versioned_files": {
 					"items": {
-						"$ref": "#/$defs/RawVersionedFileDefinition"
+						"$ref": "#/$defs/versionedFileDefinition"
 					},
 					"type": "array"
 				}
@@ -1779,7 +1644,7 @@
 				"changelog": {
 					"anyOf": [
 						{
-							"$ref": "#/$defs/RawChangelogConfig"
+							"$ref": "#/$defs/changelogConfig"
 						},
 						{
 							"type": "null"
@@ -1822,7 +1687,7 @@
 					"type": "string"
 				},
 				"publish": {
-					"$ref": "#/$defs/RawPublishSettings"
+					"$ref": "#/$defs/publishSettings"
 				},
 				"release": {
 					"default": false,
@@ -1855,7 +1720,7 @@
 				},
 				"versioned_files": {
 					"items": {
-						"$ref": "#/$defs/RawVersionedFileDefinition"
+						"$ref": "#/$defs/versionedFileDefinition"
 					},
 					"type": "array"
 				}
@@ -1863,6 +1728,106 @@
 			"required": [
 				"path"
 			],
+			"type": "object"
+		},
+		"placeholderSettings": {
+			"additionalProperties": false,
+			"properties": {
+				"readme": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"readme_file": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				}
+			},
+			"type": "object"
+		},
+		"publishAttestationSettings": {
+			"additionalProperties": false,
+			"properties": {
+				"require_registry_provenance": {
+					"default": null,
+					"type": [
+						"boolean",
+						"null"
+					]
+				}
+			},
+			"type": "object"
+		},
+		"publishRateLimitSettings": {
+			"additionalProperties": false,
+			"properties": {
+				"enforce": {
+					"default": null,
+					"type": [
+						"boolean",
+						"null"
+					]
+				}
+			},
+			"type": "object"
+		},
+		"publishSettings": {
+			"additionalProperties": false,
+			"properties": {
+				"attestations": {
+					"$ref": "#/$defs/publishAttestationSettings"
+				},
+				"enabled": {
+					"default": null,
+					"type": [
+						"boolean",
+						"null"
+					]
+				},
+				"mode": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/PublishMode"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"placeholder": {
+					"$ref": "#/$defs/placeholderSettings"
+				},
+				"rate_limits": {
+					"$ref": "#/$defs/publishRateLimitSettings"
+				},
+				"registry": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/PublishRegistry"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"trusted_publishing": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/trustedPublishingSettings"
+						},
+						{
+							"type": "null"
+						}
+					]
+				}
+			},
 			"type": "object"
 		},
 		"source": {
@@ -1929,6 +1894,60 @@
 				"repo"
 			],
 			"type": "object"
+		},
+		"trustedPublishingDetails": {
+			"additionalProperties": false,
+			"properties": {
+				"enabled": {
+					"default": null,
+					"type": [
+						"boolean",
+						"null"
+					]
+				},
+				"environment": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"repository": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"workflow": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				}
+			},
+			"type": "object"
+		},
+		"trustedPublishingSettings": {
+			"anyOf": [
+				{
+					"type": "boolean"
+				},
+				{
+					"$ref": "#/$defs/trustedPublishingDetails"
+				}
+			]
+		},
+		"versionedFileDefinition": {
+			"anyOf": [
+				{
+					"type": "string"
+				},
+				{
+					"$ref": "#/$defs/VersionedFileDefinition"
+				}
+			]
 		}
 	},
 	"$id": "https://monochange.github.io/monochange/schemas/monochange.v0.1.schema.json",
@@ -1937,7 +1956,7 @@
 	"description": "JSON Schema for monochange.toml workspace configuration files.",
 	"properties": {
 		"changelog": {
-			"$ref": "#/$defs/RawChangelogSettings"
+			"$ref": "#/$defs/changelogSettings"
 		},
 		"changesets": {
 			"$ref": "#/$defs/ChangesetSettings",
@@ -1962,7 +1981,7 @@
 			"$ref": "#/$defs/defaults"
 		},
 		"ecosystems": {
-			"$ref": "#/$defs/RawEcosystems"
+			"$ref": "#/$defs/ecosystems"
 		},
 		"group": {
 			"additionalProperties": {

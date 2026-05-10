@@ -850,7 +850,7 @@
 			"type": "array"
 		},
 		"schemaVersion": {
-			"const": "0.1",
+			"default": "0.1",
 			"type": "string"
 		},
 		"updatedChangelogs": {

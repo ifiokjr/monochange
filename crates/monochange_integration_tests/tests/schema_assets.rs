@@ -38,7 +38,7 @@ fn release_record_schema_declares_current_artifact_contract() -> Result<(), Box<
 	);
 	assert!(!json_bool(&schema, "/additionalProperties")?);
 	assert_eq!(
-		json_str(&schema, "/properties/schemaVersion/const")?,
+		json_str(&schema, "/properties/schemaVersion/default")?,
 		monochange_schema::CURRENT_SCHEMA_VERSION_TEXT
 	);
 	assert_eq!(

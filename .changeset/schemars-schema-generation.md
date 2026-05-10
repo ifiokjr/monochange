@@ -12,12 +12,13 @@ Schema assets (`monochange.schema.json` and `release-record.schema.json`) are no
 
 - `schema` feature on `monochange_core` and `monochange_config` gating `schemars`.
 - `JsonSchema` derives on `ReleaseRecord`, `RawWorkspaceConfiguration`, and their transitive types.
-- `monochange_schema_gen` binary crate providing `update` and `check` subcommands.
+- `monochange_core::schema` and `monochange_config::schema` modules providing `release_record()` and `workspace_configuration()` schema generation functions.
+- `xtask` binary crate providing `schema update` and `schema check` subcommands, with a `cargo xtask` alias.
 
 ### Changed
 
-- `devenv.nix` `schema:update` / `schema:check` now invoke `cargo run -p monochange_schema_gen`.
-- `$defs` keys use camelCase names (e.g. `packageDefinition`) matching the old template convention.
+- `devenv.nix` `schema:update` / `schema:check` now invoke `cargo xtask schema update` and `cargo xtask schema check`.
+- `$defs` keys use camelCase names (e.g. `packageDefinition`) via `#[schemars(rename)]` attributes.
 - Release-record `schemaVersion` and `kind` emit `const` constraints instead of `default`.
 
 ### Removed

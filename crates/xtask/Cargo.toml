@@ -1,15 +1,20 @@
 [package]
-name = "monochange_schema_gen"
+name = "xtask"
 version = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
 repository = { workspace = true }
-description = "Schema generation binary for monochange JSON schemas"
+description = "Development task runner for monochange"
+publish = false
 
 [dependencies]
+clap = { workspace = true, features = ["std"] }
 monochange_config = { workspace = true, features = ["schema"] }
 monochange_core = { workspace = true, features = ["schema"] }
 monochange_schema = { workspace = true }
 schemars = { workspace = true }
 serde_json = { workspace = true }
+
+[features]
+schema = ["monochange_config/schema", "monochange_core/schema"]

@@ -265,7 +265,7 @@ fn committed_release_record_schema_tracks_current_wire_constants() {
 
 	assert_eq!(
 		schema
-			.pointer("/properties/schemaVersion/const")
+			.pointer("/properties/schemaVersion/default")
 			.and_then(Value::as_str),
 		Some(CURRENT_SCHEMA_VERSION_TEXT)
 	);
