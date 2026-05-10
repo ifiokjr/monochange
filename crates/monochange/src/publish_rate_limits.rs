@@ -276,32 +276,33 @@ fn plan_unbatched_publish_order_for_requests(
 	let mut batches = Vec::new();
 	let mut windows = Vec::new();
 	for (registry, requests) in requests_by_registry {
-		if let Some(policy) = policies.get(&registry) {
-			let pending = requests.len();
-			windows.push(RegistryRateLimitWindowPlan {
-				registry,
-				operation,
-				limit: None,
-				window_seconds: None,
-				pending,
-				batches_required: 1,
-				fits_single_window: true,
-				confidence: policy.confidence,
-				notes: "rate-limit batching disabled for this publish order".to_string(),
-				evidence: policy.evidence.clone(),
-			});
-			batches.push(PublishRateLimitBatch {
-				registry,
-				operation,
-				batch_index: 1,
-				total_batches: 1,
-				packages: requests
-					.iter()
-					.map(|request| request.package_id.clone())
-					.collect(),
-				recommended_wait_seconds: None,
-			});
-		}
+		let policy = policies
+			.get(&registry)
+			.unwrap_or_else(|| panic!("missing rate-limit policy for {registry}"));
+		let pending = requests.len();
+		windows.push(RegistryRateLimitWindowPlan {
+			registry,
+			operation,
+			limit: None,
+			window_seconds: None,
+			pending,
+			batches_required: 1,
+			fits_single_window: true,
+			confidence: policy.confidence,
+			notes: "rate-limit batching disabled for this publish order".to_string(),
+			evidence: policy.evidence.clone(),
+		});
+		batches.push(PublishRateLimitBatch {
+			registry,
+			operation,
+			batch_index: 1,
+			total_batches: 1,
+			packages: requests
+				.iter()
+				.map(|request| request.package_id.clone())
+				.collect(),
+			recommended_wait_seconds: None,
+		});
 	}
 
 	PublishRateLimitReport {
