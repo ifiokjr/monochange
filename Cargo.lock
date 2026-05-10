@@ -2499,6 +2499,7 @@ version = "0.4.0"
 dependencies = [
  "monochange_config",
  "monochange_core",
+ "monochange_schema",
  "schemars",
  "serde_json",
 ]

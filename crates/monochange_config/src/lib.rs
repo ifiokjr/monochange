@@ -180,9 +180,10 @@ const SUPPORTED_CHANGE_TEMPLATE_VARIABLES: &[&str] = &[
 	"closed_issue_links",
 ];
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
-struct RawWorkspaceConfiguration {
+pub struct RawWorkspaceConfiguration {
 	#[serde(default)]
 	defaults: RawWorkspaceDefaults,
 	#[serde(default)]
@@ -198,13 +199,15 @@ struct RawWorkspaceConfiguration {
 	#[serde(default)]
 	source: Option<RawSourceConfiguration>,
 	#[serde(default)]
+	#[cfg_attr(feature = "schema", schemars(skip))]
 	lints: WorkspaceLintSettings,
 	#[serde(default)]
 	ecosystems: RawEcosystems,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Deserialize)]
-struct RawWorkspaceDefaults {
+pub struct RawWorkspaceDefaults {
 	#[serde(default = "default_parent_bump")]
 	parent_bump: BumpSeverity,
 	#[serde(default)]
@@ -241,29 +244,33 @@ impl Default for RawWorkspaceDefaults {
 	}
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
-enum RawChangelogDefinition {
+pub enum RawChangelogDefinition {
 	Enabled(bool),
 	Path(String),
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
-enum RawChangelogConfig {
+pub enum RawChangelogConfig {
 	Legacy(RawChangelogDefinition),
 	Detailed(RawChangelogTable),
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
-enum RawGroupChangelogInclude {
+pub enum RawGroupChangelogInclude {
 	Mode(String),
 	Packages(Vec<String>),
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Deserialize, Default)]
-struct RawChangelogTable {
+pub struct RawChangelogTable {
 	#[serde(default)]
 	enabled: Option<bool>,
 	#[serde(default)]
@@ -276,8 +283,9 @@ struct RawChangelogTable {
 	include: Option<RawGroupChangelogInclude>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Deserialize)]
-struct RawPackageDefinition {
+pub struct RawPackageDefinition {
 	path: PathBuf,
 	#[serde(rename = "type")]
 	package_type: Option<PackageType>,
@@ -309,8 +317,9 @@ struct RawPackageDefinition {
 	publish: RawPublishSettings,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Deserialize)]
-struct RawGroupDefinition {
+pub struct RawGroupDefinition {
 	packages: Vec<String>,
 	#[serde(default)]
 	changelog: Option<RawChangelogConfig>,
@@ -332,8 +341,9 @@ struct RawGroupDefinition {
 	version_format: VersionFormat,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Deserialize, Default)]
-struct RawCliCommandDefinition {
+pub struct RawCliCommandDefinition {
 	#[serde(default)]
 	help_text: Option<String>,
 	#[serde(default)]
@@ -344,8 +354,9 @@ struct RawCliCommandDefinition {
 	dry_run: bool,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Deserialize, Default)]
-struct RawEcosystems {
+pub struct RawEcosystems {
 	#[serde(default)]
 	cargo: RawEcosystemSettings,
 	#[serde(default)]
@@ -360,8 +371,9 @@ struct RawEcosystems {
 	go: RawEcosystemSettings,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Deserialize, Default)]
-struct RawEcosystemSettings {
+pub struct RawEcosystemSettings {
 	#[serde(default)]
 	enabled: Option<bool>,
 	#[serde(default)]
@@ -378,16 +390,18 @@ struct RawEcosystemSettings {
 	publish: RawPublishSettings,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Deserialize, Default)]
-struct RawPlaceholderSettings {
+pub struct RawPlaceholderSettings {
 	#[serde(default)]
 	readme: Option<String>,
 	#[serde(default)]
 	readme_file: Option<PathBuf>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Deserialize, Default)]
-struct RawPublishSettings {
+pub struct RawPublishSettings {
 	#[serde(default)]
 	enabled: Option<bool>,
 	#[serde(default)]
@@ -404,27 +418,31 @@ struct RawPublishSettings {
 	placeholder: RawPlaceholderSettings,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Deserialize, Default)]
-struct RawPublishAttestationSettings {
+pub struct RawPublishAttestationSettings {
 	#[serde(default)]
 	require_registry_provenance: Option<bool>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Deserialize, Default)]
-struct RawPublishRateLimitSettings {
+pub struct RawPublishRateLimitSettings {
 	#[serde(default)]
 	enforce: Option<bool>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
-enum RawTrustedPublishingSettings {
+pub enum RawTrustedPublishingSettings {
 	Enabled(bool),
 	Detailed(RawTrustedPublishingDetails),
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Deserialize, Default)]
-struct RawTrustedPublishingDetails {
+pub struct RawTrustedPublishingDetails {
 	#[serde(default)]
 	enabled: Option<bool>,
 	#[serde(default)]
@@ -435,15 +453,17 @@ struct RawTrustedPublishingDetails {
 	environment: Option<String>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
-enum RawVersionedFileDefinition {
+pub enum RawVersionedFileDefinition {
 	Path(String),
 	Detailed(VersionedFileDefinition),
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Deserialize, Default)]
-struct RawChangelogSettings {
+pub struct RawChangelogSettings {
 	#[serde(default)]
 	pub templates: Vec<String>,
 	#[serde(default)]
@@ -454,8 +474,9 @@ struct RawChangelogSettings {
 	pub types: BTreeMap<String, monochange_core::ChangelogType>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Deserialize)]
-struct RawSourceConfiguration {
+pub struct RawSourceConfiguration {
 	#[serde(default)]
 	provider: SourceProvider,
 	owner: String,
@@ -470,18 +491,21 @@ struct RawSourceConfiguration {
 	pull_requests: ProviderMergeRequestSettings,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Deserialize, Default)]
-struct RawChangeFile {
+pub struct RawChangeFile {
 	#[serde(default)]
 	changes: Vec<RawChangeEntry>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Deserialize)]
-struct RawChangeEntry {
+pub struct RawChangeEntry {
 	package: String,
 	#[serde(default)]
 	bump: Option<BumpSeverity>,
 	#[serde(default)]
+	#[cfg_attr(feature = "schema", schemars(skip))]
 	version: Option<Version>,
 	#[serde(default)]
 	reason: Option<String>,

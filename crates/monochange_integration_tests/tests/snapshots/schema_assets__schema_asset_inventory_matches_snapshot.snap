@@ -18,8 +18,6 @@ expression: inventory
     "additionalProperties": false,
     "kind": "monochange.releaseRecord",
     "required": [
-      "schemaVersion",
-      "kind",
       "createdAt",
       "command",
       "releaseTargets",

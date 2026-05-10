@@ -11,24 +11,36 @@ fn post_process(schema: &mut serde_json::Value, id: &str, title: &str) {
 	}
 }
 
+fn post_process_release(schema: &mut serde_json::Value, id: &str, title: &str) {
+	post_process(schema, id, title);
+	if let Some(obj) = schema.as_object_mut() {
+		obj.insert(
+			"additionalProperties".to_string(),
+			serde_json::Value::Bool(false),
+		);
+		obj.insert("description".to_string(), serde_json::Value::String("Durable commit-embedded release record schema for monochange artifact version 0.1.".to_string()));
+	}
+}
+
 fn main() {
 	let args: Vec<String> = std::env::args().collect();
 	let update_mode = args.get(1).map(|s| s.as_str()) == Some("update");
 
 	let schemas_dir = PathBuf::from("crates/monochange_schema/schemas");
 	let docs_schemas_dir = PathBuf::from("docs/src/schemas");
+	let version = monochange_schema::CURRENT_SCHEMA_VERSION_TEXT;
 
 	// Release record schema
 	let release_schema = schemars::schema_for!(monochange_core::ReleaseRecord);
 	let mut release_value = release_schema.to_value();
-	post_process(
+	post_process_release(
 		&mut release_value,
 		"https://monochange.github.io/monochange/schemas/release-record.schema.json",
 		"monochange release record",
 	);
 
-	// Config schema
-	let config_schema = schemars::schema_for!(monochange_core::WorkspaceConfiguration);
+	// Config schema from raw TOML types
+	let config_schema = schemars::schema_for!(monochange_config::RawWorkspaceConfiguration);
 	let mut config_value = config_schema.to_value();
 	post_process(
 		&mut config_value,
@@ -38,6 +50,26 @@ fn main() {
 
 	let release_json = serde_json::to_string_pretty(&release_value).unwrap();
 	let config_json = serde_json::to_string_pretty(&config_value).unwrap();
+
+	// Versioned schemas (identical content, different $id)
+	let mut release_versioned_value = release_value.clone();
+	let mut config_versioned_value = config_value.clone();
+	post_process(
+		&mut release_versioned_value,
+		&format!(
+			"https://monochange.github.io/monochange/schemas/release-record.v{version}.schema.json"
+		),
+		"monochange release record",
+	);
+	post_process(
+		&mut config_versioned_value,
+		&format!(
+			"https://monochange.github.io/monochange/schemas/monochange.v{version}.schema.json"
+		),
+		"monochange configuration",
+	);
+	let release_versioned_json = serde_json::to_string_pretty(&release_versioned_value).unwrap();
+	let config_versioned_json = serde_json::to_string_pretty(&config_versioned_value).unwrap();
 
 	let release_path = schemas_dir.join("release-record.schema.json");
 	let config_path = schemas_dir.join("monochange.schema.json");
@@ -58,6 +90,18 @@ fn main() {
 		fs::write(
 			docs_schemas_dir.join("monochange.schema.json"),
 			&config_json,
+		)
+		.unwrap();
+
+		// Write versioned schemas
+		fs::write(
+			docs_schemas_dir.join(format!("release-record.v{version}.schema.json")),
+			&release_versioned_json,
+		)
+		.unwrap();
+		fs::write(
+			docs_schemas_dir.join(format!("monochange.v{version}.schema.json")),
+			&config_versioned_json,
 		)
 		.unwrap();
 
