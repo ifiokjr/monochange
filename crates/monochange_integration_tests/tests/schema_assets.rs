@@ -216,7 +216,8 @@ fn schema_asset_inventory_matches_snapshot() -> Result<(), Box<dyn Error>> {
 	});
 
 	assert_json_snapshot!(inventory, {
-		".schemaCrateVersion" => "[schema crate version]"
+		".schemaCrateVersion" => "[schema crate version]",
+		".currentSchemaVersion" => "[schema version]"
 	});
 
 	Ok(())
@@ -230,10 +231,12 @@ fn release_record_schema_multiline_fields_are_snapshot_individually() -> Result<
 	let config_schema = parse_json(&paths.config_schema)?;
 	let changelog = parse_json(&paths.migration_changelog)?;
 
-	assert_snapshot!(
-		"release_record_schema_description",
-		json_str(&release_schema, "/description")?
+	let description = json_str(&release_schema, "/description")?;
+	let redacted_description = description.replace(
+		monochange_schema::CURRENT_SCHEMA_VERSION_TEXT,
+		"[schema version]",
 	);
+	assert_snapshot!("release_record_schema_description", redacted_description);
 	assert_json_snapshot!(
 		"release_record_required_fields",
 		json_array(&release_schema, "/required")?
@@ -260,23 +263,24 @@ fn schema_crate_version_stays_decoupled_from_public_schema_version() -> Result<(
 		.and_then(toml::Value::as_str)
 		.unwrap_or_default();
 
-	let (expected_major, expected_minor) = {
+	let (_expected_major, _expected_minor) = {
 		let parts: Vec<&str> = expected_version.split('.').take(2).collect();
 		(
 			parts.first().unwrap_or(&"0").parse::<u64>().unwrap_or(0),
 			parts.get(1).unwrap_or(&"0").parse::<u64>().unwrap_or(0),
 		)
 	};
-	let expected_major_minor = format!("{expected_major}.{expected_minor}");
 
 	assert_eq!(schema_crate_version(&paths)?, expected_version);
+	let expected_schema = monochange_schema::SchemaVersion::from_package_version(expected_version)
+		.map_err(|error| test_error(format!("invalid manifest version: {error}")))?;
 	assert_eq!(
 		monochange_schema::CURRENT_SCHEMA_VERSION_TEXT,
-		expected_major_minor
+		expected_schema.to_string()
 	);
 	assert_eq!(
 		monochange_schema::current_schema_version()?,
-		monochange_schema::SchemaVersion::new(expected_major, expected_minor)
+		expected_schema
 	);
 
 	Ok(())
@@ -352,7 +356,32 @@ fn release_record_migration_outcomes_match_snapshot() {
 		})
 		.collect::<Vec<_>>();
 
-	assert_json_snapshot!(outcomes);
+	let current_version = monochange_schema::CURRENT_SCHEMA_VERSION_TEXT;
+	let redacted_outcomes: Vec<Value> = outcomes
+		.into_iter()
+		.map(|mut outcome| {
+			if let Value::Object(ref mut map) = outcome {
+				if let Some(v) = map.get_mut("schemaVersion")
+					&& let Value::String(_) = v
+				{
+					*v = Value::String("[schema version]".to_string());
+				}
+				if let Some(v) = map.get_mut("v")
+					&& let Value::String(_) = v
+				{
+					*v = Value::String("[schema version]".to_string());
+				}
+				if let Some(v) = map.get_mut("error")
+					&& let Value::String(s) = v
+				{
+					*v = Value::String(s.replace(current_version, "[schema version]"));
+				}
+			}
+			outcome
+		})
+		.collect();
+
+	assert_json_snapshot!(redacted_outcomes);
 }
 
 struct SchemaAssetPaths {

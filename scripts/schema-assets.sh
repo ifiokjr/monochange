@@ -53,7 +53,7 @@ write_release_schema() {
 		--arg id "$schema_id" \
 		--arg version "$version" \
 		--arg kind "$kind" \
-		'.["$id"] = $id | .description = ("Durable commit-embedded release record schema for monochange artifact version " + $version + ".") | .properties.v.const = $version | .properties.kind.const = $kind' \
+		'.["$id"] = $id | .description = ("Durable commit-embedded release record schema for monochange artifact version " + $version + ".") | .properties.schemaVersion.const = $version | .properties.kind.const = $kind' \
 		"$release_template" >"$output_path"
 }
 

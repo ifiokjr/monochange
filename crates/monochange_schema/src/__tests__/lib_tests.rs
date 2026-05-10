@@ -63,27 +63,17 @@ fn extract_major_minor_strips_patch_at_runtime() {
 
 #[test]
 fn current_schema_version_strips_patch_from_package_version() {
-	let pkg_version = env!("CARGO_PKG_VERSION");
-
-	let (expected_major, expected_minor) = {
-		let parts: Vec<&str> = pkg_version.split('.').take(2).collect();
-		(
-			parts.first().unwrap_or(&"0").parse::<u64>().unwrap_or(0),
-			parts.get(1).unwrap_or(&"0").parse::<u64>().unwrap_or(0),
-		)
-	};
-	let expected_text = format!("{expected_major}.{expected_minor}");
-
+	let package_version = env!("CARGO_PKG_VERSION");
+	let expected_text = extract_major_minor(package_version);
 	assert_eq!(CURRENT_SCHEMA_VERSION_TEXT, expected_text);
 	let current = current_schema_version()
 		.unwrap_or_else(|error| panic!("parse current schema version: {error}"));
-	assert_eq!(current, SchemaVersion::new(expected_major, expected_minor));
-	let from_package = SchemaVersion::from_package_version(pkg_version)
+	let expected = SchemaVersion::from_package_version(package_version)
 		.unwrap_or_else(|error| panic!("parse package version: {error}"));
-	assert_eq!(
-		from_package,
-		SchemaVersion::new(expected_major, expected_minor)
-	);
+	assert_eq!(current, expected);
+	let from_package = SchemaVersion::from_package_version(package_version)
+		.unwrap_or_else(|error| panic!("parse package version: {error}"));
+	assert_eq!(from_package, expected);
 	let serialized = serde_json::to_value(current)
 		.unwrap_or_else(|error| panic!("serialize schema version: {error}"));
 	assert_eq!(serialized, json!(expected_text));

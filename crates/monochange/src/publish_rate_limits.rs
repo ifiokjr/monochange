@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::path::Path;
 
+use monochange_core::DependencyKind;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PublishRateLimitBatch;
@@ -14,6 +15,7 @@ use monochange_core::RegistryKind;
 use monochange_core::RegistryRateLimitPolicy;
 use monochange_core::RegistryRateLimitWindowPlan;
 use monochange_core::WorkspaceConfiguration;
+use monochange_core::materialize_dependency_edges;
 use monochange_publish::filter_pending_publish_requests;
 
 use crate::PreparedRelease;
@@ -60,7 +62,7 @@ pub(crate) fn plan_publish_rate_limits(
 ) -> MonochangeResult<PublishRateLimitReport> {
 	let discovery = discover_workspace(root)?;
 	let packages = &discovery.packages;
-	let requests = if mode == PublishRateLimitMode::Placeholder {
+	let mut requests = if mode == PublishRateLimitMode::Placeholder {
 		build_placeholder_plan_requests(root, configuration, packages, selected_packages)?
 	} else {
 		build_release_plan_requests(
@@ -71,6 +73,7 @@ pub(crate) fn plan_publish_rate_limits(
 			selected_packages,
 		)?
 	};
+	sort_requests_by_dependencies(&mut requests, packages);
 	Ok(plan_publish_rate_limits_for_requests(
 		&requests,
 		mode.operation(),
@@ -111,6 +114,98 @@ fn build_release_plan_requests(
 		selected_packages,
 	)?;
 	filter_pending_publish_requests(&requests)
+}
+
+pub(super) fn sort_requests_by_dependencies(
+	requests: &mut [package_publish::PublishRequest],
+	packages: &[monochange_core::PackageRecord],
+) {
+	use std::collections::BTreeMap;
+	use std::collections::BTreeSet;
+	use std::collections::VecDeque;
+
+	let edges = materialize_dependency_edges(packages);
+	let request_ids: BTreeSet<String> = requests.iter().map(|r| r.package_id.clone()).collect();
+
+	// Build graph: dependency_id -> list of dependent_ids
+	let mut dependents: BTreeMap<String, Vec<String>> = BTreeMap::new();
+	let mut in_degree: BTreeMap<String, usize> = BTreeMap::new();
+
+	// Initialize all request IDs with in-degree 0
+	for id in &request_ids {
+		in_degree.insert(id.clone(), 0);
+	}
+
+	// Build dependents for all edges where the target is in the request list,
+	// so we can discover unselected dependents later.
+	for edge in &edges {
+		if (edge.dependency_kind == DependencyKind::Runtime
+			|| edge.dependency_kind == DependencyKind::Development)
+			&& request_ids.contains(&edge.to_package_id)
+		{
+			dependents
+				.entry(edge.to_package_id.clone())
+				.or_default()
+				.push(edge.from_package_id.clone());
+		}
+	}
+
+	// Build in-degree only for edges between selected packages.
+	for edge in &edges {
+		if (edge.dependency_kind == DependencyKind::Runtime
+			|| edge.dependency_kind == DependencyKind::Development)
+			&& request_ids.contains(&edge.from_package_id)
+			&& request_ids.contains(&edge.to_package_id)
+		{
+			*in_degree.get_mut(&edge.from_package_id).unwrap() += 1;
+		}
+	}
+
+	// Kahn's algorithm: start with packages that have no dependencies
+	let mut queue: VecDeque<String> = in_degree
+		.iter()
+		.filter(|(_, deg)| **deg == 0)
+		.map(|(id, _)| id.clone())
+		.collect();
+
+	let mut sorted_ids: Vec<String> = Vec::new();
+
+	while let Some(id) = queue.pop_front() {
+		sorted_ids.push(id.clone());
+		if let Some(deps) = dependents.get(&id) {
+			#[allow(clippy::single_match)]
+			for dependent in deps {
+				match in_degree.get_mut(dependent) {
+					Some(degree) => {
+						*degree -= 1;
+						if *degree == 0 {
+							queue.push_back(dependent.clone());
+						}
+					}
+					None => {}
+				}
+			}
+		}
+	}
+
+	// If cycle detected (sorted_ids.len() != requests.len()), keep original order
+	if sorted_ids.len() != requests.len() {
+		return;
+	}
+
+	// Map package_id -> index in sorted order
+	let order_map: BTreeMap<&str, usize> = sorted_ids
+		.iter()
+		.enumerate()
+		.map(|(idx, id)| (id.as_str(), idx))
+		.collect();
+
+	// Sort requests by their position in the topological order
+	requests.sort_by_key(|req| {
+		*order_map
+			.get(req.package_id.as_str())
+			.unwrap_or(&usize::MAX)
+	});
 }
 
 pub(crate) fn plan_publish_rate_limits_for_requests(

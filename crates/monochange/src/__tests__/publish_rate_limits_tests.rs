@@ -44,6 +44,7 @@ use std::fs;
 
 use httpmock::Method::GET;
 use httpmock::MockServer;
+use monochange_core::DependencyKind;
 use monochange_core::PackagePublicationTarget;
 use monochange_core::PublishAttestationSettings;
 use monochange_core::PublishMode;
@@ -889,4 +890,161 @@ fn enforce_publish_rate_limits_blocks_multi_batch_runs_when_enabled() {
 	let error = enforce_publish_rate_limits(&configuration, &report, PublishRateLimitMode::Publish)
 		.unwrap_err();
 	assert!(error.to_string().contains("blocked this run"));
+}
+
+#[test]
+fn test_sort_requests_by_dependencies_orders_dependencies_first() {
+	let helper = monochange_core::PackageRecord::new(
+		monochange_core::Ecosystem::Cargo,
+		"helper",
+		Path::new("/ws/helper/Cargo.toml").to_path_buf(),
+		Path::new("/ws").to_path_buf(),
+		None,
+		monochange_core::PublishState::Public,
+	);
+	let mut dependent = monochange_core::PackageRecord::new(
+		monochange_core::Ecosystem::Cargo,
+		"dependent",
+		Path::new("/ws/dependent/Cargo.toml").to_path_buf(),
+		Path::new("/ws").to_path_buf(),
+		None,
+		monochange_core::PublishState::Public,
+	);
+	dependent
+		.declared_dependencies
+		.push(monochange_core::PackageDependency {
+			name: "helper".into(),
+			kind: DependencyKind::Development,
+			version_constraint: None,
+			optional: false,
+		});
+	let mut extra = monochange_core::PackageRecord::new(
+		monochange_core::Ecosystem::Cargo,
+		"extra",
+		Path::new("/ws/extra/Cargo.toml").to_path_buf(),
+		Path::new("/ws").to_path_buf(),
+		None,
+		monochange_core::PublishState::Public,
+	);
+	extra
+		.declared_dependencies
+		.push(monochange_core::PackageDependency {
+			name: "helper".into(),
+			kind: DependencyKind::Development,
+			version_constraint: None,
+			optional: false,
+		});
+	let packages = vec![helper.clone(), dependent.clone(), extra.clone()];
+	let mut requests = vec![
+		package_publish::PublishRequest {
+			package_id: dependent.id.clone(),
+			package_name: "dependent".into(),
+			ecosystem: monochange_core::Ecosystem::Cargo,
+			manifest_path: Path::new("/ws/dependent/Cargo.toml").to_path_buf(),
+			package_root: Path::new("/ws/dependent").to_path_buf(),
+			registry: RegistryKind::CratesIo,
+			package_manager: None,
+			package_metadata: BTreeMap::new(),
+			mode: PublishMode::Builtin,
+			version: "0.1.0".into(),
+			placeholder: false,
+			trusted_publishing: TrustedPublishingSettings::default(),
+			attestations: PublishAttestationSettings::default(),
+			placeholder_readme: String::new(),
+		},
+		package_publish::PublishRequest {
+			package_id: helper.id.clone(),
+			package_name: "helper".into(),
+			ecosystem: monochange_core::Ecosystem::Cargo,
+			manifest_path: Path::new("/ws/helper/Cargo.toml").to_path_buf(),
+			package_root: Path::new("/ws/helper").to_path_buf(),
+			registry: RegistryKind::CratesIo,
+			package_manager: None,
+			package_metadata: BTreeMap::new(),
+			mode: PublishMode::Builtin,
+			version: "0.1.0".into(),
+			placeholder: false,
+			trusted_publishing: TrustedPublishingSettings::default(),
+			attestations: PublishAttestationSettings::default(),
+			placeholder_readme: String::new(),
+		},
+	];
+	sort_requests_by_dependencies(&mut requests, &packages);
+	assert_eq!(requests[0].package_id, helper.id);
+	assert_eq!(requests[1].package_id, dependent.id);
+}
+
+#[test]
+fn test_sort_requests_by_dependencies_keeps_original_order_on_cycle() {
+	let mut a = monochange_core::PackageRecord::new(
+		monochange_core::Ecosystem::Cargo,
+		"crate-a",
+		Path::new("/ws/a/Cargo.toml").to_path_buf(),
+		Path::new("/ws").to_path_buf(),
+		None,
+		monochange_core::PublishState::Public,
+	);
+	let mut b = monochange_core::PackageRecord::new(
+		monochange_core::Ecosystem::Cargo,
+		"crate-b",
+		Path::new("/ws/b/Cargo.toml").to_path_buf(),
+		Path::new("/ws").to_path_buf(),
+		None,
+		monochange_core::PublishState::Public,
+	);
+	// Create a cycle: a depends on b, b depends on a
+	a.declared_dependencies
+		.push(monochange_core::PackageDependency {
+			name: "crate-b".into(),
+			kind: monochange_core::DependencyKind::Development,
+			version_constraint: None,
+			optional: false,
+		});
+	b.declared_dependencies
+		.push(monochange_core::PackageDependency {
+			name: "crate-a".into(),
+			kind: monochange_core::DependencyKind::Development,
+			version_constraint: None,
+			optional: false,
+		});
+	let packages = vec![a.clone(), b.clone()];
+	let original_ids = [a.id.clone(), b.id.clone()];
+	let mut requests = vec![
+		package_publish::PublishRequest {
+			package_id: a.id.clone(),
+			package_name: "crate-a".into(),
+			ecosystem: monochange_core::Ecosystem::Cargo,
+			manifest_path: Path::new("/ws/a/Cargo.toml").to_path_buf(),
+			package_root: Path::new("/ws/a").to_path_buf(),
+			registry: RegistryKind::CratesIo,
+			package_manager: None,
+			package_metadata: BTreeMap::new(),
+			mode: PublishMode::Builtin,
+			version: "0.1.0".into(),
+			placeholder: false,
+			trusted_publishing: TrustedPublishingSettings::default(),
+			attestations: PublishAttestationSettings::default(),
+			placeholder_readme: String::new(),
+		},
+		package_publish::PublishRequest {
+			package_id: b.id.clone(),
+			package_name: "crate-b".into(),
+			ecosystem: monochange_core::Ecosystem::Cargo,
+			manifest_path: Path::new("/ws/b/Cargo.toml").to_path_buf(),
+			package_root: Path::new("/ws/b").to_path_buf(),
+			registry: RegistryKind::CratesIo,
+			package_manager: None,
+			package_metadata: BTreeMap::new(),
+			mode: PublishMode::Builtin,
+			version: "0.1.0".into(),
+			placeholder: false,
+			trusted_publishing: TrustedPublishingSettings::default(),
+			attestations: PublishAttestationSettings::default(),
+			placeholder_readme: String::new(),
+		},
+	];
+	sort_requests_by_dependencies(&mut requests, &packages);
+	// With a cycle, we expect the original order to be preserved
+	assert_eq!(requests[0].package_id, original_ids[0]);
+	assert_eq!(requests[1].package_id, original_ids[1]);
 }

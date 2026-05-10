@@ -12,7 +12,7 @@ expression: inventory
     ],
     "schemaId": "https://monochange.github.io/monochange/schemas/monochange.schema.json"
   },
-  "currentSchemaVersion": "0.1",
+  "currentSchemaVersion": "[schema version]",
   "migrationChangelog": [],
   "releaseRecord": {
     "additionalProperties": false,
