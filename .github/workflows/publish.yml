@@ -135,7 +135,7 @@ jobs:
     if: >-
       needs.plan.outputs.has-batches == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
