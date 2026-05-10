@@ -229,7 +229,7 @@ pub fn git_reports_nothing_to_commit(output: &Output) -> bool {
 #[tracing::instrument(skip_all, fields(action))]
 /// Run a prepared command and convert process failures into `MonochangeError`.
 #[must_use = "the command result must be checked"]
-pub async fn run_command(mut command: Command, action: &str) -> MonochangeResult<()> {
+pub async fn run_command(command: Command, action: &str) -> MonochangeResult<()> {
 	let output = tokio::process::Command::from(command)
 		.output()
 		.await
@@ -315,7 +315,7 @@ where
 		)
 	})?;
 
-	let mut command = git_commit_file_command(root, message_file.path(), no_verify);
+	let command = git_commit_file_command(root, message_file.path(), no_verify);
 	let output = tokio::process::Command::from(command).output().await.map_err(|error| {
 		MonochangeError::Io(format!(
 			"failed to {action}: {error}\n{}",
@@ -353,7 +353,7 @@ where
 /// Run a commit command and treat `nothing to commit` as success.
 #[must_use = "the commit command result must be checked"]
 pub async fn run_commit_command_allow_nothing_to_commit(
-	mut command: Command,
+	command: Command,
 	action: &str,
 ) -> MonochangeResult<()> {
 	let output = tokio::process::Command::from(command)

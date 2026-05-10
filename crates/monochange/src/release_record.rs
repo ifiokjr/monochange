@@ -407,8 +407,6 @@ pub(crate) async fn create_release_tags(
 		}
 	}
 
-	let mut tag_results = tag_results;
-
 	if !dry_run {
 		for tag_result in &mut tag_results {
 			if tag_result.operation == ReleaseTagOperation::AlreadyUpToDate {

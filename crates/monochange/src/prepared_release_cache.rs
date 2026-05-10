@@ -335,6 +335,7 @@ async fn git_status_snapshot(root: &Path, excluded_path: Option<&Path>) -> Monoc
 	Ok(lines)
 }
 
+#[allow(clippy::unused_async)]
 async fn status_line_path(line: &str) -> Option<PathBuf> {
 	if line.len() < 4 {
 		return None;
@@ -342,6 +343,7 @@ async fn status_line_path(line: &str) -> Option<PathBuf> {
 	Some(PathBuf::from(line[3..].trim()))
 }
 
+#[allow(clippy::unused_async)]
 async fn tracked_path_snapshots(
 	root: &Path,
 	prepared_release: &PreparedRelease,

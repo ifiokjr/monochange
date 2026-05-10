@@ -917,6 +917,7 @@ fn run_command_wizard_for_cli(root: &Path, quiet: bool) -> MonochangeResult<Stri
 	run_command_wizard(root)
 }
 
+#[allow(clippy::unused_async)]
 async fn run_mcp_command_with<F, Fut>(quiet: bool, run_server: F) -> MonochangeResult<String>
 where
 	F: FnOnce() -> Fut,
