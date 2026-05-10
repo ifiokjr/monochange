@@ -1,3 +1,4 @@
+#[cfg(test)]
 use std::cell::Cell;
 use std::io::IsTerminal;
 
@@ -5,8 +6,9 @@ use similar::TextDiff;
 
 use super::*;
 
+#[cfg(test)]
 thread_local! {
-	pub(crate) static FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR: Cell<bool> = const { Cell::new(false) };
+	static FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR: Cell<bool> = const { Cell::new(false) };
 }
 
 thread_local! {
@@ -80,7 +82,7 @@ fn remove_from_dedup_index(root: &Path, hash: &str) -> MonochangeResult<()> {
 	save_dedup_index(root, &index)
 }
 
-pub(crate) fn build_release_targets(
+pub(crate) async fn build_release_targets(
 	configuration: &monochange_core::WorkspaceConfiguration,
 	packages: &[PackageRecord],
 	plan: &ReleasePlan,
@@ -103,7 +105,7 @@ pub(crate) fn build_release_targets(
 	// a tiny formatting helper into repeated subprocess latency. The target builder
 	// only needs a stable view of tags for the current command, so sharing one
 	// loaded list avoids re-running the same git command over and over.
-	let sorted_tags = load_sorted_tags(&configuration.root_path);
+	let sorted_tags = load_sorted_tags(&configuration.root_path).await;
 
 	let mut release_targets = configuration
 		.groups
@@ -351,7 +353,9 @@ async fn load_sorted_tags(root: &Path) -> Vec<String> {
 	let output = match monochange_core::git::git_command_output(
 		root,
 		&["tag", "--list", "--sort=-v:refname"],
-	).await {
+	)
+	.await
+	{
 		Ok(output) if output.status.success() => output,
 		_ => return Vec::new(),
 	};
@@ -375,6 +379,11 @@ fn find_previous_tag_in(current_tag: &str, sorted_tags: &[String]) -> Option<Str
 		})
 		.max_by(|left, right| left.1.cmp(&right.1))
 		.map(|(tag, _)| tag)
+}
+
+#[cfg(test)]
+pub(crate) async fn find_previous_tag(root: &Path, current_tag: &str) -> Option<String> {
+	find_previous_tag_in(current_tag, &load_sorted_tags(root).await)
 }
 
 pub(crate) fn parse_tag_prefix_and_version(tag: &str) -> Option<(String, semver::Version)> {
@@ -817,9 +826,13 @@ fn atomic_write(path: &Path, content: &[u8]) -> MonochangeResult<()> {
 	Ok(())
 }
 
-#[rustfmt::skip]
 #[tracing::instrument(skip_all)]
-pub(crate) fn build_file_diff_previews(root: &Path, updates: &[FileUpdate]) -> MonochangeResult<Vec<PreparedFileDiff>> { let colorize_diffs = diff_output_colors_enabled();
+pub(crate) fn build_file_diff_previews(
+	root: &Path,
+	updates: &[FileUpdate],
+) -> MonochangeResult<Vec<PreparedFileDiff>> {
+	let colorize_diffs = diff_output_colors_enabled();
+	#[cfg(test)]
 	if FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR.with(Cell::get) {
 		return Err(MonochangeError::Io(
 			"forced build_file_diff_previews test error".to_string(),
@@ -882,6 +895,11 @@ fn render_display_file_diff(diff: &str, colorize: bool) -> String {
 
 fn diff_output_colors_enabled() -> bool {
 	diff_output_supports_color(std::io::stdout().is_terminal())
+}
+
+#[cfg(test)]
+pub(crate) fn set_force_build_file_diff_previews_error(enabled: bool) {
+	FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR.with(|value| value.set(enabled));
 }
 
 pub(crate) fn diff_output_supports_color(stdout_is_terminal: bool) -> bool {
@@ -1356,7 +1374,8 @@ pub(crate) async fn publish_source_change_request(
 				request,
 				tracked_paths,
 				no_verify,
-			).await
+			)
+			.await
 		}
 		#[cfg(feature = "gitlab")]
 		SourceProvider::GitLab => {
@@ -1366,7 +1385,8 @@ pub(crate) async fn publish_source_change_request(
 				request,
 				tracked_paths,
 				no_verify,
-			).await
+			)
+			.await
 		}
 		#[cfg(feature = "gitea")]
 		SourceProvider::Gitea => {
@@ -1376,7 +1396,8 @@ pub(crate) async fn publish_source_change_request(
 				request,
 				tracked_paths,
 				no_verify,
-			).await
+			)
+			.await
 		}
 		#[cfg(feature = "forgejo")]
 		SourceProvider::Forgejo => {
@@ -1386,7 +1407,8 @@ pub(crate) async fn publish_source_change_request(
 				request,
 				tracked_paths,
 				no_verify,
-			).await
+			)
+			.await
 		}
 		#[cfg(not(any(
 			feature = "github",
@@ -1453,8 +1475,13 @@ pub(crate) fn render_release_cli_command_json(
 		"publishRateLimits": sections.publish_rate_limits,
 	});
 	if !sections.file_diffs.is_empty() {
-		#[rustfmt::skip]
-		value.as_object_mut().unwrap_or_else(|| panic!("release json wrapper must stay object")).insert("fileDiffs".to_string(), serde_json::to_value(sections.file_diffs).unwrap_or_default());
+		value
+			.as_object_mut()
+			.unwrap_or_else(|| panic!("release json wrapper must stay object"))
+			.insert(
+				"fileDiffs".to_string(),
+				serde_json::to_value(sections.file_diffs).unwrap_or_default(),
+			);
 	}
 	serde_json::to_string_pretty(&value)
 		.map_err(|error| MonochangeError::Discovery(error.to_string()))

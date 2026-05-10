@@ -1,7 +1,8 @@
-fn main() {
+#[tokio::main]
+async fn main() {
 	let quiet = std::env::args_os().any(|arg| matches!(arg.to_str(), Some("--quiet" | "-q")));
 
-	let result = monochange::run_from_env("mc");
+	let result = monochange::run_from_env("mc").await;
 	let Err(error) = result else {
 		return;
 	};

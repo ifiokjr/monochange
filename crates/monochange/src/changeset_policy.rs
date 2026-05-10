@@ -23,7 +23,7 @@ use crate::discover_workspace;
 /// GitHub changeset-policy workflow. It loads the workspace configuration, resolves
 /// changed files against configured packages, reads any attached changesets, and
 /// returns a structured pass/skip/fail report.
-pub fn affected_packages(
+pub async fn affected_packages(
 	root: &Path,
 	changed_paths: &[String],
 	labels: &[String],
@@ -53,7 +53,7 @@ pub fn affected_packages(
 		.collect::<Vec<_>>();
 
 	if let Some((current_branch, branch_prefix)) =
-		current_branch_matches_pull_request_branch_prefix(root, configuration.source.as_ref())
+		current_branch_matches_pull_request_branch_prefix(root, configuration.source.as_ref()).await
 	{
 		return Ok(skipped_pull_request_branch_evaluation(
 			labels,
@@ -291,21 +291,21 @@ fn skipped_pull_request_branch_evaluation(
 }
 
 /// Backwards-compatible alias for [`affected_packages`].
-pub fn verify_changesets(
+pub async fn verify_changesets(
 	root: &Path,
 	changed_paths: &[String],
 	labels: &[String],
 ) -> MonochangeResult<ChangesetPolicyEvaluation> {
-	affected_packages(root, changed_paths, labels)
+	affected_packages(root, changed_paths, labels).await
 }
 
 /// Backwards-compatible alias for [`affected_packages`].
-pub fn evaluate_changeset_policy(
+pub async fn evaluate_changeset_policy(
 	root: &Path,
 	changed_paths: &[String],
 	labels: &[String],
 ) -> MonochangeResult<ChangesetPolicyEvaluation> {
-	affected_packages(root, changed_paths, labels)
+	affected_packages(root, changed_paths, labels).await
 }
 
 pub(crate) fn compute_changed_paths_since(

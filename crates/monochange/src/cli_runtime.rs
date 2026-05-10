@@ -47,6 +47,21 @@ use crate::release_branch_policy;
 use crate::save_prepared_release_execution;
 use crate::*;
 
+/// Runs a future to completion, safely handling both inside and outside a Tokio runtime.
+///
+/// - Multi-threaded runtime: uses `block_in_place` + `handle.block_on` (safe to block).
+/// - Inside a runtime (any flavor): uses `block_in_place` to safely block the current
+///   thread while waiting for the future. For multi-threaded runtimes this frees the
+///   worker thread; for current-thread runtimes this delegates to a blocking thread pool.
+/// - No runtime: creates a new multi-threaded runtime.
+#[cfg(test)]
+pub(crate) fn block_on_in_context<T>(future: impl Future<Output = T>) -> T {
+	match tokio::runtime::Handle::try_current() {
+		Ok(handle) => tokio::task::block_in_place(|| handle.block_on(future)),
+		Err(_) => tokio::runtime::Runtime::new().unwrap().block_on(future),
+	}
+}
+
 pub(crate) async fn execute_matches(
 	root: &Path,
 	configuration: &monochange_core::WorkspaceConfiguration,
@@ -103,6 +118,7 @@ pub(crate) async fn execute_matches(
 				progress_format,
 			},
 		)
+		.await
 	} else {
 		execute_cli_command_with_options(
 			root,
@@ -117,6 +133,7 @@ pub(crate) async fn execute_matches(
 				progress_format,
 			},
 		)
+		.await
 	}
 }
 
@@ -291,7 +308,7 @@ pub(crate) fn template_value_to_input_values(value: &serde_json::Value) -> Vec<S
 
 const DEFAULT_RELEASE_MANIFEST_PATH: &str = ".monochange/local/release-manifest.json";
 
-pub(crate) fn write_release_manifest_file(
+pub(crate) async fn write_release_manifest_file(
 	root: &Path,
 	path: &Path,
 	manifest: &ReleaseManifest,
@@ -307,14 +324,14 @@ pub(crate) fn write_release_manifest_file(
 	Ok(root_relative(root, &resolved_path))
 }
 
-fn write_default_release_manifest_file(
+async fn write_default_release_manifest_file(
 	root: &Path,
 	manifest: &ReleaseManifest,
 ) -> MonochangeResult<PathBuf> {
-	write_release_manifest_file(root, Path::new(DEFAULT_RELEASE_MANIFEST_PATH), manifest)
+	write_release_manifest_file(root, Path::new(DEFAULT_RELEASE_MANIFEST_PATH), manifest).await
 }
 
-fn ensure_prepared_release_for_consumer_step(
+async fn ensure_prepared_release_for_consumer_step(
 	root: &Path,
 	configuration: &monochange_core::WorkspaceConfiguration,
 	context: &mut CliContext,
@@ -326,8 +343,14 @@ fn ensure_prepared_release_for_consumer_step(
 	if context.prepared_release.is_some() {
 		return Ok(());
 	}
-	#[rustfmt::skip]
-	let loaded = maybe_load_prepared_release_execution(root, configuration, prepared_release_path, dry_run, build_file_diffs)?;
+	let loaded = maybe_load_prepared_release_execution(
+		root,
+		configuration,
+		prepared_release_path,
+		dry_run,
+		build_file_diffs,
+	)
+	.await?;
 	let Some(loaded) = loaded else {
 		return Err(MonochangeError::Config(format!(
 			"`{step_name}` requires a previous `PrepareRelease` step or a reusable prepared release artifact"
@@ -383,14 +406,28 @@ pub(crate) fn build_release_results(
 	}
 }
 
-fn build_release_results_for_source(
+async fn build_release_results_for_source(
 	dry_run: bool,
 	source: &SourceConfiguration,
 	requests: &[SourceReleaseRequest],
 ) -> MonochangeResult<Vec<String>> {
-	#[rustfmt::skip]
-	let result = build_release_results(dry_run, requests, || publish_source_release_requests(source, requests));
-	result
+	if dry_run {
+		return build_release_results(dry_run, requests, || Ok(Vec::new()));
+	}
+
+	let outcomes = publish_source_release_requests(source, requests).await?;
+	Ok(outcomes
+		.into_iter()
+		.map(|result| {
+			format!(
+				"{} {} ({}) via {}",
+				result.repository,
+				result.tag_name,
+				format_source_operation(&result.operation),
+				result.provider
+			)
+		})
+		.collect())
 }
 
 pub(crate) fn build_release_request_result(
@@ -415,7 +452,7 @@ pub(crate) fn build_release_request_result(
 	}
 }
 
-fn build_release_request_result_for_source(
+async fn build_release_request_result_for_source(
 	dry_run: bool,
 	source: &SourceConfiguration,
 	root: &Path,
@@ -423,9 +460,19 @@ fn build_release_request_result_for_source(
 	tracked_paths: &[PathBuf],
 	no_verify: bool,
 ) -> MonochangeResult<String> {
-	#[rustfmt::skip]
-	let result = build_release_request_result(dry_run, request, || publish_source_change_request(source, root, request, tracked_paths, no_verify));
-	result
+	if dry_run {
+		return build_release_request_result(dry_run, request, || unreachable!());
+	}
+
+	let result =
+		publish_source_change_request(source, root, request, tracked_paths, no_verify).await?;
+	Ok(format!(
+		"{} #{} ({}) via {}",
+		result.repository,
+		result.number,
+		format_change_request_operation(&result.operation),
+		result.provider
+	))
 }
 
 pub(crate) fn build_issue_comment_results(
@@ -459,16 +506,35 @@ pub(crate) fn build_issue_comment_results(
 	}
 }
 
-fn build_issue_comment_results_for_source(
+async fn build_issue_comment_results_for_source(
 	dry_run: bool,
 	source: &SourceConfiguration,
 	manifest: &ReleaseManifest,
 	plans: &[HostedIssueCommentPlan],
 ) -> MonochangeResult<Vec<String>> {
+	if dry_run {
+		return build_issue_comment_results(dry_run, plans, || Ok(Vec::new()));
+	}
+
 	let adapter = hosted_sources::configured_hosted_source_adapter(source);
-	#[rustfmt::skip]
-	let result = build_issue_comment_results(dry_run, plans, || adapter.comment_released_issues(source, manifest));
-	result
+	Ok(adapter
+		.comment_released_issues(source, manifest)
+		.await?
+		.into_iter()
+		.map(|result| {
+			format!(
+				"{} {} ({})",
+				result.repository,
+				result.issue_id,
+				match result.operation {
+					monochange_core::HostedIssueCommentOperation::Created => "created",
+					monochange_core::HostedIssueCommentOperation::SkippedExisting =>
+						"skipped_existing",
+					monochange_core::HostedIssueCommentOperation::Closed => "closed",
+				}
+			)
+		})
+		.collect())
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
@@ -492,6 +558,7 @@ pub(crate) async fn execute_cli_command(
 			progress_format: ProgressFormat::Auto,
 		},
 	)
+	.await
 }
 
 pub(crate) struct ExecuteCliCommandOptions {
@@ -628,7 +695,7 @@ pub(crate) async fn execute_cli_command_with_options(
 		}
 		tracing::debug!(step = step.kind_name(), "executing CLI step");
 		let mut step_phase_timings = Vec::new();
-		let step_result: MonochangeResult<()> = (|| {
+		let step_result: MonochangeResult<()> = async {
 			match step {
 				CliStepDefinition::Config { .. } => {
 					output = if cli_command.name == "step:config" {
@@ -692,10 +759,13 @@ pub(crate) async fn execute_cli_command_with_options(
 						prepared_release_path.as_deref(),
 						true,
 						false,
-					)? {
+					)
+					.await?
+					{
 						Some(loaded) => loaded.execution,
 						None => {
-							prepare_release_execution_with_file_diffs(root, true, false, false)?
+							prepare_release_execution_with_file_diffs(root, true, false, false)
+								.await?
 						}
 					};
 					step_phase_timings.clone_from(&prepared_execution.phase_timings);
@@ -730,7 +800,9 @@ pub(crate) async fn execute_cli_command_with_options(
 							prepared_release_path.as_deref(),
 							dry_run,
 							build_file_diffs,
-						)? {
+						)
+						.await?
+					{
 						context.command_logs.push(loaded.message);
 						loaded.execution
 					} else {
@@ -739,7 +811,8 @@ pub(crate) async fn execute_cli_command_with_options(
 							dry_run,
 							build_file_diffs,
 							*allow_empty_changesets,
-						)?
+						)
+						.await?
 					};
 					step_phase_timings.clone_from(&prepared_execution.phase_timings);
 					context.prepared_file_diffs = prepared_execution.file_diffs;
@@ -758,7 +831,7 @@ pub(crate) async fn execute_cli_command_with_options(
 					let updated_prepared_release = context.prepared_release.take().unwrap();
 					context.prepared_release = Some(updated_prepared_release);
 					context.release_manifest_path =
-						Some(write_default_release_manifest_file(root, &manifest)?);
+						Some(write_default_release_manifest_file(root, &manifest).await?);
 					output = None;
 					Ok(())
 				}
@@ -772,8 +845,12 @@ pub(crate) async fn execute_cli_command_with_options(
 							"`VerifyReleaseBranch` requires `[source]` configuration".to_string(),
 						)
 					})?;
-					#[rustfmt::skip]
-					let report = release_branch_policy::verify_release_ref(root, &source.releases, &from_ref).await?;
+					let report = release_branch_policy::verify_release_ref(
+						root,
+						&source.releases,
+						&from_ref,
+					)
+					.await?;
 					output = Some(format!(
 						"release branch verified: `{}` is reachable from `{}`",
 						from_ref, report.matched_branch
@@ -801,12 +878,20 @@ pub(crate) async fn execute_cli_command_with_options(
 						&step_inputs,
 					)?;
 					if !context.dry_run {
-						#[rustfmt::skip]
-						release_branch_policy::verify_release_ref_for_publish(root, Some(&source), &verify_ref)?;
+						release_branch_policy::verify_release_ref_for_publish(
+							root,
+							Some(&source),
+							&verify_ref,
+						)
+						.await?;
 					}
 					context.release_requests = build_source_release_requests(&source, &manifest);
-					#[rustfmt::skip]
-						let results = build_release_results_for_source(context.dry_run, &source, &context.release_requests)?;
+					let results = build_release_results_for_source(
+						context.dry_run,
+						&source,
+						&context.release_requests,
+					)
+					.await?;
 					context.release_results = results;
 					output = None;
 					Ok(())
@@ -814,14 +899,29 @@ pub(crate) async fn execute_cli_command_with_options(
 				CliStepDefinition::PlaceholderPublish { .. } => {
 					let selected_packages = selected_package_ids(&step_inputs);
 					let show_all_packages = boolean_step_input(&step_inputs, "show-all");
-					#[rustfmt::skip]
-					let rate_limit_report = publish_rate_limits::plan_publish_rate_limits(root, configuration, context.prepared_release.as_ref(), &selected_packages, publish_rate_limits::PublishRateLimitMode::Placeholder, context.dry_run)?;
+					let rate_limit_report = publish_rate_limits::plan_publish_rate_limits(
+						root,
+						configuration,
+						context.prepared_release.as_ref(),
+						&selected_packages,
+						publish_rate_limits::PublishRateLimitMode::Placeholder,
+						context.dry_run,
+					)
+					.await?;
 					if !context.dry_run {
-						#[rustfmt::skip]
-						publish_rate_limits::enforce_publish_rate_limits(configuration, &rate_limit_report, publish_rate_limits::PublishRateLimitMode::Placeholder)?;
+						publish_rate_limits::enforce_publish_rate_limits(
+							configuration,
+							&rate_limit_report,
+							publish_rate_limits::PublishRateLimitMode::Placeholder,
+						)?;
 					}
-					#[rustfmt::skip]
-					let report = package_publish::run_placeholder_publish(root, configuration, &selected_packages, context.dry_run)?;
+					let report = package_publish::run_placeholder_publish(
+						root,
+						configuration,
+						&selected_packages,
+						context.dry_run,
+					)
+					.await?;
 					context.package_publish_report =
 						Some(filter_placeholder_publish_report(report, show_all_packages));
 					context.rate_limit_report = Some(rate_limit_report);
@@ -834,19 +934,31 @@ pub(crate) async fn execute_cli_command_with_options(
 					let selected_ecosystems = selected_ecosystem_ids(&step_inputs)?;
 					let resume_path = optional_publish_resume_artifact_path(&step_inputs)?;
 					let output_path = optional_publish_output_artifact_path(&step_inputs)?;
-					let publish_all = boolean_step_input(&step_inputs, "all");
 					if !context.dry_run {
-						#[rustfmt::skip]
-						release_branch_policy::verify_release_ref_for_publish(root, configuration.source.as_ref(), "HEAD")?;
+						release_branch_policy::verify_release_ref_for_publish(
+							root,
+							configuration.source.as_ref(),
+							"HEAD",
+						)
+						.await?;
 					}
-					#[rustfmt::skip]
-					let rate_limit_report = publish_rate_limits::plan_publish_rate_limits_with_selection(root, configuration, context.prepared_release.as_ref(), &selected_packages, publish_rate_limits::PublishRateLimitMode::Publish, context.dry_run, publish_all)?;
+					let rate_limit_report = publish_rate_limits::plan_publish_rate_limits(
+						root,
+						configuration,
+						context.prepared_release.as_ref(),
+						&selected_packages,
+						publish_rate_limits::PublishRateLimitMode::Publish,
+						context.dry_run,
+					)
+					.await?;
 					if !context.dry_run {
-						#[rustfmt::skip]
-						publish_rate_limits::enforce_publish_rate_limits(configuration, &rate_limit_report, publish_rate_limits::PublishRateLimitMode::Publish)?;
+						publish_rate_limits::enforce_publish_rate_limits(
+							configuration,
+							&rate_limit_report,
+							publish_rate_limits::PublishRateLimitMode::Publish,
+						)?;
 					}
-					#[rustfmt::skip]
-					let report = package_publish::run_publish_packages_with_resume_and_selection(
+					let report = package_publish::run_publish_packages_with_resume(
 						root,
 						configuration,
 						context.prepared_release.as_ref(),
@@ -855,7 +967,8 @@ pub(crate) async fn execute_cli_command_with_options(
 						&selected_ecosystems,
 						context.dry_run,
 						resume_path.as_deref(),
-						publish_all)?;
+					)
+					.await?;
 					if !context.dry_run
 						&& let Some(output_path) = output_path.as_deref()
 					{
@@ -875,10 +988,17 @@ pub(crate) async fn execute_cli_command_with_options(
 						context.prepared_release.as_ref(),
 						&step_inputs,
 						mode,
-					)?;
-					let publish_all = boolean_step_input(&step_inputs, "all");
-					#[rustfmt::skip]
-					let report = publish_rate_limits::plan_publish_rate_limits_with_selection(root, configuration, context.prepared_release.as_ref(), &selected_packages, mode, context.dry_run, publish_all)?;
+					)
+					.await?;
+					let report = publish_rate_limits::plan_publish_rate_limits(
+						root,
+						configuration,
+						context.prepared_release.as_ref(),
+						&selected_packages,
+						mode,
+						context.dry_run,
+					)
+					.await?;
 					context.rate_limit_report = Some(report);
 					output = None;
 					Ok(())
@@ -888,8 +1008,12 @@ pub(crate) async fn execute_cli_command_with_options(
 					update_release_json,
 					..
 				} => {
-					#[rustfmt::skip]
-					release_branch_policy::verify_release_ref_for_commit(root, configuration.source.as_ref(), "HEAD")?;
+					release_branch_policy::verify_release_ref_for_commit(
+						root,
+						configuration.source.as_ref(),
+						"HEAD",
+					)
+					.await?;
 					ensure_prepared_release_for_consumer_step(
 						root,
 						configuration,
@@ -898,7 +1022,8 @@ pub(crate) async fn execute_cli_command_with_options(
 						dry_run,
 						false,
 						"CommitRelease",
-					)?;
+					)
+					.await?;
 					let prepared_release = context
 						.prepared_release
 						.as_ref()
@@ -913,9 +1038,15 @@ pub(crate) async fn execute_cli_command_with_options(
 					let update_release_json =
 						parse_boolean_step_input(&step_inputs, "update_release_json")?
 							.unwrap_or(*update_release_json);
-					#[rustfmt::skip]
-				let release_commit_report =
-					commit_release(root, &context, configuration.source.as_ref(), &manifest, no_verify, update_release_json).await?;
+					let release_commit_report = commit_release(
+						root,
+						&context,
+						configuration.source.as_ref(),
+						&manifest,
+						no_verify,
+						update_release_json,
+					)
+					.await?;
 					context.release_commit_report = Some(release_commit_report);
 					output = None;
 					Ok(())
@@ -949,15 +1080,15 @@ pub(crate) async fn execute_cli_command_with_options(
 					let dry_run = context.dry_run;
 					let no_verify =
 						parse_boolean_step_input(&step_inputs, "no_verify")?.unwrap_or(*no_verify);
-					#[rustfmt::skip]
-						let result = build_release_request_result_for_source(
+					let result = build_release_request_result_for_source(
 						dry_run,
 						&source,
 						root,
 						&request,
 						&tracked_paths,
 						no_verify,
-					)?;
+					)
+					.await?;
 					context.release_request_result = Some(result);
 					context.release_request = Some(request);
 					output = None;
@@ -995,10 +1126,14 @@ pub(crate) async fn execute_cli_command_with_options(
 					for plan in &mut issue_comment_plans {
 						plan.close &= auto_close_issues;
 					}
-					#[rustfmt::skip]
 					let dry_run = context.dry_run;
-					#[rustfmt::skip]
-					let results = build_issue_comment_results_for_source(dry_run, &source, &manifest, &issue_comment_plans)?;
+					let results = build_issue_comment_results_for_source(
+						dry_run,
+						&source,
+						&manifest,
+						&issue_comment_plans,
+					)
+					.await?;
 					context.issue_comment_plans = issue_comment_plans;
 					context.issue_comment_results = results;
 					output = None;
@@ -1075,14 +1210,14 @@ pub(crate) async fn execute_cli_command_with_options(
 				}
 				CliStepDefinition::AffectedPackages { .. } => {
 					let evaluation =
-						execute_affected_packages_step(root, &step_inputs, context.quiet)?;
+						execute_affected_packages_step(root, &step_inputs, context.quiet).await?;
 					context.changeset_policy_evaluation = Some(evaluation);
 					output = None;
 					Ok(())
 				}
 				CliStepDefinition::DiagnoseChangesets { .. } => {
 					let requested = step_inputs.get("changeset").cloned().unwrap_or_default();
-					let report = diagnose_changesets(root, &requested)?;
+					let report = diagnose_changesets(root, &requested).await?;
 					context.changeset_diagnostics = Some(report);
 					output = None;
 					Ok(())
@@ -1154,7 +1289,8 @@ pub(crate) async fn execute_cli_command_with_options(
 						sync_provider,
 						context.dry_run,
 						source.as_ref(),
-					)?;
+					)
+					.await?;
 					step_phase_timings.push(StepPhaseTiming {
 						label: "plan retarget".to_string(),
 						duration: phase_started_at.elapsed(),
@@ -1167,7 +1303,8 @@ pub(crate) async fn execute_cli_command_with_options(
 						);
 					}
 					let phase_started_at = Instant::now();
-					let result = execute_release_retarget(root, source.as_ref(), &plan).await?;
+					let retarget_future = execute_release_retarget(root, source.as_ref(), &plan);
+					let result = retarget_future.await?;
 					step_phase_timings.push(StepPhaseTiming {
 						label: "apply retarget".to_string(),
 						duration: phase_started_at.elapsed(),
@@ -1213,7 +1350,8 @@ pub(crate) async fn execute_cli_command_with_options(
 					))
 				}
 			}
-		})();
+		}
+		.await;
 		if let Err(error) = step_result {
 			let elapsed = step_started_at.elapsed();
 			report_cli_step_failure(
@@ -1262,6 +1400,7 @@ pub(crate) async fn execute_cli_command_with_options(
 
 	let artifact_path = prepared_release_path.as_deref();
 	let result = save_prepared_release_artifact(root, configuration, &context, artifact_path)
+		.await
 		.and_then(|()| resolve_command_output(cli_command, &context, dry_run, output));
 	match &result {
 		Ok(_) => telemetry.capture_command(TelemetryOutcome::Success, None),
@@ -2466,7 +2605,7 @@ fn optional_path_input(
 	Ok(Some(PathBuf::from(trimmed)))
 }
 
-fn publish_rate_limit_selected_package_ids(
+async fn publish_rate_limit_selected_package_ids(
 	root: &Path,
 	configuration: &monochange_core::WorkspaceConfiguration,
 	prepared_release: Option<&PreparedRelease>,
@@ -2491,6 +2630,7 @@ fn publish_rate_limit_selected_package_ids(
 		&selected_packages,
 		&readiness_path,
 	)
+	.await
 }
 
 fn publish_rate_limit_mode_from_inputs(
@@ -2598,8 +2738,12 @@ fn render_release_commit_report(report: &CommitReleaseReport) -> Vec<String> {
 			.map(|commit| format!("  commit: {}", short_commit_sha(commit))),
 	);
 	lines.extend((!report.tracked_paths.is_empty()).then_some("  tracked paths:".to_string()));
-	#[rustfmt::skip]
-	lines.extend(report.tracked_paths.iter().map(|path| format!("    - {}", path.display())));
+	lines.extend(
+		report
+			.tracked_paths
+			.iter()
+			.map(|path| format!("    - {}", path.display())),
+	);
 	lines.push(format!("  status: {}", report.status.replace('_', "-")));
 	lines
 }
@@ -3649,7 +3793,7 @@ fn execute_create_change_file_step(
 	}
 }
 
-fn execute_affected_packages_step(
+async fn execute_affected_packages_step(
 	root: &Path,
 	step_inputs: &BTreeMap<String, Vec<String>>,
 	quiet: bool,
@@ -3675,7 +3819,7 @@ fn execute_affected_packages_step(
 	let enforce = step_inputs
 		.get("verify")
 		.is_some_and(|values| values.iter().any(|v| v == "true"));
-	let mut evaluation = affected_packages(root, &changed_paths, &labels)?;
+	let mut evaluation = affected_packages(root, &changed_paths, &labels).await?;
 	evaluation.enforce = enforce;
 	Ok(evaluation)
 }
@@ -3716,7 +3860,7 @@ fn maybe_fail_enforced_changeset_policy(
 	}
 }
 
-fn save_prepared_release_artifact(
+async fn save_prepared_release_artifact(
 	root: &Path,
 	configuration: &monochange_core::WorkspaceConfiguration,
 	context: &CliContext,
@@ -3732,7 +3876,8 @@ fn save_prepared_release_artifact(
 		prepared_release,
 		&context.prepared_file_diffs,
 		prepared_release_path,
-	);
+	)
+	.await;
 
 	match (prepared_release_path.is_some(), save_result) {
 		(_, Ok(())) => Ok(()),

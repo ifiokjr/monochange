@@ -1514,12 +1514,12 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 						},
 						|| {
 							capture_prepare_phase("build release targets", || {
-								Ok(build_release_targets(
+								Ok(tokio::runtime::Handle::current().block_on(build_release_targets(
 									&configuration,
 									&discovery.packages,
 									&plan,
 									&changeset_paths,
-								))
+								)))
 							})
 						},
 					)

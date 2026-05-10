@@ -52,7 +52,7 @@ impl PublishRateLimitMode {
 	}
 }
 
-pub(crate) fn plan_publish_rate_limits(
+pub(crate) async fn plan_publish_rate_limits(
 	root: &Path,
 	configuration: &WorkspaceConfiguration,
 	prepared_release: Option<&PreparedRelease>,
@@ -93,7 +93,7 @@ pub(crate) fn plan_publish_rate_limits_with_selection(
 			prepared_release,
 			packages,
 			selected_packages,
-		)?
+		).await?
 	};
 	Ok(plan_publish_rate_limits_for_dependency_ordered_requests(
 		&requests,
@@ -118,7 +118,7 @@ fn build_placeholder_plan_requests(
 	filter_pending_publish_requests(&requests)
 }
 
-fn build_release_plan_requests(
+async fn build_release_plan_requests(
 	root: &Path,
 	configuration: &WorkspaceConfiguration,
 	prepared_release: Option<&PreparedRelease>,
@@ -128,7 +128,7 @@ fn build_release_plan_requests(
 	let publications = package_publish::release_record_package_publications_from_prepared_or_head(
 		root,
 		prepared_release,
-	)?;
+	).await?;
 	let requests = package_publish::build_release_requests(
 		configuration,
 		packages,

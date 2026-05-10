@@ -79,7 +79,7 @@ pub(crate) fn resolve_prepared_release_artifact_path(
 	)
 }
 
-pub(crate) fn load_prepared_release_execution(
+pub(crate) async fn load_prepared_release_execution(
 	root: &Path,
 	configuration: &WorkspaceConfiguration,
 	explicit_path: Option<&Path>,
@@ -101,7 +101,7 @@ pub(crate) fn load_prepared_release_execution(
 		&artifact,
 		current_dry_run,
 		build_file_diffs,
-	)?;
+	).await?;
 
 	// Transform persisted diffs into runtime format
 	let load_started_at = Instant::now();
@@ -133,7 +133,7 @@ pub(crate) fn load_prepared_release_execution(
 	Ok(Some(LoadedPreparedReleaseExecution { execution, message }))
 }
 
-pub(crate) fn maybe_load_prepared_release_execution(
+pub(crate) async fn maybe_load_prepared_release_execution(
 	root: &Path,
 	configuration: &WorkspaceConfiguration,
 	explicit_path: Option<&Path>,
@@ -146,7 +146,7 @@ pub(crate) fn maybe_load_prepared_release_execution(
 		explicit_path,
 		current_dry_run,
 		build_file_diffs,
-	) {
+	).await {
 		Ok(Some(loaded)) => Ok(Some(loaded)),
 		Ok(None) => Ok(None),
 		Err(error) if explicit_path.is_none() => {
@@ -165,7 +165,7 @@ pub(crate) async fn save_prepared_release_execution(
 	explicit_path: Option<&Path>,
 ) -> MonochangeResult<()> {
 	let artifact_path = resolve_prepared_release_artifact_path(root, explicit_path);
-	ensure_monochange_artifact_ignored(root, &artifact_path)?;
+	ensure_monochange_artifact_ignored(root, &artifact_path).await?;
 	let parent = artifact_path.parent().map(Path::to_path_buf);
 	if let Some(parent) = parent {
 		fs::create_dir_all(&parent).map_err(|error| {
@@ -180,8 +180,8 @@ pub(crate) async fn save_prepared_release_execution(
 		schema_version: PREPARED_RELEASE_ARTIFACT_SCHEMA_VERSION,
 		configuration_snapshot: configuration_snapshot(configuration)?,
 		head_commit: git_head_commit(root).await?,
-		worktree_status: git_status_snapshot(root, Some(&artifact_path))?,
-		tracked_paths: tracked_path_snapshots(root, prepared_release)?,
+		worktree_status: git_status_snapshot(root, Some(&artifact_path)).await?,
+		tracked_paths: tracked_path_snapshots(root, prepared_release).await?,
 		prepared_release: prepared_release.clone(),
 		file_diffs: file_diffs
 			.iter()
@@ -265,7 +265,7 @@ async fn validate_prepared_release_artifact(
 		));
 	}
 
-	let current_status = git_status_snapshot(root, Some(artifact_path))?;
+	let current_status = git_status_snapshot(root, Some(artifact_path)).await?;
 	if current_status != artifact.worktree_status {
 		return Err(stale_artifact_error(
 			artifact_path,
@@ -273,7 +273,7 @@ async fn validate_prepared_release_artifact(
 		));
 	}
 
-	let current_tracked_paths = tracked_path_snapshots(root, &artifact.prepared_release)?;
+	let current_tracked_paths = tracked_path_snapshots(root, &artifact.prepared_release).await?;
 	if current_tracked_paths != artifact.tracked_paths {
 		return Err(stale_artifact_error(
 			artifact_path,
@@ -328,21 +328,21 @@ async fn git_status_snapshot(root: &Path, excluded_path: Option<&Path>) -> Monoc
 			let Some(excluded) = &excluded else {
 				return true;
 			};
-			status_line_path(line).is_none_or(|path| path != *excluded)
+			tokio::runtime::Handle::current().block_on(status_line_path(line)).is_none_or(|path| path != *excluded)
 		})
 		.collect::<Vec<_>>();
 	lines.sort();
 	Ok(lines)
 }
 
-fn status_line_path(line: &str) -> Option<PathBuf> {
+async fn status_line_path(line: &str) -> Option<PathBuf> {
 	if line.len() < 4 {
 		return None;
 	}
 	Some(PathBuf::from(line[3..].trim()))
 }
 
-fn tracked_path_snapshots(
+async fn tracked_path_snapshots(
 	root: &Path,
 	prepared_release: &PreparedRelease,
 ) -> MonochangeResult<Vec<PreparedReleaseTrackedPath>> {
@@ -359,7 +359,7 @@ fn tracked_path_snapshots(
 				Ok(PreparedReleaseTrackedPath {
 					path,
 					state: PreparedReleaseTrackedPathState::File,
-					hash: Some(hash_file_at_path(root, &absolute_path)?),
+					hash: Some(tokio::runtime::Handle::current().block_on(hash_file_at_path(root, &absolute_path))?),
 				})
 			} else {
 				Ok(PreparedReleaseTrackedPath {

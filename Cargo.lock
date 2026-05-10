@@ -2226,6 +2226,7 @@ dependencies = [
  "temp-env",
  "tempfile",
  "thiserror 2.0.18",
+ "tokio",
  "tracing",
  "walkdir",
 ]
@@ -2525,6 +2526,7 @@ dependencies = [
  "monochange_core",
  "reqwest",
  "serde",
+ "tokio",
 ]
 
 [[package]]

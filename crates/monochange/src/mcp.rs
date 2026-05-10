@@ -410,7 +410,7 @@ impl MonochangeMcpServer {
 		name = "monochange_validate",
 		description = "Validate monochange.toml and .changeset targets for a repository."
 	)]
-	fn validate(
+	async fn validate(
 		&self,
 		Parameters(params): Parameters<PathParam>,
 	) -> Result<CallToolResult, McpError> {
@@ -438,7 +438,7 @@ impl MonochangeMcpServer {
 		name = "monochange_discover",
 		description = "Discover packages, dependencies, and groups across the repository."
 	)]
-	fn discover(
+	async fn discover(
 		&self,
 		Parameters(params): Parameters<PathParam>,
 	) -> Result<CallToolResult, McpError> {
@@ -473,7 +473,7 @@ impl MonochangeMcpServer {
 		name = "monochange_diagnostics",
 		description = "Inspect pending changesets with git and review context as structured JSON."
 	)]
-	fn diagnostics(
+	async fn diagnostics(
 		&self,
 		Parameters(params): Parameters<DiagnosticsParam>,
 	) -> Result<CallToolResult, McpError> {
@@ -507,7 +507,7 @@ impl MonochangeMcpServer {
 		name = "monochange_change",
 		description = "Write a .changeset markdown file for one or more package or group ids."
 	)]
-	fn change(
+	async fn change(
 		&self,
 		Parameters(params): Parameters<ChangeParam>,
 	) -> Result<CallToolResult, McpError> {
@@ -552,7 +552,7 @@ impl MonochangeMcpServer {
 		name = "monochange_release_preview",
 		description = "Prepare a dry-run release preview from discovered .changeset files."
 	)]
-	fn release_preview(
+	async fn release_preview(
 		&self,
 		Parameters(params): Parameters<PathParam>,
 	) -> Result<CallToolResult, McpError> {
@@ -586,7 +586,7 @@ impl MonochangeMcpServer {
 		name = "monochange_release_manifest",
 		description = "Generate a dry-run release manifest JSON document for downstream automation."
 	)]
-	fn release_manifest(
+	async fn release_manifest(
 		&self,
 		Parameters(params): Parameters<PathParam>,
 	) -> Result<CallToolResult, McpError> {
@@ -622,14 +622,17 @@ impl MonochangeMcpServer {
 		name = "monochange_affected_packages",
 		description = "Evaluate changeset policy from changed paths and optional labels."
 	)]
-	fn affected_packages(
+	async fn affected_packages(
 		&self,
 		Parameters(params): Parameters<AffectedParam>,
 	) -> Result<CallToolResult, McpError> {
 		let root = resolve_root(params.path.as_deref());
 
 		let evaluation =
-			match crate::affected_packages(&root, &params.changed_paths, &params.labels) {
+			match tokio::runtime::Handle::current().block_on(crate::affected_packages(&root,
+				&params.changed_paths,
+				&params.labels,
+			)) {
 				Ok(eval) => eval,
 				Err(error) => {
 					return Ok(json_error_result(json!({
@@ -654,7 +657,7 @@ impl MonochangeMcpServer {
 		name = "monochange_lint_catalog",
 		description = "List registered manifest lint rules and presets as structured JSON."
 	)]
-	fn lint_catalog(
+	async fn lint_catalog(
 		&self,
 		Parameters(_params): Parameters<EmptyParam>,
 	) -> Result<CallToolResult, McpError> {
@@ -678,7 +681,7 @@ impl MonochangeMcpServer {
 		name = "monochange_lint_explain",
 		description = "Explain one manifest lint rule or preset as structured JSON."
 	)]
-	fn lint_explain(
+	async fn lint_explain(
 		&self,
 		Parameters(params): Parameters<LintExplainParam>,
 	) -> Result<CallToolResult, McpError> {
@@ -714,7 +717,7 @@ impl MonochangeMcpServer {
 		name = "monochange_analyze_changes",
 		description = "Analyze git diff and return ecosystem-specific semantic diffs for changed packages."
 	)]
-	fn analyze_changes(
+	async fn analyze_changes(
 		&self,
 		Parameters(params): Parameters<AnalyzeChangesParam>,
 	) -> Result<CallToolResult, McpError> {
@@ -796,7 +799,7 @@ impl MonochangeMcpServer {
 		name = "monochange_validate_changeset",
 		description = "Validate that a changeset matches the current semantic diff for its targeted packages."
 	)]
-	fn validate_changeset(
+	async fn validate_changeset(
 		&self,
 		Parameters(params): Parameters<ValidateChangesetParam>,
 	) -> Result<CallToolResult, McpError> {

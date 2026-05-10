@@ -834,11 +834,10 @@ where
 				head_ref,
 				detection_level,
 				format,
-			)
+			).await
 		}
 		Some(("migrate", migrate_matches)) => run_migration_command(root, quiet, migrate_matches),
-		Some(("mcp", _)) => run_mcp_command_with(quiet, mcp::run_server),
-
+		Some(("mcp", _)) => run_mcp_command_with(quiet, mcp::run_server).await,
 		Some(("check", check_matches)) => {
 			if quiet {
 				return Ok(String::new());
@@ -918,7 +917,7 @@ fn run_command_wizard_for_cli(root: &Path, quiet: bool) -> MonochangeResult<Stri
 	run_command_wizard(root)
 }
 
-fn run_mcp_command_with<F, Fut>(quiet: bool, run_server: F) -> MonochangeResult<String>
+async fn run_mcp_command_with<F, Fut>(quiet: bool, run_server: F) -> MonochangeResult<String>
 where
 	F: FnOnce() -> Fut,
 	Fut: Future<Output = ()>,

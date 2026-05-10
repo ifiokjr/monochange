@@ -18,7 +18,7 @@ pub(crate) struct ReleaseBranchVerificationReport {
 	pub matched_branch: String,
 }
 
-pub(crate) fn verify_release_ref_for_tags(
+pub(crate) async fn verify_release_ref_for_tags(
 	root: &Path,
 	source: Option<&SourceConfiguration>,
 	ref_name: &str,
@@ -29,10 +29,10 @@ pub(crate) fn verify_release_ref_for_tags(
 	if !source.releases.enforce_for_tags {
 		return Ok(None);
 	}
-	verify_release_ref(root, &source.releases, ref_name).map(Some)
+	verify_release_ref(root, &source.releases, ref_name).await.map(Some)
 }
 
-pub(crate) fn verify_release_ref_for_publish(
+pub(crate) async fn verify_release_ref_for_publish(
 	root: &Path,
 	source: Option<&SourceConfiguration>,
 	ref_name: &str,
@@ -43,10 +43,10 @@ pub(crate) fn verify_release_ref_for_publish(
 	if !source.releases.enforce_for_publish {
 		return Ok(None);
 	}
-	verify_release_ref(root, &source.releases, ref_name).map(Some)
+	verify_release_ref(root, &source.releases, ref_name).await.map(Some)
 }
 
-pub(crate) fn verify_release_ref_for_commit(
+pub(crate) async fn verify_release_ref_for_commit(
 	root: &Path,
 	source: Option<&SourceConfiguration>,
 	ref_name: &str,
@@ -57,7 +57,7 @@ pub(crate) fn verify_release_ref_for_commit(
 	if !source.releases.enforce_for_commit {
 		return Ok(None);
 	}
-	verify_release_ref(root, &source.releases, ref_name).map(Some)
+	verify_release_ref(root, &source.releases, ref_name).await.map(Some)
 }
 
 pub(crate) async fn verify_release_ref(
@@ -73,7 +73,7 @@ pub(crate) async fn verify_release_ref(
 	}
 
 	let commit = git_support::resolve_git_commit_ref(root, ref_name).await?;
-	let branch_refs = candidate_release_branch_refs(root, &policy.branches)?;
+	let branch_refs = candidate_release_branch_refs(root, &policy.branches).await?;
 
 	for branch_ref in &branch_refs {
 		if git_support::git_is_ancestor(root, &commit, &branch_ref.ref_name).await? {

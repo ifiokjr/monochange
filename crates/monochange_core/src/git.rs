@@ -3,7 +3,7 @@ use std::fmt::Write as FmtWrite;
 use std::io::Write as IoWrite;
 use std::path::Path;
 use std::path::PathBuf;
-use tokio::process::Command;
+use std::process::Command;
 use std::process::Output;
 use std::process::Stdio;
 
@@ -195,7 +195,8 @@ pub async fn git_head_commit(root: &Path) -> MonochangeResult<String> {
 #[must_use = "the command output must be checked"]
 pub async fn git_command_output(root: &Path, args: &[&str]) -> std::io::Result<Output> {
 	let mut command = git_command(root);
-	command.args(args).output().await
+	command.args(args);
+	tokio::process::Command::from(command).output().await
 }
 
 /// Return stdout as trimmed UTF-8 lossily decoded text.
@@ -229,7 +230,7 @@ pub fn git_reports_nothing_to_commit(output: &Output) -> bool {
 /// Run a prepared command and convert process failures into `MonochangeError`.
 #[must_use = "the command result must be checked"]
 pub async fn run_command(mut command: Command, action: &str) -> MonochangeResult<()> {
-	let output = command
+	let output = tokio::process::Command::from(command)
 		.output()
 		.await
 		.map_err(|error| MonochangeError::Io(format!("failed to {action}: {error}")))?;
@@ -315,7 +316,7 @@ where
 	})?;
 
 	let mut command = git_commit_file_command(root, message_file.path(), no_verify);
-	let output = command.output().await.map_err(|error| {
+	let output = tokio::process::Command::from(command).output().await.map_err(|error| {
 		MonochangeError::Io(format!(
 			"failed to {action}: {error}\n{}",
 			git_commit_message_diagnostics(
@@ -355,7 +356,7 @@ pub async fn run_commit_command_allow_nothing_to_commit(
 	mut command: Command,
 	action: &str,
 ) -> MonochangeResult<()> {
-	let output = command
+	let output = tokio::process::Command::from(command)
 		.output().await
 		.map_err(|error| MonochangeError::Io(format!("failed to {action}: {error}")))?;
 

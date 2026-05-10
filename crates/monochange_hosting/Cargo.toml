@@ -19,6 +19,7 @@ serde = { workspace = true, default-features = true }
 
 [dev-dependencies]
 httpmock = { workspace = true }
+tokio = { workspace = true, default-features = true }
 
 [lints]
 workspace = true
