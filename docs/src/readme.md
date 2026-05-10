@@ -86,6 +86,8 @@ When you are ready to prepare the release locally, run `mc release`.
 
 For human-readable local output, `mc release --dry-run` now defaults to terminal-friendly markdown. Use `--format json` for automation, `--format text` when you explicitly want the older plain-text rendering, `mc versions` when you only need planned package and group versions, and `--quiet` when you want dry-run behavior without stdout/stderr output. `mc versions` is a dedicated non-mutating summary command and also supports `--format markdown` and `--format json`.
 
+This book is maintained with `mdt` so shared content blocks stay synchronized across pages. See the [Configuration reference](guide/04-configuration.md#shared-documentation) for how template updates work.
+
 If you want a slower, more guided walkthrough, continue with [Start here](./guide/00-start-here.md) and [Your first release plan](./guide/02-setup.md).
 
 ## What to read next

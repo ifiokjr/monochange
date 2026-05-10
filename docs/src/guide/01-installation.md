@@ -97,8 +97,10 @@ Useful repository-development commands:
 ```bash
 monochange --help
 mc --help
-docs:check
-docs:update
+docs:check      # verify mdt shared-doc synchronization
+docs:update     # synchronize shared docs via mdt update
+schema:check    # verify committed JSON schemas are current
+schema:update   # regenerate schema assets from source
 mc validate
 lint:all
 test:all
