@@ -1716,6 +1716,62 @@ fn publish_release_pull_request_skips_matching_existing_pull_request() {
 }
 
 #[test]
+fn publish_release_pull_request_updates_stale_existing_pull_request_body() {
+	let server = MockServer::start();
+	let request = sample_pull_request_request();
+	let existing = GitHubExistingPullRequest {
+		number: 9,
+		html_url: Some("https://example.com/pr/9".to_string()),
+		node_id: "PR_node".to_string(),
+		title: request.title.clone(),
+		body: Some("stale release notes".to_string()),
+		base: GitHubExistingPullRequestBase {
+			ref_name: request.base_branch.clone(),
+		},
+		head: GitHubExistingPullRequestHead {
+			sha: Some("head-sha".to_string()),
+		},
+		labels: request
+			.labels
+			.iter()
+			.cloned()
+			.map(|name| GitHubExistingPullRequestLabel { name })
+			.collect(),
+	};
+	let update_pull_request = server.mock(|when, then| {
+		when.method(PATCH)
+			.path("/repos/ifiokjr/monochange/pulls/9")
+			.json_body(serde_json::json!({
+				"title": request.title,
+				"body": request.body,
+				"base": request.base_branch,
+			}));
+		then.status(200)
+			.header("content-type", "application/json")
+			.body(r#"{"number":9,"html_url":"https://example.com/pr/9","node_id":"PR_node"}"#);
+	});
+
+	let outcome = github_runtime()
+		.unwrap_or_else(|error| panic!("runtime: {error}"))
+		.block_on(async {
+			let client = build_test_client(&server);
+			publish_release_pull_request_with_existing_pull_request(
+				&client,
+				&request,
+				Some(&existing),
+				"head-sha",
+			)
+			.await
+		})
+		.unwrap_or_else(|error| panic!("publish pull request: {error}"));
+
+	update_pull_request.assert();
+	assert_eq!(outcome.operation, GitHubPullRequestOperation::Updated);
+	assert_eq!(outcome.number, 9);
+	assert_eq!(outcome.url.as_deref(), Some("https://example.com/pr/9"));
+}
+
+#[test]
 fn join_existing_pull_request_lookup_reports_panicked_thread() {
 	let error = join_existing_pull_request_lookup(thread::spawn(
 		|| -> MonochangeResult<Option<GitHubExistingPullRequest>> {
