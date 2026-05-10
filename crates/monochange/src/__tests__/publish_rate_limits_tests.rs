@@ -1133,6 +1133,33 @@ fn plan_publish_rate_limits_supports_placeholder_mode_and_skips_external_request
 }
 
 #[test]
+fn plan_unbatched_publish_order_skips_external_requests() {
+	let report = plan_unbatched_publish_order_for_requests(
+		&[
+			sample_publish_request(
+				"docs",
+				monochange_core::Ecosystem::Npm,
+				RegistryKind::Npm,
+				PublishMode::Builtin,
+			),
+			sample_publish_request(
+				"external",
+				monochange_core::Ecosystem::Npm,
+				RegistryKind::Npm,
+				PublishMode::External,
+			),
+		],
+		RateLimitOperation::Publish,
+		true,
+	);
+
+	assert_eq!(report.windows.len(), 1);
+	assert_eq!(report.windows[0].pending, 1);
+	assert_eq!(report.batches.len(), 1);
+	assert_eq!(report.batches[0].packages, vec!["docs".to_string()]);
+}
+
+#[test]
 fn plan_window_flags_multiple_batches_when_limit_is_exceeded() {
 	let policy = RegistryRateLimitPolicy {
 		registry: RegistryKind::PubDev,
