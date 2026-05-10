@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)
+
+### Fixed
+
+#### Update release pull request metadata on rerun
+
+`OpenReleaseRequest` now explicitly syncs existing GitHub release pull request metadata when rerun, including refreshed body content from the latest release notes.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #449](https://github.com/monochange/monochange/pull/449) _Introduced in:_ [`5978d06`](https://github.com/monochange/monochange/commit/5978d0630a34359f7e8d634f5b7f522355a64244)
+
 ## [0.4.0](https://github.com/monochange/monochange/releases/tag/v0.4.0) (2026-05-09)
 
 ### Added

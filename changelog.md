@@ -4,6 +4,61 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)
+
+Grouped release for `main`.
+
+### Added
+
+> [!NOTE]
+> _monochange_
+
+#### Add persistent deduplication index and content-hash fast path for release records
+
+Introduce a JSONL index at `.monochange/local/release-index.jsonl` that survives across CLI invocations, eliminating repeated directory scans when checking for duplicate release records. A fast path in `validate_release_record_file` now compares the `releaseTargets` identity of an existing file against the manifest before rebuilding the full `ReleaseRecord`, skipping unnecessary I/O when the targets match.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #435](https://github.com/monochange/monochange/pull/435) _Introduced in:_ [`b906cab`](https://github.com/monochange/monochange/commit/b906cab608c84b30bfd429298892a80766221ef6) _Closed issues:_ [#430](https://github.com/monochange/monochange/issues/430)
+
+> [!NOTE]
+> _monochange_
+
+#### Sort release targets and hash identity fields directly
+
+`release_targets_hash` now sorts targets by `(id, kind, version)` before hashing and only feeds identity fields (`id`, `kind`, `version`) into the hasher. Operational flags (`tag`, `release`, `tag_name`, `version_format`, `members`) are excluded from the hash so that path identity matches release identity.
+
+`ReleasePaths::from_manifest` computes the hash directly from the manifest without building the intermediate `ReleaseRecord`, and `write_release_record_file` now checks file existence before doing any expensive work.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #431](https://github.com/monochange/monochange/pull/431) _Introduced in:_ [`88a6e4c`](https://github.com/monochange/monochange/commit/88a6e4cea075da0b1745cd24a0a150ebea99bb83) _Closed issues:_ [#430](https://github.com/monochange/monochange/issues/430)
+
+### Documentation
+
+> [!NOTE]
+> _monochange_
+
+#### Document `CommitRelease.update_release_json` option
+
+Add comprehensive documentation for the `update_release_json` step-level input on `CommitRelease`:
+
+- Document the input in the `CommitRelease` CLI step reference with type, default, and description
+- Explain semantic JSON comparison (formatting-only differences such as indentation or key ordering are ignored)
+- Add a new composition example showing how to combine `dprint fmt` formatting with `CommitRelease` using `update_release_json = true`
+- Add a new common-mistake entry about running formatters between `PrepareRelease` and `CommitRelease` without setting the input
+- Document the field in the configuration guide's workflow variables section
+- Regenerate JSON Schema assets to include the new `update_release_json` field in `CommitRelease` step definitions
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #443](https://github.com/monochange/monochange/pull/443) _Introduced in:_ [`4b8cc5a`](https://github.com/monochange/monochange/commit/4b8cc5a25644ab3623177c08bd7904c649ea67a0)
+
+### Other
+
+> [!NOTE]
+> _monochange_
+
+#### Update release commands to regenerate JSON schemas
+
+Before `dprint fmt`, both commands now regenerate JSON schemas from schemars-annotated types so that committed schema assets stay in sync with the source code.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #442](https://github.com/monochange/monochange/pull/442) _Introduced in:_ [`66260c9`](https://github.com/monochange/monochange/commit/66260c9ff4880b73725807ada2ff67ed24c3096a)
+
 ## [0.4.0](https://github.com/monochange/monochange/releases/tag/v0.4.0) (2026-05-09)
 
 Grouped release for `main`.

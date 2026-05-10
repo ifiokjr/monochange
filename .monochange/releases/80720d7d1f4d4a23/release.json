@@ -1,0 +1,2941 @@
+{
+	"schemaVersion": "0.1",
+	"kind": "monochange.releaseRecord",
+	"createdAt": "2026-05-10T17:21:46Z",
+	"command": "release-pr",
+	"version": null,
+	"versions": {
+		"main": "0.4.1",
+		"monochange_schema": "0.1.1"
+	},
+	"releaseTargets": [
+		{
+			"id": "main",
+			"kind": "group",
+			"version": "0.4.1",
+			"versionFormat": "primary",
+			"tag": true,
+			"release": true,
+			"tagName": "v0.4.1",
+			"members": [
+				"@monochange/cli",
+				"@monochange/cli-darwin-arm64",
+				"@monochange/cli-darwin-x64",
+				"@monochange/cli-linux-arm64-gnu",
+				"@monochange/cli-linux-arm64-musl",
+				"@monochange/cli-linux-x64-gnu",
+				"@monochange/cli-linux-x64-musl",
+				"@monochange/cli-win32-arm64-msvc",
+				"@monochange/cli-win32-x64-msvc",
+				"@monochange/skill",
+				"monochange",
+				"monochange_analysis",
+				"monochange_cargo",
+				"monochange_changelog",
+				"monochange_config",
+				"monochange_core",
+				"monochange_dart",
+				"monochange_deno",
+				"monochange_ecmascript",
+				"monochange_forgejo",
+				"monochange_gitea",
+				"monochange_github",
+				"monochange_gitlab",
+				"monochange_go",
+				"monochange_graph",
+				"monochange_hosting",
+				"monochange_lint",
+				"monochange_lint_testing",
+				"monochange_linting",
+				"monochange_npm",
+				"monochange_publish",
+				"monochange_python",
+				"monochange_semver",
+				"monochange_telemetry",
+				"monochange_test_helpers"
+			]
+		},
+		{
+			"id": "monochange_schema",
+			"kind": "package",
+			"version": "0.1.1",
+			"versionFormat": "namespaced",
+			"tag": false,
+			"release": false,
+			"tagName": "monochange_schema/v0.1.1",
+			"members": [
+				"monochange_schema"
+			]
+		}
+	],
+	"releasedPackages": [
+		"@monochange/cli",
+		"@monochange/cli-darwin-arm64",
+		"@monochange/cli-darwin-x64",
+		"@monochange/cli-linux-arm64-gnu",
+		"@monochange/cli-linux-arm64-musl",
+		"@monochange/cli-linux-x64-gnu",
+		"@monochange/cli-linux-x64-musl",
+		"@monochange/cli-win32-arm64-msvc",
+		"@monochange/cli-win32-x64-msvc",
+		"@monochange/skill",
+		"monochange",
+		"monochange_analysis",
+		"monochange_cargo",
+		"monochange_changelog",
+		"monochange_config",
+		"monochange_core",
+		"monochange_dart",
+		"monochange_deno",
+		"monochange_ecmascript",
+		"monochange_forgejo",
+		"monochange_gitea",
+		"monochange_github",
+		"monochange_gitlab",
+		"monochange_go",
+		"monochange_graph",
+		"monochange_hosting",
+		"monochange_lint",
+		"monochange_lint_testing",
+		"monochange_linting",
+		"monochange_npm",
+		"monochange_publish",
+		"monochange_python",
+		"monochange_schema",
+		"monochange_semver",
+		"monochange_telemetry",
+		"monochange_test_helpers"
+	],
+	"changedFiles": [
+		"Cargo.lock",
+		"Cargo.toml",
+		"changelog.md",
+		"crates/monochange/Cargo.toml",
+		"crates/monochange/changelog.md",
+		"crates/monochange_analysis/Cargo.toml",
+		"crates/monochange_analysis/changelog.md",
+		"crates/monochange_cargo/Cargo.toml",
+		"crates/monochange_cargo/changelog.md",
+		"crates/monochange_changelog/Cargo.toml",
+		"crates/monochange_changelog/changelog.md",
+		"crates/monochange_config/Cargo.toml",
+		"crates/monochange_config/changelog.md",
+		"crates/monochange_core/Cargo.toml",
+		"crates/monochange_core/changelog.md",
+		"crates/monochange_dart/Cargo.toml",
+		"crates/monochange_dart/changelog.md",
+		"crates/monochange_deno/Cargo.toml",
+		"crates/monochange_deno/changelog.md",
+		"crates/monochange_ecmascript/Cargo.toml",
+		"crates/monochange_ecmascript/changelog.md",
+		"crates/monochange_forgejo/Cargo.toml",
+		"crates/monochange_forgejo/changelog.md",
+		"crates/monochange_gitea/Cargo.toml",
+		"crates/monochange_gitea/changelog.md",
+		"crates/monochange_github/Cargo.toml",
+		"crates/monochange_github/changelog.md",
+		"crates/monochange_gitlab/Cargo.toml",
+		"crates/monochange_gitlab/changelog.md",
+		"crates/monochange_go/Cargo.toml",
+		"crates/monochange_go/changelog.md",
+		"crates/monochange_graph/Cargo.toml",
+		"crates/monochange_graph/changelog.md",
+		"crates/monochange_hosting/Cargo.toml",
+		"crates/monochange_hosting/changelog.md",
+		"crates/monochange_lint/Cargo.toml",
+		"crates/monochange_lint/changelog.md",
+		"crates/monochange_lint_testing/Cargo.toml",
+		"crates/monochange_lint_testing/changelog.md",
+		"crates/monochange_linting/Cargo.toml",
+		"crates/monochange_linting/changelog.md",
+		"crates/monochange_npm/Cargo.toml",
+		"crates/monochange_npm/changelog.md",
+		"crates/monochange_publish/Cargo.toml",
+		"crates/monochange_publish/changelog.md",
+		"crates/monochange_python/Cargo.toml",
+		"crates/monochange_python/changelog.md",
+		"crates/monochange_schema/Cargo.toml",
+		"crates/monochange_schema/changelog.md",
+		"crates/monochange_semver/Cargo.toml",
+		"crates/monochange_semver/changelog.md",
+		"crates/monochange_telemetry/Cargo.toml",
+		"crates/monochange_telemetry/changelog.md",
+		"crates/monochange_test_helpers/Cargo.toml",
+		"crates/monochange_test_helpers/changelog.md",
+		"packages/monochange__cli/changelog.md",
+		"packages/monochange__cli/package.json",
+		"packages/monochange__cli-darwin-arm64/changelog.md",
+		"packages/monochange__cli-darwin-arm64/package.json",
+		"packages/monochange__cli-darwin-x64/changelog.md",
+		"packages/monochange__cli-darwin-x64/package.json",
+		"packages/monochange__cli-linux-arm64-gnu/changelog.md",
+		"packages/monochange__cli-linux-arm64-gnu/package.json",
+		"packages/monochange__cli-linux-arm64-musl/changelog.md",
+		"packages/monochange__cli-linux-arm64-musl/package.json",
+		"packages/monochange__cli-linux-x64-gnu/changelog.md",
+		"packages/monochange__cli-linux-x64-gnu/package.json",
+		"packages/monochange__cli-linux-x64-musl/changelog.md",
+		"packages/monochange__cli-linux-x64-musl/package.json",
+		"packages/monochange__cli-win32-arm64-msvc/changelog.md",
+		"packages/monochange__cli-win32-arm64-msvc/package.json",
+		"packages/monochange__cli-win32-x64-msvc/changelog.md",
+		"packages/monochange__cli-win32-x64-msvc/package.json",
+		"packages/monochange__skill/changelog.md",
+		"packages/monochange__skill/package.json"
+	],
+	"packagePublications": [
+		{
+			"package": "@monochange/cli",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "@monochange/cli-darwin-arm64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "@monochange/cli-darwin-x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "@monochange/cli-linux-arm64-gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "@monochange/cli-linux-arm64-musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "@monochange/cli-linux-x64-gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "@monochange/cli-linux-x64-musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "@monochange/cli-win32-arm64-msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "@monochange/cli-win32-x64-msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "@monochange/skill",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_analysis",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_cargo",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_changelog",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_config",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_core",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_dart",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_deno",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_ecmascript",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_forgejo",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_gitea",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_github",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_gitlab",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_go",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_graph",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_hosting",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_lint",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_linting",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_npm",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_publish",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_python",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_schema",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.1.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_semver",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_telemetry",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		},
+		{
+			"package": "monochange_test_helpers",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.4.1",
+			"mode": "builtin",
+			"trustedPublishing": {
+				"enabled": true,
+				"repository": null,
+				"workflow": null,
+				"environment": null
+			}
+		}
+	],
+	"updatedChangelogs": [
+		"changelog.md",
+		"crates/monochange/changelog.md",
+		"crates/monochange_analysis/changelog.md",
+		"crates/monochange_cargo/changelog.md",
+		"crates/monochange_changelog/changelog.md",
+		"crates/monochange_config/changelog.md",
+		"crates/monochange_core/changelog.md",
+		"crates/monochange_dart/changelog.md",
+		"crates/monochange_deno/changelog.md",
+		"crates/monochange_ecmascript/changelog.md",
+		"crates/monochange_forgejo/changelog.md",
+		"crates/monochange_gitea/changelog.md",
+		"crates/monochange_github/changelog.md",
+		"crates/monochange_gitlab/changelog.md",
+		"crates/monochange_go/changelog.md",
+		"crates/monochange_graph/changelog.md",
+		"crates/monochange_hosting/changelog.md",
+		"crates/monochange_lint/changelog.md",
+		"crates/monochange_lint_testing/changelog.md",
+		"crates/monochange_linting/changelog.md",
+		"crates/monochange_npm/changelog.md",
+		"crates/monochange_publish/changelog.md",
+		"crates/monochange_python/changelog.md",
+		"crates/monochange_schema/changelog.md",
+		"crates/monochange_semver/changelog.md",
+		"crates/monochange_telemetry/changelog.md",
+		"crates/monochange_test_helpers/changelog.md",
+		"packages/monochange__cli/changelog.md",
+		"packages/monochange__cli-darwin-arm64/changelog.md",
+		"packages/monochange__cli-darwin-x64/changelog.md",
+		"packages/monochange__cli-linux-arm64-gnu/changelog.md",
+		"packages/monochange__cli-linux-arm64-musl/changelog.md",
+		"packages/monochange__cli-linux-x64-gnu/changelog.md",
+		"packages/monochange__cli-linux-x64-musl/changelog.md",
+		"packages/monochange__cli-win32-arm64-msvc/changelog.md",
+		"packages/monochange__cli-win32-x64-msvc/changelog.md",
+		"packages/monochange__skill/changelog.md"
+	],
+	"deletedChangesets": [
+		".changeset/always-run-and-publish-filters.md",
+		".changeset/boolean-number-default-schema.md",
+		".changeset/crate-boundaries-refactor.md",
+		".changeset/document-commit-release-update-release-json.md",
+		".changeset/format-release-record-after-dprint.md",
+		".changeset/open-release-request-pr-body.md",
+		".changeset/persistent-release-index.md",
+		".changeset/publish-batch-dependency-ordering.md",
+		".changeset/release-record-version-map.md",
+		".changeset/schema-update-release-commands.md",
+		".changeset/schemars-schema-generation.md",
+		".changeset/sort-and-hash-identity-fields.md"
+	],
+	"changesets": [
+		{
+			"path": ".changeset/always-run-and-publish-filters.md",
+			"summary": "Add `always_run` primitive to CLI steps and group/ecosystem filters to `PublishPackages`",
+			"details": "##### `always_run` primitive\n\nA new `always_run` boolean field is available on every CLI step definition. When `always_run: true`, the step continues to execute even when a previous step in the same command has failed.\n\nThis enables composable dry-run workflows such as:\n\n```toml\n[[cli.publish-dry-run]]\nname = \"publish-dry-run\"\nhelp_text = \"Preview publishing without side effects\"\nsteps = [\n\t{ type = \"PrepareRelease\", name = \"prepare\", inputs = { allow_empty_changesets = \"true\" } },\n\t{ type = \"PublishPackages\", name = \"publish\", always_run = true, inputs = { resume = \".monochange/local/previous-result.json\" } },\n]\n```\n\nRunning `mc publish-dry-run --dry-run` will always execute the `PublishPackages` step regardless of whether `PrepareRelease` succeeds, because `PublishPackages` is marked `always_run = true`.\n\n###### Behavior\n\n- When a step fails and later steps have `always_run: true`, those steps still execute.\n- Non-`always_run` steps after a failure are skipped.\n- The overall command still returns the first error after all `always_run` steps finish.\n\n##### `PublishPackages` filters\n\n`PublishPackages` now accepts two new step inputs:\n\n- `--group <group-id>` — resolves a group from the workspace configuration and publishes all packages in that group.\n- `--ecosystem <ecosystem>` — filters publication targets to a specific ecosystem (`cargo`, `npm`, `deno`, `dart`, `flutter`, `python`, or `go`).\n\nBoth inputs can be repeated:\n\n```bash\nmc publish --group sdk --group apps --ecosystem npm --ecosystem cargo\n```\n\nGroups are resolved to their member packages before ecosystem filtering is applied.\n\n##### Dry-run guards\n\n`PublishPackages` now skips the following side-effecting operations when `--dry-run` is active:\n\n- `release_branch_policy::verify_release_ref_for_publish`\n- `publish_rate_limits::enforce_publish_rate_limits`\n- writing the publish report artifact to disk\n\n##### Per-command `dry_run` field\n\nCLI command definitions now support a `dry_run` boolean field. When `dry_run = true`, the command always executes in dry-run mode regardless of whether `--dry-run` is passed on the CLI. This enables built-in preview commands such as:\n\n```toml\n[cli.publish-check]\nhelp_text = \"Validate the release and preview package publishing in dry-run mode\"\ndry_run = true\nsteps = [\n\t{ type = \"PrepareRelease\", name = \"plan release\" },\n\t{ type = \"PublishPackages\", name = \"publish packages dry run\" },\n]\n```\n\nRunning `mc publish-check` (without `--dry-run`) will still run in dry-run mode because the command definition sets `dry_run = true`.",
+			"targets": [
+				{
+					"id": "monochange",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "minor"
+				},
+				{
+					"id": "monochange_core",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "minor"
+				},
+				{
+					"id": "monochange_config",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "minor"
+				},
+				{
+					"id": "monochange_schema",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "patch"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commitWebUrls": true,
+					"actorProfiles": true,
+					"reviewRequestLookup": true,
+					"relatedIssues": true,
+					"issueComments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "6ea623624e36d795edd531ae72080a2e9c3fb86a",
+						"shortSha": "6ea6236",
+						"url": "https://github.com/monochange/monochange/commit/6ea623624e36d795edd531ae72080a2e9c3fb86a",
+						"authoredAt": "2026-05-09T18:18:24+01:00",
+						"committedAt": "2026-05-09T18:18:24+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#426",
+						"title": "feat: add always_run primitive to CLI steps and group/ecosystem filters to PublishPackages",
+						"url": "https://github.com/monochange/monochange/pull/426",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"lastUpdated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "6ea623624e36d795edd531ae72080a2e9c3fb86a",
+						"shortSha": "6ea6236",
+						"url": "https://github.com/monochange/monochange/commit/6ea623624e36d795edd531ae72080a2e9c3fb86a",
+						"authoredAt": "2026-05-09T18:18:24+01:00",
+						"committedAt": "2026-05-09T18:18:24+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#426",
+						"title": "feat: add always_run primitive to CLI steps and group/ecosystem filters to PublishPackages",
+						"url": "https://github.com/monochange/monochange/pull/426",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"relatedIssues": []
+			}
+		},
+		{
+			"path": ".changeset/boolean-number-default-schema.md",
+			"summary": "allow boolean and numeric literals in `CliInputDefinition.default`",
+			"details": "The JSON schema for `monochange.toml` `[cli.*.inputs]` previously rejected boolean and numeric defaults, even though the Rust deserializer already accepted them correctly.\n\n**Before:**\n\n```toml\n[[cli.release-pr.inputs]]\nname = \"no_verify\"\ntype = \"boolean\"\ndefault = true # jsonschema error: \"true is not of types \\\"null\\\", \\\"string\\\"\"\n```\n\n**After:**\n\nThe `default` field in `CliInputDefinition` now accepts `string | boolean | integer | number | null` in the generated schema. TOML like the snippet above validates cleanly, and numeric defaults such as `default = 42` are also accepted.\n\nThe internal `CliInputDefault` enum gained `Integer(i64)` and `Number(f64)` variants, and the `schemars` derive now generates a multi-type `anyOf` schema for the `default` property.",
+			"targets": [
+				{
+					"id": "monochange_core",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "patch"
+				},
+				{
+					"id": "monochange_schema",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "patch"
+				},
+				{
+					"id": "monochange_config",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "patch"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commitWebUrls": true,
+					"actorProfiles": true,
+					"reviewRequestLookup": true,
+					"relatedIssues": true,
+					"issueComments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "1d42ece77ceda58cd44ce67749c5faa5d4ec8314",
+						"shortSha": "1d42ece",
+						"url": "https://github.com/monochange/monochange/commit/1d42ece77ceda58cd44ce67749c5faa5d4ec8314",
+						"authoredAt": "2026-05-10T15:15:07+01:00",
+						"committedAt": "2026-05-10T15:15:07+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#445",
+						"title": "fix(schema): allow boolean and numeric defaults for CLI input definitions",
+						"url": "https://github.com/monochange/monochange/pull/445",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"lastUpdated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "1d42ece77ceda58cd44ce67749c5faa5d4ec8314",
+						"shortSha": "1d42ece",
+						"url": "https://github.com/monochange/monochange/commit/1d42ece77ceda58cd44ce67749c5faa5d4ec8314",
+						"authoredAt": "2026-05-10T15:15:07+01:00",
+						"committedAt": "2026-05-10T15:15:07+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#445",
+						"title": "fix(schema): allow boolean and numeric defaults for CLI input definitions",
+						"url": "https://github.com/monochange/monochange/pull/445",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"relatedIssues": []
+			}
+		},
+		{
+			"path": ".changeset/crate-boundaries-refactor.md",
+			"summary": "Split crate boundaries for changelog, config, and publish behavior",
+			"details": "Move changelog rendering into `monochange_changelog`, shift publish planning and execution helpers into `monochange_publish`, and reduce direct concrete ecosystem/provider dependencies in `monochange_config`.",
+			"targets": [
+				{
+					"id": "monochange",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "patch"
+				},
+				{
+					"id": "monochange_changelog",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "patch"
+				},
+				{
+					"id": "monochange_config",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "patch"
+				},
+				{
+					"id": "monochange_publish",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "patch"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commitWebUrls": true,
+					"actorProfiles": true,
+					"reviewRequestLookup": true,
+					"relatedIssues": true,
+					"issueComments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "ae8ea563ae95c6cc4e8d3d1acdc5303069ea44cf",
+						"shortSha": "ae8ea56",
+						"url": "https://github.com/monochange/monochange/commit/ae8ea563ae95c6cc4e8d3d1acdc5303069ea44cf",
+						"authoredAt": "2026-05-10T14:55:51+01:00",
+						"committedAt": "2026-05-10T14:55:51+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#441",
+						"title": "refactor: split crate boundaries",
+						"url": "https://github.com/monochange/monochange/pull/441",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"lastUpdated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "ae8ea563ae95c6cc4e8d3d1acdc5303069ea44cf",
+						"shortSha": "ae8ea56",
+						"url": "https://github.com/monochange/monochange/commit/ae8ea563ae95c6cc4e8d3d1acdc5303069ea44cf",
+						"authoredAt": "2026-05-10T14:55:51+01:00",
+						"committedAt": "2026-05-10T14:55:51+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#441",
+						"title": "refactor: split crate boundaries",
+						"url": "https://github.com/monochange/monochange/pull/441",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"relatedIssues": []
+			}
+		},
+		{
+			"path": ".changeset/document-commit-release-update-release-json.md",
+			"summary": "Document `CommitRelease.update_release_json` option",
+			"details": "Add comprehensive documentation for the `update_release_json` step-level input on `CommitRelease`:\n\n- Document the input in the `CommitRelease` CLI step reference with type, default, and description\n- Explain semantic JSON comparison (formatting-only differences such as indentation or key ordering are ignored)\n- Add a new composition example showing how to combine `dprint fmt` formatting with `CommitRelease` using `update_release_json = true`\n- Add a new common-mistake entry about running formatters between `PrepareRelease` and `CommitRelease` without setting the input\n- Document the field in the configuration guide's workflow variables section\n- Regenerate JSON Schema assets to include the new `update_release_json` field in `CommitRelease` step definitions",
+			"targets": [
+				{
+					"id": "monochange",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "docs"
+				},
+				{
+					"id": "monochange_schema",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "docs"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commitWebUrls": true,
+					"actorProfiles": true,
+					"reviewRequestLookup": true,
+					"relatedIssues": true,
+					"issueComments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "4b8cc5a25644ab3623177c08bd7904c649ea67a0",
+						"shortSha": "4b8cc5a",
+						"url": "https://github.com/monochange/monochange/commit/4b8cc5a25644ab3623177c08bd7904c649ea67a0",
+						"authoredAt": "2026-05-10T12:55:43+01:00",
+						"committedAt": "2026-05-10T12:55:43+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#443",
+						"title": "docs: document CommitRelease.update_release_json option",
+						"url": "https://github.com/monochange/monochange/pull/443",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"lastUpdated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "4b8cc5a25644ab3623177c08bd7904c649ea67a0",
+						"shortSha": "4b8cc5a",
+						"url": "https://github.com/monochange/monochange/commit/4b8cc5a25644ab3623177c08bd7904c649ea67a0",
+						"authoredAt": "2026-05-10T12:55:43+01:00",
+						"committedAt": "2026-05-10T12:55:43+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#443",
+						"title": "docs: document CommitRelease.update_release_json option",
+						"url": "https://github.com/monochange/monochange/pull/443",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"relatedIssues": []
+			}
+		},
+		{
+			"path": ".changeset/format-release-record-after-dprint.md",
+			"summary": "Fix release record reformatting after dprint",
+			"details": "Prevent `commit_release` from rewriting `release.json` after `dprint fmt` has already formatted it. The validation now compares parsed JSON values instead of raw strings, so formatting-only differences (such as tab vs space indentation) no longer trigger a rewrite.\n\nThe `CommitRelease` step now accepts an `update_release_json` input (default `false`). When `true`, the step will create or overwrite the `release.json` file if it is missing or mismatched. When `false`, a mismatch produces a clear error asking the user to set `update_release_json = true`.",
+			"targets": [
+				{
+					"id": "monochange",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "patch"
+				},
+				{
+					"id": "monochange_core",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "patch"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commitWebUrls": true,
+					"actorProfiles": true,
+					"reviewRequestLookup": true,
+					"relatedIssues": true,
+					"issueComments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "f4b324ec920ea787ec6d5c511b81d9c22fbad753",
+						"shortSha": "f4b324e",
+						"url": "https://github.com/monochange/monochange/commit/f4b324ec920ea787ec6d5c511b81d9c22fbad753",
+						"authoredAt": "2026-05-10T11:49:48+01:00",
+						"committedAt": "2026-05-10T11:49:48+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#439",
+						"title": "fix: prevent commit_release from reformatting release.json after dprint formats it",
+						"url": "https://github.com/monochange/monochange/pull/439",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"lastUpdated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "f4b324ec920ea787ec6d5c511b81d9c22fbad753",
+						"shortSha": "f4b324e",
+						"url": "https://github.com/monochange/monochange/commit/f4b324ec920ea787ec6d5c511b81d9c22fbad753",
+						"authoredAt": "2026-05-10T11:49:48+01:00",
+						"committedAt": "2026-05-10T11:49:48+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#439",
+						"title": "fix: prevent commit_release from reformatting release.json after dprint formats it",
+						"url": "https://github.com/monochange/monochange/pull/439",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"relatedIssues": []
+			}
+		},
+		{
+			"path": ".changeset/open-release-request-pr-body.md",
+			"summary": "Update release pull request metadata on rerun",
+			"details": "`OpenReleaseRequest` now explicitly syncs existing GitHub release pull request metadata when rerun, including refreshed body content from the latest release notes.",
+			"targets": [
+				{
+					"id": "monochange_github",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "patch"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commitWebUrls": true,
+					"actorProfiles": true,
+					"reviewRequestLookup": true,
+					"relatedIssues": true,
+					"issueComments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "5978d0630a34359f7e8d634f5b7f522355a64244",
+						"shortSha": "5978d06",
+						"url": "https://github.com/monochange/monochange/commit/5978d0630a34359f7e8d634f5b7f522355a64244",
+						"authoredAt": "2026-05-10T16:59:14+01:00",
+						"committedAt": "2026-05-10T16:59:14+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#449",
+						"title": "fix: update existing release PR body",
+						"url": "https://github.com/monochange/monochange/pull/449",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"lastUpdated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "5978d0630a34359f7e8d634f5b7f522355a64244",
+						"shortSha": "5978d06",
+						"url": "https://github.com/monochange/monochange/commit/5978d0630a34359f7e8d634f5b7f522355a64244",
+						"authoredAt": "2026-05-10T16:59:14+01:00",
+						"committedAt": "2026-05-10T16:59:14+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#449",
+						"title": "fix: update existing release PR body",
+						"url": "https://github.com/monochange/monochange/pull/449",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"relatedIssues": []
+			}
+		},
+		{
+			"path": ".changeset/persistent-release-index.md",
+			"summary": "Add persistent deduplication index and content-hash fast path for release records",
+			"details": "Introduce a JSONL index at `.monochange/local/release-index.jsonl` that survives across CLI invocations, eliminating repeated directory scans when checking for duplicate release records. A fast path in `validate_release_record_file` now compares the `releaseTargets` identity of an existing file against the manifest before rebuilding the full `ReleaseRecord`, skipping unnecessary I/O when the targets match.",
+			"targets": [
+				{
+					"id": "monochange",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "minor"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commitWebUrls": true,
+					"actorProfiles": true,
+					"reviewRequestLookup": true,
+					"relatedIssues": true,
+					"issueComments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b906cab608c84b30bfd429298892a80766221ef6",
+						"shortSha": "b906cab",
+						"url": "https://github.com/monochange/monochange/commit/b906cab608c84b30bfd429298892a80766221ef6",
+						"authoredAt": "2026-05-10T12:35:08+01:00",
+						"committedAt": "2026-05-10T12:35:08+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#435",
+						"title": "refactor: persistent dedup index and content-hash fast path",
+						"url": "https://github.com/monochange/monochange/pull/435",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"lastUpdated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b906cab608c84b30bfd429298892a80766221ef6",
+						"shortSha": "b906cab",
+						"url": "https://github.com/monochange/monochange/commit/b906cab608c84b30bfd429298892a80766221ef6",
+						"authoredAt": "2026-05-10T12:35:08+01:00",
+						"committedAt": "2026-05-10T12:35:08+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#435",
+						"title": "refactor: persistent dedup index and content-hash fast path",
+						"url": "https://github.com/monochange/monochange/pull/435",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"relatedIssues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#430",
+						"title": null,
+						"url": "https://github.com/monochange/monochange/issues/430",
+						"relationship": "closed_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/publish-batch-dependency-ordering.md",
+			"summary": "Release PR formatting, schema version, and publish batch ordering",
+			"details": "1. Format generated `.monochange/releases/` manifests via `dprint fmt` in `[cli.release-pr]`.\n2. Derive expected schema versions in snapshots and tests from the actual `Cargo.toml` version instead of hardcoding `0.0`.\n3. Topologically sort publish requests by both runtime and development dependencies before batching so dependencies are published before dependents.",
+			"targets": [
+				{
+					"id": "monochange",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "patch"
+				},
+				{
+					"id": "monochange_core",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "patch"
+				},
+				{
+					"id": "monochange_schema",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "patch"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commitWebUrls": true,
+					"actorProfiles": true,
+					"reviewRequestLookup": true,
+					"relatedIssues": true,
+					"issueComments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "ea78ccc844318b0645010f15fcf60b9d8ea6a58c",
+						"shortSha": "ea78ccc",
+						"url": "https://github.com/monochange/monochange/commit/ea78ccc844318b0645010f15fcf60b9d8ea6a58c",
+						"authoredAt": "2026-05-10T04:33:37+01:00",
+						"committedAt": "2026-05-10T04:33:37+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#436",
+						"title": "fix: release PR formatting, schema version, and publish batch ordering",
+						"url": "https://github.com/monochange/monochange/pull/436",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"lastUpdated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "ea78ccc844318b0645010f15fcf60b9d8ea6a58c",
+						"shortSha": "ea78ccc",
+						"url": "https://github.com/monochange/monochange/commit/ea78ccc844318b0645010f15fcf60b9d8ea6a58c",
+						"authoredAt": "2026-05-10T04:33:37+01:00",
+						"committedAt": "2026-05-10T04:33:37+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#436",
+						"title": "fix: release PR formatting, schema version, and publish batch ordering",
+						"url": "https://github.com/monochange/monochange/pull/436",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"relatedIssues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#434",
+						"title": null,
+						"url": "https://github.com/monochange/monochange/issues/434",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/release-record-version-map.md",
+			"summary": "Replace release record `groupVersion` with `versions`",
+			"details": "Release records now include a `versions` map keyed by released package or group id, and no longer write the redundant `groupVersion` field.",
+			"targets": [
+				{
+					"id": "monochange",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "patch"
+				},
+				{
+					"id": "monochange_core",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "patch"
+				},
+				{
+					"id": "monochange_schema",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "patch"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commitWebUrls": true,
+					"actorProfiles": true,
+					"reviewRequestLookup": true,
+					"relatedIssues": true,
+					"issueComments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "375bc19dc69c125ffbd944d016b16ebc1c8cb7c5",
+						"shortSha": "375bc19",
+						"url": "https://github.com/monochange/monochange/commit/375bc19dc69c125ffbd944d016b16ebc1c8cb7c5",
+						"authoredAt": "2026-05-10T18:04:01+01:00",
+						"committedAt": "2026-05-10T18:04:01+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#450",
+						"title": "fix: replace release record group version",
+						"url": "https://github.com/monochange/monochange/pull/450",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"lastUpdated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "375bc19dc69c125ffbd944d016b16ebc1c8cb7c5",
+						"shortSha": "375bc19",
+						"url": "https://github.com/monochange/monochange/commit/375bc19dc69c125ffbd944d016b16ebc1c8cb7c5",
+						"authoredAt": "2026-05-10T18:04:01+01:00",
+						"committedAt": "2026-05-10T18:04:01+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#450",
+						"title": "fix: replace release record group version",
+						"url": "https://github.com/monochange/monochange/pull/450",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"relatedIssues": []
+			}
+		},
+		{
+			"path": ".changeset/schema-update-release-commands.md",
+			"summary": "Update release commands to regenerate JSON schemas",
+			"details": "Before `dprint fmt`, both commands now regenerate JSON schemas from schemars-annotated types so that committed schema assets stay in sync with the source code.",
+			"targets": [
+				{
+					"id": "monochange",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commitWebUrls": true,
+					"actorProfiles": true,
+					"reviewRequestLookup": true,
+					"relatedIssues": true,
+					"issueComments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "66260c9ff4880b73725807ada2ff67ed24c3096a",
+						"shortSha": "66260c9",
+						"url": "https://github.com/monochange/monochange/commit/66260c9ff4880b73725807ada2ff67ed24c3096a",
+						"authoredAt": "2026-05-10T12:32:54+01:00",
+						"committedAt": "2026-05-10T12:32:54+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#442",
+						"title": "feat: add xtask schema update step to release commands",
+						"url": "https://github.com/monochange/monochange/pull/442",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"lastUpdated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "66260c9ff4880b73725807ada2ff67ed24c3096a",
+						"shortSha": "66260c9",
+						"url": "https://github.com/monochange/monochange/commit/66260c9ff4880b73725807ada2ff67ed24c3096a",
+						"authoredAt": "2026-05-10T12:32:54+01:00",
+						"committedAt": "2026-05-10T12:32:54+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#442",
+						"title": "feat: add xtask schema update step to release commands",
+						"url": "https://github.com/monochange/monochange/pull/442",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"relatedIssues": []
+			}
+		},
+		{
+			"path": ".changeset/schemars-schema-generation.md",
+			"summary": "Migrate JSON Schema generation from hand-tuned templates to schemars",
+			"details": "Schema assets (`monochange.schema.json` and `release-record.schema.json`) are now generated from the Rust type tree via the `schemars` crate, eliminating manual drift between source types and committed schemas.\n\n###### Added\n\n- `schema` feature on `monochange_core` and `monochange_config` gating `schemars`.\n- `JsonSchema` derives on `ReleaseRecord`, `RawWorkspaceConfiguration`, and their transitive types.\n- `monochange_core::schema` and `monochange_config::schema` modules providing `release_record()` and `workspace_configuration()` schema generation functions.\n- `xtask` binary crate providing `schema update` and `schema check` subcommands, with a `cargo xtask` alias.\n\n###### Changed\n\n- `devenv.nix` `schema:update` / `schema:check` now invoke `cargo xtask schema update` and `cargo xtask schema check`.\n- `$defs` keys use camelCase names (e.g. `packageDefinition`) via `#[schemars(rename)]` attributes.\n- Release-record `schemaVersion` and `kind` emit `const` constraints instead of `default`.\n\n###### Removed\n\n- `scripts/schema-assets.sh` shell script.\n- `schemas/templates/*.schema.template.json` template files.",
+			"targets": [
+				{
+					"id": "monochange_core",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "minor"
+				},
+				{
+					"id": "monochange_config",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "minor"
+				},
+				{
+					"id": "monochange_schema",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "minor"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commitWebUrls": true,
+					"actorProfiles": true,
+					"reviewRequestLookup": true,
+					"relatedIssues": true,
+					"issueComments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "d0676f067299fb4db38cc748dcbb619ab7532a49",
+						"shortSha": "d0676f0",
+						"url": "https://github.com/monochange/monochange/commit/d0676f067299fb4db38cc748dcbb619ab7532a49",
+						"authoredAt": "2026-05-10T11:04:24+01:00",
+						"committedAt": "2026-05-10T11:04:24+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#438",
+						"title": "feat: add schemars-based schema generation",
+						"url": "https://github.com/monochange/monochange/pull/438",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"lastUpdated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "d0676f067299fb4db38cc748dcbb619ab7532a49",
+						"shortSha": "d0676f0",
+						"url": "https://github.com/monochange/monochange/commit/d0676f067299fb4db38cc748dcbb619ab7532a49",
+						"authoredAt": "2026-05-10T11:04:24+01:00",
+						"committedAt": "2026-05-10T11:04:24+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#438",
+						"title": "feat: add schemars-based schema generation",
+						"url": "https://github.com/monochange/monochange/pull/438",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"relatedIssues": []
+			}
+		},
+		{
+			"path": ".changeset/sort-and-hash-identity-fields.md",
+			"summary": "Sort release targets and hash identity fields directly",
+			"details": "`release_targets_hash` now sorts targets by `(id, kind, version)` before hashing and only feeds identity fields (`id`, `kind`, `version`) into the hasher. Operational flags (`tag`, `release`, `tag_name`, `version_format`, `members`) are excluded from the hash so that path identity matches release identity.\n\n`ReleasePaths::from_manifest` computes the hash directly from the manifest without building the intermediate `ReleaseRecord`, and `write_release_record_file` now checks file existence before doing any expensive work.",
+			"targets": [
+				{
+					"id": "monochange",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidenceRefs": [],
+					"changeType": "minor"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commitWebUrls": true,
+					"actorProfiles": true,
+					"reviewRequestLookup": true,
+					"relatedIssues": true,
+					"issueComments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "88a6e4cea075da0b1745cd24a0a150ebea99bb83",
+						"shortSha": "88a6e4c",
+						"url": "https://github.com/monochange/monochange/commit/88a6e4cea075da0b1745cd24a0a150ebea99bb83",
+						"authoredAt": "2026-05-09T13:33:42+01:00",
+						"committedAt": "2026-05-09T13:33:42+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#431",
+						"title": "refactor: sort release targets and hash identity fields directly",
+						"url": "https://github.com/monochange/monochange/pull/431",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"lastUpdated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"displayName": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "88a6e4cea075da0b1745cd24a0a150ebea99bb83",
+						"shortSha": "88a6e4c",
+						"url": "https://github.com/monochange/monochange/commit/88a6e4cea075da0b1745cd24a0a150ebea99bb83",
+						"authoredAt": "2026-05-09T13:33:42+01:00",
+						"committedAt": "2026-05-09T13:33:42+01:00",
+						"authorName": "Ifiok Jr.",
+						"authorEmail": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"reviewRequest": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#431",
+						"title": "refactor: sort release targets and hash identity fields directly",
+						"url": "https://github.com/monochange/monochange/pull/431",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"displayName": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"relatedIssues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#430",
+						"title": null,
+						"url": "https://github.com/monochange/monochange/issues/430",
+						"relationship": "closed_by_review_request"
+					}
+				]
+			}
+		}
+	],
+	"changelogs": [
+		{
+			"ownerId": "main",
+			"ownerKind": "group",
+			"path": "changelog.md",
+			"format": "monochange",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [
+					"Grouped release for `main`."
+				],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"> [!NOTE]\n> *monochange*\n\n#### Add persistent deduplication index and content-hash fast path for release records\n\nIntroduce a JSONL index at `.monochange/local/release-index.jsonl` that survives across CLI invocations, eliminating repeated directory scans when checking for duplicate release records. A fast path in `validate_release_record_file` now compares the `releaseTargets` identity of an existing file against the manifest before rebuilding the full `ReleaseRecord`, skipping unnecessary I/O when the targets match.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #435](https://github.com/monochange/monochange/pull/435)\n> _Introduced in:_ [`b906cab`](https://github.com/monochange/monochange/commit/b906cab608c84b30bfd429298892a80766221ef6)\n> _Closed issues:_ [#430](https://github.com/monochange/monochange/issues/430)",
+							"> [!NOTE]\n> *monochange*\n\n#### Sort release targets and hash identity fields directly\n\n`release_targets_hash` now sorts targets by `(id, kind, version)` before hashing and only feeds identity fields (`id`, `kind`, `version`) into the hasher. Operational flags (`tag`, `release`, `tag_name`, `version_format`, `members`) are excluded from the hash so that path identity matches release identity.\n\n`ReleasePaths::from_manifest` computes the hash directly from the manifest without building the intermediate `ReleaseRecord`, and `write_release_record_file` now checks file existence before doing any expensive work.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #431](https://github.com/monochange/monochange/pull/431)\n> _Introduced in:_ [`88a6e4c`](https://github.com/monochange/monochange/commit/88a6e4cea075da0b1745cd24a0a150ebea99bb83)\n> _Closed issues:_ [#430](https://github.com/monochange/monochange/issues/430)"
+						]
+					},
+					{
+						"title": "Documentation",
+						"collapsed": false,
+						"entries": [
+							"> [!NOTE]\n> *monochange*\n\n#### Document `CommitRelease.update_release_json` option\n\nAdd comprehensive documentation for the `update_release_json` step-level input on `CommitRelease`:\n\n- Document the input in the `CommitRelease` CLI step reference with type, default, and description\n- Explain semantic JSON comparison (formatting-only differences such as indentation or key ordering are ignored)\n- Add a new composition example showing how to combine `dprint fmt` formatting with `CommitRelease` using `update_release_json = true`\n- Add a new common-mistake entry about running formatters between `PrepareRelease` and `CommitRelease` without setting the input\n- Document the field in the configuration guide's workflow variables section\n- Regenerate JSON Schema assets to include the new `update_release_json` field in `CommitRelease` step definitions\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #443](https://github.com/monochange/monochange/pull/443)\n> _Introduced in:_ [`4b8cc5a`](https://github.com/monochange/monochange/commit/4b8cc5a25644ab3623177c08bd7904c649ea67a0)"
+						]
+					},
+					{
+						"title": "Other",
+						"collapsed": false,
+						"entries": [
+							"> [!NOTE]\n> *monochange*\n\n#### Update release commands to regenerate JSON schemas\n\nBefore `dprint fmt`, both commands now regenerate JSON schemas from schemars-annotated types so that committed schema assets stay in sync with the source code.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #442](https://github.com/monochange/monochange/pull/442)\n> _Introduced in:_ [`66260c9`](https://github.com/monochange/monochange/commit/66260c9ff4880b73725807ada2ff67ed24c3096a)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\nGrouped release for `main`.\n\n### Added\n\n> [!NOTE]\n> *monochange*\n\n#### Add persistent deduplication index and content-hash fast path for release records\n\nIntroduce a JSONL index at `.monochange/local/release-index.jsonl` that survives across CLI invocations, eliminating repeated directory scans when checking for duplicate release records. A fast path in `validate_release_record_file` now compares the `releaseTargets` identity of an existing file against the manifest before rebuilding the full `ReleaseRecord`, skipping unnecessary I/O when the targets match.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #435](https://github.com/monochange/monochange/pull/435)\n> _Introduced in:_ [`b906cab`](https://github.com/monochange/monochange/commit/b906cab608c84b30bfd429298892a80766221ef6)\n> _Closed issues:_ [#430](https://github.com/monochange/monochange/issues/430)\n\n> [!NOTE]\n> *monochange*\n\n#### Sort release targets and hash identity fields directly\n\n`release_targets_hash` now sorts targets by `(id, kind, version)` before hashing and only feeds identity fields (`id`, `kind`, `version`) into the hasher. Operational flags (`tag`, `release`, `tag_name`, `version_format`, `members`) are excluded from the hash so that path identity matches release identity.\n\n`ReleasePaths::from_manifest` computes the hash directly from the manifest without building the intermediate `ReleaseRecord`, and `write_release_record_file` now checks file existence before doing any expensive work.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #431](https://github.com/monochange/monochange/pull/431)\n> _Introduced in:_ [`88a6e4c`](https://github.com/monochange/monochange/commit/88a6e4cea075da0b1745cd24a0a150ebea99bb83)\n> _Closed issues:_ [#430](https://github.com/monochange/monochange/issues/430)\n\n### Documentation\n\n> [!NOTE]\n> *monochange*\n\n#### Document `CommitRelease.update_release_json` option\n\nAdd comprehensive documentation for the `update_release_json` step-level input on `CommitRelease`:\n\n- Document the input in the `CommitRelease` CLI step reference with type, default, and description\n- Explain semantic JSON comparison (formatting-only differences such as indentation or key ordering are ignored)\n- Add a new composition example showing how to combine `dprint fmt` formatting with `CommitRelease` using `update_release_json = true`\n- Add a new common-mistake entry about running formatters between `PrepareRelease` and `CommitRelease` without setting the input\n- Document the field in the configuration guide's workflow variables section\n- Regenerate JSON Schema assets to include the new `update_release_json` field in `CommitRelease` step definitions\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #443](https://github.com/monochange/monochange/pull/443)\n> _Introduced in:_ [`4b8cc5a`](https://github.com/monochange/monochange/commit/4b8cc5a25644ab3623177c08bd7904c649ea67a0)\n\n### Other\n\n> [!NOTE]\n> *monochange*\n\n#### Update release commands to regenerate JSON schemas\n\nBefore `dprint fmt`, both commands now regenerate JSON schemas from schemars-annotated types so that committed schema assets stay in sync with the source code.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #442](https://github.com/monochange/monochange/pull/442)\n> _Introduced in:_ [`66260c9`](https://github.com/monochange/monochange/commit/66260c9ff4880b73725807ada2ff67ed24c3096a)"
+		},
+		{
+			"ownerId": "monochange",
+			"ownerKind": "package",
+			"path": "crates/monochange/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Add `always_run` primitive to CLI steps and group/ecosystem filters to `PublishPackages`\n\n##### `always_run` primitive\n\nA new `always_run` boolean field is available on every CLI step definition. When `always_run: true`, the step continues to execute even when a previous step in the same command has failed.\n\nThis enables composable dry-run workflows such as:\n\n```toml\n[[cli.publish-dry-run]]\nname = \"publish-dry-run\"\nhelp_text = \"Preview publishing without side effects\"\nsteps = [\n\t{ type = \"PrepareRelease\", name = \"prepare\", inputs = { allow_empty_changesets = \"true\" } },\n\t{ type = \"PublishPackages\", name = \"publish\", always_run = true, inputs = { resume = \".monochange/local/previous-result.json\" } },\n]\n```\n\nRunning `mc publish-dry-run --dry-run` will always execute the `PublishPackages` step regardless of whether `PrepareRelease` succeeds, because `PublishPackages` is marked `always_run = true`.\n\n###### Behavior\n\n- When a step fails and later steps have `always_run: true`, those steps still execute.\n- Non-`always_run` steps after a failure are skipped.\n- The overall command still returns the first error after all `always_run` steps finish.\n\n##### `PublishPackages` filters\n\n`PublishPackages` now accepts two new step inputs:\n\n- `--group <group-id>` — resolves a group from the workspace configuration and publishes all packages in that group.\n- `--ecosystem <ecosystem>` — filters publication targets to a specific ecosystem (`cargo`, `npm`, `deno`, `dart`, `flutter`, `python`, or `go`).\n\nBoth inputs can be repeated:\n\n```bash\nmc publish --group sdk --group apps --ecosystem npm --ecosystem cargo\n```\n\nGroups are resolved to their member packages before ecosystem filtering is applied.\n\n##### Dry-run guards\n\n`PublishPackages` now skips the following side-effecting operations when `--dry-run` is active:\n\n- `release_branch_policy::verify_release_ref_for_publish`\n- `publish_rate_limits::enforce_publish_rate_limits`\n- writing the publish report artifact to disk\n\n##### Per-command `dry_run` field\n\nCLI command definitions now support a `dry_run` boolean field. When `dry_run = true`, the command always executes in dry-run mode regardless of whether `--dry-run` is passed on the CLI. This enables built-in preview commands such as:\n\n```toml\n[cli.publish-check]\nhelp_text = \"Validate the release and preview package publishing in dry-run mode\"\ndry_run = true\nsteps = [\n\t{ type = \"PrepareRelease\", name = \"plan release\" },\n\t{ type = \"PublishPackages\", name = \"publish packages dry run\" },\n]\n```\n\nRunning `mc publish-check` (without `--dry-run`) will still run in dry-run mode because the command definition sets `dry_run = true`.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #426](https://github.com/monochange/monochange/pull/426)\n> _Introduced in:_ [`6ea6236`](https://github.com/monochange/monochange/commit/6ea623624e36d795edd531ae72080a2e9c3fb86a)",
+							"#### Add persistent deduplication index and content-hash fast path for release records\n\nIntroduce a JSONL index at `.monochange/local/release-index.jsonl` that survives across CLI invocations, eliminating repeated directory scans when checking for duplicate release records. A fast path in `validate_release_record_file` now compares the `releaseTargets` identity of an existing file against the manifest before rebuilding the full `ReleaseRecord`, skipping unnecessary I/O when the targets match.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #435](https://github.com/monochange/monochange/pull/435)\n> _Introduced in:_ [`b906cab`](https://github.com/monochange/monochange/commit/b906cab608c84b30bfd429298892a80766221ef6)\n> _Closed issues:_ [#430](https://github.com/monochange/monochange/issues/430)",
+							"#### Sort release targets and hash identity fields directly\n\n`release_targets_hash` now sorts targets by `(id, kind, version)` before hashing and only feeds identity fields (`id`, `kind`, `version`) into the hasher. Operational flags (`tag`, `release`, `tag_name`, `version_format`, `members`) are excluded from the hash so that path identity matches release identity.\n\n`ReleasePaths::from_manifest` computes the hash directly from the manifest without building the intermediate `ReleaseRecord`, and `write_release_record_file` now checks file existence before doing any expensive work.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #431](https://github.com/monochange/monochange/pull/431)\n> _Introduced in:_ [`88a6e4c`](https://github.com/monochange/monochange/commit/88a6e4cea075da0b1745cd24a0a150ebea99bb83)\n> _Closed issues:_ [#430](https://github.com/monochange/monochange/issues/430)"
+						]
+					},
+					{
+						"title": "Fixed",
+						"collapsed": false,
+						"entries": [
+							"#### Split crate boundaries for changelog, config, and publish behavior\n\nMove changelog rendering into `monochange_changelog`, shift publish planning and execution helpers into `monochange_publish`, and reduce direct concrete ecosystem/provider dependencies in `monochange_config`.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #441](https://github.com/monochange/monochange/pull/441)\n> _Introduced in:_ [`ae8ea56`](https://github.com/monochange/monochange/commit/ae8ea563ae95c6cc4e8d3d1acdc5303069ea44cf)",
+							"#### Fix release record reformatting after dprint\n\nPrevent `commit_release` from rewriting `release.json` after `dprint fmt` has already formatted it. The validation now compares parsed JSON values instead of raw strings, so formatting-only differences (such as tab vs space indentation) no longer trigger a rewrite.\n\nThe `CommitRelease` step now accepts an `update_release_json` input (default `false`). When `true`, the step will create or overwrite the `release.json` file if it is missing or mismatched. When `false`, a mismatch produces a clear error asking the user to set `update_release_json = true`.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #439](https://github.com/monochange/monochange/pull/439)\n> _Introduced in:_ [`f4b324e`](https://github.com/monochange/monochange/commit/f4b324ec920ea787ec6d5c511b81d9c22fbad753)",
+							"#### Release PR formatting, schema version, and publish batch ordering\n\n1. Format generated `.monochange/releases/` manifests via `dprint fmt` in `[cli.release-pr]`.\n2. Derive expected schema versions in snapshots and tests from the actual `Cargo.toml` version instead of hardcoding `0.0`.\n3. Topologically sort publish requests by both runtime and development dependencies before batching so dependencies are published before dependents.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #436](https://github.com/monochange/monochange/pull/436)\n> _Introduced in:_ [`ea78ccc`](https://github.com/monochange/monochange/commit/ea78ccc844318b0645010f15fcf60b9d8ea6a58c)\n> _Related issues:_ [#434](https://github.com/monochange/monochange/issues/434)",
+							"#### Replace release record `groupVersion` with `versions`\n\nRelease records now include a `versions` map keyed by released package or group id, and no longer write the redundant `groupVersion` field.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #450](https://github.com/monochange/monochange/pull/450)\n> _Introduced in:_ [`375bc19`](https://github.com/monochange/monochange/commit/375bc19dc69c125ffbd944d016b16ebc1c8cb7c5)"
+						]
+					},
+					{
+						"title": "Documentation",
+						"collapsed": false,
+						"entries": [
+							"#### Document `CommitRelease.update_release_json` option\n\nAdd comprehensive documentation for the `update_release_json` step-level input on `CommitRelease`:\n\n- Document the input in the `CommitRelease` CLI step reference with type, default, and description\n- Explain semantic JSON comparison (formatting-only differences such as indentation or key ordering are ignored)\n- Add a new composition example showing how to combine `dprint fmt` formatting with `CommitRelease` using `update_release_json = true`\n- Add a new common-mistake entry about running formatters between `PrepareRelease` and `CommitRelease` without setting the input\n- Document the field in the configuration guide's workflow variables section\n- Regenerate JSON Schema assets to include the new `update_release_json` field in `CommitRelease` step definitions\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #443](https://github.com/monochange/monochange/pull/443)\n> _Introduced in:_ [`4b8cc5a`](https://github.com/monochange/monochange/commit/4b8cc5a25644ab3623177c08bd7904c649ea67a0)"
+						]
+					},
+					{
+						"title": "Other",
+						"collapsed": false,
+						"entries": [
+							"#### Update release commands to regenerate JSON schemas\n\nBefore `dprint fmt`, both commands now regenerate JSON schemas from schemars-annotated types so that committed schema assets stay in sync with the source code.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #442](https://github.com/monochange/monochange/pull/442)\n> _Introduced in:_ [`66260c9`](https://github.com/monochange/monochange/commit/66260c9ff4880b73725807ada2ff67ed24c3096a)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Added\n\n#### Add `always_run` primitive to CLI steps and group/ecosystem filters to `PublishPackages`\n\n##### `always_run` primitive\n\nA new `always_run` boolean field is available on every CLI step definition. When `always_run: true`, the step continues to execute even when a previous step in the same command has failed.\n\nThis enables composable dry-run workflows such as:\n\n```toml\n[[cli.publish-dry-run]]\nname = \"publish-dry-run\"\nhelp_text = \"Preview publishing without side effects\"\nsteps = [\n\t{ type = \"PrepareRelease\", name = \"prepare\", inputs = { allow_empty_changesets = \"true\" } },\n\t{ type = \"PublishPackages\", name = \"publish\", always_run = true, inputs = { resume = \".monochange/local/previous-result.json\" } },\n]\n```\n\nRunning `mc publish-dry-run --dry-run` will always execute the `PublishPackages` step regardless of whether `PrepareRelease` succeeds, because `PublishPackages` is marked `always_run = true`.\n\n###### Behavior\n\n- When a step fails and later steps have `always_run: true`, those steps still execute.\n- Non-`always_run` steps after a failure are skipped.\n- The overall command still returns the first error after all `always_run` steps finish.\n\n##### `PublishPackages` filters\n\n`PublishPackages` now accepts two new step inputs:\n\n- `--group <group-id>` — resolves a group from the workspace configuration and publishes all packages in that group.\n- `--ecosystem <ecosystem>` — filters publication targets to a specific ecosystem (`cargo`, `npm`, `deno`, `dart`, `flutter`, `python`, or `go`).\n\nBoth inputs can be repeated:\n\n```bash\nmc publish --group sdk --group apps --ecosystem npm --ecosystem cargo\n```\n\nGroups are resolved to their member packages before ecosystem filtering is applied.\n\n##### Dry-run guards\n\n`PublishPackages` now skips the following side-effecting operations when `--dry-run` is active:\n\n- `release_branch_policy::verify_release_ref_for_publish`\n- `publish_rate_limits::enforce_publish_rate_limits`\n- writing the publish report artifact to disk\n\n##### Per-command `dry_run` field\n\nCLI command definitions now support a `dry_run` boolean field. When `dry_run = true`, the command always executes in dry-run mode regardless of whether `--dry-run` is passed on the CLI. This enables built-in preview commands such as:\n\n```toml\n[cli.publish-check]\nhelp_text = \"Validate the release and preview package publishing in dry-run mode\"\ndry_run = true\nsteps = [\n\t{ type = \"PrepareRelease\", name = \"plan release\" },\n\t{ type = \"PublishPackages\", name = \"publish packages dry run\" },\n]\n```\n\nRunning `mc publish-check` (without `--dry-run`) will still run in dry-run mode because the command definition sets `dry_run = true`.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #426](https://github.com/monochange/monochange/pull/426)\n> _Introduced in:_ [`6ea6236`](https://github.com/monochange/monochange/commit/6ea623624e36d795edd531ae72080a2e9c3fb86a)\n\n#### Add persistent deduplication index and content-hash fast path for release records\n\nIntroduce a JSONL index at `.monochange/local/release-index.jsonl` that survives across CLI invocations, eliminating repeated directory scans when checking for duplicate release records. A fast path in `validate_release_record_file` now compares the `releaseTargets` identity of an existing file against the manifest before rebuilding the full `ReleaseRecord`, skipping unnecessary I/O when the targets match.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #435](https://github.com/monochange/monochange/pull/435)\n> _Introduced in:_ [`b906cab`](https://github.com/monochange/monochange/commit/b906cab608c84b30bfd429298892a80766221ef6)\n> _Closed issues:_ [#430](https://github.com/monochange/monochange/issues/430)\n\n#### Sort release targets and hash identity fields directly\n\n`release_targets_hash` now sorts targets by `(id, kind, version)` before hashing and only feeds identity fields (`id`, `kind`, `version`) into the hasher. Operational flags (`tag`, `release`, `tag_name`, `version_format`, `members`) are excluded from the hash so that path identity matches release identity.\n\n`ReleasePaths::from_manifest` computes the hash directly from the manifest without building the intermediate `ReleaseRecord`, and `write_release_record_file` now checks file existence before doing any expensive work.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #431](https://github.com/monochange/monochange/pull/431)\n> _Introduced in:_ [`88a6e4c`](https://github.com/monochange/monochange/commit/88a6e4cea075da0b1745cd24a0a150ebea99bb83)\n> _Closed issues:_ [#430](https://github.com/monochange/monochange/issues/430)\n\n### Fixed\n\n#### Split crate boundaries for changelog, config, and publish behavior\n\nMove changelog rendering into `monochange_changelog`, shift publish planning and execution helpers into `monochange_publish`, and reduce direct concrete ecosystem/provider dependencies in `monochange_config`.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #441](https://github.com/monochange/monochange/pull/441)\n> _Introduced in:_ [`ae8ea56`](https://github.com/monochange/monochange/commit/ae8ea563ae95c6cc4e8d3d1acdc5303069ea44cf)\n\n#### Fix release record reformatting after dprint\n\nPrevent `commit_release` from rewriting `release.json` after `dprint fmt` has already formatted it. The validation now compares parsed JSON values instead of raw strings, so formatting-only differences (such as tab vs space indentation) no longer trigger a rewrite.\n\nThe `CommitRelease` step now accepts an `update_release_json` input (default `false`). When `true`, the step will create or overwrite the `release.json` file if it is missing or mismatched. When `false`, a mismatch produces a clear error asking the user to set `update_release_json = true`.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #439](https://github.com/monochange/monochange/pull/439)\n> _Introduced in:_ [`f4b324e`](https://github.com/monochange/monochange/commit/f4b324ec920ea787ec6d5c511b81d9c22fbad753)\n\n#### Release PR formatting, schema version, and publish batch ordering\n\n1. Format generated `.monochange/releases/` manifests via `dprint fmt` in `[cli.release-pr]`.\n2. Derive expected schema versions in snapshots and tests from the actual `Cargo.toml` version instead of hardcoding `0.0`.\n3. Topologically sort publish requests by both runtime and development dependencies before batching so dependencies are published before dependents.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #436](https://github.com/monochange/monochange/pull/436)\n> _Introduced in:_ [`ea78ccc`](https://github.com/monochange/monochange/commit/ea78ccc844318b0645010f15fcf60b9d8ea6a58c)\n> _Related issues:_ [#434](https://github.com/monochange/monochange/issues/434)\n\n#### Replace release record `groupVersion` with `versions`\n\nRelease records now include a `versions` map keyed by released package or group id, and no longer write the redundant `groupVersion` field.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #450](https://github.com/monochange/monochange/pull/450)\n> _Introduced in:_ [`375bc19`](https://github.com/monochange/monochange/commit/375bc19dc69c125ffbd944d016b16ebc1c8cb7c5)\n\n### Documentation\n\n#### Document `CommitRelease.update_release_json` option\n\nAdd comprehensive documentation for the `update_release_json` step-level input on `CommitRelease`:\n\n- Document the input in the `CommitRelease` CLI step reference with type, default, and description\n- Explain semantic JSON comparison (formatting-only differences such as indentation or key ordering are ignored)\n- Add a new composition example showing how to combine `dprint fmt` formatting with `CommitRelease` using `update_release_json = true`\n- Add a new common-mistake entry about running formatters between `PrepareRelease` and `CommitRelease` without setting the input\n- Document the field in the configuration guide's workflow variables section\n- Regenerate JSON Schema assets to include the new `update_release_json` field in `CommitRelease` step definitions\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #443](https://github.com/monochange/monochange/pull/443)\n> _Introduced in:_ [`4b8cc5a`](https://github.com/monochange/monochange/commit/4b8cc5a25644ab3623177c08bd7904c649ea67a0)\n\n### Other\n\n#### Update release commands to regenerate JSON schemas\n\nBefore `dprint fmt`, both commands now regenerate JSON schemas from schemars-annotated types so that committed schema assets stay in sync with the source code.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #442](https://github.com/monochange/monochange/pull/442)\n> _Introduced in:_ [`66260c9`](https://github.com/monochange/monochange/commit/66260c9ff4880b73725807ada2ff67ed24c3096a)"
+		},
+		{
+			"ownerId": "monochange_analysis",
+			"ownerKind": "package",
+			"path": "crates/monochange_analysis/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `monochange_analysis` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `monochange_analysis` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "monochange_cargo",
+			"ownerKind": "package",
+			"path": "crates/monochange_cargo/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `monochange_cargo` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `monochange_cargo` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "monochange_changelog",
+			"ownerKind": "package",
+			"path": "crates/monochange_changelog/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Fixed",
+						"collapsed": false,
+						"entries": [
+							"#### Split crate boundaries for changelog, config, and publish behavior\n\nMove changelog rendering into `monochange_changelog`, shift publish planning and execution helpers into `monochange_publish`, and reduce direct concrete ecosystem/provider dependencies in `monochange_config`.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #441](https://github.com/monochange/monochange/pull/441)\n> _Introduced in:_ [`ae8ea56`](https://github.com/monochange/monochange/commit/ae8ea563ae95c6cc4e8d3d1acdc5303069ea44cf)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Fixed\n\n#### Split crate boundaries for changelog, config, and publish behavior\n\nMove changelog rendering into `monochange_changelog`, shift publish planning and execution helpers into `monochange_publish`, and reduce direct concrete ecosystem/provider dependencies in `monochange_config`.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #441](https://github.com/monochange/monochange/pull/441)\n> _Introduced in:_ [`ae8ea56`](https://github.com/monochange/monochange/commit/ae8ea563ae95c6cc4e8d3d1acdc5303069ea44cf)"
+		},
+		{
+			"ownerId": "monochange_config",
+			"ownerKind": "package",
+			"path": "crates/monochange_config/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Add `always_run` primitive to CLI steps and group/ecosystem filters to `PublishPackages`\n\n##### `always_run` primitive\n\nA new `always_run` boolean field is available on every CLI step definition. When `always_run: true`, the step continues to execute even when a previous step in the same command has failed.\n\nThis enables composable dry-run workflows such as:\n\n```toml\n[[cli.publish-dry-run]]\nname = \"publish-dry-run\"\nhelp_text = \"Preview publishing without side effects\"\nsteps = [\n\t{ type = \"PrepareRelease\", name = \"prepare\", inputs = { allow_empty_changesets = \"true\" } },\n\t{ type = \"PublishPackages\", name = \"publish\", always_run = true, inputs = { resume = \".monochange/local/previous-result.json\" } },\n]\n```\n\nRunning `mc publish-dry-run --dry-run` will always execute the `PublishPackages` step regardless of whether `PrepareRelease` succeeds, because `PublishPackages` is marked `always_run = true`.\n\n###### Behavior\n\n- When a step fails and later steps have `always_run: true`, those steps still execute.\n- Non-`always_run` steps after a failure are skipped.\n- The overall command still returns the first error after all `always_run` steps finish.\n\n##### `PublishPackages` filters\n\n`PublishPackages` now accepts two new step inputs:\n\n- `--group <group-id>` — resolves a group from the workspace configuration and publishes all packages in that group.\n- `--ecosystem <ecosystem>` — filters publication targets to a specific ecosystem (`cargo`, `npm`, `deno`, `dart`, `flutter`, `python`, or `go`).\n\nBoth inputs can be repeated:\n\n```bash\nmc publish --group sdk --group apps --ecosystem npm --ecosystem cargo\n```\n\nGroups are resolved to their member packages before ecosystem filtering is applied.\n\n##### Dry-run guards\n\n`PublishPackages` now skips the following side-effecting operations when `--dry-run` is active:\n\n- `release_branch_policy::verify_release_ref_for_publish`\n- `publish_rate_limits::enforce_publish_rate_limits`\n- writing the publish report artifact to disk\n\n##### Per-command `dry_run` field\n\nCLI command definitions now support a `dry_run` boolean field. When `dry_run = true`, the command always executes in dry-run mode regardless of whether `--dry-run` is passed on the CLI. This enables built-in preview commands such as:\n\n```toml\n[cli.publish-check]\nhelp_text = \"Validate the release and preview package publishing in dry-run mode\"\ndry_run = true\nsteps = [\n\t{ type = \"PrepareRelease\", name = \"plan release\" },\n\t{ type = \"PublishPackages\", name = \"publish packages dry run\" },\n]\n```\n\nRunning `mc publish-check` (without `--dry-run`) will still run in dry-run mode because the command definition sets `dry_run = true`.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #426](https://github.com/monochange/monochange/pull/426)\n> _Introduced in:_ [`6ea6236`](https://github.com/monochange/monochange/commit/6ea623624e36d795edd531ae72080a2e9c3fb86a)",
+							"#### Migrate JSON Schema generation from hand-tuned templates to schemars\n\nSchema assets (`monochange.schema.json` and `release-record.schema.json`) are now generated from the Rust type tree via the `schemars` crate, eliminating manual drift between source types and committed schemas.\n\n###### Added\n\n- `schema` feature on `monochange_core` and `monochange_config` gating `schemars`.\n- `JsonSchema` derives on `ReleaseRecord`, `RawWorkspaceConfiguration`, and their transitive types.\n- `monochange_core::schema` and `monochange_config::schema` modules providing `release_record()` and `workspace_configuration()` schema generation functions.\n- `xtask` binary crate providing `schema update` and `schema check` subcommands, with a `cargo xtask` alias.\n\n###### Changed\n\n- `devenv.nix` `schema:update` / `schema:check` now invoke `cargo xtask schema update` and `cargo xtask schema check`.\n- `$defs` keys use camelCase names (e.g. `packageDefinition`) via `#[schemars(rename)]` attributes.\n- Release-record `schemaVersion` and `kind` emit `const` constraints instead of `default`.\n\n###### Removed\n\n- `scripts/schema-assets.sh` shell script.\n- `schemas/templates/*.schema.template.json` template files.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #438](https://github.com/monochange/monochange/pull/438)\n> _Introduced in:_ [`d0676f0`](https://github.com/monochange/monochange/commit/d0676f067299fb4db38cc748dcbb619ab7532a49)"
+						]
+					},
+					{
+						"title": "Fixed",
+						"collapsed": false,
+						"entries": [
+							"#### allow boolean and numeric literals in `CliInputDefinition.default`\n\nThe JSON schema for `monochange.toml` `[cli.*.inputs]` previously rejected boolean and numeric defaults, even though the Rust deserializer already accepted them correctly.\n\n**Before:**\n\n```toml\n[[cli.release-pr.inputs]]\nname = \"no_verify\"\ntype = \"boolean\"\ndefault = true # jsonschema error: \"true is not of types \\\"null\\\", \\\"string\\\"\"\n```\n\n**After:**\n\nThe `default` field in `CliInputDefinition` now accepts `string | boolean | integer | number | null` in the generated schema. TOML like the snippet above validates cleanly, and numeric defaults such as `default = 42` are also accepted.\n\nThe internal `CliInputDefault` enum gained `Integer(i64)` and `Number(f64)` variants, and the `schemars` derive now generates a multi-type `anyOf` schema for the `default` property.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #445](https://github.com/monochange/monochange/pull/445)\n> _Introduced in:_ [`1d42ece`](https://github.com/monochange/monochange/commit/1d42ece77ceda58cd44ce67749c5faa5d4ec8314)",
+							"#### Split crate boundaries for changelog, config, and publish behavior\n\nMove changelog rendering into `monochange_changelog`, shift publish planning and execution helpers into `monochange_publish`, and reduce direct concrete ecosystem/provider dependencies in `monochange_config`.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #441](https://github.com/monochange/monochange/pull/441)\n> _Introduced in:_ [`ae8ea56`](https://github.com/monochange/monochange/commit/ae8ea563ae95c6cc4e8d3d1acdc5303069ea44cf)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Added\n\n#### Add `always_run` primitive to CLI steps and group/ecosystem filters to `PublishPackages`\n\n##### `always_run` primitive\n\nA new `always_run` boolean field is available on every CLI step definition. When `always_run: true`, the step continues to execute even when a previous step in the same command has failed.\n\nThis enables composable dry-run workflows such as:\n\n```toml\n[[cli.publish-dry-run]]\nname = \"publish-dry-run\"\nhelp_text = \"Preview publishing without side effects\"\nsteps = [\n\t{ type = \"PrepareRelease\", name = \"prepare\", inputs = { allow_empty_changesets = \"true\" } },\n\t{ type = \"PublishPackages\", name = \"publish\", always_run = true, inputs = { resume = \".monochange/local/previous-result.json\" } },\n]\n```\n\nRunning `mc publish-dry-run --dry-run` will always execute the `PublishPackages` step regardless of whether `PrepareRelease` succeeds, because `PublishPackages` is marked `always_run = true`.\n\n###### Behavior\n\n- When a step fails and later steps have `always_run: true`, those steps still execute.\n- Non-`always_run` steps after a failure are skipped.\n- The overall command still returns the first error after all `always_run` steps finish.\n\n##### `PublishPackages` filters\n\n`PublishPackages` now accepts two new step inputs:\n\n- `--group <group-id>` — resolves a group from the workspace configuration and publishes all packages in that group.\n- `--ecosystem <ecosystem>` — filters publication targets to a specific ecosystem (`cargo`, `npm`, `deno`, `dart`, `flutter`, `python`, or `go`).\n\nBoth inputs can be repeated:\n\n```bash\nmc publish --group sdk --group apps --ecosystem npm --ecosystem cargo\n```\n\nGroups are resolved to their member packages before ecosystem filtering is applied.\n\n##### Dry-run guards\n\n`PublishPackages` now skips the following side-effecting operations when `--dry-run` is active:\n\n- `release_branch_policy::verify_release_ref_for_publish`\n- `publish_rate_limits::enforce_publish_rate_limits`\n- writing the publish report artifact to disk\n\n##### Per-command `dry_run` field\n\nCLI command definitions now support a `dry_run` boolean field. When `dry_run = true`, the command always executes in dry-run mode regardless of whether `--dry-run` is passed on the CLI. This enables built-in preview commands such as:\n\n```toml\n[cli.publish-check]\nhelp_text = \"Validate the release and preview package publishing in dry-run mode\"\ndry_run = true\nsteps = [\n\t{ type = \"PrepareRelease\", name = \"plan release\" },\n\t{ type = \"PublishPackages\", name = \"publish packages dry run\" },\n]\n```\n\nRunning `mc publish-check` (without `--dry-run`) will still run in dry-run mode because the command definition sets `dry_run = true`.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #426](https://github.com/monochange/monochange/pull/426)\n> _Introduced in:_ [`6ea6236`](https://github.com/monochange/monochange/commit/6ea623624e36d795edd531ae72080a2e9c3fb86a)\n\n#### Migrate JSON Schema generation from hand-tuned templates to schemars\n\nSchema assets (`monochange.schema.json` and `release-record.schema.json`) are now generated from the Rust type tree via the `schemars` crate, eliminating manual drift between source types and committed schemas.\n\n###### Added\n\n- `schema` feature on `monochange_core` and `monochange_config` gating `schemars`.\n- `JsonSchema` derives on `ReleaseRecord`, `RawWorkspaceConfiguration`, and their transitive types.\n- `monochange_core::schema` and `monochange_config::schema` modules providing `release_record()` and `workspace_configuration()` schema generation functions.\n- `xtask` binary crate providing `schema update` and `schema check` subcommands, with a `cargo xtask` alias.\n\n###### Changed\n\n- `devenv.nix` `schema:update` / `schema:check` now invoke `cargo xtask schema update` and `cargo xtask schema check`.\n- `$defs` keys use camelCase names (e.g. `packageDefinition`) via `#[schemars(rename)]` attributes.\n- Release-record `schemaVersion` and `kind` emit `const` constraints instead of `default`.\n\n###### Removed\n\n- `scripts/schema-assets.sh` shell script.\n- `schemas/templates/*.schema.template.json` template files.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #438](https://github.com/monochange/monochange/pull/438)\n> _Introduced in:_ [`d0676f0`](https://github.com/monochange/monochange/commit/d0676f067299fb4db38cc748dcbb619ab7532a49)\n\n### Fixed\n\n#### allow boolean and numeric literals in `CliInputDefinition.default`\n\nThe JSON schema for `monochange.toml` `[cli.*.inputs]` previously rejected boolean and numeric defaults, even though the Rust deserializer already accepted them correctly.\n\n**Before:**\n\n```toml\n[[cli.release-pr.inputs]]\nname = \"no_verify\"\ntype = \"boolean\"\ndefault = true # jsonschema error: \"true is not of types \\\"null\\\", \\\"string\\\"\"\n```\n\n**After:**\n\nThe `default` field in `CliInputDefinition` now accepts `string | boolean | integer | number | null` in the generated schema. TOML like the snippet above validates cleanly, and numeric defaults such as `default = 42` are also accepted.\n\nThe internal `CliInputDefault` enum gained `Integer(i64)` and `Number(f64)` variants, and the `schemars` derive now generates a multi-type `anyOf` schema for the `default` property.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #445](https://github.com/monochange/monochange/pull/445)\n> _Introduced in:_ [`1d42ece`](https://github.com/monochange/monochange/commit/1d42ece77ceda58cd44ce67749c5faa5d4ec8314)\n\n#### Split crate boundaries for changelog, config, and publish behavior\n\nMove changelog rendering into `monochange_changelog`, shift publish planning and execution helpers into `monochange_publish`, and reduce direct concrete ecosystem/provider dependencies in `monochange_config`.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #441](https://github.com/monochange/monochange/pull/441)\n> _Introduced in:_ [`ae8ea56`](https://github.com/monochange/monochange/commit/ae8ea563ae95c6cc4e8d3d1acdc5303069ea44cf)"
+		},
+		{
+			"ownerId": "monochange_core",
+			"ownerKind": "package",
+			"path": "crates/monochange_core/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Add `always_run` primitive to CLI steps and group/ecosystem filters to `PublishPackages`\n\n##### `always_run` primitive\n\nA new `always_run` boolean field is available on every CLI step definition. When `always_run: true`, the step continues to execute even when a previous step in the same command has failed.\n\nThis enables composable dry-run workflows such as:\n\n```toml\n[[cli.publish-dry-run]]\nname = \"publish-dry-run\"\nhelp_text = \"Preview publishing without side effects\"\nsteps = [\n\t{ type = \"PrepareRelease\", name = \"prepare\", inputs = { allow_empty_changesets = \"true\" } },\n\t{ type = \"PublishPackages\", name = \"publish\", always_run = true, inputs = { resume = \".monochange/local/previous-result.json\" } },\n]\n```\n\nRunning `mc publish-dry-run --dry-run` will always execute the `PublishPackages` step regardless of whether `PrepareRelease` succeeds, because `PublishPackages` is marked `always_run = true`.\n\n###### Behavior\n\n- When a step fails and later steps have `always_run: true`, those steps still execute.\n- Non-`always_run` steps after a failure are skipped.\n- The overall command still returns the first error after all `always_run` steps finish.\n\n##### `PublishPackages` filters\n\n`PublishPackages` now accepts two new step inputs:\n\n- `--group <group-id>` — resolves a group from the workspace configuration and publishes all packages in that group.\n- `--ecosystem <ecosystem>` — filters publication targets to a specific ecosystem (`cargo`, `npm`, `deno`, `dart`, `flutter`, `python`, or `go`).\n\nBoth inputs can be repeated:\n\n```bash\nmc publish --group sdk --group apps --ecosystem npm --ecosystem cargo\n```\n\nGroups are resolved to their member packages before ecosystem filtering is applied.\n\n##### Dry-run guards\n\n`PublishPackages` now skips the following side-effecting operations when `--dry-run` is active:\n\n- `release_branch_policy::verify_release_ref_for_publish`\n- `publish_rate_limits::enforce_publish_rate_limits`\n- writing the publish report artifact to disk\n\n##### Per-command `dry_run` field\n\nCLI command definitions now support a `dry_run` boolean field. When `dry_run = true`, the command always executes in dry-run mode regardless of whether `--dry-run` is passed on the CLI. This enables built-in preview commands such as:\n\n```toml\n[cli.publish-check]\nhelp_text = \"Validate the release and preview package publishing in dry-run mode\"\ndry_run = true\nsteps = [\n\t{ type = \"PrepareRelease\", name = \"plan release\" },\n\t{ type = \"PublishPackages\", name = \"publish packages dry run\" },\n]\n```\n\nRunning `mc publish-check` (without `--dry-run`) will still run in dry-run mode because the command definition sets `dry_run = true`.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #426](https://github.com/monochange/monochange/pull/426)\n> _Introduced in:_ [`6ea6236`](https://github.com/monochange/monochange/commit/6ea623624e36d795edd531ae72080a2e9c3fb86a)",
+							"#### Migrate JSON Schema generation from hand-tuned templates to schemars\n\nSchema assets (`monochange.schema.json` and `release-record.schema.json`) are now generated from the Rust type tree via the `schemars` crate, eliminating manual drift between source types and committed schemas.\n\n###### Added\n\n- `schema` feature on `monochange_core` and `monochange_config` gating `schemars`.\n- `JsonSchema` derives on `ReleaseRecord`, `RawWorkspaceConfiguration`, and their transitive types.\n- `monochange_core::schema` and `monochange_config::schema` modules providing `release_record()` and `workspace_configuration()` schema generation functions.\n- `xtask` binary crate providing `schema update` and `schema check` subcommands, with a `cargo xtask` alias.\n\n###### Changed\n\n- `devenv.nix` `schema:update` / `schema:check` now invoke `cargo xtask schema update` and `cargo xtask schema check`.\n- `$defs` keys use camelCase names (e.g. `packageDefinition`) via `#[schemars(rename)]` attributes.\n- Release-record `schemaVersion` and `kind` emit `const` constraints instead of `default`.\n\n###### Removed\n\n- `scripts/schema-assets.sh` shell script.\n- `schemas/templates/*.schema.template.json` template files.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #438](https://github.com/monochange/monochange/pull/438)\n> _Introduced in:_ [`d0676f0`](https://github.com/monochange/monochange/commit/d0676f067299fb4db38cc748dcbb619ab7532a49)"
+						]
+					},
+					{
+						"title": "Fixed",
+						"collapsed": false,
+						"entries": [
+							"#### allow boolean and numeric literals in `CliInputDefinition.default`\n\nThe JSON schema for `monochange.toml` `[cli.*.inputs]` previously rejected boolean and numeric defaults, even though the Rust deserializer already accepted them correctly.\n\n**Before:**\n\n```toml\n[[cli.release-pr.inputs]]\nname = \"no_verify\"\ntype = \"boolean\"\ndefault = true # jsonschema error: \"true is not of types \\\"null\\\", \\\"string\\\"\"\n```\n\n**After:**\n\nThe `default` field in `CliInputDefinition` now accepts `string | boolean | integer | number | null` in the generated schema. TOML like the snippet above validates cleanly, and numeric defaults such as `default = 42` are also accepted.\n\nThe internal `CliInputDefault` enum gained `Integer(i64)` and `Number(f64)` variants, and the `schemars` derive now generates a multi-type `anyOf` schema for the `default` property.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #445](https://github.com/monochange/monochange/pull/445)\n> _Introduced in:_ [`1d42ece`](https://github.com/monochange/monochange/commit/1d42ece77ceda58cd44ce67749c5faa5d4ec8314)",
+							"#### Fix release record reformatting after dprint\n\nPrevent `commit_release` from rewriting `release.json` after `dprint fmt` has already formatted it. The validation now compares parsed JSON values instead of raw strings, so formatting-only differences (such as tab vs space indentation) no longer trigger a rewrite.\n\nThe `CommitRelease` step now accepts an `update_release_json` input (default `false`). When `true`, the step will create or overwrite the `release.json` file if it is missing or mismatched. When `false`, a mismatch produces a clear error asking the user to set `update_release_json = true`.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #439](https://github.com/monochange/monochange/pull/439)\n> _Introduced in:_ [`f4b324e`](https://github.com/monochange/monochange/commit/f4b324ec920ea787ec6d5c511b81d9c22fbad753)",
+							"#### Release PR formatting, schema version, and publish batch ordering\n\n1. Format generated `.monochange/releases/` manifests via `dprint fmt` in `[cli.release-pr]`.\n2. Derive expected schema versions in snapshots and tests from the actual `Cargo.toml` version instead of hardcoding `0.0`.\n3. Topologically sort publish requests by both runtime and development dependencies before batching so dependencies are published before dependents.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #436](https://github.com/monochange/monochange/pull/436)\n> _Introduced in:_ [`ea78ccc`](https://github.com/monochange/monochange/commit/ea78ccc844318b0645010f15fcf60b9d8ea6a58c)\n> _Related issues:_ [#434](https://github.com/monochange/monochange/issues/434)",
+							"#### Replace release record `groupVersion` with `versions`\n\nRelease records now include a `versions` map keyed by released package or group id, and no longer write the redundant `groupVersion` field.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #450](https://github.com/monochange/monochange/pull/450)\n> _Introduced in:_ [`375bc19`](https://github.com/monochange/monochange/commit/375bc19dc69c125ffbd944d016b16ebc1c8cb7c5)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Added\n\n#### Add `always_run` primitive to CLI steps and group/ecosystem filters to `PublishPackages`\n\n##### `always_run` primitive\n\nA new `always_run` boolean field is available on every CLI step definition. When `always_run: true`, the step continues to execute even when a previous step in the same command has failed.\n\nThis enables composable dry-run workflows such as:\n\n```toml\n[[cli.publish-dry-run]]\nname = \"publish-dry-run\"\nhelp_text = \"Preview publishing without side effects\"\nsteps = [\n\t{ type = \"PrepareRelease\", name = \"prepare\", inputs = { allow_empty_changesets = \"true\" } },\n\t{ type = \"PublishPackages\", name = \"publish\", always_run = true, inputs = { resume = \".monochange/local/previous-result.json\" } },\n]\n```\n\nRunning `mc publish-dry-run --dry-run` will always execute the `PublishPackages` step regardless of whether `PrepareRelease` succeeds, because `PublishPackages` is marked `always_run = true`.\n\n###### Behavior\n\n- When a step fails and later steps have `always_run: true`, those steps still execute.\n- Non-`always_run` steps after a failure are skipped.\n- The overall command still returns the first error after all `always_run` steps finish.\n\n##### `PublishPackages` filters\n\n`PublishPackages` now accepts two new step inputs:\n\n- `--group <group-id>` — resolves a group from the workspace configuration and publishes all packages in that group.\n- `--ecosystem <ecosystem>` — filters publication targets to a specific ecosystem (`cargo`, `npm`, `deno`, `dart`, `flutter`, `python`, or `go`).\n\nBoth inputs can be repeated:\n\n```bash\nmc publish --group sdk --group apps --ecosystem npm --ecosystem cargo\n```\n\nGroups are resolved to their member packages before ecosystem filtering is applied.\n\n##### Dry-run guards\n\n`PublishPackages` now skips the following side-effecting operations when `--dry-run` is active:\n\n- `release_branch_policy::verify_release_ref_for_publish`\n- `publish_rate_limits::enforce_publish_rate_limits`\n- writing the publish report artifact to disk\n\n##### Per-command `dry_run` field\n\nCLI command definitions now support a `dry_run` boolean field. When `dry_run = true`, the command always executes in dry-run mode regardless of whether `--dry-run` is passed on the CLI. This enables built-in preview commands such as:\n\n```toml\n[cli.publish-check]\nhelp_text = \"Validate the release and preview package publishing in dry-run mode\"\ndry_run = true\nsteps = [\n\t{ type = \"PrepareRelease\", name = \"plan release\" },\n\t{ type = \"PublishPackages\", name = \"publish packages dry run\" },\n]\n```\n\nRunning `mc publish-check` (without `--dry-run`) will still run in dry-run mode because the command definition sets `dry_run = true`.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #426](https://github.com/monochange/monochange/pull/426)\n> _Introduced in:_ [`6ea6236`](https://github.com/monochange/monochange/commit/6ea623624e36d795edd531ae72080a2e9c3fb86a)\n\n#### Migrate JSON Schema generation from hand-tuned templates to schemars\n\nSchema assets (`monochange.schema.json` and `release-record.schema.json`) are now generated from the Rust type tree via the `schemars` crate, eliminating manual drift between source types and committed schemas.\n\n###### Added\n\n- `schema` feature on `monochange_core` and `monochange_config` gating `schemars`.\n- `JsonSchema` derives on `ReleaseRecord`, `RawWorkspaceConfiguration`, and their transitive types.\n- `monochange_core::schema` and `monochange_config::schema` modules providing `release_record()` and `workspace_configuration()` schema generation functions.\n- `xtask` binary crate providing `schema update` and `schema check` subcommands, with a `cargo xtask` alias.\n\n###### Changed\n\n- `devenv.nix` `schema:update` / `schema:check` now invoke `cargo xtask schema update` and `cargo xtask schema check`.\n- `$defs` keys use camelCase names (e.g. `packageDefinition`) via `#[schemars(rename)]` attributes.\n- Release-record `schemaVersion` and `kind` emit `const` constraints instead of `default`.\n\n###### Removed\n\n- `scripts/schema-assets.sh` shell script.\n- `schemas/templates/*.schema.template.json` template files.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #438](https://github.com/monochange/monochange/pull/438)\n> _Introduced in:_ [`d0676f0`](https://github.com/monochange/monochange/commit/d0676f067299fb4db38cc748dcbb619ab7532a49)\n\n### Fixed\n\n#### allow boolean and numeric literals in `CliInputDefinition.default`\n\nThe JSON schema for `monochange.toml` `[cli.*.inputs]` previously rejected boolean and numeric defaults, even though the Rust deserializer already accepted them correctly.\n\n**Before:**\n\n```toml\n[[cli.release-pr.inputs]]\nname = \"no_verify\"\ntype = \"boolean\"\ndefault = true # jsonschema error: \"true is not of types \\\"null\\\", \\\"string\\\"\"\n```\n\n**After:**\n\nThe `default` field in `CliInputDefinition` now accepts `string | boolean | integer | number | null` in the generated schema. TOML like the snippet above validates cleanly, and numeric defaults such as `default = 42` are also accepted.\n\nThe internal `CliInputDefault` enum gained `Integer(i64)` and `Number(f64)` variants, and the `schemars` derive now generates a multi-type `anyOf` schema for the `default` property.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #445](https://github.com/monochange/monochange/pull/445)\n> _Introduced in:_ [`1d42ece`](https://github.com/monochange/monochange/commit/1d42ece77ceda58cd44ce67749c5faa5d4ec8314)\n\n#### Fix release record reformatting after dprint\n\nPrevent `commit_release` from rewriting `release.json` after `dprint fmt` has already formatted it. The validation now compares parsed JSON values instead of raw strings, so formatting-only differences (such as tab vs space indentation) no longer trigger a rewrite.\n\nThe `CommitRelease` step now accepts an `update_release_json` input (default `false`). When `true`, the step will create or overwrite the `release.json` file if it is missing or mismatched. When `false`, a mismatch produces a clear error asking the user to set `update_release_json = true`.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #439](https://github.com/monochange/monochange/pull/439)\n> _Introduced in:_ [`f4b324e`](https://github.com/monochange/monochange/commit/f4b324ec920ea787ec6d5c511b81d9c22fbad753)\n\n#### Release PR formatting, schema version, and publish batch ordering\n\n1. Format generated `.monochange/releases/` manifests via `dprint fmt` in `[cli.release-pr]`.\n2. Derive expected schema versions in snapshots and tests from the actual `Cargo.toml` version instead of hardcoding `0.0`.\n3. Topologically sort publish requests by both runtime and development dependencies before batching so dependencies are published before dependents.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #436](https://github.com/monochange/monochange/pull/436)\n> _Introduced in:_ [`ea78ccc`](https://github.com/monochange/monochange/commit/ea78ccc844318b0645010f15fcf60b9d8ea6a58c)\n> _Related issues:_ [#434](https://github.com/monochange/monochange/issues/434)\n\n#### Replace release record `groupVersion` with `versions`\n\nRelease records now include a `versions` map keyed by released package or group id, and no longer write the redundant `groupVersion` field.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #450](https://github.com/monochange/monochange/pull/450)\n> _Introduced in:_ [`375bc19`](https://github.com/monochange/monochange/commit/375bc19dc69c125ffbd944d016b16ebc1c8cb7c5)"
+		},
+		{
+			"ownerId": "monochange_dart",
+			"ownerKind": "package",
+			"path": "crates/monochange_dart/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `monochange_dart` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `monochange_dart` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "monochange_deno",
+			"ownerKind": "package",
+			"path": "crates/monochange_deno/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `monochange_deno` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `monochange_deno` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "monochange_ecmascript",
+			"ownerKind": "package",
+			"path": "crates/monochange_ecmascript/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `monochange_ecmascript` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `monochange_ecmascript` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "monochange_forgejo",
+			"ownerKind": "package",
+			"path": "crates/monochange_forgejo/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `monochange_forgejo` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `monochange_forgejo` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "monochange_gitea",
+			"ownerKind": "package",
+			"path": "crates/monochange_gitea/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `monochange_gitea` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `monochange_gitea` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "monochange_github",
+			"ownerKind": "package",
+			"path": "crates/monochange_github/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Fixed",
+						"collapsed": false,
+						"entries": [
+							"#### Update release pull request metadata on rerun\n\n`OpenReleaseRequest` now explicitly syncs existing GitHub release pull request metadata when rerun, including refreshed body content from the latest release notes.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #449](https://github.com/monochange/monochange/pull/449)\n> _Introduced in:_ [`5978d06`](https://github.com/monochange/monochange/commit/5978d0630a34359f7e8d634f5b7f522355a64244)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Fixed\n\n#### Update release pull request metadata on rerun\n\n`OpenReleaseRequest` now explicitly syncs existing GitHub release pull request metadata when rerun, including refreshed body content from the latest release notes.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #449](https://github.com/monochange/monochange/pull/449)\n> _Introduced in:_ [`5978d06`](https://github.com/monochange/monochange/commit/5978d0630a34359f7e8d634f5b7f522355a64244)"
+		},
+		{
+			"ownerId": "monochange_gitlab",
+			"ownerKind": "package",
+			"path": "crates/monochange_gitlab/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `monochange_gitlab` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `monochange_gitlab` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "monochange_go",
+			"ownerKind": "package",
+			"path": "crates/monochange_go/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `monochange_go` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `monochange_go` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "monochange_graph",
+			"ownerKind": "package",
+			"path": "crates/monochange_graph/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `monochange_graph` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `monochange_graph` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "monochange_hosting",
+			"ownerKind": "package",
+			"path": "crates/monochange_hosting/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `monochange_hosting` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `monochange_hosting` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "monochange_lint",
+			"ownerKind": "package",
+			"path": "crates/monochange_lint/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `monochange_lint` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `monochange_lint` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "monochange_lint_testing",
+			"ownerKind": "package",
+			"path": "crates/monochange_lint_testing/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `monochange_lint_testing` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `monochange_lint_testing` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "monochange_linting",
+			"ownerKind": "package",
+			"path": "crates/monochange_linting/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `monochange_linting` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `monochange_linting` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "monochange_npm",
+			"ownerKind": "package",
+			"path": "crates/monochange_npm/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `monochange_npm` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `monochange_npm` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "monochange_publish",
+			"ownerKind": "package",
+			"path": "crates/monochange_publish/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Fixed",
+						"collapsed": false,
+						"entries": [
+							"#### Split crate boundaries for changelog, config, and publish behavior\n\nMove changelog rendering into `monochange_changelog`, shift publish planning and execution helpers into `monochange_publish`, and reduce direct concrete ecosystem/provider dependencies in `monochange_config`.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #441](https://github.com/monochange/monochange/pull/441)\n> _Introduced in:_ [`ae8ea56`](https://github.com/monochange/monochange/commit/ae8ea563ae95c6cc4e8d3d1acdc5303069ea44cf)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Fixed\n\n#### Split crate boundaries for changelog, config, and publish behavior\n\nMove changelog rendering into `monochange_changelog`, shift publish planning and execution helpers into `monochange_publish`, and reduce direct concrete ecosystem/provider dependencies in `monochange_config`.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #441](https://github.com/monochange/monochange/pull/441)\n> _Introduced in:_ [`ae8ea56`](https://github.com/monochange/monochange/commit/ae8ea563ae95c6cc4e8d3d1acdc5303069ea44cf)"
+		},
+		{
+			"ownerId": "monochange_python",
+			"ownerKind": "package",
+			"path": "crates/monochange_python/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `monochange_python` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `monochange_python` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "monochange_schema",
+			"ownerKind": "package",
+			"path": "crates/monochange_schema/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "monochange_schema [0.1.1](https://github.com/monochange/monochange/releases/tag/monochange_schema/v0.1.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Added",
+						"collapsed": false,
+						"entries": [
+							"#### Migrate JSON Schema generation from hand-tuned templates to schemars\n\nSchema assets (`monochange.schema.json` and `release-record.schema.json`) are now generated from the Rust type tree via the `schemars` crate, eliminating manual drift between source types and committed schemas.\n\n###### Added\n\n- `schema` feature on `monochange_core` and `monochange_config` gating `schemars`.\n- `JsonSchema` derives on `ReleaseRecord`, `RawWorkspaceConfiguration`, and their transitive types.\n- `monochange_core::schema` and `monochange_config::schema` modules providing `release_record()` and `workspace_configuration()` schema generation functions.\n- `xtask` binary crate providing `schema update` and `schema check` subcommands, with a `cargo xtask` alias.\n\n###### Changed\n\n- `devenv.nix` `schema:update` / `schema:check` now invoke `cargo xtask schema update` and `cargo xtask schema check`.\n- `$defs` keys use camelCase names (e.g. `packageDefinition`) via `#[schemars(rename)]` attributes.\n- Release-record `schemaVersion` and `kind` emit `const` constraints instead of `default`.\n\n###### Removed\n\n- `scripts/schema-assets.sh` shell script.\n- `schemas/templates/*.schema.template.json` template files.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #438](https://github.com/monochange/monochange/pull/438)\n> _Introduced in:_ [`d0676f0`](https://github.com/monochange/monochange/commit/d0676f067299fb4db38cc748dcbb619ab7532a49)"
+						]
+					},
+					{
+						"title": "Fixed",
+						"collapsed": false,
+						"entries": [
+							"#### Add `always_run` primitive to CLI steps and group/ecosystem filters to `PublishPackages`\n\n##### `always_run` primitive\n\nA new `always_run` boolean field is available on every CLI step definition. When `always_run: true`, the step continues to execute even when a previous step in the same command has failed.\n\nThis enables composable dry-run workflows such as:\n\n```toml\n[[cli.publish-dry-run]]\nname = \"publish-dry-run\"\nhelp_text = \"Preview publishing without side effects\"\nsteps = [\n\t{ type = \"PrepareRelease\", name = \"prepare\", inputs = { allow_empty_changesets = \"true\" } },\n\t{ type = \"PublishPackages\", name = \"publish\", always_run = true, inputs = { resume = \".monochange/local/previous-result.json\" } },\n]\n```\n\nRunning `mc publish-dry-run --dry-run` will always execute the `PublishPackages` step regardless of whether `PrepareRelease` succeeds, because `PublishPackages` is marked `always_run = true`.\n\n###### Behavior\n\n- When a step fails and later steps have `always_run: true`, those steps still execute.\n- Non-`always_run` steps after a failure are skipped.\n- The overall command still returns the first error after all `always_run` steps finish.\n\n##### `PublishPackages` filters\n\n`PublishPackages` now accepts two new step inputs:\n\n- `--group <group-id>` — resolves a group from the workspace configuration and publishes all packages in that group.\n- `--ecosystem <ecosystem>` — filters publication targets to a specific ecosystem (`cargo`, `npm`, `deno`, `dart`, `flutter`, `python`, or `go`).\n\nBoth inputs can be repeated:\n\n```bash\nmc publish --group sdk --group apps --ecosystem npm --ecosystem cargo\n```\n\nGroups are resolved to their member packages before ecosystem filtering is applied.\n\n##### Dry-run guards\n\n`PublishPackages` now skips the following side-effecting operations when `--dry-run` is active:\n\n- `release_branch_policy::verify_release_ref_for_publish`\n- `publish_rate_limits::enforce_publish_rate_limits`\n- writing the publish report artifact to disk\n\n##### Per-command `dry_run` field\n\nCLI command definitions now support a `dry_run` boolean field. When `dry_run = true`, the command always executes in dry-run mode regardless of whether `--dry-run` is passed on the CLI. This enables built-in preview commands such as:\n\n```toml\n[cli.publish-check]\nhelp_text = \"Validate the release and preview package publishing in dry-run mode\"\ndry_run = true\nsteps = [\n\t{ type = \"PrepareRelease\", name = \"plan release\" },\n\t{ type = \"PublishPackages\", name = \"publish packages dry run\" },\n]\n```\n\nRunning `mc publish-check` (without `--dry-run`) will still run in dry-run mode because the command definition sets `dry_run = true`.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #426](https://github.com/monochange/monochange/pull/426)\n> _Introduced in:_ [`6ea6236`](https://github.com/monochange/monochange/commit/6ea623624e36d795edd531ae72080a2e9c3fb86a)",
+							"#### allow boolean and numeric literals in `CliInputDefinition.default`\n\nThe JSON schema for `monochange.toml` `[cli.*.inputs]` previously rejected boolean and numeric defaults, even though the Rust deserializer already accepted them correctly.\n\n**Before:**\n\n```toml\n[[cli.release-pr.inputs]]\nname = \"no_verify\"\ntype = \"boolean\"\ndefault = true # jsonschema error: \"true is not of types \\\"null\\\", \\\"string\\\"\"\n```\n\n**After:**\n\nThe `default` field in `CliInputDefinition` now accepts `string | boolean | integer | number | null` in the generated schema. TOML like the snippet above validates cleanly, and numeric defaults such as `default = 42` are also accepted.\n\nThe internal `CliInputDefault` enum gained `Integer(i64)` and `Number(f64)` variants, and the `schemars` derive now generates a multi-type `anyOf` schema for the `default` property.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #445](https://github.com/monochange/monochange/pull/445)\n> _Introduced in:_ [`1d42ece`](https://github.com/monochange/monochange/commit/1d42ece77ceda58cd44ce67749c5faa5d4ec8314)",
+							"#### Release PR formatting, schema version, and publish batch ordering\n\n1. Format generated `.monochange/releases/` manifests via `dprint fmt` in `[cli.release-pr]`.\n2. Derive expected schema versions in snapshots and tests from the actual `Cargo.toml` version instead of hardcoding `0.0`.\n3. Topologically sort publish requests by both runtime and development dependencies before batching so dependencies are published before dependents.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #436](https://github.com/monochange/monochange/pull/436)\n> _Introduced in:_ [`ea78ccc`](https://github.com/monochange/monochange/commit/ea78ccc844318b0645010f15fcf60b9d8ea6a58c)\n> _Related issues:_ [#434](https://github.com/monochange/monochange/issues/434)",
+							"#### Replace release record `groupVersion` with `versions`\n\nRelease records now include a `versions` map keyed by released package or group id, and no longer write the redundant `groupVersion` field.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #450](https://github.com/monochange/monochange/pull/450)\n> _Introduced in:_ [`375bc19`](https://github.com/monochange/monochange/commit/375bc19dc69c125ffbd944d016b16ebc1c8cb7c5)"
+						]
+					},
+					{
+						"title": "Documentation",
+						"collapsed": false,
+						"entries": [
+							"#### Document `CommitRelease.update_release_json` option\n\nAdd comprehensive documentation for the `update_release_json` step-level input on `CommitRelease`:\n\n- Document the input in the `CommitRelease` CLI step reference with type, default, and description\n- Explain semantic JSON comparison (formatting-only differences such as indentation or key ordering are ignored)\n- Add a new composition example showing how to combine `dprint fmt` formatting with `CommitRelease` using `update_release_json = true`\n- Add a new common-mistake entry about running formatters between `PrepareRelease` and `CommitRelease` without setting the input\n- Document the field in the configuration guide's workflow variables section\n- Regenerate JSON Schema assets to include the new `update_release_json` field in `CommitRelease` step definitions\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #443](https://github.com/monochange/monochange/pull/443)\n> _Introduced in:_ [`4b8cc5a`](https://github.com/monochange/monochange/commit/4b8cc5a25644ab3623177c08bd7904c649ea67a0)"
+						]
+					}
+				]
+			},
+			"rendered": "## monochange_schema [0.1.1](https://github.com/monochange/monochange/releases/tag/monochange_schema/v0.1.1) (2026-05-10)\n\n### Added\n\n#### Migrate JSON Schema generation from hand-tuned templates to schemars\n\nSchema assets (`monochange.schema.json` and `release-record.schema.json`) are now generated from the Rust type tree via the `schemars` crate, eliminating manual drift between source types and committed schemas.\n\n###### Added\n\n- `schema` feature on `monochange_core` and `monochange_config` gating `schemars`.\n- `JsonSchema` derives on `ReleaseRecord`, `RawWorkspaceConfiguration`, and their transitive types.\n- `monochange_core::schema` and `monochange_config::schema` modules providing `release_record()` and `workspace_configuration()` schema generation functions.\n- `xtask` binary crate providing `schema update` and `schema check` subcommands, with a `cargo xtask` alias.\n\n###### Changed\n\n- `devenv.nix` `schema:update` / `schema:check` now invoke `cargo xtask schema update` and `cargo xtask schema check`.\n- `$defs` keys use camelCase names (e.g. `packageDefinition`) via `#[schemars(rename)]` attributes.\n- Release-record `schemaVersion` and `kind` emit `const` constraints instead of `default`.\n\n###### Removed\n\n- `scripts/schema-assets.sh` shell script.\n- `schemas/templates/*.schema.template.json` template files.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #438](https://github.com/monochange/monochange/pull/438)\n> _Introduced in:_ [`d0676f0`](https://github.com/monochange/monochange/commit/d0676f067299fb4db38cc748dcbb619ab7532a49)\n\n### Fixed\n\n#### Add `always_run` primitive to CLI steps and group/ecosystem filters to `PublishPackages`\n\n##### `always_run` primitive\n\nA new `always_run` boolean field is available on every CLI step definition. When `always_run: true`, the step continues to execute even when a previous step in the same command has failed.\n\nThis enables composable dry-run workflows such as:\n\n```toml\n[[cli.publish-dry-run]]\nname = \"publish-dry-run\"\nhelp_text = \"Preview publishing without side effects\"\nsteps = [\n\t{ type = \"PrepareRelease\", name = \"prepare\", inputs = { allow_empty_changesets = \"true\" } },\n\t{ type = \"PublishPackages\", name = \"publish\", always_run = true, inputs = { resume = \".monochange/local/previous-result.json\" } },\n]\n```\n\nRunning `mc publish-dry-run --dry-run` will always execute the `PublishPackages` step regardless of whether `PrepareRelease` succeeds, because `PublishPackages` is marked `always_run = true`.\n\n###### Behavior\n\n- When a step fails and later steps have `always_run: true`, those steps still execute.\n- Non-`always_run` steps after a failure are skipped.\n- The overall command still returns the first error after all `always_run` steps finish.\n\n##### `PublishPackages` filters\n\n`PublishPackages` now accepts two new step inputs:\n\n- `--group <group-id>` — resolves a group from the workspace configuration and publishes all packages in that group.\n- `--ecosystem <ecosystem>` — filters publication targets to a specific ecosystem (`cargo`, `npm`, `deno`, `dart`, `flutter`, `python`, or `go`).\n\nBoth inputs can be repeated:\n\n```bash\nmc publish --group sdk --group apps --ecosystem npm --ecosystem cargo\n```\n\nGroups are resolved to their member packages before ecosystem filtering is applied.\n\n##### Dry-run guards\n\n`PublishPackages` now skips the following side-effecting operations when `--dry-run` is active:\n\n- `release_branch_policy::verify_release_ref_for_publish`\n- `publish_rate_limits::enforce_publish_rate_limits`\n- writing the publish report artifact to disk\n\n##### Per-command `dry_run` field\n\nCLI command definitions now support a `dry_run` boolean field. When `dry_run = true`, the command always executes in dry-run mode regardless of whether `--dry-run` is passed on the CLI. This enables built-in preview commands such as:\n\n```toml\n[cli.publish-check]\nhelp_text = \"Validate the release and preview package publishing in dry-run mode\"\ndry_run = true\nsteps = [\n\t{ type = \"PrepareRelease\", name = \"plan release\" },\n\t{ type = \"PublishPackages\", name = \"publish packages dry run\" },\n]\n```\n\nRunning `mc publish-check` (without `--dry-run`) will still run in dry-run mode because the command definition sets `dry_run = true`.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #426](https://github.com/monochange/monochange/pull/426)\n> _Introduced in:_ [`6ea6236`](https://github.com/monochange/monochange/commit/6ea623624e36d795edd531ae72080a2e9c3fb86a)\n\n#### allow boolean and numeric literals in `CliInputDefinition.default`\n\nThe JSON schema for `monochange.toml` `[cli.*.inputs]` previously rejected boolean and numeric defaults, even though the Rust deserializer already accepted them correctly.\n\n**Before:**\n\n```toml\n[[cli.release-pr.inputs]]\nname = \"no_verify\"\ntype = \"boolean\"\ndefault = true # jsonschema error: \"true is not of types \\\"null\\\", \\\"string\\\"\"\n```\n\n**After:**\n\nThe `default` field in `CliInputDefinition` now accepts `string | boolean | integer | number | null` in the generated schema. TOML like the snippet above validates cleanly, and numeric defaults such as `default = 42` are also accepted.\n\nThe internal `CliInputDefault` enum gained `Integer(i64)` and `Number(f64)` variants, and the `schemars` derive now generates a multi-type `anyOf` schema for the `default` property.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #445](https://github.com/monochange/monochange/pull/445)\n> _Introduced in:_ [`1d42ece`](https://github.com/monochange/monochange/commit/1d42ece77ceda58cd44ce67749c5faa5d4ec8314)\n\n#### Release PR formatting, schema version, and publish batch ordering\n\n1. Format generated `.monochange/releases/` manifests via `dprint fmt` in `[cli.release-pr]`.\n2. Derive expected schema versions in snapshots and tests from the actual `Cargo.toml` version instead of hardcoding `0.0`.\n3. Topologically sort publish requests by both runtime and development dependencies before batching so dependencies are published before dependents.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #436](https://github.com/monochange/monochange/pull/436)\n> _Introduced in:_ [`ea78ccc`](https://github.com/monochange/monochange/commit/ea78ccc844318b0645010f15fcf60b9d8ea6a58c)\n> _Related issues:_ [#434](https://github.com/monochange/monochange/issues/434)\n\n#### Replace release record `groupVersion` with `versions`\n\nRelease records now include a `versions` map keyed by released package or group id, and no longer write the redundant `groupVersion` field.\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #450](https://github.com/monochange/monochange/pull/450)\n> _Introduced in:_ [`375bc19`](https://github.com/monochange/monochange/commit/375bc19dc69c125ffbd944d016b16ebc1c8cb7c5)\n\n### Documentation\n\n#### Document `CommitRelease.update_release_json` option\n\nAdd comprehensive documentation for the `update_release_json` step-level input on `CommitRelease`:\n\n- Document the input in the `CommitRelease` CLI step reference with type, default, and description\n- Explain semantic JSON comparison (formatting-only differences such as indentation or key ordering are ignored)\n- Add a new composition example showing how to combine `dprint fmt` formatting with `CommitRelease` using `update_release_json = true`\n- Add a new common-mistake entry about running formatters between `PrepareRelease` and `CommitRelease` without setting the input\n- Document the field in the configuration guide's workflow variables section\n- Regenerate JSON Schema assets to include the new `update_release_json` field in `CommitRelease` step definitions\n\n> _Owner:_ [@ifiokjr](https://github.com/ifiokjr)\n> _Review:_ [PR #443](https://github.com/monochange/monochange/pull/443)\n> _Introduced in:_ [`4b8cc5a`](https://github.com/monochange/monochange/commit/4b8cc5a25644ab3623177c08bd7904c649ea67a0)"
+		},
+		{
+			"ownerId": "monochange_semver",
+			"ownerKind": "package",
+			"path": "crates/monochange_semver/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `monochange_semver` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `monochange_semver` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "monochange_telemetry",
+			"ownerKind": "package",
+			"path": "crates/monochange_telemetry/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `monochange_telemetry` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `monochange_telemetry` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "monochange_test_helpers",
+			"ownerKind": "package",
+			"path": "crates/monochange_test_helpers/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `monochange_test_helpers` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `monochange_test_helpers` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "@monochange/cli",
+			"ownerKind": "package",
+			"path": "packages/monochange__cli/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `@monochange/cli` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `@monochange/cli` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "@monochange/cli-darwin-arm64",
+			"ownerKind": "package",
+			"path": "packages/monochange__cli-darwin-arm64/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `@monochange/cli-darwin-arm64` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `@monochange/cli-darwin-arm64` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "@monochange/cli-darwin-x64",
+			"ownerKind": "package",
+			"path": "packages/monochange__cli-darwin-x64/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `@monochange/cli-darwin-x64` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `@monochange/cli-darwin-x64` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "@monochange/cli-linux-arm64-gnu",
+			"ownerKind": "package",
+			"path": "packages/monochange__cli-linux-arm64-gnu/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `@monochange/cli-linux-arm64-gnu` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `@monochange/cli-linux-arm64-gnu` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "@monochange/cli-linux-arm64-musl",
+			"ownerKind": "package",
+			"path": "packages/monochange__cli-linux-arm64-musl/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `@monochange/cli-linux-arm64-musl` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `@monochange/cli-linux-arm64-musl` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "@monochange/cli-linux-x64-gnu",
+			"ownerKind": "package",
+			"path": "packages/monochange__cli-linux-x64-gnu/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `@monochange/cli-linux-x64-gnu` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `@monochange/cli-linux-x64-gnu` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "@monochange/cli-linux-x64-musl",
+			"ownerKind": "package",
+			"path": "packages/monochange__cli-linux-x64-musl/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `@monochange/cli-linux-x64-musl` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `@monochange/cli-linux-x64-musl` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "@monochange/cli-win32-arm64-msvc",
+			"ownerKind": "package",
+			"path": "packages/monochange__cli-win32-arm64-msvc/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `@monochange/cli-win32-arm64-msvc` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `@monochange/cli-win32-arm64-msvc` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "@monochange/cli-win32-x64-msvc",
+			"ownerKind": "package",
+			"path": "packages/monochange__cli-win32-x64-msvc/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `@monochange/cli-win32-x64-msvc` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `@monochange/cli-win32-x64-msvc` was updated to 0.4.1 as part of group `main`."
+		},
+		{
+			"ownerId": "@monochange/skill",
+			"ownerKind": "package",
+			"path": "packages/monochange__skill/changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)",
+				"summary": [],
+				"sections": [
+					{
+						"title": "Changed",
+						"collapsed": false,
+						"entries": [
+							"- No package-specific changes were recorded; `@monochange/skill` was updated to 0.4.1 as part of group `main`."
+						]
+					}
+				]
+			},
+			"rendered": "## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)\n\n### Changed\n\n- No package-specific changes were recorded; `@monochange/skill` was updated to 0.4.1 as part of group `main`."
+		}
+	],
+	"provider": {
+		"kind": "github",
+		"owner": "monochange",
+		"repo": "monochange",
+		"host": null
+	}
+}
