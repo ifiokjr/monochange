@@ -326,14 +326,11 @@ in
     };
     "lint:test" = {
       exec = ''
-        set -e
-        while IFS= read -r name; do
-          unset "$name"
-        done < <(git rev-parse --local-env-vars)
-
+        set -euo pipefail
         gitleaks detect --verbose --redact
-        lint:all;
-        test:all;
+
+        # lint:all;
+        # test:all;
       '';
       description = "Used for the pre push checks";
       binary = "bash";

@@ -39,14 +39,13 @@ expression: redacted_outcomes
     "status": "error"
   },
   {
-    "error": "artifact uses invalid schema version `0.1.0`: expected exactly major.minor",
+    "error": "artifact uses invalid schema version `[schema version].0`: expected exactly major.minor",
     "scenario": "invalid_version_text",
     "status": "error"
   },
   {
-    "error": "artifact uses unsupported schema version `0.1`; current supported version is `[schema version]`",
     "scenario": "old_version_without_migration_edge",
-    "schemaVersion": "0.1",
+    "schemaVersion": "[schema version]",
     "status": "ok"
   },
   {

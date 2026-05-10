@@ -361,6 +361,11 @@ fn release_record_migration_outcomes_match_snapshot() {
 		.into_iter()
 		.map(|mut outcome| {
 			if let Value::Object(ref mut map) = outcome {
+				if let Some(v) = map.get_mut("schemaVersion")
+					&& let Value::String(_) = v
+				{
+					*v = Value::String("[schema version]".to_string());
+				}
 				if let Some(v) = map.get_mut("v")
 					&& let Value::String(_) = v
 				{

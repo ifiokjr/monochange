@@ -2378,6 +2378,13 @@ fn parse_release_record_json_normalizes_integer_schema_version() {
 	);
 	let parsed = crate::parse_release_record_json(&json_text)
 		.unwrap_or_else(|error| panic!("parse release record with integer schemaVersion: {error}"));
+	assert_eq!(parsed.schema_version, RELEASE_RECORD_SCHEMA_VERSION);
+}
+
+#[test]
+fn parse_release_record_json_rejects_non_object() {
+	let error = crate::parse_release_record_json("[]").expect_err("expected error for non-object");
+	assert!(matches!(error, ReleaseRecordError::MissingKind));
 }
 
 #[test]
