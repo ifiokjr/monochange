@@ -1991,6 +1991,8 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		no_verify: bool,
 		#[serde(default)]
+		update_release_json: bool,
+		#[serde(default)]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Verify a commit is reachable from one of the configured release branches.
@@ -2299,7 +2301,7 @@ impl CliStepDefinition {
 		match self {
 			Self::Config { .. } => Some(&[]),
 			Self::Validate { .. } => Some(&["fix"]),
-			Self::CommitRelease { .. } => Some(&["no_verify"]),
+			Self::CommitRelease { .. } => Some(&["no_verify", "update_release_json"]),
 			Self::VerifyReleaseBranch { .. } => Some(&["from"]),
 			Self::Discover { .. } | Self::DisplayVersions { .. } | Self::PrepareRelease { .. } => {
 				Some(&["format"])
@@ -2395,7 +2397,7 @@ impl CliStepDefinition {
 			}
 			Self::CommitRelease { .. } => {
 				match name {
-					"no_verify" => Some(CliInputKind::Boolean),
+					"no_verify" | "update_release_json" => Some(CliInputKind::Boolean),
 					_ => None,
 				}
 			}
@@ -4148,6 +4150,7 @@ pub fn all_step_variants() -> Vec<CliStepDefinition> {
 			when: None,
 			always_run: false,
 			no_verify: false,
+			update_release_json: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::VerifyReleaseBranch {

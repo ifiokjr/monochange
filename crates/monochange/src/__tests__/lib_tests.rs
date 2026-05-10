@@ -1529,6 +1529,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 				when: None,
 				always_run: false,
 				no_verify: false,
+				update_release_json: false,
 				inputs: BTreeMap::from([(
 					"format".to_string(),
 					monochange_core::CliStepInputValue::String("json".to_string()),
@@ -4797,16 +4798,12 @@ fn commit_release_command_creates_local_commit_with_release_record() {
 	git_in_temp_repo(root, &["add", "."]);
 	git_in_temp_repo(root, &["commit", "-m", "initial"]);
 
-	// CommitRelease requires a prepared release artifact; run PrepareRelease first
-	run_cli(
-		root,
-		[OsString::from("mc"), OsString::from("step:prepare-release")],
-	)
-	.unwrap_or_else(|error| panic!("prepare-release output: {error}"));
-
+	// The fixture defines [cli.commit-release] with PrepareRelease and
+	// CommitRelease steps, so running commit-release will prepare the
+	// release and then commit it.
 	let output = run_cli(
 		root,
-		[OsString::from("mc"), OsString::from("step:commit-release")],
+		[OsString::from("mc"), OsString::from("commit-release")],
 	)
 	.unwrap_or_else(|error| panic!("commit-release output: {error}"));
 	let commit_subject = git_output_in_temp_repo(root, &["log", "-1", "--pretty=%s"]);
@@ -4840,26 +4837,20 @@ fn commit_release_command_reports_json_output() {
 	git_in_temp_repo(root, &["add", "."]);
 	git_in_temp_repo(root, &["commit", "-m", "initial"]);
 
-	// CommitRelease requires a prepared release artifact; run PrepareRelease first
-	run_cli(
-		root,
-		[OsString::from("mc"), OsString::from("step:prepare-release")],
-	)
-	.unwrap_or_else(|error| panic!("prepare-release output: {error}"));
-
+	// Run commit-release in dry-run mode; the fixture has PrepareRelease +
+	// CommitRelease steps, so the command name in the dry-run header is
+	// `commit-release`.
 	let output = run_cli(
 		root,
 		[
 			OsString::from("mc"),
-			OsString::from("step:commit-release"),
+			OsString::from("commit-release"),
 			OsString::from("--dry-run"),
 		],
 	)
 	.unwrap_or_else(|error| panic!("commit-release output: {error}"));
 
-	// step:commit-release does not support --format, so dry-run returns
-	// plain text report.
-	assert!(output.contains("# `step:commit-release` (dry-run)"));
+	assert!(output.contains("# `commit-release` (dry-run)"));
 }
 
 #[test]
@@ -5360,9 +5351,33 @@ fn validate_release_record_file_succeeds_when_record_exists_and_matches() {
 	let manifest = sample_release_manifest_for_commit_message(false, false);
 	let expected_path = write_release_record_file(root, None, &manifest)
 		.unwrap_or_else(|error| panic!("write record: {error}"));
-	let actual_path = validate_release_record_file(root, None, &manifest)
+	let actual_path = validate_release_record_file(root, None, &manifest, true)
 		.unwrap_or_else(|error| panic!("validate record: {error}"));
 	assert_eq!(expected_path, actual_path);
+}
+
+#[test]
+fn validate_release_record_file_does_not_rewrite_when_only_formatting_differs() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	let expected_path = write_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("write record: {error}"));
+	// Simulate dprint reformatting: write back with tab indentation
+	let content =
+		fs::read_to_string(&expected_path).unwrap_or_else(|error| panic!("read record: {error}"));
+	let reformatted = content.replace("  ", "\t");
+	fs::write(&expected_path, &reformatted)
+		.unwrap_or_else(|error| panic!("reformat record: {error}"));
+	let actual_path = validate_release_record_file(root, None, &manifest, true)
+		.unwrap_or_else(|error| panic!("validate record: {error}"));
+	assert_eq!(expected_path, actual_path);
+	let after =
+		fs::read_to_string(&actual_path).unwrap_or_else(|error| panic!("read after: {error}"));
+	assert!(
+		after.contains('\t'),
+		"record should keep dprint formatting, got: {after}"
+	);
 }
 
 #[test]
@@ -5377,7 +5392,7 @@ fn validate_release_record_file_rewrites_record_when_content_differs() {
 		r#"{"v":"0.1","kind":"monochange.releaseRecord"}"#,
 	)
 	.unwrap_or_else(|error| panic!("corrupt record: {error}"));
-	let actual_path = validate_release_record_file(root, None, &manifest)
+	let actual_path = validate_release_record_file(root, None, &manifest, true)
 		.unwrap_or_else(|error| panic!("validate record: {error}"));
 	assert_eq!(expected_path, actual_path);
 	let content =
@@ -5389,19 +5404,110 @@ fn validate_release_record_file_rewrites_record_when_content_differs() {
 }
 
 #[test]
+fn validate_release_record_file_rewrites_invalid_json() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	let expected_path = write_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("write record: {error}"));
+	fs::write(&expected_path, "not valid json")
+		.unwrap_or_else(|error| panic!("corrupt record: {error}"));
+	let actual_path = validate_release_record_file(root, None, &manifest, true)
+		.unwrap_or_else(|error| panic!("validate record: {error}"));
+	assert_eq!(expected_path, actual_path);
+	let content =
+		fs::read_to_string(&actual_path).unwrap_or_else(|error| panic!("read rewritten: {error}"));
+	assert!(
+		content.contains("\"kind\": \"monochange.releaseRecord\""),
+		"invalid json should have been rewritten with valid content, got: {content}"
+	);
+}
+
+#[test]
+#[allow(clippy::permissions_set_readonly_false)]
+fn validate_release_record_file_reports_write_error_when_file_is_readonly() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	let expected_path = write_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("write record: {error}"));
+	fs::write(
+		&expected_path,
+		r#"{"schemaVersion":"0.1","kind":"monochange.releaseRecord","createdAt":"2026-01-01T00:00:00Z","command":"test","releaseTargets":[],"releasedPackages":[],"changedFiles":[]}"#,
+	)
+	.unwrap_or_else(|error| panic!("corrupt record: {error}"));
+	let mut permissions = fs::metadata(&expected_path).unwrap().permissions();
+	permissions.set_readonly(true);
+	fs::set_permissions(&expected_path, permissions).unwrap();
+	let result = validate_release_record_file(root, None, &manifest, true);
+	let mut restore = fs::metadata(&expected_path).unwrap().permissions();
+	restore.set_readonly(false);
+	let _ = fs::set_permissions(&expected_path, restore);
+	assert!(
+		result.is_err(),
+		"expected error for readonly file, got: {result:?}"
+	);
+	let message = result.unwrap_err().to_string();
+	assert!(
+		message.contains("update release record"),
+		"expected 'update release record' in error, got: {message}"
+	);
+}
+
+#[test]
 fn validate_release_record_file_fails_when_record_is_missing() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	let manifest = sample_release_manifest_for_commit_message(false, false);
-	let result = validate_release_record_file(root, None, &manifest);
+	let result = validate_release_record_file(root, None, &manifest, false);
 	assert!(
 		result.is_err(),
 		"expected error for missing record, got: {result:?}"
 	);
 	let message = result.unwrap_err().to_string();
 	assert!(
-		message.contains("release record missing"),
-		"expected 'release record missing' in error, got: {message}"
+		message.contains("no release record found"),
+		"expected 'no release record found' in error, got: {message}"
+	);
+}
+#[test]
+fn validate_release_record_file_errors_when_update_release_json_is_false_and_record_differs() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	let expected_path = write_release_record_file(root, None, &manifest)
+		.unwrap_or_else(|error| panic!("write record: {error}"));
+	fs::write(
+		&expected_path,
+		r#"{"schemaVersion":"0.1","kind":"monochange.releaseRecord","createdAt":"2026-01-01T00:00:00Z","command":"test","releaseTargets":[],"releasedPackages":[],"changedFiles":[]}"#,
+	)
+	.unwrap_or_else(|error| panic!("corrupt record: {error}"));
+	let result = validate_release_record_file(root, None, &manifest, false);
+	assert!(
+		result.is_err(),
+		"expected error when update_release_json is false, got: {result:?}"
+	);
+	let message = result.unwrap_err().to_string();
+	assert!(
+		message.contains("does not match expected content"),
+		"expected mismatch error, got: {message}"
+	);
+}
+
+#[test]
+fn validate_release_record_file_errors_when_update_release_json_is_false_and_record_is_missing() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	let result = validate_release_record_file(root, None, &manifest, false);
+	assert!(
+		result.is_err(),
+		"expected error for missing record, got: {result:?}"
+	);
+	let message = result.unwrap_err().to_string();
+	assert!(
+		message.contains("no release record found"),
+		"expected 'no release record found' in error, got: {message}"
 	);
 }
 
@@ -5570,6 +5676,24 @@ fn repair_release_command_rejects_non_descendant_targets_without_force() {
 		error
 			.to_string()
 			.contains("is not a descendant of release-record commit")
+	);
+}
+#[test]
+fn validate_release_record_file_creates_record_when_missing_and_update_is_true() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let manifest = sample_release_manifest_for_commit_message(false, false);
+	let path = validate_release_record_file(root, None, &manifest, true)
+		.unwrap_or_else(|error| panic!("validate record: {error}"));
+	assert!(
+		path.is_file(),
+		"expected release record to be created at {path:?}"
+	);
+	let content =
+		fs::read_to_string(&path).unwrap_or_else(|error| panic!("read created record: {error}"));
+	assert!(
+		content.contains("monochange.releaseRecord"),
+		"expected created record to contain kind, got: {content}"
 	);
 }
 
@@ -7872,6 +7996,7 @@ fn execute_cli_command_commit_release_requires_prepare_release() {
 			when: None,
 			always_run: false,
 			no_verify: false,
+			update_release_json: false,
 			inputs: BTreeMap::new(),
 		}],
 		dry_run: false,
@@ -13731,10 +13856,10 @@ fn deduplicate_cache_is_hit_on_second_call_with_same_manifest() {
 	write_release_record_file(root, None, &manifest)
 		.unwrap_or_else(|error| panic!("write record: {error}"));
 	// first validate call populates the cache
-	validate_release_record_file(root, None, &manifest)
+	validate_release_record_file(root, None, &manifest, true)
 		.unwrap_or_else(|error| panic!("first validate: {error}"));
 	// second validate call should hit the cache early-return
-	validate_release_record_file(root, None, &manifest)
+	validate_release_record_file(root, None, &manifest, true)
 		.unwrap_or_else(|error| panic!("second validate: {error}"));
 }
 
@@ -13762,7 +13887,7 @@ fn validate_release_record_file_reports_error_when_dedupe_cannot_read_releases_d
 	fs::set_permissions(&releases_dir, permissions)
 		.unwrap_or_else(|error| panic!("set permissions: {error}"));
 
-	let result = validate_release_record_file(root, None, &manifest);
+	let result = validate_release_record_file(root, None, &manifest, true);
 	assert!(
 		result.is_err(),
 		"expected error when dedupe cannot read releases dir, got: {result:?}"

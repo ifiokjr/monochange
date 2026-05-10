@@ -1428,6 +1428,23 @@ pub(crate) fn write_release_record_file(
 	Ok(paths.absolute)
 }
 
+/// Compare two JSON strings for semantic equality.
+/// If the strings are byte-equal, they match immediately.
+/// Otherwise, both are parsed into `serde_json::Value` and compared structurally.
+fn compare_json_strings(json1: &str, json2: &str) -> bool {
+	if json1 == json2 {
+		return true;
+	}
+
+	let parsed1: Result<serde_json::Value, _> = serde_json::from_str(json1);
+	let parsed2: Result<serde_json::Value, _> = serde_json::from_str(json2);
+
+	match (parsed1, parsed2) {
+		(Ok(v1), Ok(v2)) => v1 == v2,
+		_ => false,
+	}
+}
+
 /// Validate that the release record file expected for `manifest` still exists
 /// on disk after re-running deduplication. Called by `commit_release` to
 /// guard against stale or missing records between `prepare_release` and
@@ -1436,6 +1453,7 @@ pub(crate) fn validate_release_record_file(
 	root: &Path,
 	source: Option<&SourceConfiguration>,
 	manifest: &ReleaseManifest,
+	update_release_json: bool,
 ) -> MonochangeResult<PathBuf> {
 	let record = build_release_record(source, manifest);
 	let paths = ReleasePaths::from_record(root, &record);
@@ -1444,17 +1462,30 @@ pub(crate) fn validate_release_record_file(
 		&record.release_targets,
 		paths.absolute.parent().unwrap_or(root),
 	)?;
+	let json = serde_json::to_string_pretty(&record).unwrap_or_default();
 	if paths.absolute.is_file() {
-		let json = serde_json::to_string_pretty(&record).unwrap_or_default();
 		let existing = fs::read_to_string(&paths.absolute)
 			.map_err(|error| MonochangeError::Io(format!("read release record: {error}")))?;
-		if existing != json {
-			fs::write(&paths.absolute, json)
-				.map_err(|error| MonochangeError::Io(format!("update release record: {error}")))?;
+		if !compare_json_strings(&existing, &json) {
+			if update_release_json {
+				fs::write(&paths.absolute, json).map_err(|error| {
+					MonochangeError::Io(format!("update release record: {error}"))
+				})?;
+			} else {
+				return Err(MonochangeError::Io(format!(
+					"release record at {} does not match expected content — the file has been modified since it was prepared. Set `update_release_json = true` on the CommitRelease step to allow overwriting.",
+					paths.absolute.display()
+				)));
+			}
 		}
+	} else if update_release_json {
+		fs::create_dir_all(paths.absolute.parent().unwrap_or(root))
+			.map_err(|error| MonochangeError::Io(format!("create release record dir: {error}")))?;
+		fs::write(&paths.absolute, json)
+			.map_err(|error| MonochangeError::Io(format!("write release record: {error}")))?;
 	} else {
 		return Err(MonochangeError::Io(format!(
-			"release record missing at {} — was it removed by deduplication or never written?",
+			"no release record found at {} — was it removed by deduplication or never written?",
 			paths.absolute.display()
 		)));
 	}
@@ -1647,10 +1678,12 @@ pub(crate) fn commit_release(
 	source: Option<&SourceConfiguration>,
 	manifest: &ReleaseManifest,
 	no_verify: bool,
+	update_release_json: bool,
 ) -> MonochangeResult<CommitReleaseReport> {
 	let tracked_paths = tracked_release_pull_request_paths(context, manifest);
 	let message = build_release_commit_message(source, manifest);
-	let release_record_path = validate_release_record_file(root, source, manifest)?;
+	let release_record_path =
+		validate_release_record_file(root, source, manifest, update_release_json)?;
 	let mut tracked_paths = tracked_paths;
 	tracked_paths.push(release_record_path);
 	if !context.dry_run {
