@@ -241,6 +241,18 @@ See [Advanced: Assistant setup and MCP](docs/src/guide/09-assistant-setup.md) fo
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__graph-orange?logo=rust)](https://crates.io/crates/monochange_graph) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__graph-1f425f?logo=docs.rs)](https://docs.rs/monochange_graph/)
 - `monochange_github` — converts release manifests into GitHub release payloads and publishing operations.
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__github-orange?logo=rust)](https://crates.io/crates/monochange_github) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__github-1f425f?logo=docs.rs)](https://docs.rs/monochange_github/)
+- `monochange_gitlab` — converts release manifests into GitLab release payloads and merge-request operations.
+  - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__gitlab-orange?logo=rust)](https://crates.io/crates/monochange_gitlab) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__gitlab-1f425f?logo=docs.rs)](https://docs.rs/monochange_gitlab/)
+- `monochange_gitea` — converts release manifests into Gitea release payloads and pull-request operations.
+  - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__gitea-orange?logo=rust)](https://crates.io/crates/monochange_gitea) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__gitea-1f425f?logo=docs.rs)](https://docs.rs/monochange_gitea/)
+- `monochange_forgejo` — converts release manifests into Forgejo automation requests.
+  - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__forgejo-orange?logo=rust)](https://crates.io/crates/monochange_forgejo) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__forgejo-1f425f?logo=docs.rs)](https://docs.rs/monochange_forgejo/)
+- `monochange_hosting` — shared release-request abstractions for GitHub, GitLab, Gitea, and Forgejo providers.
+  - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__hosting-orange?logo=rust)](https://crates.io/crates/monochange_hosting) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__hosting-1f425f?logo=docs.rs)](https://docs.rs/monochange_hosting/)
+- `monochange_publish` — publishing support and trusted-publishing capability helpers for package registries.
+  - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__publish-orange?logo=rust)](https://crates.io/crates/monochange_publish) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__publish-1f425f?logo=docs.rs)](https://docs.rs/monochange_publish/)
+- `monochange_ecmascript` — shared JavaScript/TypeScript ecosystem utilities for npm, Deno, and JSR discovery.
+  - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__ecmascript-orange?logo=rust)](https://crates.io/crates/monochange_ecmascript) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__ecmascript-1f425f?logo=docs.rs)](https://docs.rs/monochange_ecmascript/)
 - `monochange_semver` — merges requested bumps with compatibility-provider evidence.
   - [![Crates.io](https://img.shields.io/badge/crates.io-monochange__semver-orange?logo=rust)](https://crates.io/crates/monochange_semver) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange__semver-1f425f?logo=docs.rs)](https://docs.rs/monochange_semver/)
 - `monochange_telemetry` — local-only telemetry event sink and privacy-preserving event schema helpers.
@@ -296,8 +308,10 @@ Useful commands:
 ```bash
 monochange --help
 mc --help
-docs:check
-docs:update
+docs:check      # verify mdt shared-doc synchronization
+docs:update     # synchronize shared docs via mdt update
+schema:check    # verify committed JSON schemas are current
+schema:update   # regenerate schema assets from source
 mc validate
 lint:all
 test:all

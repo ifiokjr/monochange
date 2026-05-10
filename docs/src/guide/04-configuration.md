@@ -4,7 +4,7 @@ Repository configuration lives in `monochange.toml`.
 
 ## JSON Schema
 
-A JSON Schema for editor support is published with the book at <https://monochange.github.io/monochange/schemas/monochange.schema.json>. That URL is the moving “current” alias for the latest docs. Stable generated copies use public schema-version suffixes, starting with <https://monochange.github.io/monochange/schemas/monochange.v0.1.schema.json>.
+A JSON Schema for editor support is published with the book at <https://monochange.github.io/monochange/schemas/monochange.schema.json>. That URL is the moving "current" alias for the latest docs. Stable generated copies use public schema-version suffixes, starting with <https://monochange.github.io/monochange/schemas/monochange.v0.1.schema.json>.
 
 Schema-aware TOML editors such as Taplo can opt in with a comment directive at the top of `monochange.toml`:
 
@@ -13,6 +13,17 @@ Schema-aware TOML editors such as Taplo can opt in with a comment directive at t
 ```
 
 The same file is also available from GitHub raw content at <https://raw.githubusercontent.com/monochange/monochange/main/docs/src/schemas/monochange.schema.json>. Regenerate committed schema assets with `schema:update` and verify them with `schema:check`; `lint:all` runs the check in CI.
+
+## Shared documentation
+
+This book is maintained with `mdt` so shared content blocks stay synchronized across pages.
+
+- Shared blocks live in `.templates/*.t.md`
+- Consumer files include them with `<!-- {=templateName} -->` directives
+- Run `mdt update` (or `docs:update` in this repository) after changing any template or consumer block
+- Run `mdt check` (or `docs:check`) before opening a PR to verify synchronization
+
+When you edit a template such as `.templates/cli-steps.t.md`, the changes propagate to every documentation file that references it. This keeps the book, readmes, and inline help consistent without manual copying.
 
 ## Defaults
 
@@ -190,14 +201,14 @@ trusted_publishing = false
 
 Supported fields:
 
-- `enabled` — include this package in managed publishing
-- `mode` — `builtin` or `external`
-- `registry` — public registry override for the package ecosystem
-- `trusted_publishing` — `true`/`false` or a table with `enabled`, `repository`, `workflow`, and `environment`
-- `attestations.require_registry_provenance` — require registry-native package provenance when the selected registry/provider capability supports it
-- `rate_limits.enforce` — block built-in publish runs when the selected package set exceeds a known single registry window
-- `placeholder.readme` — inline placeholder README content
-- `placeholder.readme_file` — workspace-relative file to use as placeholder README content
+- `enabled` - include this package in managed publishing
+- `mode` - `builtin` or `external`
+- `registry` - public registry override for the package ecosystem
+- `trusted_publishing` - `true`/`false` or a table with `enabled`, `repository`, `workflow`, and `environment`
+- `attestations.require_registry_provenance` - require registry-native package provenance when the selected registry/provider capability supports it
+- `rate_limits.enforce` - block built-in publish runs when the selected package set exceeds a known single registry window
+- `placeholder.readme` - inline placeholder README content
+- `placeholder.readme_file` - workspace-relative file to use as placeholder README content
 
 Inheritance flows from `[ecosystems.<name>.publish]` to matching packages, and package-level values override the inherited ecosystem defaults. Configure shared trusted-publishing, attestation, and context policy on the ecosystem, then use package-level publish settings for opt-outs or package-specific workflows.
 
@@ -297,7 +308,7 @@ The built-in package publishing flow is intentionally narrow for now:
 
 If your workflow needs any of those today, keep the package on `mode = "external"` and let your own CI or scripts own publication.
 
-For end-to-end GitHub and GitLab examples — including npm trusted publishing on GitHub and token/external-mode patterns on GitLab — see [Advanced: CI, package publishing, and release PR flows](./13-ci-and-publishing.md).
+For end-to-end GitHub and GitLab examples - including npm trusted publishing on GitHub and token/external-mode patterns on GitLab - see [Advanced: CI, package publishing, and release PR flows](./13-ci-and-publishing.md).
 
 ## Groups
 
@@ -334,9 +345,9 @@ include = ["sdk-cli"]
 
 `include` accepts:
 
-- `"all"` — include direct group-targeted changesets and all member-targeted changesets (default)
-- `"group-only"` — include only direct group-targeted changesets
-- `[]` or `["package-id", ...]` — include direct group-targeted changesets plus member-targeted changesets only when every target in that group is listed
+- `"all"` - include direct group-targeted changesets and all member-targeted changesets (default)
+- `"group-only"` - include only direct group-targeted changesets
+- `[]` or `["package-id", ...]` - include direct group-targeted changesets plus member-targeted changesets only when every target in that group is listed
 
 ## Versioned files
 

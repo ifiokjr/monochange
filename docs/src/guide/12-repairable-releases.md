@@ -46,6 +46,8 @@ The release commit body contains:
 1. a compact human-readable release summary
 2. a reserved monochange release-record block with structured JSON
 
+The `ReleaseRecord` JSON schema is published with the book at <https://monochange.github.io/monochange/schemas/release-record.schema.json>. Stable generated copies use public schema-version suffixes, starting with <https://monochange.github.io/monochange/schemas/release-record.v0.1.schema.json>.
+
 ## How monochange finds a release later
 
 Use `mc release-record` when you want to inspect the durable release declaration for a tag or a newer commit built on top of that release.
