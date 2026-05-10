@@ -1044,8 +1044,9 @@ fn plan_publish_rate_limits_preserves_large_dependency_chain_across_limited_batc
 
 	assert_eq!(report.batches.len(), 5);
 	for (batch_index, batch) in report.batches.iter().enumerate() {
-		let expected_prefix_len = (batch_index + 1) * 10;
-		assert_eq!(batch.packages, package_ids[..expected_prefix_len]);
+		let expected_start = batch_index * 10;
+		let expected_end = expected_start + 10;
+		assert_eq!(batch.packages, package_ids[expected_start..expected_end]);
 	}
 }
 
