@@ -93,9 +93,13 @@ fn sample_publish_request(
 	registry: RegistryKind,
 	mode: PublishMode,
 ) -> package_publish::PublishRequest {
+	let package_name = package_id.strip_prefix("monochange__").map_or_else(
+		|| package_id.to_string(),
+		|name| format!("@monochange/{name}"),
+	);
 	package_publish::PublishRequest {
 		package_id: package_id.to_string(),
-		package_name: package_id.to_string(),
+		package_name,
 		ecosystem,
 		manifest_path: Path::new("workspace/package.json").to_path_buf(),
 		package_root: Path::new("workspace").to_path_buf(),
@@ -109,6 +113,413 @@ fn sample_publish_request(
 		attestations: PublishAttestationSettings::default(),
 		placeholder_readme: String::new(),
 	}
+}
+
+fn publish_request(package_id: &str, registry: RegistryKind) -> package_publish::PublishRequest {
+	let ecosystem = match registry {
+		RegistryKind::CratesIo => monochange_core::Ecosystem::Cargo,
+		RegistryKind::Npm => monochange_core::Ecosystem::Npm,
+		other => panic!("unsupported test registry: {other}"),
+	};
+	sample_publish_request(package_id, ecosystem, registry, PublishMode::Builtin)
+}
+
+fn dependency_levels(dependencies: &BTreeMap<&str, Vec<&str>>) -> BTreeMap<usize, Vec<String>> {
+	fn rank<'a>(
+		package: &'a str,
+		dependencies: &BTreeMap<&'a str, Vec<&'a str>>,
+		ranks: &mut BTreeMap<&'a str, usize>,
+	) -> usize {
+		if let Some(rank) = ranks.get(package) {
+			return *rank;
+		}
+		let package_rank = dependencies.get(package).map_or(0, |package_dependencies| {
+			package_dependencies
+				.iter()
+				.map(|dependency| rank(dependency, dependencies, ranks) + 1)
+				.max()
+				.unwrap_or(0)
+		});
+		ranks.insert(package, package_rank);
+		package_rank
+	}
+
+	let mut ranks = BTreeMap::new();
+	for package in dependencies.keys() {
+		rank(package, dependencies, &mut ranks);
+	}
+
+	let mut levels = BTreeMap::<usize, Vec<String>>::new();
+	for (package, rank) in ranks {
+		levels.entry(rank).or_default().push(package.to_string());
+	}
+	levels
+}
+
+fn dependency_packages(
+	dependencies: &BTreeMap<&str, Vec<&str>>,
+	ecosystem: monochange_core::Ecosystem,
+) -> Vec<monochange_core::PackageRecord> {
+	dependencies
+		.iter()
+		.map(|(package, package_dependencies)| {
+			let manifest_name = match ecosystem {
+				monochange_core::Ecosystem::Cargo => "Cargo.toml",
+				monochange_core::Ecosystem::Npm => "package.json",
+				_ => "manifest",
+			};
+			let mut record = monochange_core::PackageRecord::new(
+				ecosystem,
+				*package,
+				Path::new("/workspace").join(package).join(manifest_name),
+				Path::new("/workspace").to_path_buf(),
+				None,
+				monochange_core::PublishState::Public,
+			);
+			record.id = (*package).to_string();
+			record.declared_dependencies = package_dependencies
+				.iter()
+				.map(|dependency| {
+					monochange_core::PackageDependency {
+						name: (*dependency).to_string(),
+						kind: DependencyKind::Runtime,
+						version_constraint: None,
+						optional: false,
+					}
+				})
+				.collect();
+			record
+		})
+		.collect()
+}
+
+fn dependency_ordered_publish_report(
+	requests: &[package_publish::PublishRequest],
+	crate_dependencies: &BTreeMap<&str, Vec<&str>>,
+	npm_dependencies: &BTreeMap<&str, Vec<&str>>,
+) -> PublishRateLimitReport {
+	let packages = dependency_ordered_packages(crate_dependencies, npm_dependencies);
+	plan_publish_rate_limits_for_dependency_ordered_requests(
+		requests,
+		&packages,
+		RateLimitOperation::Publish,
+		false,
+	)
+}
+
+fn dependency_ordered_unbatched_publish_report(
+	requests: &[package_publish::PublishRequest],
+	crate_dependencies: &BTreeMap<&str, Vec<&str>>,
+	npm_dependencies: &BTreeMap<&str, Vec<&str>>,
+) -> PublishRateLimitReport {
+	let packages = dependency_ordered_packages(crate_dependencies, npm_dependencies);
+	plan_unbatched_publish_order_for_dependency_ordered_requests(
+		requests,
+		&packages,
+		RateLimitOperation::Publish,
+		false,
+	)
+}
+
+fn dependency_ordered_packages(
+	crate_dependencies: &BTreeMap<&str, Vec<&str>>,
+	npm_dependencies: &BTreeMap<&str, Vec<&str>>,
+) -> Vec<monochange_core::PackageRecord> {
+	let mut packages = dependency_packages(crate_dependencies, monochange_core::Ecosystem::Cargo);
+	packages.extend(dependency_packages(
+		npm_dependencies,
+		monochange_core::Ecosystem::Npm,
+	));
+	packages
+}
+
+fn render_publish_dependency_snapshot(
+	crate_dependencies: &BTreeMap<&str, Vec<&str>>,
+	npm_dependencies: &BTreeMap<&str, Vec<&str>>,
+	report: &PublishRateLimitReport,
+) -> String {
+	let crate_levels = dependency_levels(crate_dependencies);
+	let npm_levels = dependency_levels(npm_dependencies);
+	let mut lines = vec!["dependency ranks:".to_string(), "  crates_io:".to_string()];
+	for (rank, packages) in crate_levels {
+		lines.push(format!("    rank {rank}: {}", packages.join(", ")));
+	}
+	lines.push("  npm:".to_string());
+	for (rank, packages) in npm_levels {
+		lines.push(format!("    rank {rank}: {}", packages.join(", ")));
+	}
+	lines.push("planned batches:".to_string());
+	for batch in &report.batches {
+		lines.push(format!(
+			"  {} batch {}/{}: {}",
+			batch.registry,
+			batch.batch_index,
+			batch.total_batches,
+			batch.packages.join(", ")
+		));
+	}
+	lines.join("\n")
+}
+
+#[test]
+fn publish_plan_batches_current_project_dependencies_in_registry_order() {
+	let crate_dependencies = BTreeMap::from([
+		("monochange_schema", vec![]),
+		("monochange_core", vec!["monochange_schema"]),
+		("monochange_changelog", vec!["monochange_core"]),
+		("monochange_ecmascript", vec!["monochange_core"]),
+		("monochange_hosting", vec!["monochange_core"]),
+		("monochange_lint", vec!["monochange_core"]),
+		("monochange_linting", vec!["monochange_core"]),
+		("monochange_publish", vec!["monochange_core"]),
+		("monochange_semver", vec!["monochange_core"]),
+		("monochange_telemetry", vec!["monochange_core"]),
+		("monochange_test_helpers", vec!["monochange_core"]),
+		(
+			"monochange_config",
+			vec!["monochange_core", "monochange_semver"],
+		),
+		(
+			"monochange_deno",
+			vec!["monochange_ecmascript", "monochange_core"],
+		),
+		(
+			"monochange_forgejo",
+			vec!["monochange_hosting", "monochange_core"],
+		),
+		(
+			"monochange_gitea",
+			vec!["monochange_hosting", "monochange_core"],
+		),
+		(
+			"monochange_github",
+			vec!["monochange_hosting", "monochange_core"],
+		),
+		(
+			"monochange_gitlab",
+			vec!["monochange_hosting", "monochange_core"],
+		),
+		("monochange_go", vec!["monochange_core"]),
+		(
+			"monochange_graph",
+			vec!["monochange_core", "monochange_semver"],
+		),
+		("monochange_python", vec!["monochange_core"]),
+		(
+			"monochange_cargo",
+			vec!["monochange_core", "monochange_semver"],
+		),
+		(
+			"monochange_dart",
+			vec!["monochange_core", "monochange_semver"],
+		),
+		(
+			"monochange_npm",
+			vec!["monochange_ecmascript", "monochange_core"],
+		),
+		(
+			"monochange_analysis",
+			vec!["monochange_config", "monochange_core", "monochange_graph"],
+		),
+		(
+			"monochange",
+			vec![
+				"monochange_analysis",
+				"monochange_config",
+				"monochange_core",
+			],
+		),
+	]);
+	let npm_dependencies = BTreeMap::from([
+		("monochange__cli-darwin-arm64", vec![]),
+		("monochange__cli-darwin-x64", vec![]),
+		("monochange__cli-linux-arm64-gnu", vec![]),
+		("monochange__cli-linux-arm64-musl", vec![]),
+		("monochange__cli-linux-x64-gnu", vec![]),
+		("monochange__cli-linux-x64-musl", vec![]),
+		("monochange__cli-win32-arm64-msvc", vec![]),
+		("monochange__cli-win32-x64-msvc", vec![]),
+		("monochange__skill", vec![]),
+		(
+			"monochange__cli",
+			vec![
+				"monochange__cli-darwin-arm64",
+				"monochange__cli-darwin-x64",
+				"monochange__cli-linux-arm64-gnu",
+				"monochange__cli-linux-arm64-musl",
+				"monochange__cli-linux-x64-gnu",
+				"monochange__cli-linux-x64-musl",
+				"monochange__cli-win32-arm64-msvc",
+				"monochange__cli-win32-x64-msvc",
+			],
+		),
+	]);
+	let crate_requests = crate_dependencies
+		.keys()
+		.map(|package| publish_request(package, RegistryKind::CratesIo));
+	let npm_requests = [
+		"monochange__cli",
+		"monochange__cli-darwin-arm64",
+		"monochange__cli-darwin-x64",
+		"monochange__cli-linux-arm64-gnu",
+		"monochange__cli-linux-arm64-musl",
+		"monochange__cli-linux-x64-gnu",
+		"monochange__cli-linux-x64-musl",
+		"monochange__cli-win32-arm64-msvc",
+		"monochange__cli-win32-x64-msvc",
+		"monochange__skill",
+	]
+	.into_iter()
+	.map(|package| publish_request(package, RegistryKind::Npm));
+	let requests = crate_requests.chain(npm_requests).collect::<Vec<_>>();
+	let report =
+		dependency_ordered_publish_report(&requests, &crate_dependencies, &npm_dependencies);
+	let rendered =
+		render_publish_dependency_snapshot(&crate_dependencies, &npm_dependencies, &report);
+
+	insta::assert_snapshot!(
+		&rendered,
+		@r###"
+dependency ranks:
+  crates_io:
+    rank 0: monochange_schema
+    rank 1: monochange_core
+    rank 2: monochange_changelog, monochange_ecmascript, monochange_go, monochange_hosting, monochange_lint, monochange_linting, monochange_publish, monochange_python, monochange_semver, monochange_telemetry, monochange_test_helpers
+    rank 3: monochange_cargo, monochange_config, monochange_dart, monochange_deno, monochange_forgejo, monochange_gitea, monochange_github, monochange_gitlab, monochange_graph, monochange_npm
+    rank 4: monochange_analysis
+    rank 5: monochange
+  npm:
+    rank 0: monochange__cli-darwin-arm64, monochange__cli-darwin-x64, monochange__cli-linux-arm64-gnu, monochange__cli-linux-arm64-musl, monochange__cli-linux-x64-gnu, monochange__cli-linux-x64-musl, monochange__cli-win32-arm64-msvc, monochange__cli-win32-x64-msvc, monochange__skill
+    rank 1: monochange__cli
+planned batches:
+  crates_io batch 1/3: monochange_schema, monochange_core, monochange_changelog, monochange_ecmascript, monochange_go, monochange_hosting, monochange_lint, monochange_linting, monochange_publish, monochange_python
+  crates_io batch 2/3: monochange_semver, monochange_telemetry, monochange_test_helpers, monochange_deno, monochange_npm, monochange_forgejo, monochange_gitea, monochange_github, monochange_gitlab, monochange_cargo
+  crates_io batch 3/3: monochange_config, monochange_dart, monochange_graph, monochange_analysis, monochange
+  npm batch 1/1: monochange__cli-darwin-arm64, monochange__cli-darwin-x64, monochange__cli-linux-arm64-gnu, monochange__cli-linux-arm64-musl, monochange__cli-linux-x64-gnu, monochange__cli-linux-x64-musl, monochange__cli-win32-arm64-msvc, monochange__cli-win32-x64-msvc, monochange__skill, monochange__cli
+"###
+	);
+}
+
+#[test]
+fn publish_plan_orders_current_project_dependencies_without_batching() {
+	let crate_dependencies = BTreeMap::from([
+		("monochange_schema", vec![]),
+		("monochange_core", vec!["monochange_schema"]),
+		("monochange_changelog", vec!["monochange_core"]),
+		("monochange_ecmascript", vec!["monochange_core"]),
+		("monochange_hosting", vec!["monochange_core"]),
+		("monochange_lint", vec!["monochange_core"]),
+		("monochange_linting", vec!["monochange_core"]),
+		("monochange_publish", vec!["monochange_core"]),
+		("monochange_semver", vec!["monochange_core"]),
+		("monochange_telemetry", vec!["monochange_core"]),
+		("monochange_test_helpers", vec!["monochange_core"]),
+		(
+			"monochange_config",
+			vec!["monochange_core", "monochange_semver"],
+		),
+		(
+			"monochange_deno",
+			vec!["monochange_ecmascript", "monochange_core"],
+		),
+		(
+			"monochange_forgejo",
+			vec!["monochange_hosting", "monochange_core"],
+		),
+		(
+			"monochange_gitea",
+			vec!["monochange_hosting", "monochange_core"],
+		),
+		(
+			"monochange_github",
+			vec!["monochange_hosting", "monochange_core"],
+		),
+		(
+			"monochange_gitlab",
+			vec!["monochange_hosting", "monochange_core"],
+		),
+		("monochange_go", vec!["monochange_core"]),
+		(
+			"monochange_graph",
+			vec!["monochange_core", "monochange_semver"],
+		),
+		("monochange_python", vec!["monochange_core"]),
+		(
+			"monochange_cargo",
+			vec!["monochange_core", "monochange_semver"],
+		),
+		(
+			"monochange_dart",
+			vec!["monochange_core", "monochange_semver"],
+		),
+		(
+			"monochange_npm",
+			vec!["monochange_ecmascript", "monochange_core"],
+		),
+		(
+			"monochange_analysis",
+			vec!["monochange_config", "monochange_core", "monochange_graph"],
+		),
+		(
+			"monochange",
+			vec![
+				"monochange_analysis",
+				"monochange_config",
+				"monochange_core",
+			],
+		),
+	]);
+	let npm_dependencies = BTreeMap::from([
+		("monochange__cli-darwin-arm64", vec![]),
+		("monochange__cli-linux-x64-gnu", vec![]),
+		("monochange__skill", vec![]),
+		(
+			"monochange__cli",
+			vec![
+				"monochange__cli-darwin-arm64",
+				"monochange__cli-linux-x64-gnu",
+			],
+		),
+	]);
+	let crate_requests = crate_dependencies
+		.keys()
+		.map(|package| publish_request(package, RegistryKind::CratesIo));
+	let npm_requests = [
+		"monochange__cli",
+		"monochange__cli-darwin-arm64",
+		"monochange__cli-linux-x64-gnu",
+		"monochange__skill",
+	]
+	.into_iter()
+	.map(|package| publish_request(package, RegistryKind::Npm));
+	let requests = crate_requests.chain(npm_requests).collect::<Vec<_>>();
+	let report = dependency_ordered_unbatched_publish_report(
+		&requests,
+		&crate_dependencies,
+		&npm_dependencies,
+	);
+	let rendered =
+		render_publish_dependency_snapshot(&crate_dependencies, &npm_dependencies, &report);
+
+	insta::assert_snapshot!(
+		&rendered,
+		@r###"
+dependency ranks:
+  crates_io:
+    rank 0: monochange_schema
+    rank 1: monochange_core
+    rank 2: monochange_changelog, monochange_ecmascript, monochange_go, monochange_hosting, monochange_lint, monochange_linting, monochange_publish, monochange_python, monochange_semver, monochange_telemetry, monochange_test_helpers
+    rank 3: monochange_cargo, monochange_config, monochange_dart, monochange_deno, monochange_forgejo, monochange_gitea, monochange_github, monochange_gitlab, monochange_graph, monochange_npm
+    rank 4: monochange_analysis
+    rank 5: monochange
+  npm:
+    rank 0: monochange__cli-darwin-arm64, monochange__cli-linux-x64-gnu, monochange__skill
+    rank 1: monochange__cli
+planned batches:
+  crates_io batch 1/1: monochange_schema, monochange_core, monochange_changelog, monochange_ecmascript, monochange_go, monochange_hosting, monochange_lint, monochange_linting, monochange_publish, monochange_python, monochange_semver, monochange_telemetry, monochange_test_helpers, monochange_deno, monochange_npm, monochange_forgejo, monochange_gitea, monochange_github, monochange_gitlab, monochange_cargo, monochange_config, monochange_dart, monochange_graph, monochange_analysis, monochange
+  npm batch 1/1: monochange__cli-darwin-arm64, monochange__cli-linux-x64-gnu, monochange__skill, monochange__cli
+"###
+	);
 }
 
 #[test]

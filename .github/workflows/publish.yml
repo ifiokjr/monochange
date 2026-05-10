@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  plan:
+  publish:
     environment: publisher
     permissions:
       actions: read
@@ -22,11 +22,7 @@ jobs:
     if: >-
       github.repository_owner == 'monochange'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    outputs:
-      tag: ${{ steps.release_tag.outputs.tag }}
-      has-batches: ${{ steps.publish_plan.outputs.has_batches }}
-      matrix: ${{ steps.publish_plan.outputs.matrix }}
+    timeout-minutes: 120
     steps:
       - name: resolve release tag
         id: release_tag
@@ -97,112 +93,11 @@ jobs:
             --format json
         shell: devenv shell -- bash -e {0}
 
-      - name: plan publish batches
-        id: publish_plan
+      - name: publish packages
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
         run: |
-          report="$("$RUNNER_TEMP/bin/mc" publish-plan --readiness "$RUNNER_TEMP/publish-readiness.json" --format json)"
-          echo "report<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$report" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
-          batch_count="$(echo "$report" | jq '.publishRateLimits.batches | length')"
-          if [ "$batch_count" -eq 0 ]; then
-            echo "has_batches=false" >> "$GITHUB_OUTPUT"
-            # Emit a valid placeholder matrix so GitHub Actions can parse the output.
-            # The publish job is skipped via the has-batches gate so this is never used.
-            echo "matrix={\"include\":[{\"registry\":\"none\",\"batch\":0,\"total_batches\":0,\"packages\":\"\",\"wait_seconds\":0}]}" >> "$GITHUB_OUTPUT"
-            echo "No packages to publish — all versions already exist on their registries."
-            exit 0
-          fi
-
-          echo "has_batches=true" >> "$GITHUB_OUTPUT"
-          matrix="$(echo "$report" | jq -c '{include: [.publishRateLimits.batches[] | {registry: (.registry | tostring), batch: .batchIndex, total_batches: .totalBatches, packages: (.packages | map("--package " + .) | join(" ")), wait_seconds: (.recommendedWaitSeconds // 0)}]}')"
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
-
-          echo "Publish plan:"
-          echo "$report" | jq '.publishRateLimits'
-        shell: devenv shell -- bash -e {0}
-
-  publish:
-    needs: plan
-    environment: publisher
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    if: >-
-      needs.plan.outputs.has-batches == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
-    name: publish ${{ matrix.registry }} (${{ matrix.batch }}/${{ matrix.total_batches }})
-    steps:
-      - name: checkout current monochange cli
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-
-      - name: setup current monochange cli
-        uses: ./.github/actions/devenv
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: build current monochange cli and checkout release tag
-        run: |
-          cargo build --release --package monochange --bin mc
-          mkdir -p "$RUNNER_TEMP/bin"
-          cp target/release/mc "$RUNNER_TEMP/bin/mc"
-          git fetch --force origin "+refs/heads/*:refs/remotes/origin/*"
-          git fetch --tags --force origin "refs/tags/${{ needs.plan.outputs.tag }}:refs/tags/${{ needs.plan.outputs.tag }}"
-          git checkout --detach "${{ needs.plan.outputs.tag }}"
-        shell: devenv shell -- bash -e {0}
-
-      - name: get crates oidc auth token
-        if: matrix.registry == 'crates_io'
-        uses: rust-lang/crates-io-auth-action@v1.0.4
-        id: crates-oidc
-
-      - name: download release assets
-        if: matrix.registry == 'npm' && startsWith( needs.plan.outputs.tag , 'v')
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/release-assets"
-          gh release download "$RELEASE_TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --pattern "monochange-*-${RELEASE_TAG}.tar.gz" \
-            --pattern "monochange-*-${RELEASE_TAG}.zip" \
-            --dir "$RUNNER_TEMP/release-assets"
-
-      - name: populate cli npm packages with release binaries
-        if: matrix.registry == 'npm'
-        env:
-          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
-        run: |
-          pnpm node scripts/npm/build-packages.mjs \
-            --release-tag "$RELEASE_TAG" \
-            --assets-dir "$RUNNER_TEMP/release-assets"
-          pnpm node scripts/npm/populate-packages.mjs \
-            --packages-dir packages
-        shell: devenv shell -- bash -e {0}
-
-      - name: wait for rate-limit window
-        if: matrix.wait_seconds > 0
-        run: |
-          echo "Waiting ${{ matrix.wait_seconds }} seconds before publishing batch ${{ matrix.batch }}..."
-          sleep "${{ matrix.wait_seconds }}"
-
-      - name: publish batch ${{ matrix.batch }} of ${{ matrix.total_batches }}
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
-        run: |
-          "$RUNNER_TEMP/bin/mc" publish ${{ matrix.packages }} \
-            --output "$RUNNER_TEMP/publish-result-${{ matrix.registry }}-${{ matrix.batch }}.json" \
+          "$RUNNER_TEMP/bin/mc" publish \
+            --output "$RUNNER_TEMP/publish-result.json" \
             --format json
         shell: devenv shell -- bash -e {0}
