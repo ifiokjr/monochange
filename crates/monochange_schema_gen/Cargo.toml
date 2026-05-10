@@ -3,6 +3,9 @@ name = "monochange_schema_gen"
 version = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+description = "Schema generation binary for monochange JSON schemas"
 
 [dependencies]
 monochange_config = { workspace = true, features = ["schema"] }
