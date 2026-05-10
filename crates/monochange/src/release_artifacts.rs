@@ -12,13 +12,8 @@ thread_local! {
 }
 
 thread_local! {
-	static DEDUPLICATED_CACHE: std::cell::RefCell<std::collections::HashSet<(PathBuf, String)>> =
+	pub(crate) static DEDUPLICATED_CACHE: std::cell::RefCell<std::collections::HashSet<(PathBuf, String)>> =
 		std::cell::RefCell::new(std::collections::HashSet::new());
-}
-
-#[cfg(test)]
-pub(crate) fn clear_dedup_cache() {
-	DEDUPLICATED_CACHE.with(|cache| cache.borrow_mut().clear());
 }
 
 /// Path to the persistent deduplication index relative to the workspace root.

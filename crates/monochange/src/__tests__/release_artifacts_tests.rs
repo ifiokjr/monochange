@@ -956,3 +956,109 @@ fn write_release_record_file_updates_persistent_index() {
 	let index = load_dedup_index(root);
 	assert!(index.contains(&paths.hash));
 }
+
+#[test]
+fn load_dedup_index_skips_empty_and_invalid_lines() {
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+	let index_path = root.join(".monochange/local/release-index.jsonl");
+	fs::create_dir_all(index_path.parent().unwrap()).unwrap();
+	fs::write(
+		&index_path,
+		"\n\n  \nnot-json\n{\"hash\":\"valid\"}\n\n{\"broken\n",
+	)
+	.unwrap();
+
+	let index = load_dedup_index(root);
+	assert_eq!(index.len(), 1);
+	assert!(index.contains("valid"));
+}
+
+#[test]
+#[cfg(unix)]
+fn save_dedup_index_reports_io_errors() {
+	use std::os::unix::fs::PermissionsExt;
+
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+
+	// Create a file at the exact path where the directory should be,
+	// so create_dir_all fails.
+	let local_path = root.join(".monochange/local");
+	fs::create_dir_all(local_path.parent().unwrap()).unwrap();
+	fs::write(&local_path, "block").unwrap();
+	let result = save_dedup_index(root, &std::collections::HashSet::new());
+	assert!(result.is_err());
+
+	// Restore directory and make it unwritable.
+	fs::remove_file(&local_path).unwrap();
+	fs::create_dir_all(&local_path).unwrap();
+	let mut permissions = fs::metadata(&local_path).unwrap().permissions();
+	permissions.set_mode(0o000);
+	fs::set_permissions(&local_path, permissions.clone()).unwrap();
+
+	let result = save_dedup_index(root, &std::collections::HashSet::new());
+	assert!(result.is_err());
+
+	// Cleanup: restore permissions so tempdir can be deleted.
+	permissions.set_mode(0o755);
+	let _ = fs::set_permissions(&local_path, permissions);
+}
+
+#[test]
+fn validate_release_record_file_fast_path_detects_missing_id() {
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+
+	let manifest = minimal_manifest_with_target("pkg-a", "1.0.0");
+	let path = write_release_record_file(root, None, &manifest).unwrap();
+
+	// Overwrite with a record whose target is missing the `id` field.
+	let mutated = r#"{"schemaVersion":1,"kind":"monochange.releaseRecord","createdAt":"2026-01-01T00:00:00Z","command":"prepare-release","version":"1.0.0","releaseTargets":[{"kind":"npm","version":"1.0.0"}]}"#;
+	fs::write(&path, mutated).unwrap();
+
+	let validated = validate_release_record_file(root, None, &manifest).unwrap();
+	assert_eq!(validated, path);
+
+	// Should have been rewritten with the correct content.
+	let content = fs::read_to_string(&path).unwrap();
+	assert!(content.contains("pkg-a"));
+}
+
+#[test]
+fn validate_release_record_file_fast_path_detects_missing_kind() {
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+
+	let manifest = minimal_manifest_with_target("pkg-a", "1.0.0");
+	let path = write_release_record_file(root, None, &manifest).unwrap();
+
+	// Overwrite with a record whose target is missing the `kind` field.
+	let mutated = r#"{"schemaVersion":1,"kind":"monochange.releaseRecord","createdAt":"2026-01-01T00:00:00Z","command":"prepare-release","version":"1.0.0","releaseTargets":[{"id":"pkg-a","version":"1.0.0"}]}"#;
+	fs::write(&path, mutated).unwrap();
+
+	let validated = validate_release_record_file(root, None, &manifest).unwrap();
+	assert_eq!(validated, path);
+
+	let content = fs::read_to_string(&path).unwrap();
+	assert!(content.contains("Package"));
+}
+
+#[test]
+fn validate_release_record_file_fast_path_detects_missing_version() {
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+
+	let manifest = minimal_manifest_with_target("pkg-a", "1.0.0");
+	let path = write_release_record_file(root, None, &manifest).unwrap();
+
+	// Overwrite with a record whose target is missing the `version` field.
+	let mutated = r#"{"schemaVersion":1,"kind":"monochange.releaseRecord","createdAt":"2026-01-01T00:00:00Z","command":"prepare-release","version":"1.0.0","releaseTargets":[{"id":"pkg-a","kind":"Package"}]}"#;
+	fs::write(&path, mutated).unwrap();
+
+	let validated = validate_release_record_file(root, None, &manifest).unwrap();
+	assert_eq!(validated, path);
+
+	let content = fs::read_to_string(&path).unwrap();
+	assert!(content.contains("1.0.0"));
+}

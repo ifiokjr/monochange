@@ -50,6 +50,10 @@ use crate::render_change_target_markdown;
 use crate::run_with_args;
 use crate::run_with_args_in_dir;
 
+fn clear_dedup_cache() {
+	crate::release_artifacts::DEDUPLICATED_CACHE.with(|cache| cache.borrow_mut().clear());
+}
+
 #[allow(unused_macro_rules)]
 macro_rules! assert_readable_json_snapshot {
 	($value:expr) => {{
@@ -13887,7 +13891,7 @@ fn validate_release_record_file_reports_error_when_dedupe_cannot_read_releases_d
 	// Clear both caches so deduplication must scan the directory.
 	let index_path = root.join(".monochange/local/release-index.jsonl");
 	let _ = fs::remove_file(&index_path);
-	crate::release_artifacts::clear_dedup_cache();
+	clear_dedup_cache();
 
 	// Remove read permission from the releases directory so dedupe cannot iterate.
 	let releases_dir = root.join(".monochange/releases");
