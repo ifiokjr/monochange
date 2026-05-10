@@ -403,7 +403,7 @@ fn analyze_release_trajectory_for_refs_uses_explicit_ranges_and_warns_when_head_
 #[test]
 fn latest_workspace_release_tag_reports_missing_tags_and_git_failures() {
 	let missing_repo = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let missing_repo_error = latest_workspace_release_tag(missing_repo.path())
+	let missing_repo_error = tokio::runtime::Runtime::new().unwrap().block_on(latest_workspace_release_tag(missing_repo.path()))
 		.unwrap_err()
 		.render();
 	assert!(missing_repo_error.contains("failed to list git tags"));
@@ -421,7 +421,7 @@ fn latest_workspace_release_tag_reports_missing_tags_and_git_failures() {
 	git(root, &["commit", "-m", "release"]);
 	git(root, &["branch", "-M", "main"]);
 
-	let no_tag_error = latest_workspace_release_tag(root).unwrap_err().render();
+	let no_tag_error = tokio::runtime::Runtime::new().unwrap().block_on(latest_workspace_release_tag(root)).unwrap_err().render();
 	assert!(no_tag_error.contains("failed to resolve a workspace release baseline"));
 }
 
@@ -443,7 +443,7 @@ fn latest_workspace_release_tag_ignores_higher_namespaced_tags() {
 	git(root, &["tag", "v1.2.3"]);
 
 	assert_eq!(
-		latest_workspace_release_tag(root)
+		tokio::runtime::Runtime::new().unwrap().block_on(latest_workspace_release_tag(root))
 			.unwrap_or_else(|error| panic!("latest workspace tag: {error}")),
 		"v1.2.3"
 	);
@@ -479,7 +479,7 @@ fn auto_release_trajectory_resolution_uses_latest_workspace_tag_and_branch_refs(
 	git(root, &["add", "."]);
 	git(root, &["commit", "-m", "feature changes"]);
 
-	let latest_tag = latest_workspace_release_tag(root)
+	let latest_tag = tokio::runtime::Runtime::new().unwrap().block_on(latest_workspace_release_tag(root))
 		.unwrap_or_else(|error| panic!("latest workspace tag: {error}"));
 	assert_eq!(latest_tag, "v1.0.0");
 	assert_eq!(
@@ -487,7 +487,7 @@ fn auto_release_trajectory_resolution_uses_latest_workspace_tag_and_branch_refs(
 		"main"
 	);
 
-	let analysis = analyze_release_trajectory(root, &AnalysisConfig::default())
+	let analysis = tokio::runtime::Runtime::new().unwrap().block_on(analyze_release_trajectory(root, &AnalysisConfig::default()))
 		.unwrap_or_else(|error| panic!("release trajectory: {error}"));
 	assert_eq!(analysis.refs.release_ref, "v1.0.0");
 	assert_eq!(analysis.refs.main_ref, "main");

@@ -476,7 +476,7 @@ fn git_current_branch_reports_checked_out_branch_name() {
 	let tempdir = must_ok(tempdir(), "tempdir");
 	let root = tempdir.path();
 	init_git_repository(root);
-	let branch = must_ok(git_current_branch(root), "current branch");
+	let branch = must_ok(tokio::runtime::Runtime::new().unwrap().block_on(git_current_branch(root)), "current branch");
 	assert_eq!(branch, "main");
 }
 
@@ -520,7 +520,7 @@ fn git_current_branch_reports_detached_head_as_an_error() {
 		);
 	}
 
-	let error = must_err(git_current_branch(root), "expected detached-head error");
+	let error = must_err(tokio::runtime::Runtime::new().unwrap().block_on(git_current_branch(root)), "expected detached-head error");
 	assert!(
 		error
 			.to_string()
@@ -534,7 +534,7 @@ fn git_current_branch_reports_missing_directory_as_io_error() {
 	let tempdir = must_ok(tempdir(), "tempdir");
 	let missing_root = tempdir.path().join("missing");
 	let error = must_err(
-		git_current_branch(&missing_root),
+		tokio::runtime::Runtime::new().unwrap().block_on(git_current_branch(&missing_root)),
 		"expected missing-directory error",
 	);
 	assert!(
@@ -578,7 +578,7 @@ fn git_head_commit_reports_current_commit_sha() {
 		);
 	}
 
-	let sha = must_ok(git_head_commit(root), "head commit");
+	let sha = must_ok(tokio::runtime::Runtime::new().unwrap().block_on(git_head_commit(root)), "head commit");
 	assert_eq!(sha.len(), 40);
 }
 
@@ -587,7 +587,7 @@ fn git_head_commit_reports_unborn_head_as_config_error() {
 	let tempdir = must_ok(tempdir(), "tempdir");
 	let root = tempdir.path();
 	init_git_repository(root);
-	let error = must_err(git_head_commit(root), "expected unborn HEAD config error");
+	let error = must_err(tokio::runtime::Runtime::new().unwrap().block_on(git_head_commit(root)), "expected unborn HEAD config error");
 	assert!(
 		matches!(error, MonochangeError::Config(message) if message.contains("failed to read HEAD commit"))
 	);
