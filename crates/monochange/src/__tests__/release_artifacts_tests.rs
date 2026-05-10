@@ -1062,3 +1062,47 @@ fn validate_release_record_file_fast_path_detects_missing_version() {
 	let content = fs::read_to_string(&path).unwrap();
 	assert!(content.contains("1.0.0"));
 }
+
+#[test]
+fn validate_release_record_file_fast_path_detects_mismatched_target_count() {
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+
+	let manifest = minimal_manifest_with_target("pkg-a", "1.0.0");
+	let path = write_release_record_file(root, None, &manifest).unwrap();
+
+	// Overwrite with a record that has MORE targets than the manifest.
+	let mutated = r#"{"schemaVersion":1,"kind":"monochange.releaseRecord","createdAt":"2026-01-01T00:00:00Z","command":"prepare-release","version":"1.0.0","releaseTargets":[{"id":"pkg-a","kind":"Package","version":"1.0.0"},{"id":"pkg-b","kind":"Package","version":"2.0.0"}]}"#;
+	fs::write(&path, mutated).unwrap();
+
+	let validated = validate_release_record_file(root, None, &manifest).unwrap();
+	assert_eq!(validated, path);
+
+	// Should have been rewritten because target counts don't match.
+	let content = fs::read_to_string(&path).unwrap();
+	assert!(!content.contains("pkg-b"));
+}
+
+#[test]
+#[cfg(unix)]
+fn validate_release_record_file_fast_path_reports_error_for_unreadable_file() {
+	use std::os::unix::fs::PermissionsExt;
+
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+
+	let manifest = minimal_manifest_with_target("pkg-a", "1.0.0");
+	let path = write_release_record_file(root, None, &manifest).unwrap();
+
+	// Make the file unreadable.
+	let mut permissions = fs::metadata(&path).unwrap().permissions();
+	permissions.set_mode(0o000);
+	fs::set_permissions(&path, permissions.clone()).unwrap();
+
+	let result = validate_release_record_file(root, None, &manifest);
+	assert!(result.is_err());
+
+	// Cleanup.
+	permissions.set_mode(0o644);
+	let _ = fs::set_permissions(&path, permissions);
+}

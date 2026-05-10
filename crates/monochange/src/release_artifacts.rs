@@ -52,10 +52,9 @@ fn save_dedup_index(
 	index: &std::collections::HashSet<String>,
 ) -> MonochangeResult<()> {
 	let path = root.join(DEDUP_INDEX_PATH);
-	if let Some(parent) = path.parent() {
-		fs::create_dir_all(parent)
-			.map_err(|error| MonochangeError::Io(format!("create dedup index dir: {error}")))?;
-	}
+	let parent = path.parent().unwrap_or(root);
+	fs::create_dir_all(parent)
+		.map_err(|error| MonochangeError::Io(format!("create dedup index dir: {error}")))?;
 	let mut lines = Vec::with_capacity(index.len());
 	for hash in index {
 		lines.push(format!(r#"{{"hash":"{hash}"}}"#));
