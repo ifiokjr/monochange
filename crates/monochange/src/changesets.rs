@@ -568,8 +568,8 @@ pub(crate) fn released_package_names(
 	released_packages
 }
 
-pub(crate) type PackageChangelogTargets = BTreeMap<String, ChangelogTarget>;
-pub(crate) type GroupChangelogTargets = BTreeMap<String, ChangelogTarget>;
+pub type PackageChangelogTargets = BTreeMap<String, ChangelogTarget>;
+pub type GroupChangelogTargets = BTreeMap<String, ChangelogTarget>;
 
 pub(crate) fn resolve_changelog_targets(
 	configuration: &monochange_core::WorkspaceConfiguration,

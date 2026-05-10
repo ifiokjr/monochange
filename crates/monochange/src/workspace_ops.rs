@@ -32,16 +32,11 @@ use monochange_core::SourceConfiguration;
 use monochange_core::default_cli_commands;
 #[cfg(feature = "dart")]
 use monochange_dart::DartAdapter;
-use monochange_dart::discover_dart_packages;
 use monochange_deno::DenoAdapter;
-use monochange_deno::discover_deno_packages;
 use monochange_go::GoAdapter;
-use monochange_go::discover_go_modules;
 #[cfg(feature = "npm")]
 use monochange_npm::NpmAdapter;
-use monochange_npm::discover_npm_packages;
 use monochange_python::PythonAdapter;
-use monochange_python::discover_python_packages;
 use serde_json::json;
 use typed_builder::TypedBuilder;
 
@@ -860,105 +855,9 @@ pub(crate) fn validate_cargo_workspace_version_groups(root: &Path) -> Monochange
 #[must_use = "the discovery result must be checked"]
 pub fn discover_workspace(root: &Path) -> MonochangeResult<DiscoveryReport> {
 	let configuration = load_workspace_configuration(root)?;
-	let mut warnings = Vec::new();
-	let mut packages = Vec::new();
-
-	#[cfg(all(
-		feature = "cargo",
-		feature = "npm",
-		feature = "deno",
-		feature = "dart",
-		feature = "python",
-		feature = "go"
-	))]
-	{
-		let (
-			(cargo_discovery, npm_discovery),
-			(deno_discovery, (dart_discovery, (python_discovery, go_discovery))),
-		) = rayon::join(
-			|| {
-				rayon::join(
-					|| discover_cargo_packages(root),
-					|| discover_npm_packages(root),
-				)
-			},
-			|| {
-				rayon::join(
-					|| discover_deno_packages(root),
-					|| {
-						rayon::join(
-							|| discover_dart_packages(root),
-							|| {
-								rayon::join(
-									|| discover_python_packages(root),
-									|| discover_go_modules(root),
-								)
-							},
-						)
-					},
-				)
-			},
-		);
-		for discovery in [
-			cargo_discovery?,
-			npm_discovery?,
-			deno_discovery?,
-			dart_discovery?,
-			python_discovery?,
-			go_discovery?,
-		] {
-			warnings.extend(discovery.warnings);
-			packages.extend(discovery.packages);
-		}
-	}
-
-	#[cfg(not(all(
-		feature = "cargo",
-		feature = "npm",
-		feature = "deno",
-		feature = "dart",
-		feature = "python",
-		feature = "go"
-	)))]
-	{
-		#[cfg(feature = "cargo")]
-		{
-			let d = discover_cargo_packages(root)?;
-			warnings.extend(d.warnings);
-			packages.extend(d.packages);
-		}
-		#[cfg(feature = "npm")]
-		{
-			let d = discover_npm_packages(root)?;
-			warnings.extend(d.warnings);
-			packages.extend(d.packages);
-		}
-		#[cfg(feature = "deno")]
-		{
-			let d = discover_deno_packages(root)?;
-			warnings.extend(d.warnings);
-			packages.extend(d.packages);
-		}
-		#[cfg(feature = "dart")]
-		{
-			let d = discover_dart_packages(root)?;
-			warnings.extend(d.warnings);
-			packages.extend(d.packages);
-		}
-		#[cfg(feature = "python")]
-		{
-			let d = discover_python_packages(root)?;
-			warnings.extend(d.warnings);
-			packages.extend(d.packages);
-		}
-		#[cfg(feature = "go")]
-		{
-			let d = discover_go_modules(root)?;
-			warnings.extend(d.warnings);
-			packages.extend(d.packages);
-		}
-	}
-
+	let discovery = build_ecosystem_registry().discover_all(root)?;
+	let mut warnings = discovery.warnings;
+	let mut packages = discovery.packages;
 	normalize_package_ids(root, &mut packages);
 	packages.sort_by(|left, right| left.id.cmp(&right.id));
 	packages.dedup_by(|left, right| left.id == right.id);
@@ -1739,6 +1638,23 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 			.take()
 			.unwrap_or_else(|| panic!("changesets should be available after local planning"))
 	};
+	let changelog_release_targets = release_targets
+		.iter()
+		.map(|target| {
+			monochange_changelog::ReleaseTarget {
+				id: target.id.clone(),
+				kind: target.kind,
+				version: target.version.clone(),
+				tag: target.tag,
+				release: target.release,
+				version_format: target.version_format,
+				tag_name: target.tag_name.clone(),
+				members: target.members.clone(),
+				rendered_title: target.rendered_title.clone(),
+				rendered_changelog_title: target.rendered_changelog_title.clone(),
+			}
+		})
+		.collect::<Vec<_>>();
 	let changelog_updates =
 		measure_prepare_phase(&mut phase_timings, "build changelog updates", || {
 			build_changelog_updates(
@@ -1750,13 +1666,18 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 					.change_signals(&change_signals)
 					.changesets(&changesets)
 					.changelog_targets(&changelog_targets)
-					.release_targets(&release_targets)
+					.release_targets(&changelog_release_targets)
 					.build(),
 			)
 		})?;
 	let changelog_file_updates = changelog_updates
 		.iter()
-		.map(|update| update.file.clone())
+		.map(|update| {
+			FileUpdate {
+				path: update.file.path.clone(),
+				content: update.file.content.clone(),
+			}
+		})
 		.collect::<Vec<_>>();
 	let base_updates = [
 		manifest_updates.clone(),

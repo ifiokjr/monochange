@@ -2041,6 +2041,7 @@ dependencies = [
  "minijinja",
  "monochange_analysis",
  "monochange_cargo",
+ "monochange_changelog",
  "monochange_config",
  "monochange_core",
  "monochange_dart",
@@ -2151,6 +2152,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "monochange_changelog"
+version = "0.4.0"
+dependencies = [
+ "minijinja",
+ "monochange_core",
+ "semver",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tracing",
+ "typed-builder",
+]
+
+[[package]]
 name = "monochange_config"
 version = "0.4.0"
 dependencies = [
@@ -2158,17 +2173,7 @@ dependencies = [
  "glob",
  "insta",
  "miette",
- "monochange_cargo",
  "monochange_core",
- "monochange_dart",
- "monochange_deno",
- "monochange_forgejo",
- "monochange_gitea",
- "monochange_github",
- "monochange_gitlab",
- "monochange_go",
- "monochange_npm",
- "monochange_python",
  "monochange_test_helpers",
  "proptest",
  "regex",
@@ -2460,6 +2465,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "tempfile",
  "urlencoding",
 ]
 

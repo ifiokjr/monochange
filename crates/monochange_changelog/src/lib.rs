@@ -1,9 +1,136 @@
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::fs;
+use std::path::Path;
+use std::path::PathBuf;
+
+use minijinja::Environment;
+use minijinja::UndefinedBehavior;
+use monochange_core::BumpSeverity;
+use monochange_core::ChangeSignal;
+use monochange_core::ChangelogFormat;
+use monochange_core::ChangelogSettings;
+use monochange_core::ChangelogTarget;
+use monochange_core::ChangesetTargetKind;
+use monochange_core::GroupChangelogInclude;
+use monochange_core::HostedActorRef;
+use monochange_core::HostedIssueRef;
+use monochange_core::HostedIssueRelationshipKind;
+use monochange_core::HostedReviewRequestRef;
+#[cfg(test)]
+use monochange_core::HostingCapabilities;
+use monochange_core::MonochangeError;
+use monochange_core::MonochangeResult;
+use monochange_core::PackageRecord;
+use monochange_core::PreparedChangeset;
+use monochange_core::PreparedChangesetTarget;
+use monochange_core::ReleaseNotesDocument;
+use monochange_core::ReleaseNotesSection;
+use monochange_core::ReleaseOwnerKind;
+use monochange_core::ReleasePlan;
+use monochange_core::VersionFormat;
+use monochange_core::relative_to_root;
+use monochange_core::render_release_notes;
 use typed_builder::TypedBuilder;
 
-use super::*;
+pub type PackageChangelogTargets = BTreeMap<String, ChangelogTarget>;
+pub type GroupChangelogTargets = BTreeMap<String, ChangelogTarget>;
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ReleaseTarget {
+	pub id: String,
+	pub kind: ReleaseOwnerKind,
+	pub version: String,
+	pub tag: bool,
+	pub release: bool,
+	pub version_format: VersionFormat,
+	pub tag_name: String,
+	pub members: Vec<String>,
+	pub rendered_title: String,
+	pub rendered_changelog_title: String,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct FileUpdate {
+	pub path: PathBuf,
+	pub content: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ChangelogUpdate {
+	pub file: FileUpdate,
+	pub owner_id: String,
+	pub owner_kind: ReleaseOwnerKind,
+	pub format: ChangelogFormat,
+	pub notes: ReleaseNotesDocument,
+	pub rendered: String,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ReleaseNoteChange {
+	pub package_id: String,
+	pub package_name: String,
+	pub package_labels: Vec<String>,
+	pub source_path: Option<String>,
+	pub summary: String,
+	pub details: Option<String>,
+	pub bump: BumpSeverity,
+	pub change_type: Option<String>,
+	pub context: Option<String>,
+	pub changeset_path: Option<String>,
+	pub change_owner: Option<String>,
+	pub change_owner_link: Option<String>,
+	pub review_request: Option<String>,
+	pub review_request_link: Option<String>,
+	pub introduced_commit: Option<String>,
+	pub introduced_commit_link: Option<String>,
+	pub last_updated_commit: Option<String>,
+	pub last_updated_commit_link: Option<String>,
+	pub related_issues: Option<String>,
+	pub related_issue_links: Option<String>,
+	pub closed_issues: Option<String>,
+	pub closed_issue_links: Option<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
+struct RenderedChangesetContext {
+	context: String,
+	changeset_path: String,
+	change_owner: Option<String>,
+	change_owner_link: Option<String>,
+	review_request: Option<String>,
+	review_request_link: Option<String>,
+	introduced_commit: Option<String>,
+	introduced_commit_link: Option<String>,
+	last_updated_commit: Option<String>,
+	last_updated_commit_link: Option<String>,
+	related_issues: Option<String>,
+	related_issue_links: Option<String>,
+	closed_issues: Option<String>,
+	closed_issue_links: Option<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+struct GroupReleaseNoteKey {
+	source_path: Option<String>,
+	summary: String,
+	details: Option<String>,
+	bump: BumpSeverity,
+	change_type: Option<String>,
+	context: Option<String>,
+}
+
+fn root_relative(root: &Path, path: &Path) -> PathBuf {
+	let relative = relative_to_root(root, path).unwrap_or_else(|| path.to_path_buf());
+	if relative.as_os_str().is_empty() {
+		PathBuf::from(".")
+	} else {
+		relative
+	}
+}
 
 #[derive(Clone, Copy, Debug, TypedBuilder)]
-pub(crate) struct ChangelogBuildContext<'a> {
+pub struct ChangelogBuildContext<'a> {
 	pub root: &'a Path,
 	pub configuration: &'a monochange_core::WorkspaceConfiguration,
 	pub packages: &'a [PackageRecord],
@@ -15,7 +142,7 @@ pub(crate) struct ChangelogBuildContext<'a> {
 }
 
 #[tracing::instrument(skip_all)]
-pub(crate) fn build_changelog_updates(
+pub fn build_changelog_updates(
 	context: ChangelogBuildContext<'_>,
 ) -> MonochangeResult<Vec<ChangelogUpdate>> {
 	let changeset_context_by_path = context
@@ -731,7 +858,7 @@ fn select_empty_update_message<'value>(
 		.unwrap_or(built_in_default)
 }
 
-pub(crate) fn render_jinja_template(
+pub fn render_jinja_template(
 	template: &str,
 	context: &minijinja::Value,
 ) -> MonochangeResult<String> {
@@ -794,7 +921,7 @@ fn render_jinja_template_with_behavior(
 	}
 }
 
-pub(crate) fn render_message_template(template: &str, metadata: &BTreeMap<&str, String>) -> String {
+pub fn render_message_template(template: &str, metadata: &BTreeMap<&str, String>) -> String {
 	let context = minijinja::Value::from_serialize(metadata);
 	render_jinja_template(template, &context).unwrap_or_else(|_| template.to_string())
 }
@@ -918,7 +1045,7 @@ fn group_release_note_changes(
 	changes
 }
 
-pub(crate) fn filter_group_release_note_change(
+pub fn filter_group_release_note_change(
 	change: &ReleaseNoteChange,
 	group_definition: Option<&monochange_core::GroupDefinition>,
 	planned_group: &monochange_core::PlannedVersionGroup,
@@ -954,7 +1081,7 @@ pub(crate) fn filter_group_release_note_change(
 	}
 }
 
-pub(crate) fn group_changelog_include_allows(
+pub fn group_changelog_include_allows(
 	include: &GroupChangelogInclude,
 	in_group_targets: &BTreeSet<String>,
 ) -> bool {
@@ -969,7 +1096,7 @@ pub(crate) fn group_changelog_include_allows(
 	}
 }
 
-pub(crate) fn render_group_filtered_update_message(group_id: &str) -> String {
+pub fn render_group_filtered_update_message(group_id: &str) -> String {
 	format!(
 		"No group-facing notes were recorded for this release. Member packages were updated as part of the synchronized group `{group_id}` version, but their changes are not configured for inclusion in this changelog."
 	)

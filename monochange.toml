@@ -248,6 +248,9 @@ path = "crates/monochange_npm"
 [package.monochange_config]
 path = "crates/monochange_config"
 
+[package.monochange_changelog]
+path = "crates/monochange_changelog"
+
 [package.monochange_deno]
 path = "crates/monochange_deno"
 
@@ -407,6 +410,7 @@ packages = [
 	"monochange",
 	"monochange_analysis",
 	"monochange_cargo",
+	"monochange_changelog",
 	"monochange_config",
 	"monochange_core",
 	"monochange_dart",

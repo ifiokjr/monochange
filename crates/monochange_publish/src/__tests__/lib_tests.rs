@@ -1,3 +1,6 @@
+use monochange_core::GroupChangelogInclude;
+use monochange_core::VersionFormat;
+
 use super::*;
 
 fn builtin_provider_registry_trust_capability(
@@ -286,4 +289,157 @@ fn unsupported_builtin_registries_have_no_trusted_publishing_capabilities() {
 		},
 	);
 	assert!(message.contains("supported providers: none"));
+}
+
+fn publication_target(package: &str, ecosystem: Ecosystem) -> PackagePublicationTarget {
+	PackagePublicationTarget {
+		package: package.to_string(),
+		ecosystem,
+		registry: None,
+		version: "1.0.0".to_string(),
+		mode: PublishMode::default(),
+		trusted_publishing: TrustedPublishingSettings::default(),
+		attestations: PublishAttestationSettings::default(),
+	}
+}
+
+fn group_definition(id: &str, packages: &[&str]) -> GroupDefinition {
+	GroupDefinition {
+		id: id.to_string(),
+		packages: packages
+			.iter()
+			.map(|package| (*package).to_string())
+			.collect(),
+		changelog: None,
+		changelog_include: GroupChangelogInclude::default(),
+		excluded_changelog_types: Vec::new(),
+		empty_update_message: None,
+		release_title: None,
+		changelog_version_title: None,
+		versioned_files: Vec::new(),
+		tag: true,
+		release: true,
+		version_format: VersionFormat::default(),
+	}
+}
+
+#[test]
+fn select_release_publication_targets_filters_ecosystems_and_expands_groups() {
+	let groups = vec![
+		group_definition("frontend", &["web", "ui"]),
+		group_definition("docs", &["site"]),
+	];
+	let publication_targets = vec![
+		publication_target("web", Ecosystem::Npm),
+		publication_target("cli", Ecosystem::Cargo),
+		publication_target("docs", Ecosystem::Python),
+	];
+	let selected_packages = BTreeSet::from(["manual".to_string()]);
+	let selected_groups = BTreeSet::from(["frontend".to_string(), "missing".to_string()]);
+	let selected_ecosystems = BTreeSet::from([Ecosystem::Npm, Ecosystem::Cargo]);
+
+	let selected = select_release_publication_targets(
+		&groups,
+		&publication_targets,
+		&selected_packages,
+		&selected_groups,
+		&selected_ecosystems,
+	);
+
+	assert_eq!(selected.publication_targets.len(), 2);
+	assert_eq!(selected.publication_targets[0].package, "web");
+	assert_eq!(selected.publication_targets[1].package, "cli");
+	assert_eq!(
+		selected.selected_packages,
+		BTreeSet::from(["manual".to_string(), "web".to_string(), "ui".to_string()])
+	);
+}
+
+fn sample_publish_request_for_registry(registry: RegistryKind) -> PublishRequest {
+	PublishRequest {
+		package_id: "pkg".to_string(),
+		package_name: "pkg".to_string(),
+		ecosystem: Ecosystem::Npm,
+		manifest_path: PathBuf::from("package.json"),
+		package_root: PathBuf::from("."),
+		registry,
+		package_manager: None,
+		package_metadata: BTreeMap::new(),
+		mode: PublishMode::Builtin,
+		version: "1.0.0".to_string(),
+		placeholder: false,
+		trusted_publishing: TrustedPublishingSettings::default(),
+		attestations: PublishAttestationSettings::default(),
+		placeholder_readme: "placeholder".to_string(),
+	}
+}
+
+#[test]
+fn publish_readiness_registry_push_checker_and_missing_checker_paths() {
+	let request = sample_publish_request_for_registry(RegistryKind::Npm);
+	let root = Path::new(".");
+	let mut registry = PublishReadinessRegistry::new();
+
+	assert_eq!(registry.blocked_message(root, &request).unwrap(), None);
+
+	registry.push_checker(
+		RegistryKind::Npm,
+		Box::new(|_, request| Ok(Some(format!("{} blocked", request.package_name)))),
+	);
+
+	assert_eq!(
+		registry.blocked_message(root, &request).unwrap().as_deref(),
+		Some("pkg blocked")
+	);
+}
+
+#[test]
+fn placeholder_manifest_registry_push_writer_and_directory_builder_write_files() {
+	let request = sample_publish_request_for_registry(RegistryKind::Npm);
+	let root = Path::new(".");
+	let mut registry = PlaceholderManifestWriterRegistry::new();
+
+	registry.push_writer(
+		RegistryKind::Npm,
+		Box::new(|placeholder_dir, request, _, _| {
+			fs::write(
+				placeholder_dir.join("package.json"),
+				format!("{{\"name\":\"{}\"}}", request.package_name),
+			)
+			.map_err(|error| MonochangeError::Io(error.to_string()))
+		}),
+	);
+
+	let tempdir = build_placeholder_directory(root, &request, None, &registry).unwrap();
+
+	assert_eq!(
+		fs::read_to_string(tempdir.path().join("README.md")).unwrap(),
+		"placeholder"
+	);
+	assert_eq!(
+		fs::read_to_string(tempdir.path().join("package.json")).unwrap(),
+		"{\"name\":\"pkg\"}"
+	);
+}
+
+#[test]
+fn default_registry_kind_for_ecosystem_reports_unknown_and_known_ecosystems() {
+	let unknown = default_registry_kind_for_ecosystem("unknown").unwrap_err();
+	assert!(unknown.to_string().contains("ecosystem `unknown`"));
+
+	assert_eq!(
+		default_registry_kind_for_ecosystem("go").unwrap(),
+		RegistryKind::GoProxy
+	);
+}
+
+#[test]
+fn placeholder_tempdir_error_includes_io_error() {
+	let error = std::io::Error::other("no tempdir");
+
+	assert!(
+		placeholder_tempdir_error(&error)
+			.to_string()
+			.contains("failed to create placeholder tempdir: no tempdir")
+	);
 }

@@ -12,6 +12,9 @@ use clap::Command;
 use httpmock::Method::GET;
 use httpmock::Method::PATCH;
 use httpmock::MockServer;
+use monochange_changelog::ReleaseNoteChange;
+use monochange_changelog::filter_group_release_note_change;
+use monochange_changelog::group_changelog_include_allows;
 use monochange_config::load_workspace_configuration;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangesetTargetKind;
@@ -10352,23 +10355,23 @@ fn group_changelog_include_allows_expected_member_targets() {
 	let core_only = BTreeSet::from(["core".to_string()]);
 	let core_and_app = BTreeSet::from(["core".to_string(), "app".to_string()]);
 
-	assert!(crate::group_changelog_include_allows(
+	assert!(group_changelog_include_allows(
 		&GroupChangelogInclude::All,
 		&core_only,
 	));
-	assert!(!crate::group_changelog_include_allows(
+	assert!(!group_changelog_include_allows(
 		&GroupChangelogInclude::GroupOnly,
 		&core_only,
 	));
-	assert!(crate::group_changelog_include_allows(
+	assert!(group_changelog_include_allows(
 		&GroupChangelogInclude::Selected(["core".to_string()].into()),
 		&core_only,
 	));
-	assert!(!crate::group_changelog_include_allows(
+	assert!(!group_changelog_include_allows(
 		&GroupChangelogInclude::Selected(["app".to_string()].into()),
 		&core_only,
 	));
-	assert!(!crate::group_changelog_include_allows(
+	assert!(!group_changelog_include_allows(
 		&GroupChangelogInclude::Selected(["core".to_string()].into()),
 		&core_and_app,
 	));
@@ -10380,7 +10383,7 @@ fn filter_group_release_note_change_handles_missing_context_and_direct_group_tar
 	let group = sample_group_definition(GroupChangelogInclude::GroupOnly);
 
 	assert!(
-		crate::filter_group_release_note_change(
+		filter_group_release_note_change(
 			&sample_release_note_change(None),
 			Some(&group),
 			&planned_group,
@@ -10390,7 +10393,7 @@ fn filter_group_release_note_change_handles_missing_context_and_direct_group_tar
 	);
 
 	assert!(
-		crate::filter_group_release_note_change(
+		filter_group_release_note_change(
 			&sample_release_note_change(Some(".changeset/missing.md")),
 			Some(&group),
 			&planned_group,
@@ -10411,7 +10414,7 @@ fn filter_group_release_note_change_handles_missing_context_and_direct_group_tar
 			caused_by: Vec::new(),
 		}],
 	)]);
-	let renamed = crate::filter_group_release_note_change(
+	let renamed = filter_group_release_note_change(
 		&sample_release_note_change(Some(".changeset/group.md")),
 		Some(&group),
 		&planned_group,
@@ -10433,7 +10436,7 @@ fn filter_group_release_note_change_handles_missing_context_and_direct_group_tar
 		}],
 	)]);
 	assert!(
-		crate::filter_group_release_note_change(
+		filter_group_release_note_change(
 			&sample_release_note_change(Some(".changeset/outside.md")),
 			Some(&group),
 			&planned_group,
@@ -10462,7 +10465,7 @@ fn filter_group_release_note_change_respects_member_allowlists() {
 		}],
 	)]);
 	assert!(
-		crate::filter_group_release_note_change(
+		filter_group_release_note_change(
 			&change,
 			Some(&selected_core),
 			&planned_group,
@@ -10495,7 +10498,7 @@ fn filter_group_release_note_change_respects_member_allowlists() {
 		],
 	)]);
 	assert!(
-		crate::filter_group_release_note_change(
+		filter_group_release_note_change(
 			&change,
 			Some(&selected_core),
 			&planned_group,
@@ -10509,8 +10512,8 @@ fn filter_group_release_note_change_respects_member_allowlists() {
 	assert!(message.contains("synchronized group `sdk`"));
 }
 
-fn sample_release_note_change(source_path: Option<&str>) -> crate::ReleaseNoteChange {
-	crate::ReleaseNoteChange {
+fn sample_release_note_change(source_path: Option<&str>) -> ReleaseNoteChange {
+	ReleaseNoteChange {
 		package_id: "core".to_string(),
 		package_name: "core".to_string(),
 		package_labels: Vec::new(),

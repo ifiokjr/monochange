@@ -1,0 +1,28 @@
+[package]
+name = "monochange_changelog"
+version = { workspace = true }
+categories = { workspace = true }
+documentation = "https://docs.rs/monochange_changelog"
+edition = { workspace = true }
+include = ["src/**/*.rs", "Cargo.toml", "readme.md"]
+keywords = ["cli", "changelog", "releases", "versioning", "monorepo"]
+license = { workspace = true }
+readme = "readme.md"
+repository = { workspace = true }
+rust-version = { workspace = true }
+description = "Changelog rendering for monochange"
+
+[dependencies]
+minijinja = { workspace = true, default-features = true }
+monochange_core = { workspace = true }
+semver = { workspace = true, default-features = true }
+serde = { workspace = true, default-features = true }
+serde_json = { workspace = true, default-features = true }
+tracing = { workspace = true, default-features = true }
+typed-builder = { workspace = true, default-features = true }
+
+[dev-dependencies]
+tempfile = { workspace = true, default-features = true }
+
+[lints]
+workspace = true

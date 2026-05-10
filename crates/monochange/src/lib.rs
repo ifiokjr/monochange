@@ -61,7 +61,21 @@ use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
 use analyze::render_analyze_report;
-pub(crate) use changelog::*;
+pub(crate) use monochange_changelog::ChangelogBuildContext;
+pub(crate) use monochange_changelog::build_changelog_updates;
+#[cfg(test)]
+pub(crate) use monochange_changelog::render_group_filtered_update_message;
+pub(crate) use monochange_changelog::render_jinja_template;
+#[cfg(test)]
+pub(crate) use monochange_core::ChangelogSettings;
+#[cfg(test)]
+pub(crate) use monochange_core::ChangesetTargetKind;
+#[cfg(test)]
+pub(crate) use monochange_core::ReleaseNotesSection;
+#[cfg(test)]
+pub mod changelog {
+	pub use monochange_changelog::render_message_template;
+}
 pub use changeset_policy::affected_packages;
 pub(crate) use changeset_policy::compute_changed_paths_since;
 pub use changeset_policy::evaluate_changeset_policy;
@@ -138,8 +152,6 @@ pub(crate) use git_support::run_git_process;
 #[cfg(test)]
 pub(crate) use git_support::run_git_status;
 use migration_audit::run_migration_command;
-use minijinja::Environment;
-use minijinja::UndefinedBehavior;
 #[cfg(feature = "cargo")]
 use monochange_cargo::RustSemverProvider;
 use monochange_config::load_changeset_file;
@@ -148,12 +160,10 @@ use monochange_config::resolve_package_reference;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangeSignal;
 use monochange_core::ChangelogFormat;
-use monochange_core::ChangelogSettings;
 use monochange_core::ChangelogTarget;
 use monochange_core::ChangesetContext;
 use monochange_core::ChangesetPolicyEvaluation;
 use monochange_core::ChangesetRevision;
-use monochange_core::ChangesetTargetKind;
 use monochange_core::CliCommandDefinition;
 use monochange_core::CliStepDefinition;
 use monochange_core::CommitMessage;
@@ -163,7 +173,6 @@ use monochange_core::DEFAULT_RELEASE_TITLE_NAMESPACED;
 use monochange_core::DEFAULT_RELEASE_TITLE_PRIMARY;
 use monochange_core::DiscoveryReport;
 use monochange_core::Ecosystem;
-use monochange_core::GroupChangelogInclude;
 
 #[cfg(test)]
 pub(crate) static TEST_ENV_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
@@ -171,9 +180,6 @@ use monochange_core::HostedActorRef;
 use monochange_core::HostedActorSourceKind;
 use monochange_core::HostedCommitRef;
 use monochange_core::HostedIssueCommentPlan;
-use monochange_core::HostedIssueRef;
-use monochange_core::HostedIssueRelationshipKind;
-use monochange_core::HostedReviewRequestRef;
 use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
 use monochange_core::MonochangeError;
@@ -190,7 +196,6 @@ use monochange_core::ReleaseManifestPlanDecision;
 use monochange_core::ReleaseManifestPlanGroup;
 use monochange_core::ReleaseManifestTarget;
 use monochange_core::ReleaseNotesDocument;
-use monochange_core::ReleaseNotesSection;
 use monochange_core::ReleaseOwnerKind;
 use monochange_core::ReleasePlan;
 use monochange_core::ReleaseRecord;
@@ -213,7 +218,6 @@ use monochange_core::VersionFormat;
 use monochange_core::VersionedFileDefinition;
 use monochange_core::materialize_dependency_edges;
 use monochange_core::relative_to_root;
-use monochange_core::render_release_notes;
 #[cfg(feature = "forgejo")]
 use monochange_forgejo as forgejo_provider;
 #[cfg(feature = "gitea")]
@@ -306,7 +310,6 @@ pub(crate) fn synthetic_step_command_definition(
 }
 
 mod analyze;
-mod changelog;
 mod changeset_policy;
 mod changesets;
 mod cli;
@@ -520,70 +523,6 @@ struct PreparedReleaseExecution {
 struct FileUpdate {
 	path: PathBuf,
 	content: Vec<u8>,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-struct ChangelogUpdate {
-	file: FileUpdate,
-	owner_id: String,
-	owner_kind: ReleaseOwnerKind,
-	format: ChangelogFormat,
-	notes: ReleaseNotesDocument,
-	rendered: String,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-struct ReleaseNoteChange {
-	package_id: String,
-	package_name: String,
-	package_labels: Vec<String>,
-	source_path: Option<String>,
-	summary: String,
-	details: Option<String>,
-	bump: BumpSeverity,
-	change_type: Option<String>,
-	context: Option<String>,
-	changeset_path: Option<String>,
-	change_owner: Option<String>,
-	change_owner_link: Option<String>,
-	review_request: Option<String>,
-	review_request_link: Option<String>,
-	introduced_commit: Option<String>,
-	introduced_commit_link: Option<String>,
-	last_updated_commit: Option<String>,
-	last_updated_commit_link: Option<String>,
-	related_issues: Option<String>,
-	related_issue_links: Option<String>,
-	closed_issues: Option<String>,
-	closed_issue_links: Option<String>,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Default)]
-struct RenderedChangesetContext {
-	context: String,
-	changeset_path: String,
-	change_owner: Option<String>,
-	change_owner_link: Option<String>,
-	review_request: Option<String>,
-	review_request_link: Option<String>,
-	introduced_commit: Option<String>,
-	introduced_commit_link: Option<String>,
-	last_updated_commit: Option<String>,
-	last_updated_commit_link: Option<String>,
-	related_issues: Option<String>,
-	related_issue_links: Option<String>,
-	closed_issues: Option<String>,
-	closed_issue_links: Option<String>,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
-struct GroupReleaseNoteKey {
-	source_path: Option<String>,
-	summary: String,
-	details: Option<String>,
-	bump: BumpSeverity,
-	change_type: Option<String>,
-	context: Option<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]

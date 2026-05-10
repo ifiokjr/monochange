@@ -19,17 +19,7 @@ schema = ["dep:schemars", "monochange_core/schema"]
 doc-comment = { workspace = true, default-features = true }
 glob = { workspace = true, default-features = true }
 miette = { workspace = true, default-features = true }
-monochange_cargo = { workspace = true }
 monochange_core = { workspace = true }
-monochange_dart = { workspace = true }
-monochange_deno = { workspace = true }
-monochange_forgejo = { workspace = true }
-monochange_gitea = { workspace = true }
-monochange_github = { workspace = true }
-monochange_gitlab = { workspace = true }
-monochange_go = { workspace = true }
-monochange_npm = { workspace = true }
-monochange_python = { workspace = true }
 regex = { workspace = true, default-features = true }
 schemars = { workspace = true, optional = true }
 semver = { workspace = true, default-features = true }
