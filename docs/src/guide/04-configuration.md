@@ -572,6 +572,7 @@ CLI command interpolation variables:
 - built-in commands already attach descriptive step `name` labels such as `prepare release` and `publish release`; keep or replace those labels when you want progress output to stay readable
 - custom command variables become available when `variables` is present: map your own names to variables such as `version`, `group_version`, `released_packages`, `changed_files`, and `changesets`
 - `always_run = true` on any step causes it to run even when a previous step has failed, which is useful for cleanup, notification, or dry-run preview steps
+- `update_release_json = true` on a `CommitRelease` step allows the step to create or overwrite the release record file when it is missing or differs from the expected content; the default (`false`) treats a missing or mismatched record as an error
 - `dry_run_command` on a `Command` step replaces `command` only when the CLI command is run with `--dry-run`
 - `dry_run = true` on a `[cli.<command>]` table forces the entire command to run in dry-run mode even when the user does not pass `--dry-run`
 - `shell = true` runs the command through the current shell; the default mode runs the executable directly after shell-style splitting

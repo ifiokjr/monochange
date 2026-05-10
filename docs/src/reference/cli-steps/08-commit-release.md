@@ -22,9 +22,15 @@ This is especially useful when you want to:
 
 ## Inputs
 
-`CommitRelease` does not accept built-in step inputs.
+`CommitRelease` accepts one optional step-level boolean input:
 
-That is intentional: it consumes prepared release state instead of raw user input.
+| Input                 | Type    | Default | Description                                                                                                                                                                                                                                                |
+| --------------------- | ------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `update_release_json` | boolean | `false` | When `true`, allows `CommitRelease` to create or overwrite the `.monochange/releases/<id>/release.json` record if it is missing or does not match the expected content. When `false` (the default), a missing or mismatched record is treated as an error. |
+
+This input is useful when a previous step (such as `PrepareRelease` or a `Command` step that runs `dprint fmt`) may have modified the release record file, and you want `CommitRelease` to accept the regenerated content rather than fail with a mismatch error.
+
+`CommitRelease` compares release records semantically (parsed JSON values), so formatting-only differences such as indentation or key ordering are ignored and never trigger a mismatch.
 
 ## Step-level `when` condition
 
@@ -62,6 +68,8 @@ You can provide that state in either of two ways:
 In normal mode, `CommitRelease` creates a local commit.
 
 In `--dry-run` mode, it previews the commit payload without creating the commit.
+
+Before committing, `CommitRelease` validates the `.monochange/releases/<id>/release.json` record on disk. If the file exists, the step compares it against the expected content **semantically** (parsed JSON values), so formatting-only differences such as indentation or key ordering do not trigger a mismatch. If the file is missing or semantically different, the step either errors (default) or overwrites the file, depending on the `update_release_json` input.
 
 It exposes a structured `release_commit.*` namespace to later `Command` steps. Commonly useful fields include:
 
@@ -122,6 +130,28 @@ command = "echo release commit {{ release_commit.commit }}"
 shell = true
 ```
 
+### Prepare, format, then commit with record overwrite
+
+If a formatting tool such as `dprint fmt` runs between `PrepareRelease` and `CommitRelease`, it may change the whitespace or key ordering of the generated `release.json`. By default, `CommitRelease` would treat this as a mismatch and error. Set `update_release_json = true` to allow `CommitRelease` to overwrite the formatted file with the semantically-equivalent regenerated content:
+
+```toml
+[[cli.release-pr.steps]]
+type = "PrepareRelease"
+name = "prepare release"
+
+[[cli.release-pr.steps]]
+type = "Command"
+name = "format changed files"
+command = "dprint fmt --allow-no-files {{ changed_files }} .monochange/releases/"
+
+[[cli.release-pr.steps]]
+type = "CommitRelease"
+name = "create release commit"
+update_release_json = true
+```
+
+This pattern is the recommended way to combine automated formatting with release record durability.
+
 ### Prepare, commit, then open a release request
 
 A strong provider-facing pattern is:
@@ -163,3 +193,4 @@ A raw shell commit can create a commit, but it cannot automatically preserve the
 - assuming it publishes releases or opens a release request by itself
 - forgetting that `--dry-run` previews the commit rather than creating it
 - reaching for a custom `git commit` command and then losing durable release metadata
+- running a formatter (such as `dprint fmt`) between `PrepareRelease` and `CommitRelease` without setting `update_release_json = true` on the `CommitRelease` step

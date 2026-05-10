@@ -488,6 +488,10 @@
 							"const": "CommitRelease",
 							"type": "string"
 						},
+						"update_release_json": {
+							"default": false,
+							"type": "boolean"
+						},
 						"when": {
 							"default": null,
 							"type": [
