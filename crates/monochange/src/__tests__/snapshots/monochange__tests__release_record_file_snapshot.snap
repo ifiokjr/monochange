@@ -1,5 +1,5 @@
 ---
-source: crates/monochange/src/__tests.rs
+source: crates/monochange/src/__tests__/lib_tests.rs
 expression: value
 ---
 {
@@ -34,7 +34,7 @@ expression: value
     "monochange",
     "monochange_core"
   ],
-  "schemaVersion": 1,
+  "schemaVersion": "0.1",
   "updatedChangelogs": [],
   "version": "1.2.3"
 }

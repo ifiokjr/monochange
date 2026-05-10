@@ -183,10 +183,10 @@ pub enum SchemaError {
 		expected: &'static str,
 	},
 	/// Artifact lacked the current version field.
-	#[error("artifact is missing required schema version field `v`")]
+	#[error("artifact is missing required schema version field `schemaVersion`")]
 	MissingVersion,
-	/// Current `v` field was not a string.
-	#[error("artifact schema version field `v` must be a string")]
+	/// Current `schemaVersion` field was not a string.
+	#[error("artifact schema version field `schemaVersion` must be a string")]
 	NonStringVersion,
 	/// Current `v` field could not be parsed.
 	#[error("artifact uses invalid schema version `{version}`: {source}")]
@@ -264,7 +264,8 @@ pub mod release_record {
 
 	/// Durable artifact kind for commit-embedded release records.
 	pub const KIND: &str = "monochange.releaseRecord";
-	const INTERNAL_SCHEMA_VERSION_FIELD: &str = "schemaVersion";
+	const SCHEMA_VERSION_FIELD: &str = "schemaVersion";
+	const LEGACY_VERSION_FIELD: &str = "v";
 
 	/// Return the current release-record schema version.
 	pub fn current_version() -> Result<SchemaVersion, SchemaError> {
@@ -274,13 +275,13 @@ pub mod release_record {
 	/// Convert a release-record JSON value into the current durable wire shape.
 	///
 	/// This is intended for rendering new artifacts from existing in-memory domain
-	/// structs. It writes `v` and removes internal-only `schemaVersion`.
+	/// structs. It writes `schemaVersion` and removes legacy `v`.
 	pub fn render_current_value(mut value: Value) -> Result<Value, SchemaError> {
 		let object = object_mut(&mut value)?;
 		validate_kind(object, KIND)?;
-		object.remove(INTERNAL_SCHEMA_VERSION_FIELD);
+		object.remove(LEGACY_VERSION_FIELD);
 		object.insert(
-			"v".to_string(),
+			SCHEMA_VERSION_FIELD.to_string(),
 			Value::String(CURRENT_SCHEMA_VERSION_TEXT.to_string()),
 		);
 		Ok(value)
@@ -288,12 +289,16 @@ pub mod release_record {
 
 	/// Validate a release-record JSON value against the current durable wire shape.
 	///
-	/// `0.0` is the first supported public schema version. Values without `v` or
-	/// with any non-current `v` fail instead of taking a migration path.
+	/// `0.0` is the first supported public schema version. Values without `schemaVersion`
+	/// or with any non-current `schemaVersion` fail instead of taking a migration path.
+	/// Legacy `v` fields are accepted as a compatibility bridge.
 	pub fn migrate_value(mut value: Value) -> Result<Value, SchemaError> {
 		let object = object_mut(&mut value)?;
 		validate_kind(object, KIND)?;
-		let version_value = object.get("v").ok_or(SchemaError::MissingVersion)?;
+		let version_value = object
+			.get(SCHEMA_VERSION_FIELD)
+			.or_else(|| object.get(LEGACY_VERSION_FIELD))
+			.ok_or(SchemaError::MissingVersion)?;
 		let version = parse_current_version(version_value)?;
 		let current = current_version()?;
 		if version != current {
@@ -302,6 +307,12 @@ pub mod release_record {
 				current,
 			});
 		}
+		// Normalize legacy `v` to `schemaVersion` for downstream consumers.
+		object.remove(LEGACY_VERSION_FIELD);
+		object.insert(
+			SCHEMA_VERSION_FIELD.to_string(),
+			Value::String(CURRENT_SCHEMA_VERSION_TEXT.to_string()),
+		);
 		Ok(value)
 	}
 }
@@ -326,7 +337,7 @@ pub mod migration_changelog {
 		pub artifact: &'static str,
 		/// Source version for the migration edge.
 		pub from: MigrationSource,
-		/// Destination `v` after migration.
+		/// Destination `schemaVersion` after migration.
 		pub to: SchemaVersion,
 		/// Summary operation for the edge.
 		pub operation: MigrationOperation,
@@ -344,8 +355,8 @@ pub mod migration_changelog {
 	pub enum MigrationSource {
 		/// Current string schema version field.
 		Version {
-			/// Source `v` value.
-			v: SchemaVersion,
+			/// Source `schemaVersion` value.
+			schema_version: SchemaVersion,
 		},
 	}
 

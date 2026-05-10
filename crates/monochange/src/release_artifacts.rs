@@ -1092,7 +1092,7 @@ pub(crate) fn build_release_record(
 	manifest: &ReleaseManifest,
 ) -> ReleaseRecord {
 	ReleaseRecord {
-		schema_version: monochange_core::RELEASE_RECORD_SCHEMA_VERSION,
+		schema_version: monochange_core::RELEASE_RECORD_SCHEMA_VERSION.to_string(),
 		kind: monochange_core::RELEASE_RECORD_KIND.to_string(),
 		created_at: resolve_release_datetime()
 			.and_utc()

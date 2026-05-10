@@ -2,11 +2,11 @@
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://monochange.github.io/monochange/schemas/release-record.schema.json",
 	"title": "monochange release record",
-	"description": "Durable commit-embedded release record schema for monochange artifact version 0.0.",
+	"description": "Durable commit-embedded release record schema for monochange artifact version 0.1.",
 	"type": "object",
 	"additionalProperties": false,
 	"required": [
-		"v",
+		"schemaVersion",
 		"kind",
 		"createdAt",
 		"command",
@@ -15,9 +15,9 @@
 		"changedFiles"
 	],
 	"properties": {
-		"v": {
+		"schemaVersion": {
 			"type": "string",
-			"const": "0.0",
+			"const": "0.1",
 			"description": "Public durable artifact schema version. Older CLIs reject missing, future, or non-current versions."
 		},
 		"kind": {
@@ -87,6 +87,9 @@
 					"$ref": "#/$defs/provider"
 				}
 			]
+		},
+		"v": {
+			"const": "0.1"
 		}
 	},
 	"$defs": {

@@ -12,13 +12,13 @@ expression: inventory
     ],
     "schemaId": "https://monochange.github.io/monochange/schemas/monochange.schema.json"
   },
-  "currentSchemaVersion": "0.0",
+  "currentSchemaVersion": "0.1",
   "migrationChangelog": [],
   "releaseRecord": {
     "additionalProperties": false,
     "kind": "monochange.releaseRecord",
     "required": [
-      "v",
+      "schemaVersion",
       "kind",
       "createdAt",
       "command",

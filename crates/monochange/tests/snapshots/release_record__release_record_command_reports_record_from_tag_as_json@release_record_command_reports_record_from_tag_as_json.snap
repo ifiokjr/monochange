@@ -44,7 +44,7 @@ expression: redacted
       "monochange",
       "monochange_core"
     ],
-    "schemaVersion": 1,
+    "schemaVersion": "[SCHEMA_VERSION]",
     "updatedChangelogs": [
       "crates/monochange/CHANGELOG.md"
     ],

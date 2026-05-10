@@ -5,8 +5,8 @@ expression: outcomes
 [
   {
     "scenario": "current",
-    "status": "ok",
-    "v": "0.0"
+    "schemaVersion": "0.1",
+    "status": "ok"
   },
   {
     "error": "artifact is not a JSON object",
@@ -24,17 +24,17 @@ expression: outcomes
     "status": "error"
   },
   {
-    "error": "artifact is missing required schema version field `v`",
+    "error": "artifact is missing required schema version field `schemaVersion`",
     "scenario": "missing_version",
     "status": "error"
   },
   {
-    "error": "artifact is missing required schema version field `v`",
+    "error": "artifact schema version field `schemaVersion` must be a string",
     "scenario": "pre_public_schema_version_field",
     "status": "error"
   },
   {
-    "error": "artifact schema version field `v` must be a string",
+    "error": "artifact schema version field `schemaVersion` must be a string",
     "scenario": "non_string_version",
     "status": "error"
   },
@@ -44,12 +44,12 @@ expression: outcomes
     "status": "error"
   },
   {
-    "error": "artifact uses unsupported schema version `0.1`; current supported version is `0.0`",
     "scenario": "old_version_without_migration_edge",
-    "status": "error"
+    "schemaVersion": "0.1",
+    "status": "ok"
   },
   {
-    "error": "artifact uses unsupported schema version `0.2`; current supported version is `0.0`",
+    "error": "artifact uses unsupported schema version `0.2`; current supported version is `0.1`",
     "scenario": "future_version",
     "status": "error"
   }

@@ -4723,7 +4723,7 @@ fn text_release_record_discovery_renders_targets_packages_and_provider() {
 
 fn sample_release_record_for_discovery_text() -> monochange_core::ReleaseRecord {
 	monochange_core::ReleaseRecord {
-		schema_version: monochange_core::RELEASE_RECORD_SCHEMA_VERSION,
+		schema_version: monochange_core::RELEASE_RECORD_SCHEMA_VERSION.to_string(),
 		kind: monochange_core::RELEASE_RECORD_KIND.to_string(),
 		created_at: "2026-04-07T08:00:00Z".to_string(),
 		command: "release-pr".to_string(),
@@ -4763,7 +4763,7 @@ fn text_release_record_discovery_omits_empty_sections() {
 		record_commit: "abc1234567890".to_string(),
 		distance: 2,
 		record: monochange_core::ReleaseRecord {
-			schema_version: monochange_core::RELEASE_RECORD_SCHEMA_VERSION,
+			schema_version: monochange_core::RELEASE_RECORD_SCHEMA_VERSION.to_string(),
 			kind: monochange_core::RELEASE_RECORD_KIND.to_string(),
 			created_at: "2026-04-07T08:00:00Z".to_string(),
 			command: "release-pr".to_string(),
@@ -10186,7 +10186,7 @@ fn create_release_record_commit_from_record(
 
 fn sample_release_record_for_retarget() -> monochange_core::ReleaseRecord {
 	monochange_core::ReleaseRecord {
-		schema_version: monochange_core::RELEASE_RECORD_SCHEMA_VERSION,
+		schema_version: monochange_core::RELEASE_RECORD_SCHEMA_VERSION.to_string(),
 		kind: monochange_core::RELEASE_RECORD_KIND.to_string(),
 		created_at: "2026-04-07T08:00:00Z".to_string(),
 		command: "release-pr".to_string(),
@@ -13244,7 +13244,7 @@ fn build_release_manifest_from_record_populates_manifest_from_release_record() {
 	use monochange_core::ReleaseRecordTarget;
 
 	let record = ReleaseRecord {
-		schema_version: 1,
+		schema_version: monochange_core::RELEASE_RECORD_SCHEMA_VERSION.to_string(),
 		kind: "monochange.releaseRecord".to_string(),
 		created_at: "2024-01-01T00:00:00Z".to_string(),
 		command: "release-pr".to_string(),
@@ -13326,7 +13326,7 @@ fn build_release_manifest_from_record_preserves_changelog_metadata() {
 		rendered: "## main 1.0.0\n\n- Preserve release notes".to_string(),
 	};
 	let record = ReleaseRecord {
-		schema_version: 1,
+		schema_version: monochange_core::RELEASE_RECORD_SCHEMA_VERSION.to_string(),
 		kind: "monochange.releaseRecord".to_string(),
 		created_at: "2024-01-01T00:00:00Z".to_string(),
 		command: "publish-release".to_string(),
@@ -13423,7 +13423,7 @@ branches = ["release/*"]
 
 	// Write a release record block into a file and commit it
 	let record = monochange_core::ReleaseRecord {
-		schema_version: 1,
+		schema_version: monochange_core::RELEASE_RECORD_SCHEMA_VERSION.to_string(),
 		kind: "monochange.releaseRecord".to_string(),
 		created_at: "2024-01-01T00:00:00Z".to_string(),
 		command: "release-pr".to_string(),
@@ -13569,7 +13569,7 @@ repo = "monochange"
 		.unwrap_or_else(|error| panic!("git commit: {error}"));
 
 	let record = monochange_core::ReleaseRecord {
-		schema_version: 1,
+		schema_version: monochange_core::RELEASE_RECORD_SCHEMA_VERSION.to_string(),
 		kind: "monochange.releaseRecord".to_string(),
 		created_at: "2024-01-01T00:00:00Z".to_string(),
 		command: "release-pr".to_string(),

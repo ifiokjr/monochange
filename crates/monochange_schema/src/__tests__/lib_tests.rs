@@ -92,7 +92,7 @@ fn current_schema_version_strips_patch_from_package_version() {
 #[test]
 fn release_record_accepts_current_schema_version() {
 	let migrated = release_record::migrate_value(json!({
-		"v": CURRENT_SCHEMA_VERSION_TEXT,
+		"schemaVersion": CURRENT_SCHEMA_VERSION_TEXT,
 		"kind": release_record::KIND,
 		"createdAt": "2026-04-06T12:00:00Z",
 		"command": "release-pr",
@@ -102,7 +102,10 @@ fn release_record_accepts_current_schema_version() {
 	}))
 	.unwrap_or_else(|error| panic!("validate release record: {error}"));
 
-	assert_eq!(migrated.get("v"), Some(&json!(CURRENT_SCHEMA_VERSION_TEXT)));
+	assert_eq!(
+		migrated.get("schemaVersion"),
+		Some(&json!(CURRENT_SCHEMA_VERSION_TEXT))
+	);
 }
 
 #[test]
@@ -118,10 +121,13 @@ fn release_record_render_current_value_writes_public_version_only() {
 	}))
 	.unwrap_or_else(|error| panic!("render current release record: {error}"));
 
-	assert_eq!(rendered.get("v"), Some(&json!(CURRENT_SCHEMA_VERSION_TEXT)));
+	assert_eq!(
+		rendered.get("schemaVersion"),
+		Some(&json!(CURRENT_SCHEMA_VERSION_TEXT))
+	);
 	assert!(
-		rendered.get("schemaVersion").is_none(),
-		"internal schemaVersion must not leak into durable records"
+		rendered.get("v").is_none(),
+		"legacy `v` must not leak into durable records"
 	);
 }
 
@@ -163,7 +169,7 @@ fn release_record_rejects_missing_version() {
 #[test]
 fn release_record_rejects_non_string_version() {
 	let error = release_record::migrate_value(json!({
-		"v": 1,
+		"schemaVersion": 1,
 		"kind": release_record::KIND,
 		"createdAt": "2026-04-06T12:00:00Z",
 		"command": "release-pr",
@@ -179,7 +185,7 @@ fn release_record_rejects_non_string_version() {
 #[test]
 fn release_record_rejects_invalid_version_text() {
 	let error = release_record::migrate_value(json!({
-		"v": "0.1.0",
+		"schemaVersion": "0.1.0",
 		"kind": release_record::KIND,
 		"createdAt": "2026-04-06T12:00:00Z",
 		"command": "release-pr",
@@ -198,7 +204,7 @@ fn release_record_rejects_invalid_version_text() {
 #[test]
 fn release_record_rejects_old_version_without_migration_edge() {
 	let error = release_record::migrate_value(json!({
-		"v": "9.0",
+		"schemaVersion": "9.0",
 		"kind": release_record::KIND,
 		"createdAt": "2026-04-06T12:00:00Z",
 		"command": "release-pr",
@@ -217,7 +223,7 @@ fn release_record_rejects_old_version_without_migration_edge() {
 #[test]
 fn release_record_rejects_unsupported_kind() {
 	let error = release_record::migrate_value(json!({
-		"v": "0.1",
+		"schemaVersion": "0.1",
 		"kind": "monochange.otherRecord",
 		"createdAt": "2026-04-06T12:00:00Z",
 		"command": "release-pr",
@@ -237,7 +243,7 @@ fn release_record_rejects_unsupported_kind() {
 #[test]
 fn release_record_rejects_future_version() {
 	let error = release_record::migrate_value(json!({
-		"v": "9.0",
+		"schemaVersion": "9.0",
 		"kind": release_record::KIND,
 		"createdAt": "2026-04-06T12:00:00Z",
 		"command": "release-pr",
@@ -269,7 +275,7 @@ fn committed_release_record_schema_tracks_current_wire_constants() {
 
 	assert_eq!(
 		schema
-			.pointer("/properties/v/const")
+			.pointer("/properties/schemaVersion/const")
 			.and_then(Value::as_str),
 		Some(CURRENT_SCHEMA_VERSION_TEXT)
 	);

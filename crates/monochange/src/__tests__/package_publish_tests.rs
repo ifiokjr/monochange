@@ -301,7 +301,7 @@ fn sample_configuration(
 
 fn commit_release_record(root: &Path, publications: Vec<PackagePublicationTarget>) {
 	let record = ReleaseRecord {
-		schema_version: monochange_core::RELEASE_RECORD_SCHEMA_VERSION,
+		schema_version: monochange_core::RELEASE_RECORD_SCHEMA_VERSION.to_string(),
 		kind: monochange_core::RELEASE_RECORD_KIND.to_string(),
 		created_at: "2026-04-14T08:00:00Z".to_string(),
 		command: "release-pr".to_string(),

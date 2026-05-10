@@ -3111,8 +3111,8 @@ pub struct ReleaseManifest {
 	pub plan: ReleaseManifestPlan,
 }
 
-/// Current supported `ReleaseRecord` schema version.
-pub const RELEASE_RECORD_SCHEMA_VERSION: u64 = 1;
+/// Current supported `ReleaseRecord` schema version text.
+pub const RELEASE_RECORD_SCHEMA_VERSION: &str = monochange_schema::CURRENT_SCHEMA_VERSION_TEXT;
 /// Required `ReleaseRecord.kind` discriminator.
 pub const RELEASE_RECORD_KIND: &str = "monochange.releaseRecord";
 /// Human-readable heading used for commit-embedded release records.
@@ -3122,8 +3122,8 @@ pub const RELEASE_RECORD_START_MARKER: &str = "<!-- monochange:release-record:st
 /// Closing marker for a commit-embedded release record block.
 pub const RELEASE_RECORD_END_MARKER: &str = "<!-- monochange:release-record:end -->";
 
-const fn release_record_schema_version() -> u64 {
-	RELEASE_RECORD_SCHEMA_VERSION
+fn release_record_schema_version() -> String {
+	monochange_schema::CURRENT_SCHEMA_VERSION_TEXT.to_string()
 }
 
 fn default_release_record_kind() -> String {
@@ -3148,6 +3148,32 @@ fn default_pull_request_title() -> String {
 
 fn default_pull_request_labels() -> Vec<String> {
 	vec!["release".to_string(), "automated".to_string()]
+}
+
+/// Normalize legacy schema-version fields before passing to `migrate_value`.
+///
+/// - Moves `"v"` values to `"schemaVersion"`.
+/// - Replaces the pre-public integer `schemaVersion: 1` with the current
+///   `RELEASE_RECORD_SCHEMA_VERSION` text.
+fn normalize_legacy_schema_version(raw: &mut serde_json::Value) {
+	let Some(object) = raw.as_object_mut() else {
+		return;
+	};
+	if let Some(version) = object.get("schemaVersion")
+		&& version.is_u64()
+		&& version.as_u64() == Some(1)
+	{
+		object.insert(
+			"schemaVersion".to_string(),
+			serde_json::Value::String(RELEASE_RECORD_SCHEMA_VERSION.to_string()),
+		);
+	}
+	if !object.contains_key("schemaVersion")
+		&& object.contains_key("v")
+		&& let Some(v) = object.remove("v")
+	{
+		object.insert("schemaVersion".to_string(), v);
+	}
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -3178,7 +3204,7 @@ pub struct ReleaseRecordProvider {
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseRecord {
 	#[serde(default = "release_record_schema_version")]
-	pub schema_version: u64,
+	pub schema_version: String,
 	#[serde(default = "default_release_record_kind")]
 	pub kind: String,
 	pub created_at: String,
@@ -3324,12 +3350,10 @@ pub enum ReleaseRecordError {
 	MissingJsonBlock,
 	#[error("release record is missing required `kind`")]
 	MissingKind,
-	#[error("release record is missing required `v`")]
+	#[error("release record is missing required `schemaVersion`")]
 	MissingSchemaVersion,
 	#[error("release record uses unsupported kind `{0}`")]
 	UnsupportedKind(String),
-	#[error("release record uses unsupported internal schemaVersion {0}")]
-	UnsupportedSchemaVersion(u64),
 	#[error("release record uses unsupported schema version `{0}`")]
 	UnsupportedSchemaVersionValue(String),
 	#[error("release record schema error: {0}")]
@@ -3365,8 +3389,8 @@ pub fn render_release_record_block(record: &ReleaseRecord) -> ReleaseRecordResul
 		return Err(ReleaseRecordError::UnsupportedKind(record.kind.clone()));
 	}
 	if record.schema_version != RELEASE_RECORD_SCHEMA_VERSION {
-		return Err(ReleaseRecordError::UnsupportedSchemaVersion(
-			record.schema_version,
+		return Err(ReleaseRecordError::UnsupportedSchemaVersionValue(
+			record.schema_version.clone(),
 		));
 	}
 	let raw = serde_json::to_value(record)?;
@@ -3383,17 +3407,7 @@ pub fn render_release_record_block(record: &ReleaseRecord) -> ReleaseRecordResul
 pub fn parse_release_record_json(json_text: &str) -> ReleaseRecordResult<ReleaseRecord> {
 	let mut raw = serde_json::from_str::<serde_json::Value>(json_text)
 		.map_err(ReleaseRecordError::InvalidJson)?;
-	// Normalize schemaVersion -> v for migration compatibility
-	if let Some(object) = raw.as_object_mut()
-		&& !object.contains_key("v")
-		&& object.contains_key("schemaVersion")
-	{
-		object.insert(
-			"v".to_string(),
-			serde_json::Value::String(monochange_schema::CURRENT_SCHEMA_VERSION_TEXT.to_string()),
-		);
-		object.remove("schemaVersion");
-	}
+	normalize_legacy_schema_version(&mut raw);
 	let kind = raw
 		.get("kind")
 		.and_then(serde_json::Value::as_str)
@@ -3401,16 +3415,8 @@ pub fn parse_release_record_json(json_text: &str) -> ReleaseRecordResult<Release
 	if kind != RELEASE_RECORD_KIND {
 		return Err(ReleaseRecordError::UnsupportedKind(kind.to_string()));
 	}
-	let mut current = monochange_schema::release_record::migrate_value(raw)
+	let current = monochange_schema::release_record::migrate_value(raw)
 		.map_err(release_record_schema_error_to_error)?;
-	let object = current
-		.as_object_mut()
-		.expect("release record schema migration returns an object");
-	object.remove("v");
-	object.insert(
-		"schemaVersion".to_string(),
-		serde_json::Value::from(RELEASE_RECORD_SCHEMA_VERSION),
-	);
 	serde_json::from_value(current).map_err(ReleaseRecordError::InvalidJson)
 }
 
@@ -3444,7 +3450,9 @@ pub fn parse_release_record_block(commit_message: &str) -> ReleaseRecordResult<R
 	let block_contents =
 		&commit_message[start_index + RELEASE_RECORD_START_MARKER.len()..end_index];
 	let json_text = extract_release_record_json(block_contents)?;
-	let raw = serde_json::from_str::<serde_json::Value>(&json_text)?;
+	let mut raw = serde_json::from_str::<serde_json::Value>(&json_text)?;
+	normalize_legacy_schema_version(&mut raw);
+	normalize_legacy_schema_version(&mut raw);
 	let kind = raw
 		.get("kind")
 		.and_then(serde_json::Value::as_str)
@@ -3452,16 +3460,8 @@ pub fn parse_release_record_block(commit_message: &str) -> ReleaseRecordResult<R
 	if kind != RELEASE_RECORD_KIND {
 		return Err(ReleaseRecordError::UnsupportedKind(kind.to_string()));
 	}
-	let mut current = monochange_schema::release_record::migrate_value(raw)
+	let current = monochange_schema::release_record::migrate_value(raw)
 		.map_err(release_record_schema_error_to_error)?;
-	let object = current
-		.as_object_mut()
-		.expect("release record schema migration returns an object");
-	object.remove("v");
-	object.insert(
-		"schemaVersion".to_string(),
-		serde_json::Value::from(RELEASE_RECORD_SCHEMA_VERSION),
-	);
 	serde_json::from_value(current).map_err(ReleaseRecordError::InvalidJson)
 }
 

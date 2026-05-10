@@ -3,7 +3,7 @@ source: crates/monochange_integration_tests/tests/schema_assets.rs
 expression: "json_array(&release_schema, \"/required\")?"
 ---
 [
-  "v",
+  "schemaVersion",
   "kind",
   "createdAt",
   "command",

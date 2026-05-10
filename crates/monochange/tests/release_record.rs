@@ -795,7 +795,7 @@ fn git_command(root: &Path, args: &[&str]) -> Option<String> {
 
 fn sample_release_record() -> ReleaseRecord {
 	ReleaseRecord {
-		schema_version: monochange_core::RELEASE_RECORD_SCHEMA_VERSION,
+		schema_version: monochange_core::RELEASE_RECORD_SCHEMA_VERSION.to_string(),
 		kind: monochange_core::RELEASE_RECORD_KIND.to_string(),
 		created_at: "2026-04-07T08:00:00Z".to_string(),
 		command: "release-pr".to_string(),
