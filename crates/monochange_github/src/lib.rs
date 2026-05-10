@@ -1533,19 +1533,7 @@ async fn publish_release_pull_request_with_existing_pull_request(
 		Some(existing_pull_request) => {
 			(
 				GitHubPullRequestOperation::Updated,
-				patch_json::<_, GitHubPullRequestResponse>(
-					client,
-					&format!(
-						"/repos/{}/{}/pulls/{}",
-						request.owner, request.repo, existing_pull_request.number
-					),
-					&GitHubPullRequestUpdatePayload {
-						title: &request.title,
-						body: &request.body,
-						base: &request.base_branch,
-					},
-				)
-				.await?,
+				sync_existing_pull_request_metadata(client, request, existing_pull_request).await?,
 			)
 		}
 		None => {
@@ -1656,6 +1644,26 @@ async fn sync_retargeted_releases_with_client(
 		});
 	}
 	Ok(results)
+}
+
+async fn sync_existing_pull_request_metadata(
+	client: &Octocrab,
+	request: &GitHubPullRequestRequest,
+	existing: &GitHubExistingPullRequest,
+) -> MonochangeResult<GitHubPullRequestResponse> {
+	patch_json::<_, GitHubPullRequestResponse>(
+		client,
+		&format!(
+			"/repos/{}/{}/pulls/{}",
+			request.owner, request.repo, existing.number
+		),
+		&GitHubPullRequestUpdatePayload {
+			title: &request.title,
+			body: &request.body,
+			base: &request.base_branch,
+		},
+	)
+	.await
 }
 
 async fn lookup_existing_release_with_client(
