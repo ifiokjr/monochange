@@ -382,39 +382,43 @@ fn gitea_json_helpers_cover_not_found_and_status_errors() {
 	let base = server.base_url();
 	let headers = auth_headers("token").unwrap_or_else(|error| panic!("headers: {error}"));
 
-	let missing_value = get_optional_json::<serde_json::Value>(
+	let missing_value = tokio::runtime::Runtime::new().unwrap().block_on(get_optional_json::<serde_json::Value>(
 		&client,
 		&headers,
 		&format!("{base}/missing"),
 		"Gitea",
-	)
+	))
+
 	.unwrap_or_else(|error| panic!("optional json: {error}"));
 	assert_eq!(missing_value, None);
 
 	let get_error =
-		get_json::<serde_json::Value>(&client, &headers, &format!("{base}/fail-get"), "Gitea")
+		tokio::runtime::Runtime::new().unwrap().block_on(get_json::<serde_json::Value>(&client, &headers, &format!("{base}/fail-get"), "Gitea"))
+
 			.err()
 			.unwrap_or_else(|| panic!("expected get error"));
 	assert!(get_error.to_string().contains("Gitea API GET"));
 
-	let post_error = post_json::<_, serde_json::Value>(
+	let post_error = tokio::runtime::Runtime::new().unwrap().block_on(post_json::<_, serde_json::Value>(
 		&client,
 		&headers,
 		&format!("{base}/fail-post"),
 		&serde_json::json!({"tag_name": "v1.2.3"}),
 		"Gitea",
-	)
+	))
+
 	.err()
 	.unwrap_or_else(|| panic!("expected post error"));
 	assert!(post_error.to_string().contains("Gitea API POST"));
 
-	let patch_error = patch_json::<_, serde_json::Value>(
+	let patch_error = tokio::runtime::Runtime::new().unwrap().block_on(patch_json::<_, serde_json::Value>(
 		&client,
 		&headers,
 		&format!("{base}/fail-patch"),
 		&serde_json::json!({"name": "v1.2.3"}),
 		"Gitea",
-	)
+	))
+
 	.err()
 	.unwrap_or_else(|| panic!("expected patch error"));
 	assert!(patch_error.to_string().contains("Gitea API PATCH"));
@@ -524,7 +528,8 @@ fn publish_release_requests_creates_release_via_gitea_api() {
 	let requests = build_release_requests(&source, &sample_manifest());
 
 	let outcomes = with_gitea_env(Some("token"), || {
-		publish_release_requests(&source, &requests)
+		tokio::runtime::Runtime::new().unwrap().block_on(publish_release_requests(&source, &requests))
+
 			.unwrap_or_else(|error| panic!("publish release: {error}"))
 	});
 
@@ -563,7 +568,8 @@ fn publish_release_requests_updates_existing_release_via_gitea_api() {
 	let requests = build_release_requests(&source, &sample_manifest());
 
 	let outcomes = with_gitea_env(Some("token"), || {
-		publish_release_requests(&source, &requests)
+		tokio::runtime::Runtime::new().unwrap().block_on(publish_release_requests(&source, &requests))
+
 			.unwrap_or_else(|error| panic!("publish release: {error}"))
 	});
 
@@ -593,7 +599,7 @@ fn publish_release_requests_reports_gitea_api_errors() {
 	let requests = build_release_requests(&source, &sample_manifest());
 
 	let error = with_gitea_env(Some("token"), || {
-		publish_release_requests(&source, &requests)
+		tokio::runtime::Runtime::new().unwrap().block_on(publish_release_requests(&source, &requests))
 	})
 	.err()
 	.unwrap_or_else(|| panic!("expected publish error"));
@@ -636,13 +642,14 @@ fn publish_release_pull_request_create_branch_is_covered_without_etest() {
 	let request = build_release_pull_request_request(&source, &sample_manifest());
 
 	let outcome = with_gitea_env(Some("token"), || {
-		publish_release_pull_request(
+		tokio::runtime::Runtime::new().unwrap().block_on(publish_release_pull_request(
 			&source,
 			&repo,
 			&request,
 			&[PathBuf::from("release.txt")],
 			false,
-		)
+		))
+
 		.unwrap_or_else(|error| panic!("publish pull request: {error}"))
 	});
 
@@ -688,13 +695,14 @@ fn publish_release_pull_request_creates_pull_request_and_labels() {
 	request.commit_message.body = Some("release body".to_string());
 
 	let outcome = with_gitea_env(Some("token"), || {
-		publish_release_pull_request(
+		tokio::runtime::Runtime::new().unwrap().block_on(publish_release_pull_request(
 			&source,
 			&repo,
 			&request,
 			&[PathBuf::from("release.txt")],
 			false,
-		)
+		))
+
 		.unwrap_or_else(|error| panic!("publish pull request: {error}"))
 	});
 
@@ -718,7 +726,7 @@ fn publish_release_pull_request_creates_pull_request_and_labels() {
 fn git_commit_paths_reports_io_and_non_noop_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let missing = tempdir.path().join("missing");
-	let io_error = git_commit_paths(
+	let io_error = tokio::runtime::Runtime::new().unwrap().block_on(git_commit_paths(
 		&missing,
 		&CommitMessage {
 			subject: "chore(release): prepare release".to_string(),
@@ -726,7 +734,8 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 		},
 		"commit release pull request changes",
 		false,
-	)
+	))
+
 	.err()
 	.unwrap_or_else(|| panic!("expected missing worktree error"));
 	assert!(
@@ -750,7 +759,7 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 	std::fs::write(repo.join("release.txt"), "initial\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 	git(&repo, &["add", "release.txt"]);
-	let error = git_commit_paths(
+	let error = tokio::runtime::Runtime::new().unwrap().block_on(git_commit_paths(
 		&repo,
 		&CommitMessage {
 			subject: "chore(release): prepare release".to_string(),
@@ -758,7 +767,8 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 		},
 		"commit release pull request changes",
 		false,
-	)
+	))
+
 	.err()
 	.unwrap_or_else(|| panic!("expected pre-commit hook failure"));
 	assert!(
@@ -780,7 +790,7 @@ fn git_commit_paths_treats_clean_worktrees_as_already_committed() {
 	git(&repo, &["add", "release.txt"]);
 	git(&repo, &["commit", "-m", "initial"]);
 
-	git_commit_paths(
+	tokio::runtime::Runtime::new().unwrap().block_on(git_commit_paths(
 		&repo,
 		&CommitMessage {
 			subject: "chore(release): prepare release".to_string(),
@@ -788,7 +798,8 @@ fn git_commit_paths_treats_clean_worktrees_as_already_committed() {
 		},
 		"commit release pull request changes",
 		false,
-	)
+	))
+
 	.unwrap_or_else(|error| panic!("commit paths: {error}"));
 
 	assert_eq!(
@@ -812,11 +823,11 @@ fn git_checkout_branch_is_noop_when_branch_is_already_checked_out() {
 	git(&repo, &["commit", "-m", "initial"]);
 
 	must_ok(
-		git_checkout_branch(&repo, "monochange/release/release", "test context"),
+		tokio::runtime::Runtime::new().unwrap().block_on(git_checkout_branch(&repo, "monochange/release/release", "test context")),
 		"checkout branch",
 	);
 	must_ok(
-		git_checkout_branch(&repo, "monochange/release/release", "test context"),
+		tokio::runtime::Runtime::new().unwrap().block_on(git_checkout_branch(&repo, "monochange/release/release", "test context")),
 		"repeat checkout branch",
 	);
 
@@ -865,12 +876,12 @@ fn publish_pull_request_updates_existing_pull_request() {
 	let client = gitea_client().unwrap_or_else(|error| panic!("client: {error}"));
 	let headers = auth_headers("token").unwrap_or_else(|error| panic!("headers: {error}"));
 
-	let outcome = publish_pull_request(
+	let outcome = tokio::runtime::Runtime::new().unwrap().block_on(publish_pull_request(
 		&client,
 		&headers,
 		&format!("{}/api/v1", server.base_url()),
 		&request,
-	)
+	))
 	.unwrap_or_else(|error| panic!("update pull request: {error}"));
 
 	list.assert();
@@ -881,11 +892,9 @@ fn publish_pull_request_updates_existing_pull_request() {
 
 #[test]
 fn join_existing_pull_request_lookup_reports_panicked_thread() {
-	let error = join_existing_pull_request_lookup(thread::spawn(
-		|| -> MonochangeResult<Option<GiteaExistingPullRequest>> {
-			panic!("boom");
-		},
-	))
+	let error = tokio::runtime::Runtime::new().unwrap().block_on(join_existing_pull_request_lookup(tokio::task::spawn(async {
+		panic!("boom");
+	})))
 	.err()
 	.unwrap_or_else(|| panic!("expected join error"));
 	assert!(
@@ -944,13 +953,14 @@ fn publish_release_pull_request_skips_push_when_existing_pull_request_matches_lo
 	);
 
 	let outcome = with_gitea_env(Some("token"), || {
-		publish_release_pull_request(
+		tokio::runtime::Runtime::new().unwrap().block_on(publish_release_pull_request(
 			&source,
 			&repo,
 			&request,
 			&[PathBuf::from("release.txt")],
 			false,
-		)
+		))
+
 		.unwrap_or_else(|error| panic!("publish pull request: {error}"))
 	});
 
