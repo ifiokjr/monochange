@@ -100,7 +100,6 @@ use monochange_core::CliInputKind;
 use monochange_core::CliStepDefinition;
 use monochange_core::CliStepInputValue;
 use monochange_core::Ecosystem;
-use monochange_core::EcosystemRegistry;
 use monochange_core::EcosystemSettings;
 use monochange_core::EcosystemType;
 use monochange_core::GroupChangelogInclude;
@@ -112,12 +111,14 @@ use monochange_core::PackageDefinition;
 use monochange_core::PackageRecord;
 use monochange_core::PackageType;
 use monochange_core::ProviderMergeRequestSettings;
+use monochange_core::ProviderReleaseNotesSource;
 use monochange_core::ProviderReleaseSettings;
 use monochange_core::PublishAttestationSettings;
 use monochange_core::PublishMode;
 use monochange_core::PublishRegistry;
 use monochange_core::PublishSettings;
 use monochange_core::RegistryKind;
+use monochange_core::SourceCapabilities;
 use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
 use monochange_core::TrustedPublishingSettings;
@@ -3280,26 +3281,63 @@ fn path_uses_glob(path: &str) -> bool {
 	path.contains('*') || path.contains('?') || path.contains('[')
 }
 
-fn build_ecosystem_registry() -> EcosystemRegistry {
-	EcosystemRegistry::new()
-		.with_adapter(Box::new(monochange_cargo::CargoAdapter))
-		.with_adapter(Box::new(monochange_npm::NpmAdapter))
-		.with_adapter(Box::new(monochange_deno::DenoAdapter))
-		.with_adapter(Box::new(monochange_dart::DartAdapter))
-		.with_adapter(Box::new(monochange_python::PythonAdapter))
-		.with_adapter(Box::new(monochange_go::GoAdapter))
-}
-
 fn path_is_supported_for_ecosystem(path: &Path, ecosystem_type: EcosystemType) -> bool {
-	build_ecosystem_registry().supported_versioned_file_kind(path, ecosystem_type.into())
+	let file_name = path
+		.file_name()
+		.and_then(|name| name.to_str())
+		.unwrap_or_default();
+	match ecosystem_type {
+		EcosystemType::Cargo => {
+			path.extension()
+				.and_then(|extension| extension.to_str())
+				.is_some_and(|extension| extension.eq_ignore_ascii_case("toml"))
+				|| file_name == "Cargo.lock"
+		}
+		EcosystemType::Npm => {
+			matches!(
+				file_name,
+				"package.json" | "package-lock.json" | "pnpm-lock.yaml" | "bun.lock" | "bun.lockb"
+			)
+		}
+		EcosystemType::Deno => matches!(file_name, "deno.json" | "deno.jsonc" | "deno.lock"),
+		EcosystemType::Dart => matches!(file_name, "pubspec.yaml" | "pubspec.yml" | "pubspec.lock"),
+		EcosystemType::Python => matches!(file_name, "pyproject.toml" | "uv.lock" | "poetry.lock"),
+		_ => matches!(file_name, "go.mod" | "go.sum"),
+	}
 }
 
-fn source_capabilities(provider: SourceProvider) -> monochange_core::SourceCapabilities {
+fn source_capabilities(provider: SourceProvider) -> SourceCapabilities {
 	match provider {
-		SourceProvider::GitHub => monochange_github::source_capabilities(),
-		SourceProvider::GitLab => monochange_gitlab::source_capabilities(),
-		SourceProvider::Gitea => monochange_gitea::source_capabilities(),
-		SourceProvider::Forgejo => monochange_forgejo::source_capabilities(),
+		SourceProvider::GitHub => {
+			SourceCapabilities {
+				draft_releases: true,
+				prereleases: true,
+				generated_release_notes: true,
+				auto_merge_change_requests: true,
+				released_issue_comments: true,
+				requires_host: false,
+			}
+		}
+		SourceProvider::GitLab => {
+			SourceCapabilities {
+				draft_releases: false,
+				prereleases: false,
+				generated_release_notes: false,
+				auto_merge_change_requests: false,
+				released_issue_comments: false,
+				requires_host: false,
+			}
+		}
+		SourceProvider::Gitea | SourceProvider::Forgejo => {
+			SourceCapabilities {
+				draft_releases: true,
+				prereleases: true,
+				generated_release_notes: false,
+				auto_merge_change_requests: false,
+				released_issue_comments: false,
+				requires_host: true,
+			}
+		}
 	}
 }
 
@@ -3721,12 +3759,52 @@ fn validate_source_configuration(source: Option<&SourceConfiguration>) -> Monoch
 	if let Some(host) = &source.host {
 		validate_api_url_host(host, source.provider)?;
 	}
-	match source.provider {
-		SourceProvider::GitHub => monochange_github::validate_source_configuration(source),
-		SourceProvider::GitLab => monochange_gitlab::validate_source_configuration(source),
-		SourceProvider::Gitea => monochange_gitea::validate_source_configuration(source),
-		SourceProvider::Forgejo => monochange_forgejo::validate_source_configuration(source),
+	validate_source_provider_capabilities(source)
+}
+
+fn validate_source_provider_capabilities(source: &SourceConfiguration) -> MonochangeResult<()> {
+	let capabilities = source_capabilities(source.provider);
+	if capabilities.requires_host && source.host.as_deref().is_none_or(str::is_empty) {
+		return Err(MonochangeError::Config(format!(
+			"[source].host must be set for `provider = \"{}\"`",
+			source.provider
+		)));
 	}
+	if source.releases.draft && !capabilities.draft_releases {
+		return Err(MonochangeError::Config(format!(
+			"[source.releases].draft is not supported for `provider = \"{}\"`",
+			source.provider
+		)));
+	}
+	if source.releases.prerelease && !capabilities.prereleases {
+		return Err(MonochangeError::Config(format!(
+			"[source.releases].prerelease is not supported for `provider = \"{}\"`",
+			source.provider
+		)));
+	}
+	if source.releases.generate_notes && !capabilities.generated_release_notes {
+		return Err(MonochangeError::Config(format!(
+			"provider-generated release notes are not supported for `provider = \"{}\"`; use `source = \"monochange\"`",
+			source.provider
+		)));
+	}
+	if source.releases.generate_notes
+		&& matches!(
+			source.releases.source,
+			ProviderReleaseNotesSource::Monochange
+		) {
+		return Err(MonochangeError::Config(
+			"[source.releases].generate_notes cannot be true when `source = \"monochange\"`; choose one release-note source"
+				.to_string(),
+		));
+	}
+	if source.pull_requests.auto_merge && !capabilities.auto_merge_change_requests {
+		return Err(MonochangeError::Config(format!(
+			"[source.pull_requests].auto_merge is not supported for `provider = \"{}\"`",
+			source.provider
+		)));
+	}
+	Ok(())
 }
 
 /// Reject `api_url` or `host` values that use insecure schemes. API tokens are
@@ -5045,16 +5123,92 @@ fn validate_ecosystem_version_readable(
 	owner_kind: &str,
 	owner_id: &str,
 ) -> MonochangeResult<()> {
-	let result = build_ecosystem_registry().validate_versioned_file(
-		full_path,
-		display_path,
-		ecosystem_type.into(),
-		fields,
+	if !path_is_supported_for_ecosystem(full_path, ecosystem_type) {
+		return Err(MonochangeError::Config(format!(
+			"{owner_kind} `{owner_id}` versioned file `{display_path}` is not supported for ecosystem `{ecosystem_type:?}`"
+		)));
+	}
+	let contents = fs::read_to_string(full_path).map_err(|error| {
+		MonochangeError::Io(format!("failed to read {}: {error}", full_path.display()))
+	})?;
+	let uses_default_version_field = fields.is_none();
+	let field_names: Vec<&str> = fields.map_or_else(
+		|| vec!["version"],
+		|fields| fields.iter().map(String::as_str).collect(),
 	);
-
-	result.map_err(|error| match error {
-		MonochangeError::Config(msg) => MonochangeError::Config(format!("{owner_kind} `{owner_id}` {msg}")), other => other,
-	})
+	let field_error = |field: &str| {
+		if uses_default_version_field {
+			MonochangeError::Config(format!(
+				"{owner_kind} `{owner_id}` versioned file `{display_path}` does not contain a `version` string field; does not contain a readable version field"
+			))
+		} else {
+			MonochangeError::Config(format!(
+				"{owner_kind} `{owner_id}` versioned file `{display_path}` does not contain a `{field}` string field"
+			))
+		}
+	};
+	let value_is_string = |value: &serde_json::Value, field: &str| {
+		value.get(field).and_then(serde_json::Value::as_str).is_some()
+	};
+	match ecosystem_type {
+		EcosystemType::Npm | EcosystemType::Deno => {
+			let value: serde_json::Value = serde_json::from_str(&contents).map_err(|error| {
+				MonochangeError::Config(format!("{owner_kind} `{owner_id}` `{display_path}` is not valid JSON: {error}"))
+			})?;
+			for field in field_names {
+				if value_is_string(&value, field) {
+					continue;
+				}
+				Err(field_error(field))?;
+			}
+		}
+		EcosystemType::Dart => {
+			let value: serde_yaml_ng::Value = serde_yaml_ng::from_str(&contents).map_err(|error| {
+				MonochangeError::Config(format!("{owner_kind} `{owner_id}` `{display_path}` is not valid YAML: {error}"))
+			})?;
+			for field in field_names {
+				let is_string = value
+					.get(field)
+					.and_then(serde_yaml_ng::Value::as_str)
+					.is_some();
+				if is_string {
+					continue;
+				}
+				Err(field_error(field))?;
+			}
+		}
+		EcosystemType::Cargo => {
+			let value: toml::Value = toml::from_str(&contents).map_err(|error| {
+				MonochangeError::Config(format!(
+					"{owner_kind} `{owner_id}` `{display_path}` is not valid TOML: {error}"
+				))
+			})?;
+			let value_at_path_is_string = |field: &str| {
+				field
+					.split('.')
+					.try_fold(&value, |current, segment| current.get(segment))
+					.and_then(toml::Value::as_str)
+					.is_some()
+			};
+			if uses_default_version_field {
+				let has_version = ["version", "package.version", "workspace.package.version"]
+					.into_iter()
+					.any(value_at_path_is_string);
+				if !has_version {
+					return Err(field_error("version"));
+				}
+			} else {
+				for field in field_names {
+					if value_at_path_is_string(field) {
+						continue;
+					}
+					Err(field_error(field))?;
+				}
+			}
+		}
+		_ => {}
+	}
+	Ok(())
 }
 
 fn validate_changeset_targets(

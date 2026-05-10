@@ -69,6 +69,7 @@ walkdir = { version = "2", default-features = false }
 monochange = { version = "0.4.0", path = "./crates/monochange" }
 monochange_analysis = { version = "0.4.0", path = "./crates/monochange_analysis" }
 monochange_cargo = { version = "0.4.0", path = "./crates/monochange_cargo" }
+monochange_changelog = { version = "0.4.0", path = "./crates/monochange_changelog" }
 monochange_config = { version = "0.4.0", path = "./crates/monochange_config" }
 monochange_core = { version = "0.4.0", path = "./crates/monochange_core" }
 monochange_dart = { version = "0.4.0", path = "./crates/monochange_dart" }

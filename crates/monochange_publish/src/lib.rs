@@ -1,24 +1,64 @@
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::env;
+use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
 use monochange_core::Ecosystem;
+use monochange_core::GroupDefinition;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
+use monochange_core::PackagePublicationTarget;
 use monochange_core::PackageRecord;
 use monochange_core::PublishAttestationSettings;
 use monochange_core::PublishMode;
 use monochange_core::PublishRegistry;
 use monochange_core::PublishState;
 use monochange_core::RegistryKind;
+use monochange_core::SourceConfiguration;
 use monochange_core::TrustedPublishingSettings;
+use monochange_core::WorkspaceConfiguration;
 use reqwest::StatusCode;
 use reqwest::blocking::Client;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value as JsonValue;
+use tempfile::TempDir;
 use urlencoding::encode;
+
+pub const PLACEHOLDER_VERSION: &str = "0.0.0";
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct SelectedReleasePublicationTargets {
+	pub publication_targets: Vec<PackagePublicationTarget>,
+	pub selected_packages: BTreeSet<String>,
+}
+
+pub fn select_release_publication_targets(
+	groups: &[GroupDefinition],
+	publication_targets: &[PackagePublicationTarget],
+	selected_packages: &BTreeSet<String>,
+	selected_groups: &BTreeSet<String>,
+	selected_ecosystems: &BTreeSet<Ecosystem>,
+) -> SelectedReleasePublicationTargets {
+	let mut publication_targets = publication_targets.to_vec();
+	if !selected_ecosystems.is_empty() {
+		publication_targets.retain(|target| selected_ecosystems.contains(&target.ecosystem));
+	}
+
+	let mut selected_packages = selected_packages.clone();
+	for group_id in selected_groups {
+		if let Some(group) = groups.iter().find(|group| group.id == *group_id) {
+			selected_packages.extend(group.packages.iter().cloned());
+		}
+	}
+
+	SelectedReleasePublicationTargets {
+		publication_targets,
+		selected_packages,
+	}
+}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -85,6 +125,169 @@ pub struct PackagePublishReport {
 	pub packages: Vec<PackagePublishOutcome>,
 }
 
+#[must_use]
+pub fn disabled_trust_outcome() -> TrustedPublishingOutcome {
+	TrustedPublishingOutcome {
+		status: TrustedPublishingStatus::Disabled,
+		repository: None,
+		workflow: None,
+		environment: None,
+		setup_url: None,
+		message: "trusted publishing disabled".to_string(),
+	}
+}
+
+#[must_use]
+pub fn failed_publish_outcome(
+	mode: PackagePublishRunMode,
+	request: &PublishRequest,
+	message: String,
+) -> PackagePublishOutcome {
+	PackagePublishOutcome {
+		package: request.package_id.clone(),
+		ecosystem: request.ecosystem,
+		registry: request.registry.to_string(),
+		version: request.version.clone(),
+		status: PackagePublishStatus::Failed,
+		message,
+		placeholder: mode == PackagePublishRunMode::Placeholder,
+		trusted_publishing: disabled_trust_outcome(),
+		command: None,
+		stdout: None,
+		stderr: None,
+	}
+}
+
+#[must_use]
+pub fn planned_publish_message(mode: PackagePublishRunMode, request: &PublishRequest) -> String {
+	match mode {
+		PackagePublishRunMode::Placeholder => {
+			format!(
+				"would publish placeholder {} {} to {}",
+				request.package_name, request.version, request.registry
+			)
+		}
+		PackagePublishRunMode::Release => {
+			format!(
+				"would publish {} {} to {}",
+				request.package_name, request.version, request.registry
+			)
+		}
+	}
+}
+
+#[must_use]
+pub fn non_empty_output(output: String) -> Option<String> {
+	(!output.is_empty()).then_some(output)
+}
+
+pub fn reject_npm_token_environment(
+	request: &PublishRequest,
+	env_map: &BTreeMap<String, String>,
+) -> MonochangeResult<()> {
+	let token_keys = forbidden_npm_token_env_keys(env_map);
+	if token_keys.is_empty() {
+		return Ok(());
+	}
+
+	Err(MonochangeError::Config(format!(
+		"`{}` requires npm trusted publishing, but long-lived npm token environment variables are present: {}. Remove token-based npm credentials and publish from the configured CI/OIDC workflow, or set `publish.trusted_publishing = false` to opt out.",
+		request.package_id,
+		token_keys.join(", "),
+	)))
+}
+
+#[must_use]
+pub fn forbidden_npm_token_env_keys(env_map: &BTreeMap<String, String>) -> Vec<String> {
+	env_map
+		.keys()
+		.filter(|key| is_forbidden_npm_token_env_key(key))
+		.cloned()
+		.collect()
+}
+
+#[must_use]
+pub fn is_forbidden_npm_token_env_key(key: &str) -> bool {
+	let lowercase_key = key.to_ascii_lowercase();
+	matches!(
+		key,
+		"NPM_TOKEN" | "NODE_AUTH_TOKEN" | "NPM_CONFIG__AUTH_TOKEN" | "npm_config__authToken"
+	) || (lowercase_key.starts_with("npm_config_")
+		&& lowercase_key.contains("auth")
+		&& lowercase_key.contains("token"))
+}
+
+pub fn enforce_release_attestation_prerequisites(
+	request: &PublishRequest,
+	env_map: &BTreeMap<String, String>,
+	command_builder: &PublishCommandBuilder,
+) -> MonochangeResult<()> {
+	if !request.attestations.require_registry_provenance {
+		return Ok(());
+	}
+
+	if !request.trusted_publishing.enabled {
+		return Err(MonochangeError::Config(format!(
+			"`{}` requires registry-native package provenance, but trusted publishing is disabled. Registry provenance is only enforceable for built-in publishing from a verifiable CI/OIDC identity; set `publish.trusted_publishing = true` or set `publish.attestations.require_registry_provenance = false` to opt out.",
+			request.package_id,
+		)));
+	}
+
+	let registry = PublishRegistry::Builtin(request.registry);
+	let identity = detect_trusted_publishing_identity(env_map);
+	let capability_message = trusted_publishing_capability_message(&registry, &identity);
+	if !identity.is_verifiable_by_env() {
+		return Err(MonochangeError::Config(format!(
+			"`{}` requires registry-native package provenance from a verifiable CI/OIDC identity, but the current publishing context is local or unverifiable. {capability_message} Run `mc publish` from the configured CI workflow or set `publish.attestations.require_registry_provenance = false` to opt out.",
+			request.package_id,
+		)));
+	}
+
+	let capability = provider_registry_trust_capability(&registry, identity.provider());
+	if !capability.registry_native_provenance {
+		return Err(MonochangeError::Config(format!(
+			"`{}` cannot require registry-native package provenance for {} from {}. {capability_message} This registry/provider combination does not expose provenance monochange can require; set `publish.attestations.require_registry_provenance = false` to opt out or use an external publisher that enforces its own attestation policy.",
+			request.package_id,
+			request.registry,
+			identity.provider().label(),
+		)));
+	}
+	if !command_builder
+		.adapter_for_registry(request.registry)
+		.is_some_and(PublishAdapter::supports_provenance)
+	{
+		return Err(MonochangeError::Config(format!(
+			"`{}` cannot require registry-native package provenance for {} yet. {capability_message} The registry supports provenance, but monochange's current built-in publisher for this ecosystem does not expose a publish command that can require it; set `publish.attestations.require_registry_provenance = false` to opt out or use an external publisher that enforces its own attestation policy.",
+			request.package_id, request.registry,
+		)));
+	}
+
+	Ok(())
+}
+
+#[must_use]
+pub fn manual_setup_url(request: &PublishRequest) -> String {
+	if request.registry == RegistryKind::CratesIo {
+		format!("https://crates.io/crates/{}", encode(&request.package_name))
+	} else if request.registry == RegistryKind::PubDev {
+		format!("https://pub.dev/packages/{}/admin", request.package_name)
+	} else if request.registry == RegistryKind::Jsr {
+		format!("https://jsr.io/{}", request.package_name)
+	} else if request.registry == RegistryKind::Pypi {
+		format!(
+			"https://pypi.org/manage/project/{}/settings/publishing/",
+			request.package_name
+		)
+	} else if request.registry == RegistryKind::GoProxy {
+		format!("https://pkg.go.dev/{}", go_module_path(request))
+	} else {
+		format!(
+			"https://www.npmjs.com/package/{}/access",
+			request.package_name
+		)
+	}
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PublishRequest {
 	pub package_id: String,
@@ -108,6 +311,534 @@ pub struct CommandSpec {
 	pub program: String,
 	pub args: Vec<String>,
 	pub cwd: PathBuf,
+}
+
+pub type PlaceholderManifestWriter =
+	dyn Fn(&Path, &PublishRequest, &Path, Option<&SourceConfiguration>) -> MonochangeResult<()>;
+
+pub type PublishReadinessChecker =
+	dyn Fn(&Path, &PublishRequest) -> MonochangeResult<Option<String>>;
+
+#[derive(Default)]
+pub struct PublishReadinessRegistry {
+	checkers: Vec<(RegistryKind, Box<PublishReadinessChecker>)>,
+}
+
+impl PublishReadinessRegistry {
+	#[must_use]
+	pub fn new() -> Self {
+		Self::default()
+	}
+
+	#[must_use]
+	pub fn with_checker(
+		mut self,
+		registry: RegistryKind,
+		checker: Box<PublishReadinessChecker>,
+	) -> Self {
+		self.checkers.push((registry, checker));
+		self
+	}
+
+	pub fn push_checker(&mut self, registry: RegistryKind, checker: Box<PublishReadinessChecker>) {
+		self.checkers.push((registry, checker));
+	}
+
+	pub fn blocked_message(
+		&self,
+		root: &Path,
+		request: &PublishRequest,
+	) -> MonochangeResult<Option<String>> {
+		let Some((_, checker)) = self
+			.checkers
+			.iter()
+			.find(|(registry, _)| *registry == request.registry)
+		else {
+			return Ok(None);
+		};
+		checker(root, request)
+	}
+}
+
+#[derive(Default)]
+pub struct PlaceholderManifestWriterRegistry {
+	writers: Vec<(RegistryKind, Box<PlaceholderManifestWriter>)>,
+}
+
+impl PlaceholderManifestWriterRegistry {
+	#[must_use]
+	pub fn new() -> Self {
+		Self::default()
+	}
+
+	#[must_use]
+	pub fn with_writer(
+		mut self,
+		registry: RegistryKind,
+		writer: Box<PlaceholderManifestWriter>,
+	) -> Self {
+		self.writers.push((registry, writer));
+		self
+	}
+
+	pub fn push_writer(&mut self, registry: RegistryKind, writer: Box<PlaceholderManifestWriter>) {
+		self.writers.push((registry, writer));
+	}
+
+	pub fn write_manifest(
+		&self,
+		placeholder_dir: &Path,
+		request: &PublishRequest,
+		root: &Path,
+		source: Option<&SourceConfiguration>,
+	) -> MonochangeResult<()> {
+		let (_, writer) = self
+			.writers
+			.iter()
+			.find(|(registry, _)| *registry == request.registry)
+			.expect("unsupported built-in publish registry");
+		writer(placeholder_dir, request, root, source)
+	}
+}
+
+pub fn build_placeholder_directory(
+	root: &Path,
+	request: &PublishRequest,
+	source: Option<&SourceConfiguration>,
+	manifest_writers: &PlaceholderManifestWriterRegistry,
+) -> MonochangeResult<TempDir> {
+	let tempdir = tempfile::tempdir().map_err(|error| placeholder_tempdir_error(&error))?;
+	fs::write(
+		tempdir.path().join("README.md"),
+		&request.placeholder_readme,
+	)
+	.map_err(|error| MonochangeError::Io(format!("failed to write placeholder README: {error}")))?;
+
+	manifest_writers.write_manifest(tempdir.path(), request, root, source)?;
+
+	Ok(tempdir)
+}
+
+fn placeholder_tempdir_error(error: &std::io::Error) -> MonochangeError {
+	MonochangeError::Io(format!("failed to create placeholder tempdir: {error}"))
+}
+
+#[must_use]
+pub fn current_env_map() -> BTreeMap<String, String> {
+	env::vars().collect()
+}
+
+pub trait PublishTrustHandler {
+	fn trust_outcome_for_skip(
+		&self,
+		request: &PublishRequest,
+		source: Option<&SourceConfiguration>,
+		root: &Path,
+		env_map: &BTreeMap<String, String>,
+	) -> TrustedPublishingOutcome;
+
+	fn planned_trust_outcome(
+		&self,
+		request: &PublishRequest,
+		source: Option<&SourceConfiguration>,
+		root: &Path,
+		env_map: &BTreeMap<String, String>,
+	) -> TrustedPublishingOutcome;
+
+	fn enforce_release_trust_prerequisites(
+		&self,
+		request: &PublishRequest,
+		source: Option<&SourceConfiguration>,
+		root: &Path,
+		env_map: &BTreeMap<String, String>,
+	) -> MonochangeResult<()>;
+
+	fn configure_successful_publish_trust(
+		&self,
+		request: &PublishRequest,
+		source: Option<&SourceConfiguration>,
+		root: &Path,
+		env_map: &BTreeMap<String, String>,
+		executor: &mut dyn CommandExecutor,
+	) -> MonochangeResult<TrustedPublishingOutcome>;
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn execute_publish_requests_with_process(
+	root: &Path,
+	source: Option<&SourceConfiguration>,
+	mode: PackagePublishRunMode,
+	dry_run: bool,
+	requests: &[PublishRequest],
+	command_builder: &PublishCommandBuilder,
+	manifest_writers: &PlaceholderManifestWriterRegistry,
+	readiness: &PublishReadinessRegistry,
+	trust_handler: &dyn PublishTrustHandler,
+) -> MonochangeResult<PackagePublishReport> {
+	let env_map = current_env_map();
+	let endpoints = RegistryEndpoints::from_env();
+	let client = registry_client()?;
+	let mut executor = ProcessCommandExecutor;
+	execute_publish_requests(
+		root,
+		source,
+		mode,
+		dry_run,
+		requests,
+		&client,
+		&endpoints,
+		&env_map,
+		&mut executor,
+		command_builder,
+		manifest_writers,
+		readiness,
+		trust_handler,
+	)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn execute_publish_requests(
+	root: &Path,
+	source: Option<&SourceConfiguration>,
+	mode: PackagePublishRunMode,
+	dry_run: bool,
+	requests: &[PublishRequest],
+	client: &Client,
+	endpoints: &RegistryEndpoints,
+	env_map: &BTreeMap<String, String>,
+	executor: &mut dyn CommandExecutor,
+	command_builder: &PublishCommandBuilder,
+	manifest_writers: &PlaceholderManifestWriterRegistry,
+	readiness: &PublishReadinessRegistry,
+	trust_handler: &dyn PublishTrustHandler,
+) -> MonochangeResult<PackagePublishReport> {
+	let mut outcomes = Vec::new();
+
+	for request in requests {
+		if request.mode == PublishMode::External {
+			outcomes.push(PackagePublishOutcome {
+				package: request.package_id.clone(),
+				ecosystem: request.ecosystem,
+				registry: request.registry.to_string(),
+				version: request.version.clone(),
+				status: PackagePublishStatus::SkippedExternal,
+				message: "package opted out of built-in publishing".to_string(),
+				placeholder: mode == PackagePublishRunMode::Placeholder,
+				trusted_publishing: disabled_trust_outcome(),
+				command: None,
+				stdout: None,
+				stderr: None,
+			});
+			continue;
+		}
+
+		let version_exists = registry_version_exists(client, endpoints, request)?;
+		if version_exists {
+			outcomes.push(PackagePublishOutcome {
+				package: request.package_id.clone(),
+				ecosystem: request.ecosystem,
+				registry: request.registry.to_string(),
+				version: request.version.clone(),
+				status: PackagePublishStatus::SkippedExisting,
+				message: format!(
+					"{} {} already exists on {}",
+					request.package_name, request.version, request.registry
+				),
+				placeholder: mode == PackagePublishRunMode::Placeholder,
+				trusted_publishing: trust_handler
+					.trust_outcome_for_skip(request, source, root, env_map),
+				command: None,
+				stdout: None,
+				stderr: None,
+			});
+			continue;
+		}
+
+		let blocked_message = if mode == PackagePublishRunMode::Release {
+			readiness.blocked_message(root, request)?
+		} else {
+			None
+		};
+		if let Some(message) = blocked_message {
+			if dry_run {
+				outcomes.push(PackagePublishOutcome {
+					package: request.package_id.clone(),
+					ecosystem: request.ecosystem,
+					registry: request.registry.to_string(),
+					version: request.version.clone(),
+					status: PackagePublishStatus::Blocked,
+					message,
+					placeholder: mode == PackagePublishRunMode::Placeholder,
+					trusted_publishing: trust_handler
+						.planned_trust_outcome(request, source, root, env_map),
+					command: None,
+					stdout: None,
+					stderr: None,
+				});
+				continue;
+			}
+
+			return Err(MonochangeError::Config(message));
+		}
+
+		let placeholder_dir = if mode == PackagePublishRunMode::Placeholder {
+			Some(build_placeholder_directory(
+				root,
+				request,
+				source,
+				manifest_writers,
+			)?)
+		} else {
+			None
+		};
+		let publish_command = command_builder.build_publish_command(
+			request,
+			mode,
+			placeholder_dir.as_ref().map(TempDir::path),
+			dry_run,
+		);
+
+		if dry_run {
+			outcomes.push(PackagePublishOutcome {
+				package: request.package_id.clone(),
+				ecosystem: request.ecosystem,
+				registry: request.registry.to_string(),
+				version: request.version.clone(),
+				status: PackagePublishStatus::Planned,
+				message: planned_publish_message(mode, request),
+				placeholder: mode == PackagePublishRunMode::Placeholder,
+				trusted_publishing: trust_handler
+					.planned_trust_outcome(request, source, root, env_map),
+				command: None,
+				stdout: None,
+				stderr: None,
+			});
+			continue;
+		}
+
+		if mode == PackagePublishRunMode::Release {
+			trust_handler.enforce_release_trust_prerequisites(request, source, root, env_map)?;
+			enforce_release_attestation_prerequisites(request, env_map, command_builder)?;
+		}
+
+		let output = match executor.run(&publish_command) {
+			Ok(output) => output,
+			Err(error) => {
+				outcomes.push(failed_publish_outcome(mode, request, error.to_string()));
+				break;
+			}
+		};
+		if !output.success {
+			let mut outcome = failed_publish_outcome(
+				mode,
+				request,
+				format!(
+					"`{}` failed: {}",
+					render_command(&publish_command),
+					render_command_error(&output)
+				),
+			);
+			outcome.command = Some(render_command(&publish_command));
+			outcome.stdout = non_empty_output(output.stdout);
+			outcome.stderr = non_empty_output(output.stderr);
+			outcomes.push(outcome);
+			break;
+		}
+
+		let trusted_publishing = if request.trusted_publishing.enabled {
+			trust_handler
+				.configure_successful_publish_trust(request, source, root, env_map, executor)?
+		} else {
+			disabled_trust_outcome()
+		};
+
+		outcomes.push(PackagePublishOutcome {
+			package: request.package_id.clone(),
+			ecosystem: request.ecosystem,
+			registry: request.registry.to_string(),
+			version: request.version.clone(),
+			status: PackagePublishStatus::Published,
+			message: format!(
+				"published {} {} to {}",
+				request.package_name, request.version, request.registry
+			),
+			placeholder: mode == PackagePublishRunMode::Placeholder,
+			trusted_publishing,
+			command: Some(render_command(&publish_command)),
+			stdout: non_empty_output(output.stdout),
+			stderr: non_empty_output(output.stderr),
+		});
+	}
+
+	Ok(PackagePublishReport {
+		mode,
+		dry_run,
+		packages: outcomes,
+	})
+}
+
+pub fn build_placeholder_requests(
+	root: &Path,
+	configuration: &WorkspaceConfiguration,
+	packages: &[PackageRecord],
+	selected_packages: &BTreeSet<String>,
+) -> MonochangeResult<Vec<PublishRequest>> {
+	let packages_by_config_id = packages_by_config_id(packages);
+	let mut requests = Vec::new();
+
+	for package_definition in &configuration.packages {
+		let package = packages_by_config_id
+			.get(package_definition.id.as_str())
+			.copied();
+		let should_publish =
+			package.is_some_and(|package| package_can_be_published(package_definition, package));
+		if let Some(package) = package.filter(|_| {
+			should_publish
+				&& (selected_packages.is_empty()
+					|| selected_packages.contains(&package_definition.id))
+		}) {
+			requests.push(PublishRequest {
+				package_id: package_definition.id.clone(),
+				package_name: package.name.clone(),
+				ecosystem: package.ecosystem,
+				manifest_path: package.manifest_path.clone(),
+				package_root: package
+					.manifest_path
+					.parent()
+					.unwrap_or(&package.workspace_root)
+					.to_path_buf(),
+				registry: resolve_registry_kind(
+					package_definition.publish.registry.as_ref(),
+					package.ecosystem,
+				)?,
+				package_manager: package.metadata.get("manager").cloned(),
+				package_metadata: package.metadata.clone(),
+				mode: package_definition.publish.mode,
+				version: PLACEHOLDER_VERSION.to_string(),
+				placeholder: true,
+				trusted_publishing: package_definition.publish.trusted_publishing.clone(),
+				attestations: package_definition.publish.attestations.clone(),
+				placeholder_readme: resolve_placeholder_readme(
+					root,
+					package_definition.publish.placeholder.readme.as_deref(),
+					package_definition
+						.publish
+						.placeholder
+						.readme_file
+						.as_deref(),
+					&package.name,
+				)?,
+			});
+		}
+	}
+
+	requests.sort_by(|left, right| left.package_id.cmp(&right.package_id));
+	Ok(requests)
+}
+
+pub fn build_release_requests(
+	configuration: &WorkspaceConfiguration,
+	packages: &[PackageRecord],
+	publications: &[PackagePublicationTarget],
+	selected_packages: &BTreeSet<String>,
+) -> MonochangeResult<Vec<PublishRequest>> {
+	let packages_by_config_id = packages_by_config_id(packages);
+	let mut requests = Vec::new();
+
+	for publication in publications {
+		if !selected_packages.is_empty() && !selected_packages.contains(&publication.package) {
+			continue;
+		}
+
+		let Some(package_definition) = configuration.package_by_id(&publication.package) else {
+			continue;
+		};
+		let Some(package) = packages_by_config_id
+			.get(publication.package.as_str())
+			.copied()
+		else {
+			continue;
+		};
+
+		if !package_can_be_published(package_definition, package) {
+			continue;
+		}
+
+		requests.push(PublishRequest {
+			package_id: publication.package.clone(),
+			package_name: package.name.clone(),
+			ecosystem: package.ecosystem,
+			manifest_path: package.manifest_path.clone(),
+			package_root: package
+				.manifest_path
+				.parent()
+				.unwrap_or(&package.workspace_root)
+				.to_path_buf(),
+			registry: resolve_registry_kind(publication.registry.as_ref(), package.ecosystem)?,
+			package_manager: package.metadata.get("manager").cloned(),
+			package_metadata: package.metadata.clone(),
+			mode: publication.mode,
+			version: publication.version.clone(),
+			placeholder: false,
+			trusted_publishing: publication.trusted_publishing.clone(),
+			attestations: publication.attestations.clone(),
+			placeholder_readme: default_placeholder_readme(&package.name),
+		});
+	}
+
+	order_release_requests_by_publish_dependencies(packages, requests)
+}
+
+pub fn resolve_registry_kind(
+	registry: Option<&PublishRegistry>,
+	ecosystem: Ecosystem,
+) -> MonochangeResult<RegistryKind> {
+	match registry {
+		Some(PublishRegistry::Builtin(registry)) => Ok(*registry),
+		Some(PublishRegistry::Custom(name)) => {
+			Err(MonochangeError::Config(format!(
+				"built-in package publishing does not support custom registry `{name}`"
+			)))
+		}
+		None => default_registry_kind_for_ecosystem(ecosystem.as_str()),
+	}
+}
+
+pub fn default_registry_kind_for_ecosystem(ecosystem: &str) -> MonochangeResult<RegistryKind> {
+	let parsed = ecosystem.parse::<Ecosystem>().map_err(|()| {
+		MonochangeError::Config(format!(
+			"built-in package publishing does not support ecosystem `{ecosystem}`"
+		))
+	})?;
+	Ok(monochange_core::default_registry_kind_for_ecosystem(parsed)
+		.expect("all built-in ecosystems have default registries"))
+}
+
+pub fn resolve_placeholder_readme(
+	root: &Path,
+	inline: Option<&str>,
+	file: Option<&Path>,
+	package_name: &str,
+) -> MonochangeResult<String> {
+	if let Some(inline) = inline {
+		return Ok(inline.to_string());
+	}
+	if let Some(file) = file {
+		let path = root.join(file);
+		return fs::read_to_string(&path).map_err(|error| {
+			MonochangeError::Io(format!(
+				"failed to read placeholder README {}: {error}",
+				path.display()
+			))
+		});
+	}
+	Ok(default_placeholder_readme(package_name))
+}
+
+pub fn default_placeholder_readme(package_name: &str) -> String {
+	format!(
+		"# {package_name}\n\nThis is a placeholder release published by monochange to bootstrap trusted publishing.\n"
+	)
 }
 
 /// Adapter for building ecosystem-specific publish commands.
@@ -1081,9 +1812,6 @@ fn circle_project_slug(env_map: &BTreeMap<String, String>) -> Option<String> {
 		.map(|(owner, repo)| format!("gh/{owner}/{repo}"))
 		.or_else(|| env_map.get("CIRCLE_PROJECT_REPONAME").cloned())
 }
-
-use std::collections::BTreeSet;
-use std::fs;
 
 use monochange_core::DependencyKind;
 use monochange_core::materialize_dependency_edges;

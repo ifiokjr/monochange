@@ -6490,3 +6490,226 @@ steps = [
 	);
 	assert_eq!(publish_check.steps.len(), 2);
 }
+
+fn source_config_for_provider(provider: SourceProvider) -> monochange_core::SourceConfiguration {
+	monochange_core::SourceConfiguration {
+		provider,
+		owner: "owner".to_string(),
+		repo: "repo".to_string(),
+		host: None,
+		api_url: None,
+		releases: monochange_core::ProviderReleaseSettings::default(),
+		pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
+	}
+}
+
+#[test]
+fn source_provider_capabilities_reject_unsupported_settings() {
+	let gitea_without_host = source_config_for_provider(SourceProvider::Gitea);
+	let error = crate::validate_source_provider_capabilities(&gitea_without_host).unwrap_err();
+	assert!(error.to_string().contains("[source].host must be set"));
+
+	let mut gitlab_with_draft = source_config_for_provider(SourceProvider::GitLab);
+	gitlab_with_draft.releases.draft = true;
+	let error = crate::validate_source_provider_capabilities(&gitlab_with_draft).unwrap_err();
+	assert!(
+		error
+			.to_string()
+			.contains("[source.releases].draft is not supported")
+	);
+
+	let mut gitlab_with_prerelease = source_config_for_provider(SourceProvider::GitLab);
+	gitlab_with_prerelease.releases.prerelease = true;
+	let error = crate::validate_source_provider_capabilities(&gitlab_with_prerelease).unwrap_err();
+	assert!(
+		error
+			.to_string()
+			.contains("[source.releases].prerelease is not supported")
+	);
+
+	let mut gitea_with_notes = source_config_for_provider(SourceProvider::Gitea);
+	gitea_with_notes.host = Some("https://git.example.com".to_string());
+	gitea_with_notes.releases.generate_notes = true;
+	let error = crate::validate_source_provider_capabilities(&gitea_with_notes).unwrap_err();
+	assert!(
+		error
+			.to_string()
+			.contains("provider-generated release notes are not supported")
+	);
+
+	let mut gitea_with_auto_merge = source_config_for_provider(SourceProvider::Gitea);
+	gitea_with_auto_merge.host = Some("https://git.example.com".to_string());
+	gitea_with_auto_merge.pull_requests.auto_merge = true;
+	let error = crate::validate_source_provider_capabilities(&gitea_with_auto_merge).unwrap_err();
+	assert!(
+		error
+			.to_string()
+			.contains("[source.pull_requests].auto_merge is not supported")
+	);
+}
+
+#[test]
+fn validate_ecosystem_version_readable_reports_parse_and_field_errors() {
+	let root = tempdir().unwrap();
+	let unsupported = root.path().join("package.txt");
+	std::fs::write(&unsupported, "version = \"1.0.0\"").unwrap();
+	let error = crate::validate_ecosystem_version_readable(
+		&unsupported,
+		"package.txt",
+		EcosystemType::Npm,
+		None,
+		"package",
+		"pkg",
+	)
+	.unwrap_err();
+	assert!(error.to_string().contains("is not supported for ecosystem"));
+
+	let missing = root.path().join("package.json");
+	let error = crate::validate_ecosystem_version_readable(
+		&missing,
+		"package.json",
+		EcosystemType::Npm,
+		None,
+		"package",
+		"pkg",
+	)
+	.unwrap_err();
+	assert!(error.to_string().contains("failed to read"));
+
+	let bad_json = root.path().join("package.json");
+	std::fs::write(&bad_json, "{").unwrap();
+	let error = crate::validate_ecosystem_version_readable(
+		&bad_json,
+		"package.json",
+		EcosystemType::Npm,
+		None,
+		"package",
+		"pkg",
+	)
+	.unwrap_err();
+	assert!(error.to_string().contains("is not valid JSON"));
+
+	std::fs::write(&bad_json, "{\"version\":\"1.0.0\"}").unwrap();
+	crate::validate_ecosystem_version_readable(
+		&bad_json,
+		"package.json",
+		EcosystemType::Npm,
+		None,
+		"package",
+		"pkg",
+	)
+	.unwrap();
+
+	std::fs::write(&bad_json, "{\"name\":\"pkg\"}").unwrap();
+	let error = crate::validate_ecosystem_version_readable(
+		&bad_json,
+		"package.json",
+		EcosystemType::Npm,
+		None,
+		"package",
+		"pkg",
+	)
+	.unwrap_err();
+	assert!(
+		error
+			.to_string()
+			.contains("does not contain a `version` string field")
+	);
+
+	let bad_yaml = root.path().join("pubspec.yaml");
+	std::fs::write(&bad_yaml, ": bad").unwrap();
+	let error = crate::validate_ecosystem_version_readable(
+		&bad_yaml,
+		"pubspec.yaml",
+		EcosystemType::Dart,
+		None,
+		"package",
+		"pkg",
+	)
+	.unwrap_err();
+	assert!(error.to_string().contains("is not valid YAML"));
+
+	std::fs::write(&bad_yaml, "version: 1.0.0\n").unwrap();
+	crate::validate_ecosystem_version_readable(
+		&bad_yaml,
+		"pubspec.yaml",
+		EcosystemType::Dart,
+		None,
+		"package",
+		"pkg",
+	)
+	.unwrap();
+
+	std::fs::write(&bad_yaml, "name: pkg\n").unwrap();
+	let error = crate::validate_ecosystem_version_readable(
+		&bad_yaml,
+		"pubspec.yaml",
+		EcosystemType::Dart,
+		None,
+		"package",
+		"pkg",
+	)
+	.unwrap_err();
+	assert!(
+		error
+			.to_string()
+			.contains("does not contain a `version` string field")
+	);
+
+	let go_mod = root.path().join("go.mod");
+	std::fs::write(&go_mod, "module example.com/pkg\n").unwrap();
+	crate::validate_ecosystem_version_readable(
+		&go_mod,
+		"go.mod",
+		EcosystemType::Go,
+		None,
+		"package",
+		"pkg",
+	)
+	.unwrap();
+
+	let bad_toml = root.path().join("Cargo.toml");
+	std::fs::write(&bad_toml, "[").unwrap();
+	let error = crate::validate_ecosystem_version_readable(
+		&bad_toml,
+		"Cargo.toml",
+		EcosystemType::Cargo,
+		None,
+		"package",
+		"pkg",
+	)
+	.unwrap_err();
+	assert!(error.to_string().contains("is not valid TOML"));
+
+	std::fs::write(
+		&bad_toml,
+		"[package]\nname = \"pkg\"\nversion = \"1.0.0\"\n",
+	)
+	.unwrap();
+	let fields = vec!["package.version".to_string()];
+	crate::validate_ecosystem_version_readable(
+		&bad_toml,
+		"Cargo.toml",
+		EcosystemType::Cargo,
+		Some(&fields),
+		"package",
+		"pkg",
+	)
+	.unwrap();
+
+	std::fs::write(&bad_toml, "[package]\nname = \"pkg\"\n").unwrap();
+	let error = crate::validate_ecosystem_version_readable(
+		&bad_toml,
+		"Cargo.toml",
+		EcosystemType::Cargo,
+		Some(&fields),
+		"package",
+		"pkg",
+	)
+	.unwrap_err();
+	assert!(
+		error
+			.to_string()
+			.contains("does not contain a `package.version` string field")
+	);
+}

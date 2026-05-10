@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fs;
+use std::path::Path;
+use std::path::PathBuf;
 
 use monochange_core::ChangeSignal;
 use monochange_core::ChangelogFormat;
@@ -1583,4 +1585,11 @@ fn monochange_format_includes_heading_for_custom_single_section() {
 		markdown.contains("### Features"),
 		"monochange format should include heading for custom single section"
 	);
+}
+
+#[test]
+fn root_relative_renders_workspace_root_as_dot() {
+	let root = Path::new("/workspace");
+
+	assert_eq!(root_relative(root, root), PathBuf::from("."));
 }
