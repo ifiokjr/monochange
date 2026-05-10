@@ -1,0 +1,8 @@
+[package]
+name = "billing_engine"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ledger_types = { path = "../ledger_types", version = "0.1.0" }
+auth_policy = { path = "../auth_policy", version = "0.1.0" }

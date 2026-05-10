@@ -75,10 +75,22 @@ fn publish_plan_integration_preserves_dependency_order_across_grouped_batches() 
 	let value: Value = serde_json::from_slice(&output.stdout)
 		.unwrap_or_else(|error| panic!("parse publish plan json: {error}"));
 	let publish_rate_limits = &value["publishRateLimits"];
-	let expected = (0..12)
-		.map(|index| format!("crate_{index:02}"))
-		.collect::<Vec<_>>();
+	let expected = [
+		"ledger_types",
+		"yaml_config",
+		"zeta_transport",
+		"catalog_index",
+		"auth_policy",
+		"telemetry_core",
+		"billing_engine",
+		"notification_worker",
+		"checkout_api",
+		"fulfillment_service",
+		"public_gateway",
+		"storefront_app",
+	]
+	.map(String::from);
 	assert_package_batch(publish_rate_limits, 0, &expected[..10]);
-	assert_package_batch(publish_rate_limits, 1, &expected);
+	assert_package_batch(publish_rate_limits, 1, &expected[10..]);
 	assert_json_snapshot!(publish_rate_limits);
 }

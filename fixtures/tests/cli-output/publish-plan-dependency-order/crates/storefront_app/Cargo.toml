@@ -1,0 +1,9 @@
+[package]
+name = "storefront_app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+public_gateway = { path = "../public_gateway", version = "0.1.0" }
+fulfillment_service = { path = "../fulfillment_service", version = "0.1.0" }
+telemetry_core = { path = "../telemetry_core", version = "0.1.0" }

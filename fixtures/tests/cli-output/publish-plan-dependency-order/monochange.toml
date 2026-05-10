@@ -11,50 +11,51 @@ steps = [
 	{ name = "plan publish rate limits", type = "PlanPublishRateLimits" },
 ]
 
-[package.crate_00]
-path = "crates/crate_00"
+[package.zeta_transport]
+path = "crates/zeta_transport"
 publish.rate_limits.enforce = true
 
-[package.crate_01]
-path = "crates/crate_01"
+[package.yaml_config]
+path = "crates/yaml_config"
 publish.rate_limits.enforce = true
 
-[package.crate_02]
-path = "crates/crate_02"
+[package.ledger_types]
+path = "crates/ledger_types"
 publish.rate_limits.enforce = true
 
-[package.crate_03]
-path = "crates/crate_03"
+[package.auth_policy]
+path = "crates/auth_policy"
 publish.rate_limits.enforce = true
 
-[package.crate_04]
-path = "crates/crate_04"
+[package.telemetry_core]
+path = "crates/telemetry_core"
 publish.rate_limits.enforce = true
 
-[package.crate_05]
-path = "crates/crate_05"
+[package.billing_engine]
+path = "crates/billing_engine"
 publish.rate_limits.enforce = true
 
-[package.crate_06]
-path = "crates/crate_06"
+[package.catalog_index]
+path = "crates/catalog_index"
 publish.rate_limits.enforce = true
 
-[package.crate_07]
-path = "crates/crate_07"
+[package.checkout_api]
+path = "crates/checkout_api"
 publish.rate_limits.enforce = true
 
-[package.crate_08]
-path = "crates/crate_08"
+[package.notification_worker]
+path = "crates/notification_worker"
 publish.rate_limits.enforce = true
 
-[package.crate_09]
-path = "crates/crate_09"
+[package.fulfillment_service]
+path = "crates/fulfillment_service"
 publish.rate_limits.enforce = true
 
-[package.crate_10]
-path = "crates/crate_10"
+[package.public_gateway]
+path = "crates/public_gateway"
 publish.rate_limits.enforce = true
 
-[package.crate_11]
-path = "crates/crate_11"
+[package.storefront_app]
+path = "crates/storefront_app"
 publish.rate_limits.enforce = true
+
