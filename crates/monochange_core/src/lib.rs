@@ -3277,7 +3277,7 @@ pub struct ReleaseRecord {
 	#[serde(default)]
 	pub version: Option<String>,
 	#[serde(default)]
-	pub group_version: Option<String>,
+	pub versions: BTreeMap<String, String>,
 	pub release_targets: Vec<ReleaseRecordTarget>,
 	pub released_packages: Vec<String>,
 	pub changed_files: Vec<PathBuf>,

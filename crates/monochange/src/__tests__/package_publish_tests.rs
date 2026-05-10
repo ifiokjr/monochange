@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -306,7 +307,7 @@ fn commit_release_record(root: &Path, publications: Vec<PackagePublicationTarget
 		created_at: "2026-04-14T08:00:00Z".to_string(),
 		command: "release-pr".to_string(),
 		version: Some("1.2.3".to_string()),
-		group_version: None,
+		versions: BTreeMap::from([("pkg".to_string(), "1.2.3".to_string())]),
 		release_targets: vec![monochange_core::ReleaseRecordTarget {
 			id: "pkg".to_string(),
 			kind: monochange_core::ReleaseOwnerKind::Package,

@@ -535,8 +535,11 @@ pub(crate) fn text_release_record_discovery(discovery: &ReleaseRecordDiscovery) 
 	if let Some(version) = &discovery.record.version {
 		lines.push(format!("  version: {version}"));
 	}
-	if let Some(group_version) = &discovery.record.group_version {
-		lines.push(format!("  group version: {group_version}"));
+	if !discovery.record.versions.is_empty() {
+		lines.push("  versions:".to_string());
+		for (id, version) in &discovery.record.versions {
+			lines.push(format!("    - {id}: {version}"));
+		}
 	}
 	if !discovery.record.release_targets.is_empty() {
 		lines.push("  targets:".to_string());

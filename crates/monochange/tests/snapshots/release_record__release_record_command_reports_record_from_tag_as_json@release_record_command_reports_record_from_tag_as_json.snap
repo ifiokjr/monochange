@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/release_record.rs
+assertion_line: 51
 expression: redacted
 ---
 {
@@ -16,7 +17,6 @@ expression: redacted
     "deletedChangesets": [
       ".changeset/feature.md"
     ],
-    "groupVersion": "1.2.3",
     "kind": "monochange.releaseRecord",
     "packagePublications": [],
     "provider": {
@@ -48,7 +48,10 @@ expression: redacted
     "updatedChangelogs": [
       "crates/monochange/CHANGELOG.md"
     ],
-    "version": "1.2.3"
+    "version": "1.2.3",
+    "versions": {
+      "sdk": "1.2.3"
+    }
   },
   "recordCommit": "[SHA]",
   "resolvedCommit": "[SHA]"

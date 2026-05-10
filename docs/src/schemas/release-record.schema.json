@@ -808,13 +808,6 @@
 			},
 			"type": "array"
 		},
-		"groupVersion": {
-			"default": null,
-			"type": [
-				"string",
-				"null"
-			]
-		},
 		"kind": {
 			"const": "monochange.releaseRecord",
 			"type": "string"
@@ -866,6 +859,13 @@
 				"string",
 				"null"
 			]
+		},
+		"versions": {
+			"additionalProperties": {
+				"type": "string"
+			},
+			"default": {},
+			"type": "object"
 		}
 	},
 	"required": [
