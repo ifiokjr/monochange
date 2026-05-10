@@ -780,7 +780,7 @@ steps = [
 	{ type = "Command", name = "update json schemas", command = "cargo xtask schema update" },
 	{ type = "Command", name = "format changed files", command = "dprint fmt --allow-no-files {{ changed_files }} .monochange/releases/" },
 	{ type = "Command", name = "refresh shared markdown", command = "mdt update", when = "{{ inputs.commit }}" },
-	{ type = "CommitRelease", name = "create release commit", when = "{{ inputs.commit }}", update_release_json = true },
+	{ type = "CommitRelease", name = "create release commit", when = "{{ inputs.commit }}" },
 	{ type = "Command", name = "push release commit", command = "git push --no-verify", when = "{{ inputs.commit }}" },
 	{ type = "PublishRelease", name = "publish hosted releases", when = "{{ inputs.commit }}" },
 	{ type = "CommentReleasedIssues", name = "comment on released issues", when = "{{ inputs.commit }}" },
@@ -799,7 +799,7 @@ steps = [
 	{ type = "Command", name = "update json schemas", when = "{{ number_of_changesets > 0 }}", command = "cargo xtask schema update" },
 	{ type = "Command", name = "format changed files", when = "{{ number_of_changesets > 0 }}", command = "dprint fmt --allow-no-files {{ changed_files }} .monochange/releases/" },
 	{ type = "Command", name = "refresh shared markdown", when = "{{ number_of_changesets > 0 }}", command = "mdt update" },
-	{ type = "CommitRelease", name = "create release commit", when = "{{ number_of_changesets > 0 }}", inputs = { no_verify = "{{ inputs.no_verify }}" }, update_release_json = true },
+	{ type = "CommitRelease", name = "create release commit", when = "{{ number_of_changesets > 0 }}", inputs = { no_verify = "{{ inputs.no_verify }}" } },
 	{ type = "OpenReleaseRequest", name = "create the pr", when = "{{ number_of_changesets > 0 }}", inputs = { no_verify = "{{ inputs.no_verify }}" } },
 ]
 
