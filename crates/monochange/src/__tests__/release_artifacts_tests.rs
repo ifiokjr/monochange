@@ -913,7 +913,7 @@ fn validate_release_record_file_skips_rebuild_when_targets_match() {
 	assert!(path.is_file());
 
 	let first_content = fs::read_to_string(&path).unwrap();
-	let validated = validate_release_record_file(root, None, &manifest).unwrap();
+	let validated = validate_release_record_file(root, None, &manifest, false).unwrap();
 	assert_eq!(validated, path);
 
 	let second_content = fs::read_to_string(&path).unwrap();
@@ -934,7 +934,7 @@ fn validate_release_record_file_rewrites_when_targets_differ() {
 	fs::write(&path, &mutated).unwrap();
 
 	// Validation should detect the mismatch and rewrite.
-	let validated = validate_release_record_file(root, None, &manifest).unwrap();
+	let validated = validate_release_record_file(root, None, &manifest, true).unwrap();
 	assert_eq!(validated, path);
 
 	let second_content = fs::read_to_string(&path).unwrap();
@@ -1017,7 +1017,7 @@ fn validate_release_record_file_fast_path_detects_missing_id() {
 	let mutated = r#"{"schemaVersion":1,"kind":"monochange.releaseRecord","createdAt":"2026-01-01T00:00:00Z","command":"prepare-release","version":"1.0.0","releaseTargets":[{"kind":"npm","version":"1.0.0"}]}"#;
 	fs::write(&path, mutated).unwrap();
 
-	let validated = validate_release_record_file(root, None, &manifest).unwrap();
+	let validated = validate_release_record_file(root, None, &manifest, true).unwrap();
 	assert_eq!(validated, path);
 
 	// Should have been rewritten with the correct content.
@@ -1037,7 +1037,7 @@ fn validate_release_record_file_fast_path_detects_missing_kind() {
 	let mutated = r#"{"schemaVersion":1,"kind":"monochange.releaseRecord","createdAt":"2026-01-01T00:00:00Z","command":"prepare-release","version":"1.0.0","releaseTargets":[{"id":"pkg-a","version":"1.0.0"}]}"#;
 	fs::write(&path, mutated).unwrap();
 
-	let validated = validate_release_record_file(root, None, &manifest).unwrap();
+	let validated = validate_release_record_file(root, None, &manifest, true).unwrap();
 	assert_eq!(validated, path);
 
 	let content = fs::read_to_string(&path).unwrap();
@@ -1056,7 +1056,7 @@ fn validate_release_record_file_fast_path_detects_missing_version() {
 	let mutated = r#"{"schemaVersion":1,"kind":"monochange.releaseRecord","createdAt":"2026-01-01T00:00:00Z","command":"prepare-release","version":"1.0.0","releaseTargets":[{"id":"pkg-a","kind":"Package"}]}"#;
 	fs::write(&path, mutated).unwrap();
 
-	let validated = validate_release_record_file(root, None, &manifest).unwrap();
+	let validated = validate_release_record_file(root, None, &manifest, true).unwrap();
 	assert_eq!(validated, path);
 
 	let content = fs::read_to_string(&path).unwrap();
@@ -1075,7 +1075,7 @@ fn validate_release_record_file_fast_path_detects_mismatched_target_count() {
 	let mutated = r#"{"schemaVersion":1,"kind":"monochange.releaseRecord","createdAt":"2026-01-01T00:00:00Z","command":"prepare-release","version":"1.0.0","releaseTargets":[{"id":"pkg-a","kind":"Package","version":"1.0.0"},{"id":"pkg-b","kind":"Package","version":"2.0.0"}]}"#;
 	fs::write(&path, mutated).unwrap();
 
-	let validated = validate_release_record_file(root, None, &manifest).unwrap();
+	let validated = validate_release_record_file(root, None, &manifest, true).unwrap();
 	assert_eq!(validated, path);
 
 	// Should have been rewritten because target counts don't match.
@@ -1099,7 +1099,7 @@ fn validate_release_record_file_fast_path_reports_error_for_unreadable_file() {
 	permissions.set_mode(0o000);
 	fs::set_permissions(&path, permissions.clone()).unwrap();
 
-	let result = validate_release_record_file(root, None, &manifest);
+	let result = validate_release_record_file(root, None, &manifest, false);
 	assert!(result.is_err());
 
 	// Cleanup.
