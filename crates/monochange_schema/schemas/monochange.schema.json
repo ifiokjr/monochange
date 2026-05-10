@@ -149,6 +149,24 @@
 			},
 			"type": "object"
 		},
+		"CliInputDefault": {
+			"anyOf": [
+				{
+					"type": "string"
+				},
+				{
+					"type": "boolean"
+				},
+				{
+					"format": "int64",
+					"type": "integer"
+				},
+				{
+					"format": "double",
+					"type": "number"
+				}
+			]
+		},
 		"CliInputDefinition": {
 			"additionalProperties": false,
 			"properties": {
@@ -160,11 +178,15 @@
 					"type": "array"
 				},
 				"default": {
-					"default": null,
-					"type": [
-						"string",
-						"null"
-					]
+					"anyOf": [
+						{
+							"$ref": "#/$defs/CliInputDefault"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
 				},
 				"help_text": {
 					"default": null,
