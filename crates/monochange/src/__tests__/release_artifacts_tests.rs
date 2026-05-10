@@ -27,6 +27,41 @@ use monochange_core::WorkspaceDefaults;
 use semver::Version;
 use tempfile::tempdir;
 
+fn minimal_manifest_with_target(id: &str, version: &str) -> ReleaseManifest {
+	ReleaseManifest {
+		command: "prepare-release".to_string(),
+		dry_run: false,
+		version: Some(version.to_string()),
+		group_version: None,
+		release_targets: vec![ReleaseManifestTarget {
+			id: id.to_string(),
+			kind: ReleaseOwnerKind::Package,
+			version: version.to_string(),
+			tag: true,
+			release: true,
+			tag_name: format!("v{version}"),
+			version_format: VersionFormat::Primary,
+			members: vec![],
+			rendered_title: format!("Release {id} {version}"),
+			rendered_changelog_title: format!("{id} {version}"),
+		}],
+		released_packages: vec![],
+		changed_files: vec![],
+		changelogs: vec![],
+		package_publications: vec![],
+		changesets: vec![],
+		deleted_changesets: vec![],
+		plan: ReleaseManifestPlan {
+			workspace_root: PathBuf::from("."),
+			decisions: vec![],
+			groups: vec![],
+			warnings: vec![],
+			unresolved_items: vec![],
+			compatibility_evidence: vec![],
+		},
+	}
+}
+
 use super::*;
 
 fn empty_configuration(root: &Path) -> WorkspaceConfiguration {
@@ -789,4 +824,285 @@ fn release_paths_from_record_produces_same_hash_as_from_manifest() {
 	assert_eq!(from_manifest.hash, from_record.hash);
 	assert_eq!(from_manifest.relative, from_record.relative);
 	assert_eq!(from_manifest.absolute, from_record.absolute);
+}
+
+#[test]
+fn dedup_index_roundtrip() {
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+
+	let index = load_dedup_index(root);
+	assert!(index.is_empty());
+
+	let mut set = std::collections::HashSet::new();
+	set.insert("abc123".to_string());
+	set.insert("def456".to_string());
+	save_dedup_index(root, &set).unwrap();
+
+	let loaded = load_dedup_index(root);
+	assert_eq!(loaded.len(), 2);
+	assert!(loaded.contains("abc123"));
+	assert!(loaded.contains("def456"));
+}
+
+#[test]
+fn add_and_remove_from_dedup_index() {
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+
+	add_to_dedup_index(root, "hash_a").unwrap();
+	add_to_dedup_index(root, "hash_b").unwrap();
+	let index = load_dedup_index(root);
+	assert_eq!(index.len(), 2);
+
+	remove_from_dedup_index(root, "hash_a").unwrap();
+	let index = load_dedup_index(root);
+	assert_eq!(index.len(), 1);
+	assert!(index.contains("hash_b"));
+}
+
+#[test]
+fn deduplicate_uses_persistent_index_to_skip_scan() {
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+
+	let stale_dir = root.join(".monochange/releases/stale");
+	fs::create_dir_all(&stale_dir).unwrap();
+	let stale_record = r#"{
+		"schemaVersion": 1,
+		"kind": "monochange.releaseRecord",
+		"createdAt": "2026-01-01T00:00:00Z",
+		"command": "prepare-release",
+		"version": "1.0.0",
+		"releaseTargets": [
+			{"id":"pkg-a","kind":"Package","version":"1.0.0","tag":true,"release":true,"tag_name":"v1.0.0","version_format":"primary","members":[],"rendered_title":"Release pkg-a 1.0.0","rendered_changelog_title":"pkg-a 1.0.0"}
+		]
+	}"#;
+	fs::write(stale_dir.join("release.json"), stale_record).unwrap();
+
+	let manifest = minimal_manifest_with_target("pkg-b", "2.0.0");
+	let paths = ReleasePaths::from_manifest(root, &manifest);
+	add_to_dedup_index(root, &paths.hash).unwrap();
+
+	let target = ReleaseRecordTarget {
+		id: "pkg-b".to_string(),
+		kind: ReleaseOwnerKind::Package,
+		version: "2.0.0".to_string(),
+		version_format: VersionFormat::Primary,
+		tag: true,
+		release: true,
+		tag_name: "v2.0.0".to_string(),
+		members: vec![],
+	};
+	let result = deduplicate_overlapping_release_records(
+		root,
+		&[target],
+		root.join(".monochange/releases").as_path(),
+	);
+	assert!(result.is_ok());
+	assert!(stale_dir.is_dir());
+}
+
+#[test]
+fn validate_release_record_file_skips_rebuild_when_targets_match() {
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+
+	let manifest = minimal_manifest_with_target("pkg-a", "1.0.0");
+	let path = write_release_record_file(root, None, &manifest).unwrap();
+	assert!(path.is_file());
+
+	let first_content = fs::read_to_string(&path).unwrap();
+	let validated = validate_release_record_file(root, None, &manifest, false).unwrap();
+	assert_eq!(validated, path);
+
+	let second_content = fs::read_to_string(&path).unwrap();
+	assert_eq!(first_content, second_content);
+}
+
+#[test]
+fn validate_release_record_file_rewrites_when_targets_differ() {
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+
+	let manifest = minimal_manifest_with_target("pkg-a", "1.0.0");
+	let path = write_release_record_file(root, None, &manifest).unwrap();
+	let first_content = fs::read_to_string(&path).unwrap();
+
+	// Manually mutate the file so its targets no longer match.
+	let mutated = first_content.replace("pkg-a", "pkg-b");
+	fs::write(&path, &mutated).unwrap();
+
+	// Validation should detect the mismatch and rewrite.
+	let validated = validate_release_record_file(root, None, &manifest, true).unwrap();
+	assert_eq!(validated, path);
+
+	let second_content = fs::read_to_string(&path).unwrap();
+	// The mutated content should have been overwritten back to the original target.
+	assert!(!second_content.contains("pkg-b"));
+	assert!(second_content.contains("pkg-a"));
+}
+
+#[test]
+fn write_release_record_file_updates_persistent_index() {
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+
+	let manifest = minimal_manifest_with_target("pkg-a", "1.0.0");
+	let path = write_release_record_file(root, None, &manifest).unwrap();
+	assert!(path.is_file());
+
+	let paths = ReleasePaths::from_manifest(root, &manifest);
+	let index = load_dedup_index(root);
+	assert!(index.contains(&paths.hash));
+}
+
+#[test]
+fn load_dedup_index_skips_empty_and_invalid_lines() {
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+	let index_path = root.join(".monochange/local/release-index.jsonl");
+	fs::create_dir_all(index_path.parent().unwrap()).unwrap();
+	fs::write(
+		&index_path,
+		"\n\n  \nnot-json\n{\"hash\":\"valid\"}\n\n{\"broken\n",
+	)
+	.unwrap();
+
+	let index = load_dedup_index(root);
+	assert_eq!(index.len(), 1);
+	assert!(index.contains("valid"));
+}
+
+#[test]
+#[cfg(unix)]
+fn save_dedup_index_reports_io_errors() {
+	use std::os::unix::fs::PermissionsExt;
+
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+
+	// Create a file at the exact path where the directory should be,
+	// so create_dir_all fails.
+	let local_path = root.join(".monochange/local");
+	fs::create_dir_all(local_path.parent().unwrap()).unwrap();
+	fs::write(&local_path, "block").unwrap();
+	let result = save_dedup_index(root, &std::collections::HashSet::new());
+	assert!(result.is_err());
+
+	// Restore directory and make it unwritable.
+	fs::remove_file(&local_path).unwrap();
+	fs::create_dir_all(&local_path).unwrap();
+	let mut permissions = fs::metadata(&local_path).unwrap().permissions();
+	permissions.set_mode(0o000);
+	fs::set_permissions(&local_path, permissions.clone()).unwrap();
+
+	let result = save_dedup_index(root, &std::collections::HashSet::new());
+	assert!(result.is_err());
+
+	// Cleanup: restore permissions so tempdir can be deleted.
+	permissions.set_mode(0o755);
+	let _ = fs::set_permissions(&local_path, permissions);
+}
+
+#[test]
+fn validate_release_record_file_fast_path_detects_missing_id() {
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+
+	let manifest = minimal_manifest_with_target("pkg-a", "1.0.0");
+	let path = write_release_record_file(root, None, &manifest).unwrap();
+
+	// Overwrite with a record whose target is missing the `id` field.
+	let mutated = r#"{"schemaVersion":1,"kind":"monochange.releaseRecord","createdAt":"2026-01-01T00:00:00Z","command":"prepare-release","version":"1.0.0","releaseTargets":[{"kind":"npm","version":"1.0.0"}]}"#;
+	fs::write(&path, mutated).unwrap();
+
+	let validated = validate_release_record_file(root, None, &manifest, true).unwrap();
+	assert_eq!(validated, path);
+
+	// Should have been rewritten with the correct content.
+	let content = fs::read_to_string(&path).unwrap();
+	assert!(content.contains("pkg-a"));
+}
+
+#[test]
+fn validate_release_record_file_fast_path_detects_missing_kind() {
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+
+	let manifest = minimal_manifest_with_target("pkg-a", "1.0.0");
+	let path = write_release_record_file(root, None, &manifest).unwrap();
+
+	// Overwrite with a record whose target is missing the `kind` field.
+	let mutated = r#"{"schemaVersion":1,"kind":"monochange.releaseRecord","createdAt":"2026-01-01T00:00:00Z","command":"prepare-release","version":"1.0.0","releaseTargets":[{"id":"pkg-a","version":"1.0.0"}]}"#;
+	fs::write(&path, mutated).unwrap();
+
+	let validated = validate_release_record_file(root, None, &manifest, true).unwrap();
+	assert_eq!(validated, path);
+
+	let content = fs::read_to_string(&path).unwrap();
+	assert!(content.contains("Package"));
+}
+
+#[test]
+fn validate_release_record_file_fast_path_detects_missing_version() {
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+
+	let manifest = minimal_manifest_with_target("pkg-a", "1.0.0");
+	let path = write_release_record_file(root, None, &manifest).unwrap();
+
+	// Overwrite with a record whose target is missing the `version` field.
+	let mutated = r#"{"schemaVersion":1,"kind":"monochange.releaseRecord","createdAt":"2026-01-01T00:00:00Z","command":"prepare-release","version":"1.0.0","releaseTargets":[{"id":"pkg-a","kind":"Package"}]}"#;
+	fs::write(&path, mutated).unwrap();
+
+	let validated = validate_release_record_file(root, None, &manifest, true).unwrap();
+	assert_eq!(validated, path);
+
+	let content = fs::read_to_string(&path).unwrap();
+	assert!(content.contains("1.0.0"));
+}
+
+#[test]
+fn validate_release_record_file_fast_path_detects_mismatched_target_count() {
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+
+	let manifest = minimal_manifest_with_target("pkg-a", "1.0.0");
+	let path = write_release_record_file(root, None, &manifest).unwrap();
+
+	// Overwrite with a record that has MORE targets than the manifest.
+	let mutated = r#"{"schemaVersion":1,"kind":"monochange.releaseRecord","createdAt":"2026-01-01T00:00:00Z","command":"prepare-release","version":"1.0.0","releaseTargets":[{"id":"pkg-a","kind":"Package","version":"1.0.0"},{"id":"pkg-b","kind":"Package","version":"2.0.0"}]}"#;
+	fs::write(&path, mutated).unwrap();
+
+	let validated = validate_release_record_file(root, None, &manifest, true).unwrap();
+	assert_eq!(validated, path);
+
+	// Should have been rewritten because target counts don't match.
+	let content = fs::read_to_string(&path).unwrap();
+	assert!(!content.contains("pkg-b"));
+}
+
+#[test]
+#[cfg(unix)]
+fn validate_release_record_file_fast_path_reports_error_for_unreadable_file() {
+	use std::os::unix::fs::PermissionsExt;
+
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+
+	let manifest = minimal_manifest_with_target("pkg-a", "1.0.0");
+	let path = write_release_record_file(root, None, &manifest).unwrap();
+
+	// Make the file unreadable.
+	let mut permissions = fs::metadata(&path).unwrap().permissions();
+	permissions.set_mode(0o000);
+	fs::set_permissions(&path, permissions.clone()).unwrap();
+
+	let result = validate_release_record_file(root, None, &manifest, false);
+	assert!(result.is_err());
+
+	// Cleanup.
+	permissions.set_mode(0o644);
+	let _ = fs::set_permissions(&path, permissions);
 }

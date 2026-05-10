@@ -1,0 +1,42 @@
+---
+source: crates/monochange_integration_tests/tests/release_record_artifacts.rs
+expression: "serde_json::json!({\n    \"releaseRecordPath\":\n    first_paths[0].strip_prefix(root).unwrap_or_else(|error|\n    panic!(\"strip temp root: {error}\")).to_string_lossy(), \"index\":\n    index_entries, \"releaseTargets\": first[\"releaseTargets\"],\n})"
+---
+{
+  "index": [
+    {
+      "hash": "1b9c77930352f342"
+    }
+  ],
+  "releaseRecordPath": ".monochange/releases/1b9c77930352f342/release.json",
+  "releaseTargets": [
+    {
+      "id": "app",
+      "kind": "package",
+      "members": [
+        "app"
+      ],
+      "release": true,
+      "renderedChangelogTitle": "app [1.0.1](https://github.com/ifiokjr/monochange/releases/tag/app/v1.0.1) (2026-04-07)",
+      "renderedTitle": "app 1.0.1 (2026-04-07)",
+      "tag": false,
+      "tagName": "app/v1.0.1",
+      "version": "1.0.1",
+      "versionFormat": "namespaced"
+    },
+    {
+      "id": "core",
+      "kind": "package",
+      "members": [
+        "core"
+      ],
+      "release": true,
+      "renderedChangelogTitle": "core [1.1.0](https://github.com/ifiokjr/monochange/releases/tag/core/v1.1.0) (2026-04-07)",
+      "renderedTitle": "core 1.1.0 (2026-04-07)",
+      "tag": true,
+      "tagName": "core/v1.1.0",
+      "version": "1.1.0",
+      "versionFormat": "namespaced"
+    }
+  ]
+}
