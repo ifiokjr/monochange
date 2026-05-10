@@ -1,0 +1,4 @@
+[package]
+name = "zeta_transport"
+version = "0.1.0"
+edition = "2021"

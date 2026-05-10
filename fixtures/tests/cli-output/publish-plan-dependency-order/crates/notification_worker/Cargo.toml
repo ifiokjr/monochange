@@ -1,0 +1,8 @@
+[package]
+name = "notification_worker"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+telemetry_core = { path = "../telemetry_core", version = "0.1.0" }
+yaml_config = { path = "../yaml_config", version = "0.1.0" }

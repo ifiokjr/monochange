@@ -124,8 +124,28 @@ pub(super) fn sort_requests_by_dependencies(
 	use std::collections::BTreeSet;
 	use std::collections::VecDeque;
 
-	let edges = materialize_dependency_edges(packages);
+	let mut request_ids_by_record_id: BTreeMap<String, String> = BTreeMap::new();
 	let request_ids: BTreeSet<String> = requests.iter().map(|r| r.package_id.clone()).collect();
+	for package in packages {
+		if request_ids.contains(&package.id) {
+			request_ids_by_record_id.insert(package.id.clone(), package.id.clone());
+			continue;
+		}
+		if let Some(request) = requests
+			.iter()
+			.find(|request| request.package_name == package.name)
+		{
+			request_ids_by_record_id.insert(package.id.clone(), request.package_id.clone());
+		}
+	}
+	let edges = materialize_dependency_edges(packages)
+		.into_iter()
+		.filter_map(|mut edge| {
+			edge.from_package_id = request_ids_by_record_id.get(&edge.from_package_id)?.clone();
+			edge.to_package_id = request_ids_by_record_id.get(&edge.to_package_id)?.clone();
+			Some(edge)
+		})
+		.collect::<Vec<_>>();
 
 	// Build graph: dependency_id -> list of dependent_ids
 	let mut dependents: BTreeMap<String, Vec<String>> = BTreeMap::new();

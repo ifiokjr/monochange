@@ -1,0 +1,8 @@
+[package]
+name = "fulfillment_service"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+checkout_api = { path = "../checkout_api", version = "0.1.0" }
+notification_worker = { path = "../notification_worker", version = "0.1.0" }

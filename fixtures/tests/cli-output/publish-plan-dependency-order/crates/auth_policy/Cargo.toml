@@ -1,0 +1,8 @@
+[package]
+name = "auth_policy"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ledger_types = { path = "../ledger_types", version = "0.1.0" }
+yaml_config = { path = "../yaml_config", version = "0.1.0" }

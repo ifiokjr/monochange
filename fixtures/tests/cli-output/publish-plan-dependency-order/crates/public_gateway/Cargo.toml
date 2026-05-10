@@ -1,0 +1,8 @@
+[package]
+name = "public_gateway"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+checkout_api = { path = "../checkout_api", version = "0.1.0" }
+auth_policy = { path = "../auth_policy", version = "0.1.0" }
