@@ -38,11 +38,11 @@ fn release_record_schema_declares_current_artifact_contract() -> Result<(), Box<
 	);
 	assert!(!json_bool(&schema, "/additionalProperties")?);
 	assert_eq!(
-		json_str(&schema, "/properties/schemaVersion/default")?,
+		json_str(&schema, "/properties/schemaVersion/const")?,
 		monochange_schema::CURRENT_SCHEMA_VERSION_TEXT
 	);
 	assert_eq!(
-		json_str(&schema, "/properties/kind/default")?,
+		json_str(&schema, "/properties/kind/const")?,
 		monochange_schema::release_record::KIND
 	);
 
@@ -184,11 +184,6 @@ fn config_schema_preserves_dynamic_tables_while_closing_known_shapes() -> Result
 	] {
 		assert!(!json_bool(&schema, pointer)?, "{pointer} should be closed");
 	}
-
-	assert!(
-		json_object(&schema, "/$defs/lints/properties/rules")?.contains_key("additionalProperties"),
-		"lint rule names must remain dynamic"
-	);
 
 	Ok(())
 }

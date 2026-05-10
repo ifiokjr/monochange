@@ -1,24 +1,139 @@
 use std::fs;
 use std::path::PathBuf;
 
-fn post_process(schema: &mut serde_json::Value, id: &str, title: &str) {
+fn post_process(schema: &mut serde_json::Value, id: &str, title: &str, description: &str) {
 	if let Some(obj) = schema.as_object_mut() {
 		obj.insert("$id".to_string(), serde_json::Value::String(id.to_string()));
 		obj.insert(
 			"title".to_string(),
 			serde_json::Value::String(title.to_string()),
 		);
+		obj.insert(
+			"description".to_string(),
+			serde_json::Value::String(description.to_string()),
+		);
 	}
 }
 
 fn post_process_release(schema: &mut serde_json::Value, id: &str, title: &str) {
-	post_process(schema, id, title);
+	post_process(
+		schema,
+		id,
+		title,
+		"Durable commit-embedded release record schema for monochange artifact version 0.1.",
+	);
 	if let Some(obj) = schema.as_object_mut() {
 		obj.insert(
 			"additionalProperties".to_string(),
 			serde_json::Value::Bool(false),
 		);
-		obj.insert("description".to_string(), serde_json::Value::String("Durable commit-embedded release record schema for monochange artifact version 0.1.".to_string()));
+		// Override schemaVersion and kind to use const (single allowed value)
+		if let Some(props) = schema
+			.pointer_mut("/properties")
+			.and_then(|v| v.as_object_mut())
+		{
+			if let Some(sv) = props.get_mut("schemaVersion") {
+				if let Some(sv_obj) = sv.as_object_mut() {
+					sv_obj.remove("default");
+					sv_obj.insert(
+						"const".to_string(),
+						serde_json::Value::String("0.1".to_string()),
+					);
+				}
+			}
+			if let Some(kind) = props.get_mut("kind") {
+				if let Some(kind_obj) = kind.as_object_mut() {
+					kind_obj.remove("default");
+					kind_obj.insert(
+						"const".to_string(),
+						serde_json::Value::String("monochange.releaseRecord".to_string()),
+					);
+				}
+			}
+		}
+	}
+}
+
+fn post_process_config(schema: &mut serde_json::Value, id: &str, title: &str) {
+	post_process(
+		schema,
+		id,
+		title,
+		"JSON Schema for monochange.toml workspace configuration files.",
+	);
+	// Rename $defs from Raw* to camelCase equivalents, update $refs, add additionalProperties: false
+	let replacements: std::collections::HashMap<String, String> = [
+		(
+			"RawPackageDefinition".to_string(),
+			"packageDefinition".to_string(),
+		),
+		(
+			"RawGroupDefinition".to_string(),
+			"groupDefinition".to_string(),
+		),
+		(
+			"RawCliCommandDefinition".to_string(),
+			"cliCommand".to_string(),
+		),
+		(
+			"RawEcosystemSettings".to_string(),
+			"ecosystemSettings".to_string(),
+		),
+		("RawSourceConfiguration".to_string(), "source".to_string()),
+		("RawWorkspaceDefaults".to_string(), "defaults".to_string()),
+	]
+	.into_iter()
+	.collect();
+
+	// Walk the tree and rename $refs
+	fn rename_refs(value: &mut serde_json::Value, map: &std::collections::HashMap<String, String>) {
+		match value {
+			serde_json::Value::Object(obj) => {
+				for (k, v) in obj.iter_mut() {
+					if k == "$ref" {
+						if let serde_json::Value::String(s) = v {
+							for (old, new) in map {
+								*s =
+									s.replace(&format!("#/$defs/{old}"), &format!("#/$defs/{new}"));
+							}
+						}
+					} else {
+						rename_refs(v, map);
+					}
+				}
+			}
+			serde_json::Value::Array(arr) => {
+				for v in arr.iter_mut() {
+					rename_refs(v, map);
+				}
+			}
+			_ => {}
+		}
+	}
+	rename_refs(schema, &replacements);
+
+	// Rename $defs keys and add additionalProperties: false
+	if let Some(defs) = schema.pointer_mut("/$defs").and_then(|v| v.as_object_mut()) {
+		let keys_to_rename: Vec<(String, String, serde_json::Value)> = defs
+			.iter_mut()
+			.filter_map(|(k, v)| {
+				replacements.get(k).map(|new| {
+					if let Some(obj) = v.as_object_mut() {
+						if obj.contains_key("properties") {
+							obj.insert(
+								"additionalProperties".to_string(),
+								serde_json::Value::Bool(false),
+							);
+						}
+					}
+					(k.clone(), new.clone(), v.clone())
+				})
+			})
+			.collect();
+		for (old, new, value) in keys_to_rename {
+			defs.remove(&old);
+			defs.insert(new, value);
+		}
 	}
 }
 
@@ -42,7 +157,7 @@ fn main() {
 	// Config schema from raw TOML types
 	let config_schema = schemars::schema_for!(monochange_config::RawWorkspaceConfiguration);
 	let mut config_value = config_schema.to_value();
-	post_process(
+	post_process_config(
 		&mut config_value,
 		"https://monochange.github.io/monochange/schemas/monochange.schema.json",
 		"monochange configuration",
@@ -54,14 +169,14 @@ fn main() {
 	// Versioned schemas (identical content, different $id)
 	let mut release_versioned_value = release_value.clone();
 	let mut config_versioned_value = config_value.clone();
-	post_process(
+	post_process_release(
 		&mut release_versioned_value,
 		&format!(
 			"https://monochange.github.io/monochange/schemas/release-record.v{version}.schema.json"
 		),
 		"monochange release record",
 	);
-	post_process(
+	post_process_config(
 		&mut config_versioned_value,
 		&format!(
 			"https://monochange.github.io/monochange/schemas/monochange.v{version}.schema.json"
