@@ -41,6 +41,7 @@ regex = { version = "1", default-features = false, features = ["std", "unicode-p
 reqwest = { version = "0.13", default-features = false, features = ["blocking", "json", "rustls"] }
 rmcp = { version = "1", default-features = false }
 rstest = { version = "0.26.1", default-features = false }
+schemars = { version = "1.2", default-features = false, features = ["derive", "std"] }
 semver = { version = "1", default-features = false, features = ["serde"] }
 serde = { version = "1", default-features = false, features = ["derive"] }
 serde_json = { version = "1", default-features = false }

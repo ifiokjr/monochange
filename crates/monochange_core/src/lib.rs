@@ -146,6 +146,7 @@ impl MonochangeError {
 	}
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -225,6 +226,7 @@ impl fmt::Display for BumpSeverity {
 	}
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -545,6 +547,7 @@ pub struct DependencyEdge {
 	pub is_direct: bool,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -574,6 +577,7 @@ impl PackageType {
 	}
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -583,6 +587,7 @@ pub enum VersionFormat {
 	Primary,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -1072,6 +1077,7 @@ fn json_span_is_object(contents: &str, span: JsonSpan) -> bool {
 		&& contents.as_bytes().get(span.end - 1) == Some(&b'}')
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct VersionedFileDefinition {
 	pub path: String,
@@ -1095,6 +1101,7 @@ impl VersionedFileDefinition {
 	}
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ChangelogDefinition {
 	Disabled,
@@ -1102,6 +1109,7 @@ pub enum ChangelogDefinition {
 	PathPattern(String),
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -1111,6 +1119,7 @@ pub enum ChangelogFormat {
 	KeepAChangelog,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ChangelogTarget {
 	pub path: PathBuf,
@@ -1120,6 +1129,7 @@ pub struct ChangelogTarget {
 	pub initial_header: Option<String>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ReleaseNotesSection {
 	pub title: String,
@@ -1128,6 +1138,7 @@ pub struct ReleaseNotesSection {
 	pub entries: Vec<String>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ReleaseNotesDocument {
 	pub title: String,
@@ -1135,6 +1146,7 @@ pub struct ReleaseNotesDocument {
 	pub sections: Vec<ReleaseNotesSection>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ChangelogSectionDef {
 	/// Display heading for the section in rendered changelogs.
@@ -1151,6 +1163,7 @@ fn default_changelog_section_priority() -> i8 {
 	100
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ChangelogSectionThresholds {
 	/// Collapse sections whose priority is greater than or equal to this value.
@@ -1178,6 +1191,7 @@ impl Default for ChangelogSectionThresholds {
 	}
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ChangelogType {
 	/// Semver bump severity implied by this changeset type.
@@ -1195,6 +1209,7 @@ fn default_changelog_type_bump() -> BumpSeverity {
 }
 
 /// Top-level `[changelog]` configuration combining templates, sections, and types.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ChangelogSettings {
 	#[serde(default)]
@@ -1435,6 +1450,7 @@ impl ChangelogSettings {
 	}
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -1461,6 +1477,7 @@ impl fmt::Display for PublishMode {
 	}
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -1494,6 +1511,7 @@ impl fmt::Display for RegistryKind {
 	}
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PublishRegistry {
@@ -1501,6 +1519,7 @@ pub enum PublishRegistry {
 	Custom(String),
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub struct PlaceholderSettings {
 	#[serde(default)]
@@ -1509,12 +1528,14 @@ pub struct PlaceholderSettings {
 	pub readme_file: Option<PathBuf>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub struct PublishRateLimitSettings {
 	#[serde(default)]
 	pub enforce: bool,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TrustedPublishingSettings {
 	#[serde(default = "default_true")]
@@ -1527,6 +1548,7 @@ pub struct TrustedPublishingSettings {
 	pub environment: Option<String>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub struct PublishAttestationSettings {
 	#[serde(default)]
@@ -1540,6 +1562,7 @@ impl PublishAttestationSettings {
 	}
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub struct ReleaseAttestationSettings {
 	#[serde(default)]
@@ -1565,6 +1588,7 @@ impl Default for TrustedPublishingSettings {
 }
 
 #[allow(clippy::struct_excessive_bools)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PublishSettings {
 	#[serde(default = "default_true")]
@@ -1600,6 +1624,7 @@ impl Default for PublishSettings {
 	}
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PackageDefinition {
 	pub id: String,
@@ -1626,6 +1651,7 @@ pub struct PackageDefinition {
 	pub publish: PublishSettings,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub enum GroupChangelogInclude {
 	#[default]
@@ -1634,6 +1660,7 @@ pub enum GroupChangelogInclude {
 	Selected(BTreeSet<String>),
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct GroupDefinition {
 	pub id: String,
@@ -1653,6 +1680,7 @@ pub struct GroupDefinition {
 	pub version_format: VersionFormat,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct WorkspaceDefaults {
 	pub parent_bump: BumpSeverity,
@@ -1684,6 +1712,7 @@ impl Default for WorkspaceDefaults {
 	}
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub struct EcosystemSettings {
 	#[serde(default)]
@@ -1702,6 +1731,7 @@ pub struct EcosystemSettings {
 	pub publish: PublishSettings,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct LockfileCommandDefinition {
 	pub command: String,
@@ -1718,6 +1748,7 @@ pub struct LockfileCommandExecution {
 	pub shell: ShellConfig,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CliInputKind {
@@ -1728,6 +1759,7 @@ pub enum CliInputKind {
 	Boolean,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CliInputDefinition {
 	pub name: String,
@@ -1765,6 +1797,7 @@ where
 	}))
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum CliStepInputValue {
@@ -1772,6 +1805,7 @@ pub enum CliStepInputValue {
 	Boolean(bool),
 	List(Vec<String>),
 }
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CommandVariable {
@@ -1783,6 +1817,7 @@ pub enum CommandVariable {
 }
 
 /// Shell configuration for `Command` steps.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub enum ShellConfig {
 	#[default]
@@ -1862,6 +1897,7 @@ impl<'de> Deserialize<'de> for ShellConfig {
 /// release state.
 ///
 /// See the CLI step reference in the book for full workflow guidance.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", deny_unknown_fields)]
 #[non_exhaustive]
@@ -2513,6 +2549,7 @@ impl CliStepDefinition {
 	}
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub struct CliCommandDefinition {
 	pub name: String,
@@ -2618,6 +2655,7 @@ fn push_release_note_entries(lines: &mut Vec<String>, entries: &[String]) {
 	}
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReleaseOwnerKind {
@@ -2659,6 +2697,7 @@ pub struct ReleaseManifestTarget {
 	pub rendered_changelog_title: String,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseManifestChangelog {
@@ -2670,6 +2709,7 @@ pub struct ReleaseManifestChangelog {
 	pub rendered: String,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PackagePublicationTarget {
@@ -2787,6 +2827,7 @@ pub struct PublishRateLimitReport {
 	pub warnings: Vec<String>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum HostingProviderKind {
@@ -2827,6 +2868,7 @@ impl fmt::Display for HostingProviderKind {
 }
 
 #[allow(clippy::struct_excessive_bools)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct HostingCapabilities {
@@ -2837,6 +2879,7 @@ pub struct HostingCapabilities {
 	pub issue_comments: bool,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum HostedActorSourceKind {
@@ -2846,6 +2889,7 @@ pub enum HostedActorSourceKind {
 	ReviewRequestAuthor,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct HostedActorRef {
@@ -2863,6 +2907,7 @@ pub struct HostedActorRef {
 	pub source: HostedActorSourceKind,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct HostedCommitRef {
@@ -2883,6 +2928,7 @@ pub struct HostedCommitRef {
 	pub author_email: Option<String>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum HostedReviewRequestKind {
@@ -2908,6 +2954,7 @@ impl fmt::Display for HostedReviewRequestKind {
 	}
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct HostedReviewRequestRef {
@@ -2924,6 +2971,7 @@ pub struct HostedReviewRequestRef {
 	pub author: Option<HostedActorRef>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum HostedIssueRelationshipKind {
@@ -2953,6 +3001,7 @@ impl fmt::Display for HostedIssueRelationshipKind {
 	}
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct HostedIssueRef {
@@ -2967,6 +3016,7 @@ pub struct HostedIssueRef {
 	pub relationship: HostedIssueRelationshipKind,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ChangesetRevision {
@@ -2978,6 +3028,7 @@ pub struct ChangesetRevision {
 	pub review_request: Option<HostedReviewRequestRef>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ChangesetContext {
@@ -2994,6 +3045,7 @@ pub struct ChangesetContext {
 	pub related_issues: Vec<HostedIssueRef>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ChangesetTargetKind {
@@ -3018,6 +3070,7 @@ impl fmt::Display for ChangesetTargetKind {
 	}
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreparedChangesetTarget {
@@ -3034,6 +3087,7 @@ pub struct PreparedChangesetTarget {
 	pub caused_by: Vec<String>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreparedChangeset {
@@ -3176,6 +3230,7 @@ fn normalize_legacy_schema_version(raw: &mut serde_json::Value) {
 	}
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseRecordTarget {
@@ -3190,6 +3245,7 @@ pub struct ReleaseRecordTarget {
 	pub members: Vec<String>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseRecordProvider {
@@ -3200,6 +3256,7 @@ pub struct ReleaseRecordProvider {
 	pub host: Option<String>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseRecord {
@@ -3230,6 +3287,7 @@ pub struct ReleaseRecord {
 	pub provider: Option<ReleaseRecordProvider>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseRecordDiscovery {
@@ -3240,6 +3298,7 @@ pub struct ReleaseRecordDiscovery {
 	pub record: ReleaseRecord,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RetargetOperation {
@@ -3250,6 +3309,7 @@ pub enum RetargetOperation {
 	Failed,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RetargetTagResult {
@@ -3498,6 +3558,7 @@ fn extract_release_record_json(block_contents: &str) -> ReleaseRecordResult<Stri
 	Ok(json)
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ProviderReleaseNotesSource {
@@ -3508,6 +3569,7 @@ pub enum ProviderReleaseNotesSource {
 }
 
 #[allow(clippy::struct_excessive_bools)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ProviderReleaseSettings {
 	#[serde(default = "default_true")]
@@ -3553,6 +3615,7 @@ impl Default for ProviderReleaseSettings {
 }
 
 #[allow(clippy::struct_excessive_bools)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ProviderMergeRequestSettings {
 	#[serde(default = "default_true")]
@@ -3586,6 +3649,7 @@ impl Default for ProviderMergeRequestSettings {
 }
 
 #[allow(clippy::struct_excessive_bools)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ChangesetAffectedSettings {
 	#[serde(default = "default_true")]
@@ -3615,6 +3679,7 @@ impl Default for ChangesetAffectedSettings {
 	}
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub struct ChangesetSettings {
 	#[serde(default)]
@@ -3685,6 +3750,7 @@ pub struct ChangesetPolicyEvaluation {
 	pub errors: Vec<String>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub enum SourceProvider {
 	#[default]
@@ -3728,6 +3794,7 @@ pub struct SourceCapabilities {
 	pub requires_host: bool,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SourceConfiguration {
 	#[serde(default)]
@@ -3956,6 +4023,7 @@ pub struct EffectiveReleaseIdentity {
 	pub members: Vec<String>,
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct WorkspaceConfiguration {
 	pub root_path: PathBuf,
@@ -3966,6 +4034,7 @@ pub struct WorkspaceConfiguration {
 	pub cli: Vec<CliCommandDefinition>,
 	pub changesets: ChangesetSettings,
 	pub source: Option<SourceConfiguration>,
+	#[cfg_attr(feature = "schema", schemars(skip))]
 	pub lints: lint::WorkspaceLintSettings,
 	pub cargo: EcosystemSettings,
 	pub npm: EcosystemSettings,
@@ -4359,6 +4428,14 @@ pub fn materialize_dependency_edges(packages: &[PackageRecord]) -> Vec<Dependenc
 #[cfg(test)]
 #[path = "__tests__/proptest_bump_severity_tests.rs"]
 mod proptest_bump_severity;
+
+#[cfg(feature = "schema")]
+pub mod schema {
+	/// Generate the JSON Schema for the monochange release record.
+	pub fn release_record() -> schemars::Schema {
+		schemars::schema_for!(super::ReleaseRecord)
+	}
+}
 
 #[cfg(test)]
 #[path = "__tests__/lib_tests.rs"]
