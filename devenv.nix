@@ -106,20 +106,7 @@ in
     "npm" = {
       exec = ''
         set -euo pipefail
-
-        profile_bin="$DEVENV_PROFILE/bin"
-        old_path="$PATH"
-        PATH="$(printf '%s' "$PATH" | awk -v profile_bin="$profile_bin" '
-          BEGIN { RS = ":"; ORS = "" }
-          $0 != profile_bin {
-            if (seen++) printf ":"
-            printf "%s", $0
-          }
-        ')"
-        real_npm="$(command -v npm)"
-        PATH="$old_path"
-
-        "$DEVENV_PROFILE/bin/strip:env" "$real_npm" "$@"
+        pnpm npm "$@"
       '';
       description = "a wrapper for the npm executable";
       binary = "bash";
