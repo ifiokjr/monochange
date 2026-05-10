@@ -1,9 +1,10 @@
 ---
 monochange_core: patch
 monochange_schema: patch
+monochange_config: patch
 ---
 
-#### allow boolean and numeric literals in `CliInputDefinition.default`
+# allow boolean and numeric literals in `CliInputDefinition.default`
 
 The JSON schema for `monochange.toml` `[cli.*.inputs]` previously rejected boolean and numeric defaults, even though the Rust deserializer already accepted them correctly.
 

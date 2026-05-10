@@ -276,6 +276,50 @@ fn load_workspace_configuration_supports_boolean_input_default_values() {
 }
 
 #[test]
+fn load_workspace_configuration_supports_numeric_input_default_values() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	std::fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[cli.deploy]
+
+[[cli.deploy.inputs]]
+name = "port"
+type = "string"
+default = 8080
+
+[[cli.deploy.inputs]]
+name = "timeout"
+type = "string"
+default = 3.5
+
+[[cli.deploy.steps]]
+type = "Validate"
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let command = configuration
+		.cli
+		.iter()
+		.find(|command| command.name == "deploy")
+		.unwrap_or_else(|| panic!("expected deploy command"));
+	let port = command
+		.inputs
+		.iter()
+		.find(|input| input.name == "port")
+		.unwrap_or_else(|| panic!("missing port input"));
+	let timeout = command
+		.inputs
+		.iter()
+		.find(|input| input.name == "timeout")
+		.unwrap_or_else(|| panic!("missing timeout input"));
+	assert_eq!(port.default.as_deref(), Some("8080"));
+	assert_eq!(timeout.default.as_deref(), Some("3.5"));
+}
+
+#[test]
 fn load_workspace_configuration_parses_package_group_and_cli_command_declarations() {
 	let root = fixture_path("config/package-group-and-cli");
 	let configuration = load_workspace_configuration(&root)
