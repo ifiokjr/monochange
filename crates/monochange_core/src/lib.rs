@@ -1770,6 +1770,7 @@ pub struct CliInputDefinition {
 	#[serde(default)]
 	pub required: bool,
 	#[serde(default, deserialize_with = "deserialize_cli_input_default")]
+	#[cfg_attr(feature = "schema", schemars(with = "Option<CliInputDefault>"))]
 	pub default: Option<String>,
 	#[serde(default)]
 	pub choices: Vec<String>,
@@ -1777,11 +1778,14 @@ pub struct CliInputDefinition {
 	pub short: Option<char>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
-enum CliInputDefault {
+pub enum CliInputDefault {
 	String(String),
 	Boolean(bool),
+	Integer(i64),
+	Number(f64),
 }
 
 fn deserialize_cli_input_default<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
@@ -1793,6 +1797,8 @@ where
 		match value {
 			CliInputDefault::String(value) => value,
 			CliInputDefault::Boolean(value) => value.to_string(),
+			CliInputDefault::Integer(value) => value.to_string(),
+			CliInputDefault::Number(value) => value.to_string(),
 		}
 	}))
 }
