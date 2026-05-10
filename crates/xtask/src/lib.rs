@@ -188,7 +188,27 @@ fn check_schemas(paths: &[(&PathBuf, &str)]) -> Result<(), String> {
 	for (path, expected) in paths {
 		if path.exists() {
 			let existing = fs::read_to_string(path).unwrap();
-			if existing != *expected {
+			let existing_value: serde_json::Value = match serde_json::from_str(&existing) {
+				Ok(v) => v,
+				Err(_) => {
+					errors.push(format!(
+						"Schema mismatch (invalid JSON): {}",
+						path.display()
+					));
+					continue;
+				}
+			};
+			let expected_value: serde_json::Value = match serde_json::from_str(expected) {
+				Ok(v) => v,
+				Err(_) => {
+					errors.push(format!(
+						"Generated schema contains invalid JSON for {}",
+						path.display()
+					));
+					continue;
+				}
+			};
+			if existing_value != expected_value {
 				errors.push(format!("Schema mismatch: {}", path.display()));
 			}
 		} else {

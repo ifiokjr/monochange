@@ -205,12 +205,35 @@ fn run_cli_round_trip() {
 #[test]
 fn check_schemas_mismatch() {
 	let temp_path = PathBuf::from("/tmp/test-schema-mismatch.json");
-	fs::write(&temp_path, "wrong content").unwrap();
-	let paths = [(&temp_path, "expected content")];
+	fs::write(&temp_path, r#"{"a": 1}"#).unwrap();
+	let paths = [(&temp_path, r#"{"a": 2}"#)];
 	let result = check_schemas(&paths);
 	fs::remove_file(&temp_path).unwrap();
 	assert!(result.is_err());
 	assert!(result.unwrap_err().contains("mismatch"));
+}
+
+#[test]
+fn check_schemas_invalid_json() {
+	let temp_path = PathBuf::from("/tmp/test-schema-invalid.json");
+	fs::write(&temp_path, "not json").unwrap();
+	let paths = [(&temp_path, r#"{}"#)];
+	let result = check_schemas(&paths);
+	fs::remove_file(&temp_path).unwrap();
+	assert!(result.is_err());
+	let msg = result.unwrap_err();
+	assert!(msg.contains("mismatch"));
+	assert!(msg.contains("invalid JSON"));
+}
+
+#[test]
+fn check_schemas_formatting_difference_ok() {
+	let temp_path = PathBuf::from("/tmp/test-schema-formatting.json");
+	fs::write(&temp_path, "{\"a\":1}").unwrap();
+	let paths = [(&temp_path, r#"{"a": 1}"#)];
+	let result = check_schemas(&paths);
+	fs::remove_file(&temp_path).unwrap();
+	assert!(result.is_ok());
 }
 
 #[test]
@@ -221,4 +244,17 @@ fn check_schemas_missing() {
 	let result = check_schemas(&paths);
 	assert!(result.is_err());
 	assert!(result.unwrap_err().contains("missing"));
+}
+
+#[test]
+fn check_schemas_expected_invalid_json() {
+	let temp_path = PathBuf::from("/tmp/test-schema-expected-invalid.json");
+	fs::write(&temp_path, r#"{"a": 1}"#).unwrap();
+	let paths = [(&temp_path, "not json")];
+	let result = check_schemas(&paths);
+	fs::remove_file(&temp_path).unwrap();
+	assert!(result.is_err());
+	let msg = result.unwrap_err();
+	assert!(msg.contains("invalid JSON"));
+	assert!(msg.contains("Generated"));
 }
