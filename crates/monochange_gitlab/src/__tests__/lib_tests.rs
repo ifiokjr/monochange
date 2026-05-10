@@ -1,5 +1,4 @@
 use std::path::PathBuf;
-use std::thread;
 
 use httpmock::Method::GET;
 use httpmock::Method::PATCH;
@@ -16,7 +15,6 @@ use monochange_core::HostedActorSourceKind;
 use monochange_core::HostedCommitRef;
 use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
-use monochange_core::MonochangeResult;
 use monochange_core::PreparedChangeset;
 use monochange_core::ProviderMergeRequestSettings;
 use monochange_core::ProviderReleaseNotesSource;

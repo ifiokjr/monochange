@@ -328,7 +328,7 @@ async fn git_status_snapshot(root: &Path, excluded_path: Option<&Path>) -> Monoc
 			let Some(excluded) = &excluded else {
 				return true;
 			};
-			tokio::runtime::Handle::current().block_on(status_line_path(line)).is_none_or(|path| path != *excluded)
+			status_line_path(line).is_none_or(|path| path != *excluded)
 		})
 		.collect::<Vec<_>>();
 	lines.sort();
@@ -336,7 +336,7 @@ async fn git_status_snapshot(root: &Path, excluded_path: Option<&Path>) -> Monoc
 }
 
 #[allow(clippy::unused_async)]
-async fn status_line_path(line: &str) -> Option<PathBuf> {
+fn status_line_path(line: &str) -> Option<PathBuf> {
 	if line.len() < 4 {
 		return None;
 	}
@@ -361,7 +361,7 @@ async fn tracked_path_snapshots(
 				Ok(PreparedReleaseTrackedPath {
 					path,
 					state: PreparedReleaseTrackedPathState::File,
-					hash: Some(tokio::runtime::Handle::current().block_on(hash_file_at_path(root, &absolute_path))?),
+					hash: Some(crate::cli_runtime::block_on_in_context(hash_file_at_path(root, &absolute_path))?),
 				})
 			} else {
 				Ok(PreparedReleaseTrackedPath {

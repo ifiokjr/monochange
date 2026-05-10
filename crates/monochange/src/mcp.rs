@@ -629,7 +629,7 @@ impl MonochangeMcpServer {
 		let root = resolve_root(params.path.as_deref());
 
 		let evaluation =
-			match tokio::runtime::Handle::current().block_on(crate::affected_packages(&root,
+			match crate::cli_runtime::block_on_in_context(crate::affected_packages(&root,
 				&params.changed_paths,
 				&params.labels,
 			)) {
