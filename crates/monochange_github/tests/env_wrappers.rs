@@ -36,7 +36,7 @@ fn publish_release_requests_reads_github_env_configuration() {
 
 	with_github_env(&server.base_url(), || {
 		let github = sample_github_source();
-		let outcomes = publish_release_requests(
+		let outcomes = tokio::runtime::Runtime::new().unwrap().block_on(publish_release_requests(
 			&github,
 			&[GitHubReleaseRequest {
 				provider: SourceProvider::GitHub,
@@ -52,7 +52,7 @@ fn publish_release_requests_reads_github_env_configuration() {
 				prerelease: false,
 				generate_release_notes: false,
 			}],
-		)
+		))
 		.unwrap_or_else(|error| panic!("publish releases: {error}"));
 		let outcome = outcomes
 			.first()
@@ -114,7 +114,7 @@ fn publish_release_pull_request_uses_git_and_github_env_configuration() {
 
 	with_github_env(&server.base_url(), || {
 		let github = sample_github_source();
-		let outcome = publish_release_pull_request(
+		let outcome = tokio::runtime::Runtime::new().unwrap().block_on(publish_release_pull_request(
 			&github,
 			&repo,
 			&GitHubPullRequestRequest {
@@ -135,7 +135,7 @@ fn publish_release_pull_request_uses_git_and_github_env_configuration() {
 			},
 			&[PathBuf::from("release.txt")],
 			false,
-		)
+		))
 		.unwrap_or_else(|error| panic!("publish release pull request: {error}"));
 		assert_eq!(outcome.operation, GitHubPullRequestOperation::Created);
 	});

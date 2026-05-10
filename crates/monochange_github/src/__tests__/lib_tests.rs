@@ -1649,13 +1649,13 @@ fn publish_release_pull_request_falls_back_when_verified_commit_is_unavailable()
 			("GITHUB_REPOSITORY", Some("ifiokjr/monochange")),
 		],
 		|| {
-			publish_release_pull_request(
+			tokio::runtime::Runtime::new().unwrap().block_on(publish_release_pull_request(
 				&source,
 				&repo,
 				&request,
 				&[PathBuf::from("release.txt")],
 				false,
-			)
+			))
 			.unwrap_or_else(|error| panic!("publish pull request: {error}"))
 		},
 	);
@@ -1967,13 +1967,13 @@ fn publish_release_pull_request_skips_push_when_existing_pull_request_matches_lo
 	);
 
 	let outcome = with_github_env(Some("token"), || {
-		publish_release_pull_request(
+		tokio::runtime::Runtime::new().unwrap().block_on(publish_release_pull_request(
 			&source,
 			&repo,
 			&request,
 			&[PathBuf::from("release.txt")],
 			false,
-		)
+		))
 		.unwrap_or_else(|error| panic!("publish pull request: {error}"))
 	});
 
@@ -2011,18 +2011,18 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 	);
 
 	must_ok(
-		git_checkout_branch(&repo, "monochange/release/release"),
+		tokio::runtime::Runtime::new().unwrap().block_on(git_checkout_branch(&repo, "monochange/release/release")),
 		"checkout branch",
 	);
 	must_ok(
-		git_checkout_branch(&repo, "monochange/release/release"),
+		tokio::runtime::Runtime::new().unwrap().block_on(git_checkout_branch(&repo, "monochange/release/release")),
 		"repeat checkout branch",
 	);
 	must_ok(
-		git_stage_paths(&repo, &[PathBuf::from("release.txt")]),
+		tokio::runtime::Runtime::new().unwrap().block_on(git_stage_paths(&repo, &[PathBuf::from("release.txt")])),
 		"stage paths",
 	);
-	git_commit_paths(
+	tokio::runtime::Runtime::new().unwrap().block_on(git_commit_paths(
 		&repo,
 		&CommitMessage {
 			subject: "chore(release): prepare release".to_string(),
@@ -2031,9 +2031,9 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 			),
 		},
 		false,
-	)
+	))
 		.unwrap_or_else(|error| panic!("commit paths: {error}"));
-	git_push_branch(&repo, "monochange/release/release", false)
+	tokio::runtime::Runtime::new().unwrap().block_on(git_push_branch(&repo, "monochange/release/release", false))
 		.unwrap_or_else(|error| panic!("push branch: {error}"));
 
 	let branch = git_output(
@@ -2074,13 +2074,13 @@ fn git_stage_paths_skips_missing_untracked_paths_and_ignored_untracked_files() {
 	);
 
 	must_ok(
-		git_stage_paths(
+		tokio::runtime::Runtime::new().unwrap().block_on(git_stage_paths(
 			&repo,
 			&[
 				PathBuf::from(".monochange/local/release-manifest.json"),
 				PathBuf::from(".changeset/missing.md"),
 			],
-		),
+		)),
 		"stage paths",
 	);
 
@@ -2095,7 +2095,7 @@ fn git_path_is_tracked_reports_command_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path().join("missing");
 
-	let error = git_path_is_tracked(&root, Path::new("release.txt"))
+	let error = tokio::runtime::Runtime::new().unwrap().block_on(git_path_is_tracked(&root, Path::new("release.txt")))
 		.err()
 		.unwrap_or_else(|| panic!("expected tracked command failure"));
 	assert!(
@@ -2115,7 +2115,7 @@ fn git_path_is_tracked_reports_inspection_failures() {
 		"write release file",
 	);
 
-	let error = git_path_is_tracked(&repo, Path::new("release.txt"))
+	let error = tokio::runtime::Runtime::new().unwrap().block_on(git_path_is_tracked(&repo, Path::new("release.txt")))
 		.err()
 		.unwrap_or_else(|| panic!("expected tracked inspection failure"));
 	assert!(
@@ -2136,7 +2136,7 @@ fn git_path_is_ignored_reports_false_for_unignored_paths() {
 	);
 
 	assert!(
-		!git_path_is_ignored(&repo, Path::new("release.txt"))
+		!tokio::runtime::Runtime::new().unwrap().block_on(git_path_is_ignored(&repo, Path::new("release.txt")))
 			.unwrap_or_else(|error| panic!("git path ignored: {error}"))
 	);
 }
@@ -2151,7 +2151,7 @@ fn git_path_is_ignored_reports_inspection_failures() {
 		"write release file",
 	);
 
-	let error = git_path_is_ignored(&repo, Path::new("release.txt"))
+	let error = tokio::runtime::Runtime::new().unwrap().block_on(git_path_is_ignored(&repo, Path::new("release.txt")))
 		.err()
 		.unwrap_or_else(|| panic!("expected ignored inspection failure"));
 	assert!(
@@ -2166,7 +2166,7 @@ fn git_path_is_ignored_reports_command_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path().join("missing");
 
-	let error = git_path_is_ignored(&root, Path::new("release.txt"))
+	let error = tokio::runtime::Runtime::new().unwrap().block_on(git_path_is_ignored(&root, Path::new("release.txt")))
 		.err()
 		.unwrap_or_else(|| panic!("expected ignored command failure"));
 	assert!(
@@ -2180,14 +2180,14 @@ fn git_path_is_ignored_reports_command_failures() {
 fn git_commit_paths_reports_io_and_non_noop_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let missing = tempdir.path().join("missing");
-	let io_error = git_commit_paths(
+	let io_error = tokio::runtime::Runtime::new().unwrap().block_on(git_commit_paths(
 		&missing,
 		&CommitMessage {
 			subject: "chore(release): prepare release".to_string(),
 			body: None,
 		},
 		false,
-	)
+	))
 	.err()
 	.unwrap_or_else(|| panic!("expected missing worktree error"));
 	assert!(
@@ -2212,14 +2212,14 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 	fs::write(repo.join("release.txt"), "initial\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 	git(&repo, &["add", "release.txt"]);
-	let error = git_commit_paths(
+	let error = tokio::runtime::Runtime::new().unwrap().block_on(git_commit_paths(
 		&repo,
 		&CommitMessage {
 			subject: "chore(release): prepare release".to_string(),
 			body: None,
 		},
 		false,
-	)
+	))
 	.err()
 	.unwrap_or_else(|| panic!("expected pre-commit hook failure"));
 	assert!(
@@ -2242,14 +2242,14 @@ fn git_commit_paths_treats_clean_worktrees_as_already_committed() {
 	git(&repo, &["add", "release.txt"]);
 	git(&repo, &["commit", "-m", "initial"]);
 
-	git_commit_paths(
+	tokio::runtime::Runtime::new().unwrap().block_on(git_commit_paths(
 		&repo,
 		&CommitMessage {
 			subject: "chore(release): prepare release".to_string(),
 			body: None,
 		},
 		false,
-	)
+	))
 	.unwrap_or_else(|error| panic!("commit paths: {error}"));
 
 	assert_eq!(
