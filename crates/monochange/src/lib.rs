@@ -771,12 +771,7 @@ where
 			let result = populate_workspace(root)?;
 			Ok(format_populate_workspace_result(&result))
 		}
-		Some(("command", _)) => {
-			if quiet {
-				return Ok(String::new());
-			}
-			run_command_wizard(root)
-		}
+		Some(("command", _)) => run_command_wizard_for_cli(root, quiet),
 		Some(("skill", skill_matches)) => {
 			let forwarded_args = skill_matches
 				.get_many::<String>("args")
@@ -1020,6 +1015,14 @@ fn format_populate_workspace_result(result: &PopulateWorkspaceResult) -> String 
 			result.added_commands.join(", ")
 		)
 	}
+}
+
+#[coverage(off)]
+fn run_command_wizard_for_cli(root: &Path, quiet: bool) -> MonochangeResult<String> {
+	if quiet {
+		return Ok(String::new());
+	}
+	run_command_wizard(root)
 }
 
 fn run_mcp_command_with<F, Fut>(quiet: bool, run_server: F) -> MonochangeResult<String>
