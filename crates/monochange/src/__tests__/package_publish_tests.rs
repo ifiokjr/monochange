@@ -1986,7 +1986,7 @@ fn build_release_requests_detects_publish_relevant_dependency_cycles() {
 }
 
 #[test]
-fn build_release_requests_ignores_development_dependency_cycles() {
+fn build_release_requests_reports_development_dependency_cycles() {
 	let configuration = sample_configuration(&[
 		("core", monochange_core::PackageType::Npm, true),
 		("utils", monochange_core::PackageType::Npm, true),
@@ -2008,15 +2008,13 @@ fn build_release_requests_ignores_development_dependency_cycles() {
 		sample_npm_publication("core"),
 	];
 
-	let requests =
-		build_release_requests(&configuration, &packages, &publications, &BTreeSet::new())
-			.expect("development-only dependency cycles should not fail");
-	let ordered_package_ids = requests
-		.iter()
-		.map(|request| request.package_id.as_str())
-		.collect::<Vec<_>>();
+	let error = build_release_requests(&configuration, &packages, &publications, &BTreeSet::new())
+		.expect_err("development dependency cycles should fail");
+	let message = error.to_string();
 
-	assert_eq!(ordered_package_ids, vec!["core", "utils"]);
+	assert!(message.contains("cyclic publish dependencies detected"));
+	assert!(message.contains("core -> utils"));
+	assert!(message.contains("utils -> core"));
 }
 
 #[test]
