@@ -16,6 +16,7 @@ use monochange_core::RegistryRateLimitPolicy;
 use monochange_core::RegistryRateLimitWindowPlan;
 use monochange_core::WorkspaceConfiguration;
 use monochange_core::materialize_dependency_edges;
+use monochange_publish::build_pending_configured_package_release_requests as build_pending_configured_requests;
 use monochange_publish::filter_pending_publish_requests;
 
 use crate::PreparedRelease;
@@ -60,10 +61,32 @@ pub(crate) fn plan_publish_rate_limits(
 	mode: PublishRateLimitMode,
 	dry_run: bool,
 ) -> MonochangeResult<PublishRateLimitReport> {
+	plan_publish_rate_limits_with_selection(
+		root,
+		configuration,
+		prepared_release,
+		selected_packages,
+		mode,
+		dry_run,
+		false,
+	)
+}
+
+pub(crate) fn plan_publish_rate_limits_with_selection(
+	root: &Path,
+	configuration: &WorkspaceConfiguration,
+	prepared_release: Option<&PreparedRelease>,
+	selected_packages: &BTreeSet<String>,
+	mode: PublishRateLimitMode,
+	dry_run: bool,
+	publish_all: bool,
+) -> MonochangeResult<PublishRateLimitReport> {
 	let discovery = discover_workspace(root)?;
 	let packages = &discovery.packages;
 	let requests = if mode == PublishRateLimitMode::Placeholder {
 		build_placeholder_plan_requests(root, configuration, packages, selected_packages)?
+	} else if publish_all {
+		build_pending_configured_requests(configuration, packages, selected_packages)?
 	} else {
 		build_release_plan_requests(
 			root,

@@ -1244,7 +1244,8 @@ fn valid_input_names_returns_expected_names_for_display_and_publish_steps() {
 				"package",
 				"group",
 				"ecosystem",
-				"resume"
+				"resume",
+				"all"
 			]
 			.as_slice()
 		)
@@ -1257,7 +1258,7 @@ fn valid_input_names_returns_expected_names_for_display_and_publish_steps() {
 		inputs: BTreeMap::new(),
 	};
 	let names = plan.valid_input_names().unwrap();
-	for expected in ["format", "mode", "package", "ci", "readiness"] {
+	for expected in ["format", "mode", "package", "ci", "readiness", "all"] {
 		assert!(names.contains(&expected), "missing: {expected}");
 	}
 }
@@ -1645,6 +1646,7 @@ fn expected_input_kind_returns_correct_types_for_display_and_publish_steps() {
 		plan.expected_input_kind("readiness"),
 		Some(CliInputKind::Path)
 	);
+	assert_eq!(plan.expected_input_kind("all"), Some(CliInputKind::Boolean));
 	assert_eq!(plan.expected_input_kind("unknown"), None);
 }
 

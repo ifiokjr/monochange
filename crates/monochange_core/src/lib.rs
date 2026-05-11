@@ -2326,10 +2326,11 @@ impl CliStepDefinition {
 					"group",
 					"ecosystem",
 					"resume",
+					"all",
 				])
 			}
 			Self::PlanPublishRateLimits { .. } => {
-				Some(&["format", "mode", "package", "ci", "readiness"])
+				Some(&["format", "mode", "package", "ci", "readiness", "all"])
 			}
 			Self::CreateChangeFile { .. } => {
 				Some(&[
@@ -2453,6 +2454,7 @@ impl CliStepDefinition {
 					"format" => Some(CliInputKind::Choice),
 					"package" => Some(CliInputKind::StringList),
 					"output" | "resume" => Some(CliInputKind::Path),
+					"all" => Some(CliInputKind::Boolean),
 					_ => None,
 				}
 			}
@@ -2460,6 +2462,7 @@ impl CliStepDefinition {
 				match name {
 					"package" => Some(CliInputKind::StringList),
 					"readiness" => Some(CliInputKind::Path),
+					"all" => Some(CliInputKind::Boolean),
 					"format" | "mode" | "ci" => Some(CliInputKind::Choice),
 					_ => None,
 				}

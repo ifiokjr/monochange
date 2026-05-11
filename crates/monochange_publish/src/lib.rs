@@ -774,6 +774,51 @@ pub fn build_placeholder_requests(
 	Ok(requests)
 }
 
+pub fn configured_package_publication_targets(
+	configuration: &WorkspaceConfiguration,
+	packages: &[PackageRecord],
+) -> Vec<PackagePublicationTarget> {
+	let packages_by_config_id = packages_by_config_id(packages);
+	configuration
+		.packages
+		.iter()
+		.filter_map(|package_definition| {
+			let package = packages_by_config_id
+				.get(package_definition.id.as_str())
+				.copied()?;
+			let version = package.current_version.as_ref()?.to_string();
+			Some(PackagePublicationTarget {
+				package: package_definition.id.clone(),
+				ecosystem: package.ecosystem,
+				registry: package_definition.publish.registry.clone(),
+				version,
+				mode: package_definition.publish.mode,
+				trusted_publishing: package_definition.publish.trusted_publishing.clone(),
+				attestations: package_definition.publish.attestations.clone(),
+			})
+		})
+		.collect()
+}
+
+pub fn build_configured_package_release_requests(
+	configuration: &WorkspaceConfiguration,
+	packages: &[PackageRecord],
+	selected_packages: &BTreeSet<String>,
+) -> MonochangeResult<Vec<PublishRequest>> {
+	let publications = configured_package_publication_targets(configuration, packages);
+	build_release_requests(configuration, packages, &publications, selected_packages)
+}
+
+pub fn build_pending_configured_package_release_requests(
+	configuration: &WorkspaceConfiguration,
+	packages: &[PackageRecord],
+	selected_packages: &BTreeSet<String>,
+) -> MonochangeResult<Vec<PublishRequest>> {
+	let requests =
+		build_configured_package_release_requests(configuration, packages, selected_packages)?;
+	filter_pending_publish_requests(&requests)
+}
+
 pub fn build_release_requests(
 	configuration: &WorkspaceConfiguration,
 	packages: &[PackageRecord],

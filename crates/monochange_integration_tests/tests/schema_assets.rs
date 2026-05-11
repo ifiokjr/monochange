@@ -143,13 +143,17 @@ fn config_schema_covers_current_root_toml_top_level_keys() -> Result<(), Box<dyn
 	assert!(!json_bool(&schema, "/additionalProperties")?);
 
 	for key in config_table.keys() {
-		// Schema generation skips lints because the lint type tree is complex
-		if key == "lints" {
-			continue;
-		}
 		assert!(
 			schema_properties.contains_key(key),
 			"config schema is missing root monochange.toml key `{key}`"
+		);
+	}
+
+	let lints_schema = json_object(&schema, "/properties/lints")?;
+	for keyword in ["additionalProperties", "properties", "type"] {
+		assert!(
+			!lints_schema.contains_key(keyword),
+			"lints schema should not restrict lint rule shapes with `{keyword}`"
 		);
 	}
 

@@ -201,7 +201,7 @@ pub(crate) struct RawWorkspaceConfiguration {
 	#[serde(default)]
 	source: Option<RawSourceConfiguration>,
 	#[serde(default)]
-	#[cfg_attr(feature = "schema", schemars(skip))]
+	#[cfg_attr(feature = "schema", schemars(with = "serde_json::Value"))]
 	lints: WorkspaceLintSettings,
 	#[serde(default)]
 	ecosystems: RawEcosystems,

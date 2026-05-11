@@ -656,6 +656,33 @@ fn plan_publish_rate_limits_summarizes_pending_publications_and_batches() {
 }
 
 #[test]
+fn plan_publish_rate_limits_publish_all_respects_selected_packages() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("../../fixtures/tests/publish-rate-limits/single-window/workspace");
+	copy_fixture_dir(&fixture, tempdir.path());
+	let mut configuration = crate::load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("load config: {error}"));
+	for package in &mut configuration.packages {
+		package.publish.mode = PublishMode::External;
+	}
+	let selected_packages = BTreeSet::from(["docs".to_string()]);
+	let report = plan_publish_rate_limits_with_selection(
+		tempdir.path(),
+		&configuration,
+		None,
+		&selected_packages,
+		PublishRateLimitMode::Publish,
+		true,
+		true,
+	)
+	.unwrap_or_else(|error| panic!("plan publish all rate limits: {error}"));
+
+	assert!(report.batches.is_empty());
+	assert!(report.warnings.is_empty());
+}
+
+#[test]
 fn plan_publish_rate_limits_skips_private_and_disabled_packages_from_release_batches() {
 	let configuration = WorkspaceConfiguration {
 		root_path: std::path::PathBuf::from("/workspace"),
