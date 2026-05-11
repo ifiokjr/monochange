@@ -706,9 +706,9 @@ fn format_clap_error(error: &clap::Error, colored: bool) -> String {
 	}
 }
 
-fn colorize(text: &str, code: &str, colored: bool) -> String {
+fn paint(text: &str, style: anstyle::Style, colored: bool) -> String {
 	if colored {
-		format!("\x1b[{code}m{text}\x1b[0m")
+		format!("{style}{text}{style:#}")
 	} else {
 		text.to_string()
 	}
@@ -743,12 +743,16 @@ fn render_custom_command_argument_error(
 	let command = format!("mc {}", cli_command.name);
 	let argument =
 		unexpected_argument_from_error(error).unwrap_or_else(|| "the supplied option".to_string());
-	let heading = colorize("✖ Unexpected command input", "1;31", colored);
-	let argument = colorize(&argument, "1;33", colored);
-	let command = colorize(&command, "1", colored);
-	let config_path = colorize(&format!("[cli.{}]", cli_command.name), "36", colored);
-	let usage = colorize("Usage", "1;34", colored);
-	let fix = colorize("How to fix", "1;34", colored);
+	let heading = paint("✖ Unexpected command input", cli_theme::error(), colored);
+	let argument = paint(&argument, cli_theme::literal(), colored);
+	let command = paint(&command, cli_theme::usage(), colored);
+	let config_path = paint(
+		&format!("[cli.{}]", cli_command.name),
+		cli_theme::header(),
+		colored,
+	);
+	let usage = paint("Usage", cli_theme::header(), colored);
+	let fix = paint("How to fix", cli_theme::header(), colored);
 
 	format!(
 		"{heading}\n\n  Argument {argument} is not declared for custom command {command}.\n\n{usage}:\n  {}\n\n{fix}:\n  This command comes from {config_path} in monochange.toml.\n  Add a matching input there to make this option valid, for example:\n\n    [cli.{}]\n    inputs = [\n      {{ name = \"{}\", type = \"boolean\" }},\n    ]\n\n  Then run `mc help {}` to confirm the option is listed.",

@@ -971,8 +971,12 @@ fn mcp_and_root_command_support_quiet_and_missing_subcommands() {
 #[test]
 fn custom_command_diagnostic_colorizes_terminal_output() {
 	assert_eq!(
-		crate::colorize("hello", "1;31", true),
-		"\x1b[1;31mhello\x1b[0m"
+		crate::paint("hello", crate::cli_theme::error(), true),
+		format!(
+			"{}hello{:#}",
+			crate::cli_theme::error(),
+			crate::cli_theme::error()
+		)
 	);
 }
 
