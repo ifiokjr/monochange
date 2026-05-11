@@ -488,7 +488,7 @@ fn publish_dependency_order_handles_realistic_cargo_dependency_graph() {
 			publish_order_request("schema"),
 		],
 	)
-	.expect("publish requests should be ordered");
+	.unwrap_or_else(|error| panic!("publish requests should be ordered: {error}"));
 	let ordered_package_ids = ordered
 		.iter()
 		.map(|request| request.package_id.as_str())
