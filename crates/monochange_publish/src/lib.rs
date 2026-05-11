@@ -453,15 +453,6 @@ pub trait PublishTrustHandler {
 		root: &Path,
 		env_map: &BTreeMap<String, String>,
 	) -> MonochangeResult<()>;
-
-	fn configure_successful_publish_trust(
-		&self,
-		request: &PublishRequest,
-		source: Option<&SourceConfiguration>,
-		root: &Path,
-		env_map: &BTreeMap<String, String>,
-		executor: &mut dyn CommandExecutor,
-	) -> MonochangeResult<TrustedPublishingOutcome>;
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -688,8 +679,7 @@ pub fn execute_publish_requests(
 		}
 
 		let trusted_publishing = if request.trusted_publishing.enabled {
-			trust_handler
-				.configure_successful_publish_trust(request, source, root, env_map, executor)?
+			trust_handler.trust_outcome_for_skip(request, source, root, env_map)
 		} else {
 			disabled_trust_outcome()
 		};

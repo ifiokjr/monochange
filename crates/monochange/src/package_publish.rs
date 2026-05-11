@@ -23,13 +23,11 @@ use monochange_dart::write_dart_placeholder_manifest;
 use monochange_deno::write_jsr_placeholder_manifest;
 use monochange_github::format_manual_trust_context;
 use monochange_github::resolve_github_trust_context;
-use monochange_github::trust_list_contains_context;
 use monochange_github::verify_github_trust_context;
 use monochange_go::write_go_placeholder_manifest;
-use monochange_npm::build_npm_trust_command;
-use monochange_npm::build_npm_trust_list_command;
 use monochange_npm::render_npm_trust_command;
 use monochange_npm::write_npm_placeholder_manifest;
+#[cfg(test)]
 use monochange_publish::CommandExecutor;
 #[cfg(test)]
 pub(crate) use monochange_publish::PLACEHOLDER_VERSION;
@@ -73,8 +71,6 @@ use monochange_publish::read_publish_report_artifact;
 #[cfg(test)]
 pub(crate) use monochange_publish::registry_version_exists;
 use monochange_publish::reject_npm_token_environment;
-use monochange_publish::render_command;
-use monochange_publish::render_command_error;
 #[cfg(test)]
 pub(crate) use monochange_publish::resolve_placeholder_readme;
 #[cfg(test)]
@@ -272,21 +268,6 @@ impl PublishTrustHandler for CliPublishTrustHandler {
 	) -> MonochangeResult<()> {
 		enforce_release_trust_prerequisites(request, source, root, env_map)
 	}
-
-	fn configure_successful_publish_trust(
-		&self,
-		request: &PublishRequest,
-		source: Option<&SourceConfiguration>,
-		root: &Path,
-		env_map: &BTreeMap<String, String>,
-		executor: &mut dyn CommandExecutor,
-	) -> MonochangeResult<TrustedPublishingOutcome> {
-		if request.registry == RegistryKind::Npm {
-			configure_npm_trusted_publishing(request, source, root, env_map, executor)
-		} else {
-			Ok(manual_trust_outcome(request, source, root, env_map))
-		}
-	}
 }
 
 #[cfg(test)]
@@ -446,57 +427,6 @@ fn planned_trust_outcome(
 	} else {
 		manual_trust_outcome(request, source, root, env_map)
 	}
-}
-
-fn configure_npm_trusted_publishing(
-	request: &PublishRequest,
-	source: Option<&SourceConfiguration>,
-	root: &Path,
-	env_map: &BTreeMap<String, String>,
-	executor: &mut dyn CommandExecutor,
-) -> MonochangeResult<TrustedPublishingOutcome> {
-	let context = resolve_github_trust_context(root, source, &request.trusted_publishing, env_map)?;
-	let list_command = build_npm_trust_list_command(request);
-	let list_output = executor.run(&list_command)?;
-	if trust_list_contains_context(&list_output.stdout, &context) {
-		return Ok(TrustedPublishingOutcome {
-			status: TrustedPublishingStatus::Configured,
-			repository: Some(context.repository),
-			workflow: Some(context.workflow),
-			environment: context.environment,
-			setup_url: Some(manual_setup_url(request)),
-			message: "npm trusted publishing already matches the current GitHub workflow"
-				.to_string(),
-		});
-	}
-
-	let trust_command = build_npm_trust_command(request, &context);
-	let trust_output = executor.run(&trust_command)?;
-	if !trust_output.success {
-		return Err(MonochangeError::Discovery(format!(
-			"`{}` failed: {}",
-			render_command(&trust_command),
-			render_command_error(&trust_output)
-		)));
-	}
-
-	let verify_output = executor.run(&list_command)?;
-	if !trust_list_contains_context(&verify_output.stdout, &context) {
-		return Err(MonochangeError::Discovery(format!(
-			"npm trusted publishing could not be verified for `{}` after running `{}`",
-			request.package_name,
-			render_command(&trust_command)
-		)));
-	}
-
-	Ok(TrustedPublishingOutcome {
-		status: TrustedPublishingStatus::Configured,
-		repository: Some(context.repository),
-		workflow: Some(context.workflow),
-		environment: context.environment,
-		setup_url: Some(manual_setup_url(request)),
-		message: "configured npm trusted publishing for the current GitHub workflow".to_string(),
-	})
 }
 
 #[cfg(test)]
