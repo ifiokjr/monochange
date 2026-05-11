@@ -61,6 +61,7 @@ impl LintSuite for CargoLintSuite {
 		vec![
 			Box::new(DependencyFieldOrderRule::new()),
 			Box::new(InternalDependencyWorkspaceRule::new()),
+			Box::new(PublishableDependencyRule::new()),
 			Box::new(RequiredPackageFieldsRule::new()),
 			Box::new(SortedDependenciesRule::new()),
 			Box::new(UnlistedPackagePrivateRule::new()),
@@ -82,6 +83,10 @@ impl LintSuite for CargoLintSuite {
 				),
 				(
 					"cargo/internal-dependency-workspace".to_string(),
+					LintRuleConfig::Severity(LintSeverity::Error),
+				),
+				(
+					"cargo/publishable-dependencies".to_string(),
 					LintRuleConfig::Severity(LintSeverity::Error),
 				),
 				(
@@ -110,6 +115,10 @@ impl LintSuite for CargoLintSuite {
 				),
 				(
 					"cargo/internal-dependency-workspace".to_string(),
+					LintRuleConfig::Severity(LintSeverity::Error),
+				),
+				(
+					"cargo/publishable-dependencies".to_string(),
 					LintRuleConfig::Severity(LintSeverity::Error),
 				),
 				(

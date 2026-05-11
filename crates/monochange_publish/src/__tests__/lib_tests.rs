@@ -571,3 +571,126 @@ fn publish_order_request(package: &str) -> PublishRequest {
 		placeholder_readme: String::new(),
 	}
 }
+
+#[derive(Debug, Default)]
+struct RecordingExecutor {
+	commands: Vec<CommandSpec>,
+}
+
+impl CommandExecutor for RecordingExecutor {
+	fn run(&mut self, spec: &CommandSpec) -> MonochangeResult<CommandOutput> {
+		self.commands.push(spec.clone());
+		Ok(CommandOutput {
+			success: true,
+			stdout: "dry run ok".to_string(),
+			stderr: "validated package".to_string(),
+		})
+	}
+}
+
+#[derive(Debug, Default)]
+struct TestTrustHandler;
+
+impl PublishTrustHandler for TestTrustHandler {
+	fn trust_outcome_for_skip(
+		&self,
+		_request: &PublishRequest,
+		_source: Option<&SourceConfiguration>,
+		_root: &Path,
+		_env_map: &BTreeMap<String, String>,
+	) -> TrustedPublishingOutcome {
+		disabled_trust_outcome()
+	}
+
+	fn planned_trust_outcome(
+		&self,
+		_request: &PublishRequest,
+		_source: Option<&SourceConfiguration>,
+		_root: &Path,
+		_env_map: &BTreeMap<String, String>,
+	) -> TrustedPublishingOutcome {
+		disabled_trust_outcome()
+	}
+
+	fn enforce_release_trust_prerequisites(
+		&self,
+		_request: &PublishRequest,
+		_source: Option<&SourceConfiguration>,
+		_root: &Path,
+		_env_map: &BTreeMap<String, String>,
+	) -> MonochangeResult<()> {
+		Ok(())
+	}
+}
+
+fn cargo_publish_request() -> PublishRequest {
+	PublishRequest {
+		package_id: "pkg".to_string(),
+		package_name: "pkg".to_string(),
+		ecosystem: Ecosystem::Cargo,
+		manifest_path: PathBuf::from("crates/pkg/Cargo.toml"),
+		package_root: PathBuf::from("crates/pkg"),
+		registry: RegistryKind::CratesIo,
+		package_manager: None,
+		package_metadata: BTreeMap::new(),
+		mode: PublishMode::Builtin,
+		version: "1.2.3".to_string(),
+		placeholder: false,
+		trusted_publishing: TrustedPublishingSettings {
+			enabled: false,
+			..TrustedPublishingSettings::default()
+		},
+		attestations: PublishAttestationSettings::default(),
+		placeholder_readme: String::new(),
+	}
+}
+
+#[test]
+fn dry_run_publish_executes_registry_dry_run_and_captures_output() {
+	let request = cargo_publish_request();
+	let client = registry_client().unwrap_or_else(|error| panic!("registry client: {error}"));
+	let endpoints = RegistryEndpoints::from_env();
+	let command_builder = build_publish_command_builder();
+	let manifest_writers = PlaceholderManifestWriterRegistry::default();
+	let readiness = PublishReadinessRegistry::default();
+	let trust_handler = TestTrustHandler;
+	let mut executor = RecordingExecutor::default();
+
+	let report = execute_publish_requests(
+		Path::new("."),
+		None,
+		PackagePublishRunMode::Release,
+		true,
+		&[request],
+		&client,
+		&endpoints,
+		&BTreeMap::new(),
+		&mut executor,
+		&command_builder,
+		&manifest_writers,
+		&readiness,
+		&trust_handler,
+	)
+	.unwrap_or_else(|error| panic!("execute publish dry run: {error}"));
+
+	assert_eq!(executor.commands.len(), 1);
+	assert!(
+		executor.commands[0]
+			.args
+			.iter()
+			.any(|arg| arg == "--dry-run")
+	);
+	let outcome = report
+		.packages
+		.first()
+		.unwrap_or_else(|| panic!("expected publish outcome"));
+	assert_eq!(outcome.status, PackagePublishStatus::Planned);
+	assert_eq!(outcome.stdout.as_deref(), Some("dry run ok"));
+	assert_eq!(outcome.stderr.as_deref(), Some("validated package"));
+	assert!(
+		outcome
+			.command
+			.as_deref()
+			.is_some_and(|command| command.contains("--dry-run"))
+	);
+}

@@ -3973,7 +3973,13 @@ fn execute_publish_requests_placeholder_dry_run_validates_publish_command() {
 	.expect("report:");
 
 	assert_eq!(report.packages[0].status, PackagePublishStatus::Planned);
-	assert!(executor.commands.is_empty());
+	assert_eq!(executor.commands.len(), 1);
+	assert!(
+		executor.commands[0]
+			.args
+			.iter()
+			.any(|arg| arg == "--dry-run")
+	);
 }
 
 #[test]
