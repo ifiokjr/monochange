@@ -308,12 +308,6 @@ path = "crates/monochange_lint"
 [package.monochange_linting]
 path = "crates/monochange_linting"
 
-[package.monochange_lint_testing]
-path = "crates/monochange_lint_testing"
-tag = false
-release = false
-changelog = false
-
 [package."@monochange/skill"]
 path = "packages/monochange__skill"
 type = "npm"
@@ -424,7 +418,6 @@ packages = [
 	"monochange_graph",
 	"monochange_hosting",
 	"monochange_lint",
-	"monochange_lint_testing",
 	"monochange_linting",
 	"monochange_npm",
 	"monochange_publish",

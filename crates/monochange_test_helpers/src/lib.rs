@@ -28,6 +28,7 @@
 pub mod fs;
 pub mod git;
 pub mod insta;
+pub mod lint_testing;
 pub mod rmcp;
 pub mod workspace_ops;
 

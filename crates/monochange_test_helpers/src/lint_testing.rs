@@ -1,5 +1,3 @@
-#![forbid(clippy::indexing_slicing)]
-
 //! Testing helpers for monochange lint suites.
 
 use std::collections::BTreeMap;
@@ -87,5 +85,5 @@ pub fn relative_path(root: &Path, path: &Path) -> String {
 }
 
 #[cfg(test)]
-#[path = "__tests__/lib_tests.rs"]
+#[path = "__tests__/lint_testing_tests.rs"]
 mod tests;
