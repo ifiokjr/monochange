@@ -676,6 +676,7 @@ pub(crate) fn render_changeset_markdown(
 
 #[cfg(test)]
 mod tests {
+	#[allow(unused_imports)]
 	use super::*;
 
 	mod diagnostics_tests {
@@ -684,6 +685,7 @@ mod tests {
 	}
 
 	mod changesets_tests {
+		#[allow(unused_imports)]
 		use super::*;
 		include!("__tests__/changesets_tests.rs");
 	}

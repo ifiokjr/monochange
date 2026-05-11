@@ -332,6 +332,7 @@ fn sample_rate_limit_report() -> monochange_core::PublishRateLimitReport {
 fn git_in_dir(root: &Path, args: &[&str]) {
 	let status = std::process::Command::new("git")
 		.current_dir(root)
+		.args(["-c", "commit.gpgsign=false"])
 		.args(args)
 		.status()
 		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));

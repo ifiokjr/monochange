@@ -2126,6 +2126,7 @@ fn validate_configured_change_type_with_context(
 	)))
 }
 
+#[allow(dead_code)]
 fn infer_package_bump_from_explicit_version(
 	package_id: &str,
 	packages: &[PackageRecord],
@@ -2139,6 +2140,7 @@ fn infer_package_bump_from_explicit_version(
 		.map(|current_version| infer_bump_from_versions(current_version, explicit_version))
 }
 
+#[allow(dead_code)]
 fn infer_group_bump_from_explicit_version(
 	group: &GroupDefinition,
 	workspace_root: &Path,
@@ -5289,15 +5291,14 @@ pub mod schema {
 
 #[cfg(test)]
 mod tests {
-	use super::*;
 
 	mod mutant_killers_tests {
-		use super::*;
+
 		include!("__tests__/mutant_killers_tests.rs");
 	}
 
 	mod lib_tests {
-		use super::*;
+
 		include!("__tests__/lib_tests.rs");
 	}
 }

@@ -706,6 +706,7 @@ pub fn default_dependency_version_prefix() -> &'static str {
 pub fn default_dependency_fields() -> &'static [&'static str] {
 	&["dependencies", "dev_dependencies"]
 }
+#[allow(dead_code)]
 fn yaml_bool(mapping: &Mapping, key: &str) -> Option<bool> {
 	mapping
 		.get(Value::String(key.to_string()))

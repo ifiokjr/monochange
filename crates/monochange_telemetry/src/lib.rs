@@ -73,6 +73,7 @@ const TELEMETRY_FILE_ENV: &str = "MC_TELEMETRY_FILE";
 const TELEMETRY_SCOPE_NAME: &str = "monochange.telemetry";
 const TELEMETRY_SCOPE_VERSION: &str = "0.1.0";
 
+#[allow(dead_code)]
 static TEST_ENV_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 #[derive(Debug, Clone)]

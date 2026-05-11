@@ -654,20 +654,19 @@ fn planned_group(
 
 #[cfg(test)]
 mod tests {
-	use super::*;
 
 	mod mutant_killers_tests {
-		use super::*;
+
 		include!("__tests__/mutant_killers_tests.rs");
 	}
 
 	mod lib_tests {
-		use super::*;
+
 		include!("__tests__/lib_tests.rs");
 	}
 
 	mod prop_tests {
-		use super::*;
+
 		include!("__tests__/prop_tests.rs");
 	}
 }

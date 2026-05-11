@@ -4444,15 +4444,14 @@ pub mod schema {
 
 #[cfg(test)]
 mod tests {
-	use super::*;
 
 	mod proptest_bump_severity_tests {
-		use super::*;
+
 		include!("__tests__/proptest_bump_severity_tests.rs");
 	}
 
 	mod lib_tests {
-		use super::*;
+
 		include!("__tests__/lib_tests.rs");
 	}
 }

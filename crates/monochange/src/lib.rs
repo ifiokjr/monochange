@@ -109,6 +109,7 @@ use monochange_core::DEFAULT_RELEASE_TITLE_PRIMARY;
 use monochange_core::DiscoveryReport;
 use monochange_core::Ecosystem;
 
+#[allow(dead_code)]
 pub(crate) static TEST_ENV_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 use monochange_core::HostedActorRef;
 use monochange_core::HostedActorSourceKind;

@@ -667,6 +667,7 @@ fn join_existing_pull_request_lookup(
 	})?
 }
 
+#[allow(dead_code)]
 fn gitea_client() -> MonochangeResult<Client> {
 	build_http_client("Gitea")
 }

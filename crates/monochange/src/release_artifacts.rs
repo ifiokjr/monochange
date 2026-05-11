@@ -377,6 +377,7 @@ fn find_previous_tag_in(current_tag: &str, sorted_tags: &[String]) -> Option<Str
 		.map(|(tag, _)| tag)
 }
 
+#[allow(dead_code)]
 pub(crate) fn find_previous_tag(root: &Path, current_tag: &str) -> Option<String> {
 	find_previous_tag_in(current_tag, &load_sorted_tags(root))
 }
@@ -888,6 +889,7 @@ fn diff_output_colors_enabled() -> bool {
 	diff_output_supports_color(std::io::stdout().is_terminal())
 }
 
+#[allow(dead_code)]
 pub(crate) fn set_force_build_file_diff_previews_error(enabled: bool) {
 	FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR.with(|value| value.set(enabled));
 }

@@ -366,6 +366,7 @@ pub(crate) fn run_git_process(
 	handle_git_process_output(&output, error_message)
 }
 
+#[allow(dead_code)]
 pub(crate) fn run_git_process_with_stdin(
 	mut command: ProcessCommand,
 	input: &[u8],

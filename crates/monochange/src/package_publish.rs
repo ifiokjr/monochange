@@ -1,7 +1,5 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-use std::env;
-use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -250,6 +248,7 @@ impl PublishTrustHandler for CliPublishTrustHandler {
 }
 
 #[allow(clippy::too_many_arguments)]
+#[allow(dead_code)]
 fn execute_publish_requests(
 	root: &Path,
 	source: Option<&SourceConfiguration>,
@@ -278,6 +277,7 @@ fn execute_publish_requests(
 	)
 }
 
+#[allow(dead_code)]
 pub(crate) fn enforce_release_attestation_prerequisites(
 	request: &PublishRequest,
 	env_map: &BTreeMap<String, String>,
@@ -406,6 +406,7 @@ fn planned_trust_outcome(
 	}
 }
 
+#[allow(dead_code)]
 fn build_npm_trust_list_command(request: &PublishRequest) -> CommandSpec {
 	CommandSpec {
 		program: "npm".to_string(),
@@ -418,6 +419,7 @@ fn build_npm_trust_list_command(request: &PublishRequest) -> CommandSpec {
 	}
 }
 
+#[allow(dead_code)]
 fn configure_npm_trusted_publishing(
 	request: &PublishRequest,
 	source: Option<&SourceConfiguration>,
@@ -469,6 +471,7 @@ fn configure_npm_trusted_publishing(
 	})
 }
 
+#[allow(dead_code)]
 pub(crate) fn build_placeholder_directory(
 	root: &Path,
 	request: &PublishRequest,
@@ -482,6 +485,7 @@ pub(crate) fn build_placeholder_directory(
 	)
 }
 
+#[allow(dead_code)]
 fn placeholder_tempdir_error(error: &std::io::Error) -> MonochangeError {
 	MonochangeError::Io(format!("failed to create placeholder tempdir: {error}"))
 }

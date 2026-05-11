@@ -239,6 +239,7 @@ pub(crate) fn plan_publish_rate_limits_for_dependency_ordered_requests(
 	plan_publish_rate_limits_for_requests(&requests, operation, dry_run)
 }
 
+#[allow(dead_code)]
 pub(crate) fn plan_unbatched_publish_order_for_dependency_ordered_requests(
 	requests: &[package_publish::PublishRequest],
 	packages: &[monochange_core::PackageRecord],
@@ -250,6 +251,7 @@ pub(crate) fn plan_unbatched_publish_order_for_dependency_ordered_requests(
 	plan_unbatched_publish_order_for_requests(&requests, operation, dry_run)
 }
 
+#[allow(dead_code)]
 fn plan_unbatched_publish_order_for_requests(
 	requests: &[package_publish::PublishRequest],
 	operation: RateLimitOperation,

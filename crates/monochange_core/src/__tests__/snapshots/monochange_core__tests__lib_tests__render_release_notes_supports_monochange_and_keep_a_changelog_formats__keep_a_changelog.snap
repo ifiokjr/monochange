@@ -1,6 +1,7 @@
 ---
 source: crates/monochange_core/src/__tests__/lib_tests.rs
-expression: monochange
+assertion_line: 1854
+expression: keep_a_changelog
 ---
 ## 1.2.3
 

@@ -23,6 +23,7 @@ use monochange_core::HostedIssueRef;
 use monochange_core::HostedIssueRelationshipKind;
 use monochange_core::HostedReviewRequestKind;
 use monochange_core::HostedReviewRequestRef;
+use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
 use monochange_core::PackageDefinition;
 use monochange_core::PackageRecord;

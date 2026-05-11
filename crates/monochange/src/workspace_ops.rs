@@ -1332,14 +1332,9 @@ fn run_lockfile_command_in_place(
 }
 
 use monochange_test_helpers::workspace_ops::collect_workspace_files;
-use monochange_test_helpers::workspace_ops::copy_workspace_file;
-use monochange_test_helpers::workspace_ops::copy_workspace_tree;
-use monochange_test_helpers::workspace_ops::ensure_parent_directory;
 use monochange_test_helpers::workspace_ops::read_optional_file;
-use monochange_test_helpers::workspace_ops::remap_workspace_path;
-use monochange_test_helpers::workspace_ops::run_lockfile_command;
-use monochange_test_helpers::workspace_ops::strip_workspace_prefix;
 
+#[allow(dead_code)]
 fn collect_workspace_file_updates(
 	root: &Path,
 	temp_root: &Path,
@@ -1413,6 +1408,7 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 }
 
 #[tracing::instrument(skip_all, fields(dry_run))]
+#[allow(dead_code)]
 pub(crate) fn prepare_release_execution(
 	root: &Path,
 	dry_run: bool,
@@ -1421,6 +1417,7 @@ pub(crate) fn prepare_release_execution(
 }
 
 #[tracing::instrument(skip_all, fields(dry_run, build_file_diffs))]
+#[allow(dead_code)]
 pub(crate) fn prepare_release_execution_with_file_diffs(
 	root: &Path,
 	dry_run: bool,

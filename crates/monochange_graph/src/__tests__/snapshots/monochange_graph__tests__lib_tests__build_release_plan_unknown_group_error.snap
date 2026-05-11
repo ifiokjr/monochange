@@ -1,5 +1,6 @@
 ---
 source: crates/monochange_graph/src/__tests__/lib_tests.rs
+assertion_line: 602
 expression: error.to_string()
 ---
 config error: changeset references group `nonexistent-group` which was not found in the workspace configuration

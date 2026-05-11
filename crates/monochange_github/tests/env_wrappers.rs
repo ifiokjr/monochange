@@ -98,6 +98,7 @@ fn publish_release_pull_request_uses_git_and_github_env_configuration() {
 	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
 	git(&repo, &["config", "user.name", "monochange Tests"]);
 	git(&repo, &["config", "user.email", "monochange@example.com"]);
+	git(&repo, &["config", "commit.gpgsign", "false"]);
 	std::fs::write(repo.join("release.txt"), "before\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 	git(&repo, &["add", "release.txt"]);
@@ -169,6 +170,7 @@ fn with_github_env<R>(base_url: &str, action: impl FnOnce() -> R) -> R {
 fn git(root: &std::path::Path, args: &[&str]) {
 	let status = std::process::Command::new("git")
 		.current_dir(root)
+		.args(["-c", "commit.gpgsign=false"])
 		.args(args)
 		.status()
 		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));

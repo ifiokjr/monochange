@@ -6283,6 +6283,11 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 		.args(["config", "user.name", "Test User"])
 		.output()
 		.unwrap_or_else(|error| panic!("git config name: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["config", "commit.gpgsign", "false"])
+		.output()
+		.unwrap_or_else(|error| panic!("git config gpgsign: {error}"));
 	fs::write(tempdir.path().join("tracked.txt"), "test\n")
 		.unwrap_or_else(|error| panic!("write tracked: {error}"));
 	std::process::Command::new("git")
@@ -6353,9 +6358,11 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 
 #[test]
 fn execute_cli_command_source_follow_up_steps_require_source_configuration() {
-	let root = fixture_path("monochange/release-base");
-	let mut configuration = load_workspace_configuration(&root)
-		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/release-base", tempdir.path());
+	let root = tempdir.path();
+	let mut configuration =
+		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
 	configuration.source = Some(monochange_core::SourceConfiguration {
 		provider: monochange_core::SourceProvider::GitLab,
 		host: Some("https://gitlab.example.com".to_string()),
@@ -6387,7 +6394,7 @@ fn execute_cli_command_source_follow_up_steps_require_source_configuration() {
 		dry_run: false,
 	};
 	let error = crate::execute_cli_command(
-		&root,
+		root,
 		&configuration,
 		&prepare_and_publish,
 		true,
@@ -6404,9 +6411,11 @@ fn execute_cli_command_source_follow_up_steps_require_source_configuration() {
 
 #[test]
 fn execute_cli_command_comment_released_issues_requires_source_configuration() {
-	let root = fixture_path("monochange/release-base");
-	let mut configuration = load_workspace_configuration(&root)
-		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/release-base", tempdir.path());
+	let root = tempdir.path();
+	let mut configuration =
+		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
 	configuration.source = None;
 	let cli_command = CliCommandDefinition {
 		name: "release-comments".to_string(),
@@ -6431,7 +6440,7 @@ fn execute_cli_command_comment_released_issues_requires_source_configuration() {
 	};
 
 	let error =
-		crate::execute_cli_command(&root, &configuration, &cli_command, true, BTreeMap::new())
+		crate::execute_cli_command(root, &configuration, &cli_command, true, BTreeMap::new())
 			.err()
 			.unwrap_or_else(|| panic!("expected missing source configuration error"));
 
@@ -6444,9 +6453,11 @@ fn execute_cli_command_comment_released_issues_requires_source_configuration() {
 
 #[test]
 fn execute_cli_command_publish_and_request_steps_require_source_configuration() {
-	let root = fixture_path("monochange/release-base");
-	let mut configuration = load_workspace_configuration(&root)
-		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/release-base", tempdir.path());
+	let root = tempdir.path();
+	let mut configuration =
+		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
 	configuration.source = None;
 
 	let cases = [
@@ -6491,7 +6502,7 @@ fn execute_cli_command_publish_and_request_steps_require_source_configuration() 
 			dry_run: false,
 		};
 		let error =
-			crate::execute_cli_command(&root, &configuration, &cli_command, true, BTreeMap::new())
+			crate::execute_cli_command(root, &configuration, &cli_command, true, BTreeMap::new())
 				.err()
 				.unwrap_or_else(|| panic!("expected missing source error for {name}"));
 		assert!(error.to_string().contains(expected), "error: {error}");
@@ -6500,9 +6511,11 @@ fn execute_cli_command_publish_and_request_steps_require_source_configuration() 
 
 #[test]
 fn execute_cli_command_change_step_requires_reason_input() {
-	let root = fixture_path("monochange/release-base");
-	let configuration = load_workspace_configuration(&root)
-		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("monochange/release-base", tempdir.path());
+	let root = tempdir.path();
+	let configuration =
+		load_workspace_configuration(root).unwrap_or_else(|error| panic!("configuration: {error}"));
 	let cli_command = CliCommandDefinition {
 		name: "change".to_string(),
 		help_text: None,
@@ -6517,7 +6530,7 @@ fn execute_cli_command_change_step_requires_reason_input() {
 		dry_run: false,
 	};
 	let error = crate::execute_cli_command(
-		&root,
+		root,
 		&configuration,
 		&cli_command,
 		true,
@@ -12383,6 +12396,7 @@ fn sanitized_git_command() -> std::process::Command {
 fn git_in_dir(root: &Path, args: &[&str]) {
 	let status = sanitized_git_command()
 		.current_dir(root)
+		.args(["-c", "commit.gpgsign=false"])
 		.args(args)
 		.status()
 		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
@@ -12393,6 +12407,7 @@ fn git_output_in_git_dir(git_dir: &Path, args: &[&str]) -> String {
 	let output = sanitized_git_command()
 		.arg("--git-dir")
 		.arg(git_dir)
+		.args(["-c", "commit.gpgsign=false"])
 		.args(args)
 		.output()
 		.unwrap_or_else(|error| panic!("git --git-dir {args:?}: {error}"));
@@ -12406,6 +12421,7 @@ fn git_output_in_git_dir(git_dir: &Path, args: &[&str]) -> String {
 fn git_in_temp_repo(root: &Path, args: &[&str]) {
 	let status = sanitized_git_command()
 		.current_dir(root)
+		.args(["-c", "commit.gpgsign=false"])
 		.args(args)
 		.status()
 		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
@@ -12415,6 +12431,7 @@ fn git_in_temp_repo(root: &Path, args: &[&str]) {
 fn git_output_in_temp_repo(root: &Path, args: &[&str]) -> String {
 	let output = sanitized_git_command()
 		.current_dir(root)
+		.args(["-c", "commit.gpgsign=false"])
 		.args(args)
 		.output()
 		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
@@ -13706,6 +13723,11 @@ repo = "monochange"
 		.args(["config", "user.name", "Test User"])
 		.output()
 		.unwrap_or_else(|error| panic!("git config name: {error}"));
+	std::process::Command::new("git")
+		.current_dir(tempdir.path())
+		.args(["config", "commit.gpgsign", "false"])
+		.output()
+		.unwrap_or_else(|error| panic!("git config gpgsign: {error}"));
 	fs::write(tempdir.path().join("tracked.txt"), "test\n")
 		.unwrap_or_else(|error| panic!("write tracked: {error}"));
 	std::process::Command::new("git")

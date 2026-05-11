@@ -1994,6 +1994,7 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
 	git(&repo, &["config", "user.name", "monochange Tests"]);
 	git(&repo, &["config", "user.email", "monochange@example.com"]);
+	git(&repo, &["config", "commit.gpgsign", "false"]);
 	fs::write(repo.join("release.txt"), "before\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 	git(&repo, &["add", "release.txt"]);
@@ -2052,6 +2053,7 @@ fn git_stage_paths_skips_missing_untracked_paths_and_ignored_untracked_files() {
 	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
 	git(&repo, &["config", "user.name", "monochange Tests"]);
 	git(&repo, &["config", "user.email", "monochange@example.com"]);
+	git(&repo, &["config", "commit.gpgsign", "false"]);
 	must_ok(
 		fs::write(repo.join(".gitignore"), ".monochange/local/\n"),
 		"write gitignore",
@@ -2198,6 +2200,7 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
 	git(&repo, &["config", "user.name", "monochange Tests"]);
 	git(&repo, &["config", "user.email", "monochange@example.com"]);
+	git(&repo, &["config", "commit.gpgsign", "false"]);
 	let hooks_dir = repo.join(".git/hooks");
 	fs::write(hooks_dir.join("pre-commit"), "#!/bin/sh\nexit 1\n")
 		.unwrap_or_else(|error| panic!("write hook: {error}"));
@@ -2233,6 +2236,7 @@ fn git_commit_paths_treats_clean_worktrees_as_already_committed() {
 	git(tempdir.path(), &["init", repo.to_string_lossy().as_ref()]);
 	git(&repo, &["config", "user.name", "monochange Tests"]);
 	git(&repo, &["config", "user.email", "monochange@example.com"]);
+	git(&repo, &["config", "commit.gpgsign", "false"]);
 	fs::write(repo.join("release.txt"), "initial\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 	git(&repo, &["add", "release.txt"]);
@@ -2866,6 +2870,7 @@ fn seed_git_repository() -> (tempfile::TempDir, PathBuf) {
 	);
 	git(&repo, &["config", "user.name", "monochange Tests"]);
 	git(&repo, &["config", "user.email", "monochange@example.com"]);
+	git(&repo, &["config", "commit.gpgsign", "false"]);
 	git(&repo, &["config", "commit.gpgsign", "false"]);
 	fs::write(repo.join("release.txt"), "before\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));

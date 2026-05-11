@@ -18,6 +18,12 @@ use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
 use monochange_core::VersionFormat;
 use monochange_core::WorkspaceConfiguration;
+use monochange_test_helpers::workspace_ops::copy_workspace_file;
+use monochange_test_helpers::workspace_ops::copy_workspace_tree;
+use monochange_test_helpers::workspace_ops::ensure_parent_directory;
+use monochange_test_helpers::workspace_ops::remap_workspace_path;
+use monochange_test_helpers::workspace_ops::run_lockfile_command;
+use monochange_test_helpers::workspace_ops::strip_workspace_prefix;
 
 use super::*;
 

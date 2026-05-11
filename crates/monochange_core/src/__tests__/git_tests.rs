@@ -70,6 +70,7 @@ fn tempdir(context: &str) -> tempfile::TempDir {
 
 fn git(root: &Path, args: &[&str]) {
 	let status = git_command(root)
+		.args(["-c", "commit.gpgsign=false"])
 		.args(args)
 		.status()
 		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
@@ -78,6 +79,7 @@ fn git(root: &Path, args: &[&str]) {
 
 fn git_stdout(root: &Path, args: &[&str]) -> String {
 	let output = git_command(root)
+		.args(["-c", "commit.gpgsign=false"])
 		.args(args)
 		.output()
 		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
@@ -262,6 +264,7 @@ fn run_git_commit_message_commits_large_message_from_file() {
 	git(root, &["init"]);
 	git(root, &["config", "user.name", "monochange Tests"]);
 	git(root, &["config", "user.email", "monochange@example.com"]);
+	git(root, &["config", "commit.gpgsign", "false"]);
 	fs::write(root.join("release.txt"), "release\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 	git(root, &["add", "release.txt"]);

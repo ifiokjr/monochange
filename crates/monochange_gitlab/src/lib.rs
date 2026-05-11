@@ -634,6 +634,7 @@ fn join_existing_merge_request_lookup(
 	})?
 }
 
+#[allow(dead_code)]
 fn gitlab_client() -> MonochangeResult<Client> {
 	build_http_client("GitLab")
 }
