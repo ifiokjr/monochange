@@ -1,4 +1,5 @@
 use monochange_core::GroupChangelogInclude;
+use monochange_core::PackageDependency;
 use monochange_core::VersionFormat;
 
 use super::*;
@@ -442,4 +443,83 @@ fn placeholder_tempdir_error_includes_io_error() {
 			.to_string()
 			.contains("failed to create placeholder tempdir: no tempdir")
 	);
+}
+
+#[test]
+fn publish_dependency_order_treats_development_dependencies_as_relevant() {
+	assert!(publish_dependency_kind_is_ordering_relevant(
+		DependencyKind::Development
+	));
+}
+
+#[test]
+fn publish_dependency_order_reports_development_dependency_cycles() {
+	let mut app = publish_order_package("app");
+	app.declared_dependencies.push(publish_order_dependency(
+		"helper",
+		DependencyKind::Development,
+	));
+	let mut helper = publish_order_package("helper");
+	helper
+		.declared_dependencies
+		.push(publish_order_dependency("app", DependencyKind::Development));
+
+	let error = order_release_requests_by_publish_dependencies(
+		&[app, helper],
+		vec![
+			publish_order_request("app"),
+			publish_order_request("helper"),
+		],
+	)
+	.expect_err("development dependency cycle should be rejected");
+
+	assert!(
+		error
+			.to_string()
+			.contains("cyclic publish dependencies detected")
+	);
+}
+
+fn publish_order_package(name: &str) -> PackageRecord {
+	let root = PathBuf::from("/workspace");
+	let mut package = PackageRecord::new(
+		Ecosystem::Cargo,
+		name,
+		root.join(name).join("Cargo.toml"),
+		root,
+		None,
+		PublishState::Public,
+	);
+	package
+		.metadata
+		.insert("config_id".to_string(), name.to_string());
+	package
+}
+
+fn publish_order_dependency(name: &str, kind: DependencyKind) -> PackageDependency {
+	PackageDependency {
+		name: name.to_string(),
+		kind,
+		version_constraint: Some("1.0.0".to_string()),
+		optional: false,
+	}
+}
+
+fn publish_order_request(package: &str) -> PublishRequest {
+	PublishRequest {
+		package_id: package.to_string(),
+		package_name: package.to_string(),
+		ecosystem: Ecosystem::Cargo,
+		manifest_path: PathBuf::from(format!("/workspace/{package}/Cargo.toml")),
+		package_root: PathBuf::from(format!("/workspace/{package}")),
+		registry: RegistryKind::CratesIo,
+		package_manager: None,
+		package_metadata: BTreeMap::new(),
+		mode: PublishMode::Builtin,
+		version: "1.0.0".to_string(),
+		placeholder: false,
+		trusted_publishing: TrustedPublishingSettings::default(),
+		attestations: PublishAttestationSettings::default(),
+		placeholder_readme: String::new(),
+	}
 }

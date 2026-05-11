@@ -2154,8 +2154,8 @@ pub fn order_release_requests_by_publish_dependencies(
 	Ok(ordered_requests)
 }
 
-pub fn publish_dependency_kind_is_ordering_relevant(kind: DependencyKind) -> bool {
-	!matches!(kind, DependencyKind::Development)
+pub fn publish_dependency_kind_is_ordering_relevant(_kind: DependencyKind) -> bool {
+	true
 }
 
 pub fn config_ids_by_package_record_id(packages: &[PackageRecord]) -> BTreeMap<String, String> {

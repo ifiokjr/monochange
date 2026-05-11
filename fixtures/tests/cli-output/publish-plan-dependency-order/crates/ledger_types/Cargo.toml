@@ -2,3 +2,6 @@
 name = "ledger_types"
 version = "0.1.0"
 edition = "2021"
+
+[dev-dependencies]
+yaml_config = { path = "../yaml_config", version = "0.1.0" }
