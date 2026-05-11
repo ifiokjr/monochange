@@ -424,6 +424,7 @@ in
       exec = ''
         set -euo pipefail
         mdt check
+        cargo xtask skill commands check
         pnpm node scripts/check-agent-surface.mjs
       '';
       description = "Check that shared documentation blocks are synchronized and agent-facing docs stay aligned with the repo surface.";
