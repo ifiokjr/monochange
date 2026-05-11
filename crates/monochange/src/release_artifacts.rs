@@ -6,7 +6,7 @@ use similar::TextDiff;
 use super::*;
 
 thread_local! {
-	static FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR: Cell<bool> = const { Cell::new(false) };
+	pub(crate) static FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR: Cell<bool> = const { Cell::new(false) };
 }
 
 thread_local! {
@@ -375,11 +375,6 @@ fn find_previous_tag_in(current_tag: &str, sorted_tags: &[String]) -> Option<Str
 		})
 		.max_by(|left, right| left.1.cmp(&right.1))
 		.map(|(tag, _)| tag)
-}
-
-#[allow(dead_code)]
-pub(crate) fn find_previous_tag(root: &Path, current_tag: &str) -> Option<String> {
-	find_previous_tag_in(current_tag, &load_sorted_tags(root))
 }
 
 pub(crate) fn parse_tag_prefix_and_version(tag: &str) -> Option<(String, semver::Version)> {
@@ -887,11 +882,6 @@ fn render_display_file_diff(diff: &str, colorize: bool) -> String {
 
 fn diff_output_colors_enabled() -> bool {
 	diff_output_supports_color(std::io::stdout().is_terminal())
-}
-
-#[allow(dead_code)]
-pub(crate) fn set_force_build_file_diff_previews_error(enabled: bool) {
-	FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR.with(|value| value.set(enabled));
 }
 
 pub(crate) fn diff_output_supports_color(stdout_is_terminal: bool) -> bool {

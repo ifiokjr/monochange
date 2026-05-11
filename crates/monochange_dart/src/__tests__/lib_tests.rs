@@ -7,8 +7,15 @@ use monochange_core::EcosystemAdapter;
 use monochange_core::PackageRecord;
 use monochange_core::PublishState;
 use semver::Version;
+use serde_yaml_ng::Mapping;
 use serde_yaml_ng::Value;
 use tempfile::tempdir;
+
+fn yaml_bool(mapping: &Mapping, key: &str) -> Option<bool> {
+	mapping
+		.get(Value::String(key.to_string()))
+		.and_then(Value::as_bool)
+}
 
 use crate::DartVersionedFileKind;
 use crate::adapter;
@@ -24,7 +31,6 @@ use crate::update_dependency_fields;
 use crate::update_manifest_text;
 use crate::update_pubspec_lock;
 use crate::yaml_array_strings;
-use crate::yaml_bool;
 use crate::yaml_mapping;
 use crate::yaml_string;
 
@@ -181,7 +187,7 @@ fn default_lockfile_commands_choose_dart_or_flutter_pub_get() {
 
 #[test]
 fn update_dependency_fields_only_changes_declared_dependencies() {
-	let mut manifest: serde_yaml_ng::Mapping = serde_yaml_ng::from_str(
+	let mut manifest: Mapping = serde_yaml_ng::from_str(
 		r"
 dependencies:
   core: ^1.0.0
@@ -267,7 +273,7 @@ fn yaml_helper_functions_cover_missing_and_inline_paths() {
 
 #[test]
 fn update_pubspec_lock_rewrites_known_package_versions() {
-	let mut lock: serde_yaml_ng::Mapping = serde_yaml_ng::from_str(
+	let mut lock: Mapping = serde_yaml_ng::from_str(
 		r"
 packages:
   core:
@@ -292,7 +298,7 @@ packages:
 
 #[test]
 fn update_pubspec_lock_ignores_missing_package_section() {
-	let mut lock: serde_yaml_ng::Mapping = serde_yaml_ng::from_str("root: true\n")
+	let mut lock: Mapping = serde_yaml_ng::from_str("root: true\n")
 		.unwrap_or_else(|error| panic!("pubspec lock yaml: {error}"));
 	update_pubspec_lock(
 		&mut lock,
@@ -363,7 +369,7 @@ fn workspace_and_manifest_helpers_cover_yaml_and_error_paths() {
 		warning.contains("missing/*") && warning.contains("matched no packages")
 	}));
 
-	let nameless_manifest: serde_yaml_ng::Mapping = serde_yaml_ng::from_str(
+	let nameless_manifest: Mapping = serde_yaml_ng::from_str(
 		r"
 dependencies:
   core: ^1.0.0

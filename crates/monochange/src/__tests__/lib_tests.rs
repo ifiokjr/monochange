@@ -10,6 +10,35 @@ use std::path::PathBuf;
 use std::sync::LazyLock;
 use std::sync::Mutex;
 
+fn set_force_build_file_diff_previews_error(enabled: bool) {
+	crate::release_artifacts::FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR.with(|value| value.set(enabled));
+}
+
+fn find_previous_tag(root: &Path, current_tag: &str) -> Option<String> {
+	let output =
+		monochange_core::git::git_command_output(root, &["tag", "--list", "--sort=-v:refname"])
+			.ok()?;
+	let sorted_tags = String::from_utf8_lossy(&output.stdout)
+		.lines()
+		.map(str::trim)
+		.filter(|tag| !tag.is_empty())
+		.map(ToString::to_string)
+		.collect::<Vec<_>>();
+	let (prefix, current_version) =
+		crate::release_artifacts::parse_tag_prefix_and_version(current_tag)?;
+	sorted_tags
+		.iter()
+		.filter(|tag| tag.as_str() != current_tag)
+		.filter_map(|tag| {
+			let (candidate_prefix, candidate_version) =
+				crate::release_artifacts::parse_tag_prefix_and_version(tag)?;
+			(candidate_prefix == prefix && candidate_version < current_version)
+				.then(|| (tag.clone(), candidate_version))
+		})
+		.max_by(|left, right| left.1.cmp(&right.1))
+		.map(|(tag, _)| tag)
+}
+
 pub(crate) static TEST_ENV_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 use clap::Command;
@@ -73,7 +102,7 @@ use crate::git_support::run_git_status;
 use crate::interactive::InteractiveChangeResult;
 use crate::interactive::InteractiveTarget;
 use crate::plan_release;
-use crate::release_artifacts::set_force_build_file_diff_previews_error;
+use crate::prepare_release_execution_with_file_diffs;
 use crate::release_artifacts::validate_release_record_file;
 use crate::release_artifacts::write_release_record_file;
 use crate::render_change_target_markdown;
@@ -81,7 +110,6 @@ use crate::run_with_args;
 use crate::run_with_args_in_dir;
 use crate::workspace_ops::build_lockfile_command_executions;
 use crate::workspace_ops::change_type_default_bump;
-use crate::workspace_ops::prepare_release_execution;
 use crate::workspace_ops::render_cli_commands_toml;
 use crate::workspace_ops::render_interactive_changeset_markdown;
 
@@ -2621,7 +2649,7 @@ fn prepare_release_allows_empty_changesets_when_configured() {
 		.unwrap_or_else(|error| panic!("remove changesets: {error}"));
 
 	let strict_error =
-		crate::prepare_release_execution_with_file_diffs(tempdir.path(), true, false, false)
+		prepare_release_execution_with_file_diffs(tempdir.path(), true, false, false)
 			.err()
 			.unwrap_or_else(|| panic!("expected missing changeset error"));
 	assert!(
@@ -2630,9 +2658,8 @@ fn prepare_release_allows_empty_changesets_when_configured() {
 			.contains("no markdown changesets found under .changeset")
 	);
 
-	let execution =
-		crate::prepare_release_execution_with_file_diffs(tempdir.path(), true, true, true)
-			.unwrap_or_else(|error| panic!("prepare release execution: {error}"));
+	let execution = prepare_release_execution_with_file_diffs(tempdir.path(), true, true, true)
+		.unwrap_or_else(|error| panic!("prepare release execution: {error}"));
 
 	assert_eq!(
 		execution.prepared_release.plan.workspace_root,
@@ -3006,7 +3033,7 @@ fn prepare_release_execution_dry_run_skips_lockfile_commands_for_performance() {
 		.unwrap_or_else(|error| panic!("package lock before dry-run: {error}"));
 
 	let prepared = with_path_prefixed(tempdir.path(), || {
-		prepare_release_execution(tempdir.path(), true)
+		prepare_release_execution_with_file_diffs(tempdir.path(), true, true, false)
 			.unwrap_or_else(|error| panic!("prepare release execution: {error}"))
 	});
 	let after = fs::read_to_string(tempdir.path().join("packages/app/package-lock.json"))
@@ -11789,7 +11816,7 @@ fn build_file_diff_previews_reports_directory_read_errors() {
 fn prepare_release_execution_collects_file_diffs_for_dry_runs() {
 	let tempdir = setup_scenario_workspace("cli-output/group-basic");
 	let prepared = temp_env::with_var("NO_COLOR", Some("1"), || {
-		prepare_release_execution(tempdir.path(), true)
+		prepare_release_execution_with_file_diffs(tempdir.path(), true, true, false)
 			.unwrap_or_else(|error| panic!("prepare release execution: {error}"))
 	});
 	assert!(!prepared.prepared_release.changed_files.is_empty());
@@ -11829,7 +11856,7 @@ fn command_release_without_diff_skips_file_diff_previews() {
 fn prepare_release_execution_propagates_file_diff_preview_errors() {
 	let tempdir = setup_scenario_workspace("cli-output/group-basic");
 	set_force_build_file_diff_previews_error(true);
-	let error = prepare_release_execution(tempdir.path(), true)
+	let error = prepare_release_execution_with_file_diffs(tempdir.path(), true, true, false)
 		.err()
 		.unwrap_or_else(|| panic!("expected forced file diff preview error"));
 	set_force_build_file_diff_previews_error(false);
@@ -12113,13 +12140,10 @@ fn find_previous_tag_returns_previous_matching_prefix() {
 	git_in_temp_repo(tempdir.path(), &["tag", "core/v1.2.0"]);
 	git_in_temp_repo(tempdir.path(), &["tag", "app/v9.9.9"]);
 	assert_eq!(
-		crate::find_previous_tag(tempdir.path(), "core/v1.2.0"),
+		find_previous_tag(tempdir.path(), "core/v1.2.0"),
 		Some("core/v1.0.0".to_string())
 	);
-	assert_eq!(
-		crate::find_previous_tag(tempdir.path(), "core/v1.0.0"),
-		None
-	);
+	assert_eq!(find_previous_tag(tempdir.path(), "core/v1.0.0"), None);
 }
 
 fn sample_planned_group() -> monochange_core::PlannedVersionGroup {

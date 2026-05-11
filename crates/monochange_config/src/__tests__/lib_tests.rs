@@ -18,6 +18,8 @@ use monochange_core::CliStepInputValue;
 use monochange_core::Ecosystem;
 use monochange_core::EcosystemType;
 use monochange_core::GroupChangelogInclude;
+use monochange_core::GroupDefinition;
+use monochange_core::MonochangeResult;
 use monochange_core::PackageRecord;
 use monochange_core::PublishMode;
 use monochange_core::PublishRegistry;
@@ -34,6 +36,47 @@ use monochange_test_helpers::current_test_name;
 use monochange_test_helpers::snapshot_settings;
 use semver::Version;
 use tempfile::tempdir;
+
+fn infer_package_bump_from_explicit_version(
+	package_id: &str,
+	packages: &[PackageRecord],
+	explicit_version: Option<&Version>,
+) -> Option<BumpSeverity> {
+	let explicit_version = explicit_version?;
+	packages
+		.iter()
+		.find(|package| package.id == package_id)
+		.and_then(|package| package.current_version.as_ref())
+		.map(|current_version| crate::infer_bump_from_versions(current_version, explicit_version))
+}
+
+fn infer_group_bump_from_explicit_version(
+	group: &GroupDefinition,
+	workspace_root: &Path,
+	packages: &[PackageRecord],
+	explicit_version: Option<&Version>,
+) -> MonochangeResult<Option<BumpSeverity>> {
+	let Some(explicit_version) = explicit_version else {
+		return Ok(None);
+	};
+	let mut max_version: Option<&Version> = None;
+	for member_id in &group.packages {
+		let package_id = resolve_package_reference(member_id, workspace_root, packages)?;
+		if let Some(current_version) = packages
+			.iter()
+			.find(|package| package.id == package_id)
+			.and_then(|package| package.current_version.as_ref())
+		{
+			max_version = Some(match max_version {
+				Some(current_max) if current_version > current_max => current_version,
+				Some(current_max) => current_max,
+				None => current_version,
+			});
+		}
+	}
+	Ok(max_version
+		.map(|current_version| crate::infer_bump_from_versions(current_version, explicit_version)))
+}
 
 use crate::apply_version_groups;
 use crate::frontmatter_span_for_line_column;
@@ -1651,7 +1694,7 @@ fn raw_change(bump: Option<BumpSeverity>, change_type: Option<&str>) -> crate::R
 	}
 }
 
-fn expect_config_error(result: monochange_core::MonochangeResult<()>, expected: &str) {
+fn expect_config_error(result: MonochangeResult<()>, expected: &str) {
 	let error = result.expect_err("expected config error").to_string();
 	assert!(error.contains(expected), "unexpected error: {error}");
 }
@@ -4683,7 +4726,7 @@ fn infer_bump_helpers_cover_major_minor_patch_and_none() {
 		Some(Version::new(2, 0, 0)),
 		PublishState::Public,
 	);
-	let group = monochange_core::GroupDefinition {
+	let group = GroupDefinition {
 		id: "sdk".to_string(),
 		packages: vec![core.id.clone(), app.id.clone()],
 		changelog: None,
@@ -4698,7 +4741,7 @@ fn infer_bump_helpers_cover_major_minor_patch_and_none() {
 		version_format: monochange_core::VersionFormat::Primary,
 	};
 	assert_eq!(
-		crate::infer_group_bump_from_explicit_version(
+		infer_group_bump_from_explicit_version(
 			&group,
 			&workspace_root,
 			&[core.clone(), app.clone()],
@@ -4710,7 +4753,7 @@ fn infer_bump_helpers_cover_major_minor_patch_and_none() {
 
 	// A group with an unresolvable member should now produce an error
 	// instead of silently dropping the member.
-	let group_with_missing = monochange_core::GroupDefinition {
+	let group_with_missing = GroupDefinition {
 		id: "sdk-missing".to_string(),
 		packages: vec![core.id.clone(), "missing".to_string(), app.id.clone()],
 		changelog: None,
@@ -4724,7 +4767,7 @@ fn infer_bump_helpers_cover_major_minor_patch_and_none() {
 		release: true,
 		version_format: monochange_core::VersionFormat::Primary,
 	};
-	let error = crate::infer_group_bump_from_explicit_version(
+	let error = infer_group_bump_from_explicit_version(
 		&group_with_missing,
 		&workspace_root,
 		&[core.clone(), app.clone()],
@@ -4735,7 +4778,7 @@ fn infer_bump_helpers_cover_major_minor_patch_and_none() {
 	assert!(error.to_string().contains("missing"));
 	let core_id = core.id.clone();
 	assert_eq!(
-		crate::infer_package_bump_from_explicit_version(
+		infer_package_bump_from_explicit_version(
 			&core_id,
 			&[core, app],
 			Some(&Version::new(1, 0, 1))
@@ -4743,7 +4786,7 @@ fn infer_bump_helpers_cover_major_minor_patch_and_none() {
 		Some(BumpSeverity::Patch)
 	);
 	assert_eq!(
-		crate::infer_group_bump_from_explicit_version(&group, &workspace_root, &[], None)
+		infer_group_bump_from_explicit_version(&group, &workspace_root, &[], None)
 			.unwrap_or_else(|error| panic!("expected Ok, got: {error}")),
 		None
 	);

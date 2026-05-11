@@ -40,6 +40,10 @@ use monochange_test_helpers::git;
 use monochange_test_helpers::git_output;
 use tempfile::tempdir;
 
+fn gitlab_client() -> MonochangeResult<Client> {
+	build_http_client("GitLab")
+}
+
 use super::*;
 
 fn must_ok<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) -> T {

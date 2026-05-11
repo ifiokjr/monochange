@@ -1331,71 +1331,6 @@ fn run_lockfile_command_in_place(
 	)))
 }
 
-use monochange_test_helpers::workspace_ops::collect_workspace_files;
-use monochange_test_helpers::workspace_ops::read_optional_file;
-
-#[allow(dead_code)]
-fn collect_workspace_file_updates(
-	root: &Path,
-	temp_root: &Path,
-	base_updates: &[FileUpdate],
-	lockfile_commands: &[LockfileCommandExecution],
-) -> MonochangeResult<Vec<FileUpdate>> {
-	let normalized_root = monochange_core::normalize_path(root);
-	let mut dirs_to_scan = BTreeSet::new();
-
-	for update in base_updates {
-		if let Some(parent) = update.path.parent() {
-			let normalized = monochange_core::normalize_path(parent);
-			if let Ok(relative) = normalized.strip_prefix(&normalized_root) {
-				dirs_to_scan.insert(relative.to_path_buf());
-			}
-		}
-	}
-
-	for command in lockfile_commands {
-		let normalized = monochange_core::normalize_path(&command.cwd);
-		if let Ok(relative) = normalized.strip_prefix(&normalized_root) {
-			dirs_to_scan.insert(relative.to_path_buf());
-		} else {
-			dirs_to_scan.insert(command.cwd.clone());
-		}
-	}
-
-	// Always scan the changeset directory (files are deleted during release).
-	dirs_to_scan.insert(PathBuf::from(".changeset"));
-
-	let mut relative_paths = BTreeSet::new();
-
-	for dir in &dirs_to_scan {
-		let original_dir = root.join(dir);
-		let temp_dir = temp_root.join(dir);
-		if original_dir.is_dir() {
-			collect_workspace_files(root, &original_dir, &mut relative_paths)?;
-		}
-		if temp_dir.is_dir() {
-			collect_workspace_files(temp_root, &temp_dir, &mut relative_paths)?;
-		}
-	}
-
-	let mut updates = Vec::new();
-
-	for relative in relative_paths {
-		let before = read_optional_file(&root.join(&relative))?;
-		let after = read_optional_file(&temp_root.join(&relative))?;
-		if let Some(content) = after.filter(|content| before.as_ref() != Some(content)) {
-			updates.push(FileUpdate {
-				path: root.join(relative),
-				content,
-			});
-		}
-	}
-
-	updates.sort_by(|left, right| left.path.cmp(&right.path));
-
-	Ok(updates)
-}
-
 /// Prepare a release, update versioned files, and return the structured result.
 #[must_use = "the prepared release result must be checked"]
 pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedRelease> {
@@ -1408,16 +1343,7 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 }
 
 #[tracing::instrument(skip_all, fields(dry_run))]
-#[allow(dead_code)]
-pub(crate) fn prepare_release_execution(
-	root: &Path,
-	dry_run: bool,
-) -> MonochangeResult<PreparedReleaseExecution> {
-	prepare_release_execution_with_file_diffs(root, dry_run, true, false)
-}
-
 #[tracing::instrument(skip_all, fields(dry_run, build_file_diffs))]
-#[allow(dead_code)]
 pub(crate) fn prepare_release_execution_with_file_diffs(
 	root: &Path,
 	dry_run: bool,
