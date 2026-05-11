@@ -1798,6 +1798,9 @@ fn execute_cli_command_with_options_covers_final_artifact_save_call() {
 
 #[test]
 fn execute_cli_command_with_options_plans_publish_rate_limits_from_prepared_release_artifact() {
+	let _guard = TEST_ENV_LOCK
+		.lock()
+		.unwrap_or_else(|error| panic!("test env lock: {error}"));
 	let root = fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
 		.unwrap_or_else(|error| panic!("workspace root: {error}"));
 	let configuration = sample_configuration(&root);
@@ -1894,6 +1897,9 @@ fn execute_cli_command_with_options_rejects_readiness_for_placeholder_publish_pl
 
 #[test]
 fn execute_cli_command_with_options_reuses_prepared_release_artifact_for_versions() {
+	let _guard = TEST_ENV_LOCK
+		.lock()
+		.unwrap_or_else(|error| panic!("test env lock: {error}"));
 	let root = fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
 		.unwrap_or_else(|error| panic!("workspace root: {error}"));
 	let configuration = sample_configuration(&root);
@@ -1964,6 +1970,9 @@ fn execute_cli_command_with_options_reports_invalid_versions_artifacts() {
 
 #[test]
 fn execute_cli_command_with_options_reports_invalid_versions_output_formats() {
+	let _guard = TEST_ENV_LOCK
+		.lock()
+		.unwrap_or_else(|error| panic!("test env lock: {error}"));
 	let root = fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
 		.unwrap_or_else(|error| panic!("workspace root: {error}"));
 	let configuration = sample_configuration(&root);
