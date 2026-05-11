@@ -97,6 +97,8 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
         run: |
+          alias npm="pnpm npm"
+
           "$RUNNER_TEMP/bin/mc" publish \
             --output "$RUNNER_TEMP/publish-result.json" \
             --format json
