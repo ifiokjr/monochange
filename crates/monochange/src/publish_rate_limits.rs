@@ -17,7 +17,6 @@ use monochange_core::WorkspaceConfiguration;
 use monochange_core::materialize_dependency_edges;
 use monochange_publish::build_pending_configured_package_release_requests as build_pending_configured_requests;
 use monochange_publish::filter_pending_publish_requests;
-use monochange_publish::publish_dependency_kind_is_ordering_relevant;
 
 use crate::PreparedRelease;
 use crate::discover_workspace;
@@ -182,9 +181,7 @@ pub(super) fn sort_requests_by_dependencies(
 	// Build dependents for all edges where the target is in the request list,
 	// so we can discover unselected dependents later.
 	for edge in &edges {
-		if publish_dependency_kind_is_ordering_relevant(edge.dependency_kind)
-			&& request_ids.contains(&edge.to_package_id)
-		{
+		if request_ids.contains(&edge.to_package_id) {
 			dependents
 				.entry(edge.to_package_id.clone())
 				.or_default()
@@ -194,9 +191,7 @@ pub(super) fn sort_requests_by_dependencies(
 
 	// Build in-degree only for edges between selected packages.
 	for edge in &edges {
-		if publish_dependency_kind_is_ordering_relevant(edge.dependency_kind)
-			&& request_ids.contains(&edge.from_package_id)
-			&& request_ids.contains(&edge.to_package_id)
+		if request_ids.contains(&edge.from_package_id) && request_ids.contains(&edge.to_package_id)
 		{
 			*in_degree.get_mut(&edge.from_package_id).unwrap() += 1;
 		}

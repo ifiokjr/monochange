@@ -1,3 +1,4 @@
+use monochange_core::DependencyKind;
 use monochange_core::GroupChangelogInclude;
 use monochange_core::PackageDependency;
 use monochange_core::VersionFormat;
@@ -446,10 +447,57 @@ fn placeholder_tempdir_error_includes_io_error() {
 }
 
 #[test]
-fn publish_dependency_order_treats_development_dependencies_as_relevant() {
-	assert!(publish_dependency_kind_is_ordering_relevant(
-		DependencyKind::Development
+fn publish_dependency_order_handles_realistic_cargo_dependency_graph() {
+	let schema = publish_order_package("schema");
+
+	let mut codegen = publish_order_package("codegen");
+	codegen
+		.declared_dependencies
+		.push(publish_order_dependency("schema", DependencyKind::Runtime));
+
+	let mut test_helpers = publish_order_package("test_helpers");
+	test_helpers
+		.declared_dependencies
+		.push(publish_order_dependency("schema", DependencyKind::Runtime));
+
+	let mut core = publish_order_package("core");
+	core.declared_dependencies
+		.push(publish_order_dependency("schema", DependencyKind::Build));
+	core.declared_dependencies.push(publish_order_dependency(
+		"test_helpers",
+		DependencyKind::Development,
 	));
+
+	let mut cli = publish_order_package("cli");
+	cli.declared_dependencies
+		.push(publish_order_dependency("core", DependencyKind::Runtime));
+	cli.declared_dependencies
+		.push(publish_order_dependency("codegen", DependencyKind::Build));
+	cli.declared_dependencies.push(publish_order_dependency(
+		"test_helpers",
+		DependencyKind::Development,
+	));
+
+	let ordered = order_release_requests_by_publish_dependencies(
+		&[cli, core, test_helpers, codegen, schema],
+		vec![
+			publish_order_request("cli"),
+			publish_order_request("core"),
+			publish_order_request("test_helpers"),
+			publish_order_request("codegen"),
+			publish_order_request("schema"),
+		],
+	)
+	.expect("publish requests should be ordered");
+	let ordered_package_ids = ordered
+		.iter()
+		.map(|request| request.package_id.as_str())
+		.collect::<Vec<_>>();
+
+	assert_eq!(
+		ordered_package_ids,
+		vec!["schema", "codegen", "test_helpers", "core", "cli"]
+	);
 }
 
 #[test]
