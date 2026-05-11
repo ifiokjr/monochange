@@ -679,7 +679,7 @@ pub fn execute_publish_requests(
 		}
 
 		let trusted_publishing = if request.trusted_publishing.enabled {
-			trust_handler.trust_outcome_for_skip(request, source, root, &env_map)
+			trust_handler.trust_outcome_for_skip(request, source, root, env_map)
 		} else {
 			disabled_trust_outcome()
 		};
