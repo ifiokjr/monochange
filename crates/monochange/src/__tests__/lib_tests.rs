@@ -969,6 +969,14 @@ fn mcp_and_root_command_support_quiet_and_missing_subcommands() {
 }
 
 #[test]
+fn custom_command_diagnostic_colorizes_terminal_output() {
+	assert_eq!(
+		crate::colorize("hello", "1;31", true),
+		"\x1b[1;31mhello\x1b[0m"
+	);
+}
+
+#[test]
 fn custom_command_unexpected_argument_error_explains_configured_inputs() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
