@@ -25,6 +25,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 use tempfile::TempDir;
+use tracing::info;
 use urlencoding::encode;
 
 pub const PLACEHOLDER_VERSION: &str = "0.0.0";
@@ -516,6 +517,12 @@ pub fn execute_publish_requests(
 
 	for request in requests {
 		if request.mode == PublishMode::External {
+			info!(
+				package_name = request.package_name,
+				version = %request.version,
+				registry = %request.registry,
+				"skipping external package"
+			);
 			outcomes.push(PackagePublishOutcome {
 				package: request.package_id.clone(),
 				ecosystem: request.ecosystem,
@@ -532,8 +539,23 @@ pub fn execute_publish_requests(
 			continue;
 		}
 
+		info!(
+			package_name = request.package_name,
+			version = %request.version,
+			registry = %request.registry,
+			dry_run,
+			mode = ?mode,
+			"publishing package"
+		);
+
 		let version_exists = registry_version_exists(client, endpoints, request)?;
 		if version_exists {
+			info!(
+				package_name = request.package_name,
+				version = %request.version,
+				registry = %request.registry,
+				"skipping already-published version"
+			);
 			outcomes.push(PackagePublishOutcome {
 				package: request.package_id.clone(),
 				ecosystem: request.ecosystem,
@@ -599,6 +621,13 @@ pub fn execute_publish_requests(
 		);
 
 		if dry_run {
+			info!(
+				package_name = request.package_name,
+				version = %request.version,
+				registry = %request.registry,
+				mode = ?mode,
+				"would publish package (dry run)"
+			);
 			outcomes.push(PackagePublishOutcome {
 				package: request.package_id.clone(),
 				ecosystem: request.ecosystem,
@@ -624,11 +653,24 @@ pub fn execute_publish_requests(
 		let output = match executor.run(&publish_command) {
 			Ok(output) => output,
 			Err(error) => {
+				tracing::error!(
+					package_name = request.package_name,
+					version = %request.version,
+					registry = %request.registry,
+					error = %error,
+					"publish command failed to execute"
+				);
 				outcomes.push(failed_publish_outcome(mode, request, error.to_string()));
 				break;
 			}
 		};
 		if !output.success {
+			tracing::error!(
+				package_name = request.package_name,
+				version = %request.version,
+				registry = %request.registry,
+				"publish command returned non-zero exit"
+			);
 			let mut outcome = failed_publish_outcome(
 				mode,
 				request,
@@ -652,6 +694,12 @@ pub fn execute_publish_requests(
 			disabled_trust_outcome()
 		};
 
+		info!(
+			package_name = request.package_name,
+			version = %request.version,
+			registry = %request.registry,
+			"published package"
+		);
 		outcomes.push(PackagePublishOutcome {
 			package: request.package_id.clone(),
 			ecosystem: request.ecosystem,
