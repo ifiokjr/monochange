@@ -17,7 +17,6 @@ in
       cargo-run-bin
       cacert
       custom.mdt
-      custom.pnpm
       dprint
       gh
       git
@@ -26,6 +25,8 @@ in
       jq
       mdbook
       nixfmt
+      pnpm_10
+      nodejs_24
       python3
       rustup
       shfmt
@@ -39,7 +40,6 @@ in
 
   enterShell = ''
     set -euo pipefail
-    eval "$(pnpm-activate-env)"
     export PATH="$DEVENV_PROFILE/bin:$PATH"
   '';
 
@@ -93,22 +93,6 @@ in
         cargo run --quiet --release --package monochange --bin mc -- "$@"
       '';
       description = "The release build of the `monochange` executable";
-      binary = "bash";
-    };
-    "pnpm" = {
-      exec = ''
-        set -euo pipefail
-        strip:env ${pkgs.pnpm}/bin/pnpm "$@"
-      '';
-      description = "a wrapper for the pnpm executable";
-      binary = "bash";
-    };
-    "npm" = {
-      exec = ''
-        set -euo pipefail
-        pnpm npm "$@"
-      '';
-      description = "a wrapper for the npm executable";
       binary = "bash";
     };
     "install:all" = {
@@ -481,10 +465,9 @@ in
       exec = ''
         set -euo pipefail
 
-        exec env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT \
+        env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT \
         	-u NIX_LD -u NIX_LD_LIBRARY_PATH \
-        	-u NIX_CFLAGS_COMPILE -u NIX_LDFLAGS \
-        	"$@"
+        	-u NIX_CFLAGS_COMPILE -u NIX_LDFLAGS
       '';
       description = "Strip environment variables";
       binary = "bash";
