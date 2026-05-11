@@ -98,6 +98,21 @@ describe("parseChangedLines", () => {
 
 		assert.deepEqual([...changedLinesByFile.keys()], ["/repo/crates/monochange/src/lib.rs"]);
 	});
+
+	test("ignores xtask crate paths", () => {
+		const changedLinesByFile = parseChangedLines(
+			[
+				"diff --git a/crates/xtask/src/lib.rs b/crates/xtask/src/lib.rs",
+				"--- a/crates/xtask/src/lib.rs",
+				"+++ b/crates/xtask/src/lib.rs",
+				"@@ -9,0 +10 @@",
+				"+pub fn helper() {}",
+			].join("\n"),
+			repoRoot,
+		);
+
+		assert.equal(changedLinesByFile.size, 0);
+	});
 });
 
 describe("computePatchCoverage", () => {

@@ -76,6 +76,10 @@ function ensureLineSet(changedLinesByFile, filePath) {
 	return changedLinesByFile.get(filePath);
 }
 
+function isIgnoredCoveragePath(filePath) {
+	return filePath.includes("/crates/xtask/");
+}
+
 function isTestOnlyPath(filePath) {
 	return (
 		filePath.includes("/__tests__/") ||
@@ -92,7 +96,10 @@ export function parseChangedLines(text, repoRoot = process.cwd()) {
 	for (const line of text.split(/\r?\n/u)) {
 		if (line.startsWith("+++ ")) {
 			const normalizedPath = normalizePath(line.slice(4).trim(), repoRoot);
-			currentFile = normalizedPath && !isTestOnlyPath(normalizedPath) ? normalizedPath : null;
+			currentFile =
+				normalizedPath && !isIgnoredCoveragePath(normalizedPath) && !isTestOnlyPath(normalizedPath)
+					? normalizedPath
+					: null;
 			continue;
 		}
 

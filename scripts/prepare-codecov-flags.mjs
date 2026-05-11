@@ -33,11 +33,13 @@ function isSubpath(candidatePath, parentPath) {
 	return relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
 }
 
+const IGNORED_CRATES = new Set(["xtask"]);
+
 function parsePublicCrates(repoRoot) {
 	const cratesRoot = resolve(repoRoot, "crates");
 
 	return readdirSync(cratesRoot, { withFileTypes: true })
-		.filter((entry) => entry.isDirectory())
+		.filter((entry) => entry.isDirectory() && !IGNORED_CRATES.has(entry.name))
 		.map((entry) => {
 			const directory = resolve(cratesRoot, entry.name);
 			const cargoToml = readFileSync(resolve(directory, "Cargo.toml"), "utf8");

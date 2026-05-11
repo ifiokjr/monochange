@@ -163,7 +163,7 @@ in
     "test:cargo" = {
       exec = ''
         set -euo pipefail
-        cargo insta test --workspace --all-features --test-runner nextest --unreferenced=reject
+        cargo insta test --workspace --exclude xtask --all-features --test-runner nextest --unreferenced=reject
       '';
       description = "Run cargo tests with nextest and reject unreferenced snapshots.";
       binary = "bash";
@@ -171,7 +171,7 @@ in
     "test:cargo:expensive" = {
       exec = ''
         set -euo pipefail
-        MONOCHANGE_EXPENSIVE_TESTS=1 cargo insta test --workspace --all-features --test-runner nextest --unreferenced=reject
+        MONOCHANGE_EXPENSIVE_TESTS=1 cargo insta test --workspace --exclude xtask --all-features --test-runner nextest --unreferenced=reject
       '';
       description = "Run cargo tests with CI-only large-fixture cases enabled and reject unreferenced snapshots.";
       binary = "bash";
@@ -179,7 +179,7 @@ in
     "test:docs" = {
       exec = ''
         set -euo pipefail
-        cargo test --doc --workspace --all-features
+        cargo test --doc --workspace --exclude xtask --all-features
       '';
       description = "Run documentation tests.";
       binary = "bash";
@@ -205,9 +205,9 @@ in
         set -euo pipefail
         mkdir -p target/coverage
         cargo llvm-cov clean --workspace
-        cargo llvm-cov test --workspace --all-features --all-targets --no-report
-        cargo llvm-cov report --summary-only --fail-under-lines 70
-        cargo llvm-cov report --lcov --output-path target/coverage/lcov.info
+        cargo llvm-cov test --workspace --exclude xtask --all-features --all-targets --no-report
+        cargo llvm-cov report --ignore-filename-regex 'crates/xtask/' --summary-only --fail-under-lines 70
+        cargo llvm-cov report --ignore-filename-regex 'crates/xtask/' --lcov --output-path target/coverage/lcov.info
       '';
       description = "Run workspace coverage, enforce a 70% line-coverage floor, and write target/coverage/lcov.info.";
       binary = "bash";
@@ -449,7 +449,7 @@ in
     "snapshot:check" = {
       exec = ''
         set -euo pipefail
-        cargo insta test --workspace --all-features --test-runner nextest --unreferenced=reject
+        cargo insta test --workspace --exclude xtask --all-features --test-runner nextest --unreferenced=reject
       '';
       description = "Check insta snapshots and fail on unreferenced snapshot files.";
       binary = "bash";
@@ -457,7 +457,7 @@ in
     "snapshot:update" = {
       exec = ''
         set -euo pipefail
-        cargo insta test --workspace --all-features --test-runner nextest --force-update-snapshots --unreferenced=delete
+        cargo insta test --workspace --exclude xtask --all-features --test-runner nextest --force-update-snapshots --unreferenced=delete
       '';
       description = "Update insta snapshots and delete unreferenced snapshot files.";
       binary = "bash";
