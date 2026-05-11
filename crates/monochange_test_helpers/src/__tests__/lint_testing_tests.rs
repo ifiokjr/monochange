@@ -7,9 +7,9 @@ use monochange_core::lint::LintResult;
 use monochange_core::lint::LintSeverity;
 use monochange_core::lint::LintSuite;
 use monochange_core::lint::LintTarget;
-use monochange_test_helpers::fixture_path;
 
 use super::*;
+use crate::fixture_path;
 
 struct EmptySuite;
 

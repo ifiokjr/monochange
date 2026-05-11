@@ -83,7 +83,6 @@ monochange_go = { version = "0.4.2", path = "./crates/monochange_go" }
 monochange_graph = { version = "0.4.2", path = "./crates/monochange_graph" }
 monochange_hosting = { version = "0.4.2", path = "./crates/monochange_hosting" }
 monochange_lint = { version = "0.4.2", path = "./crates/monochange_lint" }
-monochange_lint_testing = { version = "0.4.2", path = "./crates/monochange_lint_testing" }
 monochange_linting = { version = "0.4.2", path = "./crates/monochange_linting" }
 monochange_npm = { version = "0.4.2", path = "./crates/monochange_npm" }
 monochange_publish = { version = "0.4.2", path = "./crates/monochange_publish" }

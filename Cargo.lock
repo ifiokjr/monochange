@@ -2131,7 +2131,6 @@ dependencies = [
  "insta",
  "monochange_config",
  "monochange_core",
- "monochange_lint_testing",
  "monochange_linting",
  "monochange_publish",
  "monochange_semver",
@@ -2416,15 +2415,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "monochange_lint_testing"
-version = "0.4.2"
-dependencies = [
- "monochange_core",
- "monochange_lint",
- "monochange_test_helpers",
-]
-
-[[package]]
 name = "monochange_linting"
 version = "0.4.2"
 dependencies = [
@@ -2441,7 +2431,6 @@ dependencies = [
  "monochange_core",
  "monochange_ecmascript",
  "monochange_github",
- "monochange_lint_testing",
  "monochange_linting",
  "monochange_publish",
  "monochange_test_helpers",
@@ -2531,6 +2520,7 @@ version = "0.4.2"
 dependencies = [
  "insta",
  "monochange_core",
+ "monochange_lint",
  "rmcp",
  "shlex",
  "tempfile",
