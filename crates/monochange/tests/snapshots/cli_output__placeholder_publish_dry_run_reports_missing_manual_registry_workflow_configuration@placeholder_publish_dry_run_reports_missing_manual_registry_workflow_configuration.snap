@@ -15,10 +15,10 @@ info:
     GITHUB_RUN_ID: ""
     GITHUB_WORKFLOW: ""
     GITHUB_WORKFLOW_REF: ""
-    MONOCHANGE_CRATES_IO_API_URL: "http://127.0.0.1:61222"
-    MONOCHANGE_JSR_BASE_URL: "http://127.0.0.1:61222"
-    MONOCHANGE_NPM_REGISTRY_URL: "http://127.0.0.1:61222"
-    MONOCHANGE_PUB_DEV_API_URL: "http://127.0.0.1:61222"
+    MONOCHANGE_CRATES_IO_API_URL: "http://127.0.0.1:58768"
+    MONOCHANGE_JSR_BASE_URL: "http://127.0.0.1:58768"
+    MONOCHANGE_NPM_REGISTRY_URL: "http://127.0.0.1:58768"
+    MONOCHANGE_PUB_DEV_API_URL: "http://127.0.0.1:58768"
     MONOCHANGE_TRUSTED_PUBLISHING_ENVIRONMENT: ""
     NO_COLOR: "1"
     RUST_LOG: ""
@@ -136,3 +136,9 @@ exit_code: 0
 }
 
 ----- stderr -----
+◆ Publishing 2 packages (Placeholder dry-run) across 🦀 cargo, 📦 npm
+→ 🦀 cargo core checking 0.0.0 on crates_io
+📝 🦀 cargo core would publish 0.0.0 to crates_io
+→ 📦 npm npm-pkg checking 0.0.0 on npm
+📝 📦 npm npm-pkg would publish 0.0.0 to npm
+◆ Publish complete: 2 packages, ✅ 0 published, ⏭️ 2 skipped, ❌ 0 failed

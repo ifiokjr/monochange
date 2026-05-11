@@ -10,10 +10,10 @@ info:
   env:
     GITHUB_JOB: release
     GITHUB_WORKFLOW_REF: ifiokjr/monochange/.github/workflows/publish.yml@refs/heads/main
-    MONOCHANGE_CRATES_IO_API_URL: "http://127.0.0.1:61223"
-    MONOCHANGE_JSR_BASE_URL: "http://127.0.0.1:61223"
-    MONOCHANGE_NPM_REGISTRY_URL: "http://127.0.0.1:61223"
-    MONOCHANGE_PUB_DEV_API_URL: "http://127.0.0.1:61223"
+    MONOCHANGE_CRATES_IO_API_URL: "http://127.0.0.1:58769"
+    MONOCHANGE_JSR_BASE_URL: "http://127.0.0.1:58769"
+    MONOCHANGE_NPM_REGISTRY_URL: "http://127.0.0.1:58769"
+    MONOCHANGE_PUB_DEV_API_URL: "http://127.0.0.1:58769"
     NO_COLOR: "1"
     RUST_LOG: ""
 ---
@@ -56,3 +56,9 @@ planned batches:
 - npm batch 1/1 packages: npm_pkg
 
 ----- stderr -----
+◆ Publishing 2 packages (Placeholder dry-run) across 🦀 cargo, 📦 npm
+→ 🦀 cargo core checking 0.0.0 on crates_io
+📝 🦀 cargo core would publish 0.0.0 to crates_io
+→ 📦 npm npm-pkg checking 0.0.0 on npm
+📝 📦 npm npm-pkg would publish 0.0.0 to npm
+◆ Publish complete: 2 packages, ✅ 0 published, ⏭️ 2 skipped, ❌ 0 failed
