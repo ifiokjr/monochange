@@ -96,6 +96,63 @@ fn publish_plan_integration_preserves_dependency_order_across_grouped_batches() 
 }
 
 #[test]
+fn publish_plan_all_integration_includes_every_configured_package() {
+	let tempdir = setup_publish_plan_dependency_order_repo();
+	let output = monochange_command("2026-04-06")
+		.current_dir(tempdir.path())
+		.arg("plan-release-publish")
+		.arg("--dry-run")
+		.arg("--all")
+		.arg("--format")
+		.arg("json")
+		.output()
+		.unwrap_or_else(|error| panic!("run publish all plan: {error}"));
+	assert!(
+		output.status.success(),
+		"publish all plan failed\nstdout:\n{}\nstderr:\n{}",
+		String::from_utf8_lossy(&output.stdout),
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let value: Value = serde_json::from_slice(&output.stdout)
+		.unwrap_or_else(|error| panic!("parse publish all plan json: {error}"));
+	let mut packages = value["publishRateLimits"]["batches"]
+		.as_array()
+		.unwrap_or_else(|| panic!("publish all plan batches should be an array"))
+		.iter()
+		.flat_map(|batch| {
+			batch["packages"]
+				.as_array()
+				.unwrap_or_else(|| panic!("publish all plan batch packages should be an array"))
+		})
+		.map(|package| {
+			package
+				.as_str()
+				.unwrap_or_else(|| panic!("publish all plan package should be a string"))
+				.to_string()
+		})
+		.collect::<Vec<_>>();
+	let mut expected = [
+		"ledger_types",
+		"yaml_config",
+		"zeta_transport",
+		"catalog_index",
+		"auth_policy",
+		"telemetry_core",
+		"billing_engine",
+		"notification_worker",
+		"checkout_api",
+		"fulfillment_service",
+		"public_gateway",
+		"storefront_app",
+		"orphan_tool",
+	]
+	.map(String::from);
+	packages.sort();
+	expected.sort();
+	assert_eq!(packages, expected);
+}
+
+#[test]
 fn publish_all_integration_plans_every_configured_package() {
 	let tempdir = setup_publish_plan_dependency_order_repo();
 	let output = monochange_command("2026-04-06")

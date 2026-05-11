@@ -2330,7 +2330,7 @@ impl CliStepDefinition {
 				])
 			}
 			Self::PlanPublishRateLimits { .. } => {
-				Some(&["format", "mode", "package", "ci", "readiness"])
+				Some(&["format", "mode", "package", "ci", "readiness", "all"])
 			}
 			Self::CreateChangeFile { .. } => {
 				Some(&[
@@ -2462,6 +2462,7 @@ impl CliStepDefinition {
 				match name {
 					"package" => Some(CliInputKind::StringList),
 					"readiness" => Some(CliInputKind::Path),
+					"all" => Some(CliInputKind::Boolean),
 					"format" | "mode" | "ci" => Some(CliInputKind::Choice),
 					_ => None,
 				}

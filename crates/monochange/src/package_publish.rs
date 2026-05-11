@@ -54,6 +54,7 @@ pub(crate) use monochange_publish::build_placeholder_requests;
 pub(crate) use monochange_publish::build_publish_command;
 use monochange_publish::build_publish_command_builder;
 pub(crate) use monochange_publish::build_release_requests;
+use monochange_publish::configured_package_publication_targets;
 #[cfg(test)]
 pub(crate) use monochange_publish::default_registry_kind_for_ecosystem;
 use monochange_publish::detect_trusted_publishing_identity;
@@ -267,31 +268,6 @@ pub(crate) fn release_record_package_publications_from_prepared_or_head(
 	Ok(discover_release_record(root, "HEAD")?
 		.record
 		.package_publications)
-}
-
-pub(crate) fn configured_package_publication_targets(
-	configuration: &WorkspaceConfiguration,
-	packages: &[PackageRecord],
-) -> Vec<PackagePublicationTarget> {
-	configuration
-		.packages
-		.iter()
-		.filter_map(|package_definition| {
-			let package = packages.iter().find(|package| {
-				package.metadata.get("config_id") == Some(&package_definition.id)
-			})?;
-			let version = package.current_version.as_ref()?.to_string();
-			Some(PackagePublicationTarget {
-				package: package_definition.id.clone(),
-				ecosystem: package.ecosystem,
-				registry: package_definition.publish.registry.clone(),
-				version,
-				mode: package_definition.publish.mode,
-				trusted_publishing: package_definition.publish.trusted_publishing.clone(),
-				attestations: package_definition.publish.attestations.clone(),
-			})
-		})
-		.collect()
 }
 
 struct CliPublishTrustHandler;

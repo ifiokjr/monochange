@@ -876,8 +876,9 @@ pub(crate) fn execute_cli_command_with_options(
 						&step_inputs,
 						mode,
 					)?;
+					let publish_all = boolean_step_input(&step_inputs, "all");
 					#[rustfmt::skip]
-					let report = publish_rate_limits::plan_publish_rate_limits(root, configuration, context.prepared_release.as_ref(), &selected_packages, mode, context.dry_run)?;
+					let report = publish_rate_limits::plan_publish_rate_limits_with_selection(root, configuration, context.prepared_release.as_ref(), &selected_packages, mode, context.dry_run, publish_all)?;
 					context.rate_limit_report = Some(report);
 					output = None;
 					Ok(())

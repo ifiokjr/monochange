@@ -5,6 +5,7 @@ changelog = false
 [cli.plan-release-publish]
 inputs = [
 	{ name = "format", type = "choice", choices = ["json"], default = "json" },
+	{ name = "all", type = "boolean", default = false },
 ]
 steps = [
 	{ name = "prepare release", type = "PrepareRelease" },
