@@ -39,7 +39,7 @@ pub(crate) use monochange_publish::build_release_requests;
 use monochange_publish::configured_package_publication_targets;
 use monochange_publish::detect_trusted_publishing_identity;
 use monochange_publish::disabled_trust_outcome;
-use monochange_publish::execute_publish_requests_with_process;
+use monochange_publish::execute_publish_requests_with_process_and_progress;
 use monochange_publish::manual_setup_url;
 use monochange_publish::merge_publish_resume_report;
 use monochange_publish::provider_registry_trust_capability;
@@ -54,6 +54,7 @@ use monochange_python::write_python_placeholder_manifest;
 use crate::PreparedRelease;
 use crate::discover_release_record;
 use crate::discover_workspace;
+use crate::publish_progress::StderrPublishProgressReporter;
 
 pub(crate) fn run_placeholder_publish(
 	root: &Path,
@@ -64,7 +65,8 @@ pub(crate) fn run_placeholder_publish(
 	let discovery = discover_workspace(root)?;
 	let requests =
 		build_placeholder_requests(root, configuration, &discovery.packages, selected_packages)?;
-	execute_publish_requests_with_process(
+	let progress = StderrPublishProgressReporter::new(false);
+	execute_publish_requests_with_process_and_progress(
 		root,
 		configuration.source.as_ref(),
 		PackagePublishRunMode::Placeholder,
@@ -74,6 +76,7 @@ pub(crate) fn run_placeholder_publish(
 		&placeholder_manifest_writer_registry(),
 		&publish_readiness_registry(),
 		&CliPublishTrustHandler,
+		&progress,
 	)
 }
 
@@ -209,7 +212,8 @@ fn execute_release_publish_requests(
 	dry_run: bool,
 	requests: &[PublishRequest],
 ) -> MonochangeResult<PackagePublishReport> {
-	execute_publish_requests_with_process(
+	let progress = StderrPublishProgressReporter::new(false);
+	execute_publish_requests_with_process_and_progress(
 		root,
 		configuration.source.as_ref(),
 		PackagePublishRunMode::Release,
@@ -219,6 +223,7 @@ fn execute_release_publish_requests(
 		&placeholder_manifest_writer_registry(),
 		&publish_readiness_registry(),
 		&CliPublishTrustHandler,
+		&progress,
 	)
 }
 

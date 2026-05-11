@@ -248,6 +248,7 @@ mod migration_audit;
 mod package_publish;
 mod prepared_release_cache;
 mod publish_bootstrap;
+mod publish_progress;
 mod publish_rate_limits;
 mod publish_readiness;
 mod release_artifacts;

@@ -30,6 +30,100 @@ use urlencoding::encode;
 
 pub const PLACEHOLDER_VERSION: &str = "0.0.0";
 
+pub trait EcosystemProgressPresentation {
+	fn progress_emoji(self) -> &'static str;
+	fn progress_label(self) -> &'static str;
+}
+
+impl EcosystemProgressPresentation for Ecosystem {
+	fn progress_emoji(self) -> &'static str {
+		progress_emoji_for_label(self.as_str())
+	}
+
+	fn progress_label(self) -> &'static str {
+		self.as_str()
+	}
+}
+
+fn progress_emoji_for_label(label: &str) -> &'static str {
+	match label {
+		"cargo" => "🦀",
+		"npm" => "📦",
+		"deno" => "🦕",
+		"dart" => "🎯",
+		"flutter" => "🦋",
+		"python" => "🐍",
+		"go" => "🐹",
+		_ => "🌐",
+	}
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct PublishProgressPackage {
+	pub package_id: String,
+	pub package_name: String,
+	pub version: String,
+	pub ecosystem: Ecosystem,
+	pub registry: String,
+}
+
+impl PublishProgressPackage {
+	#[must_use]
+	pub fn from_request(request: &PublishRequest) -> Self {
+		Self {
+			package_id: request.package_id.clone(),
+			package_name: request.package_name.clone(),
+			version: request.version.clone(),
+			ecosystem: request.ecosystem,
+			registry: request.registry.to_string(),
+		}
+	}
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum PublishProgressEvent {
+	RunStarted {
+		mode: PackagePublishRunMode,
+		dry_run: bool,
+		total: usize,
+		ecosystems: Vec<Ecosystem>,
+	},
+	RegistryCheckStarted(PublishProgressPackage),
+	PackageStarted(PublishProgressPackage),
+	PackageSkipped {
+		package: PublishProgressPackage,
+		message: String,
+	},
+	PackagePlanned(PublishProgressPackage),
+	PackagePublished(PublishProgressPackage),
+	PackageFailed {
+		package: PublishProgressPackage,
+		message: String,
+	},
+	RunFinished {
+		mode: PackagePublishRunMode,
+		total: usize,
+		published: usize,
+		skipped: usize,
+		failed: usize,
+	},
+}
+
+pub trait PublishProgressReporter: Send + Sync {
+	fn report(&self, event: PublishProgressEvent);
+}
+
+#[derive(Debug, Default)]
+pub struct NoopPublishProgressReporter;
+
+impl PublishProgressReporter for NoopPublishProgressReporter {
+	fn report(&self, _event: PublishProgressEvent) {}
+}
+
+fn publish_progress_package(request: &PublishRequest) -> PublishProgressPackage {
+	PublishProgressPackage::from_request(request)
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SelectedReleasePublicationTargets {
 	pub publication_targets: Vec<PackagePublicationTarget>,
@@ -471,7 +565,7 @@ pub fn execute_publish_requests_with_process(
 	let endpoints = RegistryEndpoints::from_env();
 	let client = registry_client()?;
 	let mut executor = ProcessCommandExecutor;
-	execute_publish_requests(
+	execute_publish_requests_with_progress(
 		root,
 		source,
 		mode,
@@ -485,6 +579,42 @@ pub fn execute_publish_requests_with_process(
 		manifest_writers,
 		readiness,
 		trust_handler,
+		&NoopPublishProgressReporter,
+	)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn execute_publish_requests_with_process_and_progress(
+	root: &Path,
+	source: Option<&SourceConfiguration>,
+	mode: PackagePublishRunMode,
+	dry_run: bool,
+	requests: &[PublishRequest],
+	command_builder: &PublishCommandBuilder,
+	manifest_writers: &PlaceholderManifestWriterRegistry,
+	readiness: &PublishReadinessRegistry,
+	trust_handler: &dyn PublishTrustHandler,
+	progress: &dyn PublishProgressReporter,
+) -> MonochangeResult<PackagePublishReport> {
+	let env_map = current_env_map();
+	let endpoints = RegistryEndpoints::from_env();
+	let client = registry_client()?;
+	let mut executor = ProcessCommandExecutor;
+	execute_publish_requests_with_progress(
+		root,
+		source,
+		mode,
+		dry_run,
+		requests,
+		&client,
+		&endpoints,
+		&env_map,
+		&mut executor,
+		command_builder,
+		manifest_writers,
+		readiness,
+		trust_handler,
+		progress,
 	)
 }
 
@@ -504,6 +634,53 @@ pub fn execute_publish_requests(
 	readiness: &PublishReadinessRegistry,
 	trust_handler: &dyn PublishTrustHandler,
 ) -> MonochangeResult<PackagePublishReport> {
+	execute_publish_requests_with_progress(
+		root,
+		source,
+		mode,
+		dry_run,
+		requests,
+		client,
+		endpoints,
+		env_map,
+		executor,
+		command_builder,
+		manifest_writers,
+		readiness,
+		trust_handler,
+		&NoopPublishProgressReporter,
+	)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn execute_publish_requests_with_progress(
+	root: &Path,
+	source: Option<&SourceConfiguration>,
+	mode: PackagePublishRunMode,
+	dry_run: bool,
+	requests: &[PublishRequest],
+	client: &Client,
+	endpoints: &RegistryEndpoints,
+	env_map: &BTreeMap<String, String>,
+	executor: &mut dyn CommandExecutor,
+	command_builder: &PublishCommandBuilder,
+	manifest_writers: &PlaceholderManifestWriterRegistry,
+	readiness: &PublishReadinessRegistry,
+	trust_handler: &dyn PublishTrustHandler,
+	progress: &dyn PublishProgressReporter,
+) -> MonochangeResult<PackagePublishReport> {
+	let ecosystems = requests
+		.iter()
+		.map(|request| request.ecosystem)
+		.collect::<BTreeSet<_>>()
+		.into_iter()
+		.collect::<Vec<_>>();
+	progress.report(PublishProgressEvent::RunStarted {
+		mode,
+		dry_run,
+		total: requests.len(),
+		ecosystems,
+	});
 	let mut outcomes = Vec::new();
 
 	for request in requests {
@@ -514,6 +691,10 @@ pub fn execute_publish_requests(
 				registry = %request.registry,
 				"skipping external package"
 			);
+			progress.report(PublishProgressEvent::PackageSkipped {
+				package: publish_progress_package(request),
+				message: "package opted out of built-in publishing".to_string(),
+			});
 			outcomes.push(PackagePublishOutcome {
 				package: request.package_id.clone(),
 				ecosystem: request.ecosystem,
@@ -539,6 +720,9 @@ pub fn execute_publish_requests(
 			"publishing package"
 		);
 
+		progress.report(PublishProgressEvent::RegistryCheckStarted(
+			publish_progress_package(request),
+		));
 		let version_exists = registry_version_exists(client, endpoints, request)?;
 		if version_exists {
 			info!(
@@ -547,6 +731,13 @@ pub fn execute_publish_requests(
 				registry = %request.registry,
 				"skipping already-published version"
 			);
+			progress.report(PublishProgressEvent::PackageSkipped {
+				package: publish_progress_package(request),
+				message: format!(
+					"{} {} already exists on {}",
+					request.package_name, request.version, request.registry
+				),
+			});
 			outcomes.push(PackagePublishOutcome {
 				package: request.package_id.clone(),
 				ecosystem: request.ecosystem,
@@ -573,6 +764,10 @@ pub fn execute_publish_requests(
 			None
 		};
 		if let Some(message) = blocked_message {
+			progress.report(PublishProgressEvent::PackageSkipped {
+				package: publish_progress_package(request),
+				message: message.clone(),
+			});
 			if dry_run {
 				outcomes.push(PackagePublishOutcome {
 					package: request.package_id.clone(),
@@ -612,6 +807,9 @@ pub fn execute_publish_requests(
 		);
 
 		if dry_run {
+			progress.report(PublishProgressEvent::PackagePlanned(
+				publish_progress_package(request),
+			));
 			if mode == PackagePublishRunMode::Placeholder {
 				outcomes.push(PackagePublishOutcome {
 					package: request.package_id.clone(),
@@ -644,9 +842,18 @@ pub fn execute_publish_requests(
 			enforce_release_attestation_prerequisites(request, env_map, command_builder)?;
 		}
 
+		if !dry_run {
+			progress.report(PublishProgressEvent::PackageStarted(
+				publish_progress_package(request),
+			));
+		}
 		let output = match executor.run(&publish_command) {
 			Ok(output) => output,
 			Err(error) => {
+				progress.report(PublishProgressEvent::PackageFailed {
+					package: publish_progress_package(request),
+					message: error.to_string(),
+				});
 				tracing::error!(
 					package_name = request.package_name,
 					version = %request.version,
@@ -659,6 +866,10 @@ pub fn execute_publish_requests(
 			}
 		};
 		if !output.success {
+			progress.report(PublishProgressEvent::PackageFailed {
+				package: publish_progress_package(request),
+				message: render_command_error(&output),
+			});
 			tracing::error!(
 				package_name = request.package_name,
 				version = %request.version,
@@ -713,6 +924,9 @@ pub fn execute_publish_requests(
 				planned_publish_message(mode, request),
 			)
 		} else {
+			progress.report(PublishProgressEvent::PackagePublished(
+				publish_progress_package(request),
+			));
 			(
 				PackagePublishStatus::Published,
 				format!(
@@ -743,6 +957,22 @@ pub fn execute_publish_requests(
 		});
 	}
 
+	let published = outcomes
+		.iter()
+		.filter(|outcome| outcome.status == PackagePublishStatus::Published)
+		.count();
+	let failed = outcomes
+		.iter()
+		.filter(|outcome| outcome.status == PackagePublishStatus::Failed)
+		.count();
+	let skipped = outcomes.len().saturating_sub(published + failed);
+	progress.report(PublishProgressEvent::RunFinished {
+		mode,
+		total: outcomes.len(),
+		published,
+		skipped,
+		failed,
+	});
 	Ok(PackagePublishReport {
 		mode,
 		dry_run,

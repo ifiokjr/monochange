@@ -376,6 +376,143 @@ fn sample_publish_request_for_registry(registry: RegistryKind) -> PublishRequest
 	}
 }
 
+#[derive(Default)]
+struct RecordingPublishProgressReporter {
+	events: std::sync::Mutex<Vec<PublishProgressEvent>>,
+}
+
+impl PublishProgressReporter for RecordingPublishProgressReporter {
+	fn report(&self, event: PublishProgressEvent) {
+		self.events.lock().unwrap().push(event);
+	}
+}
+
+struct PanickingCommandExecutor;
+
+impl CommandExecutor for PanickingCommandExecutor {
+	fn run(&mut self, _spec: &CommandSpec) -> MonochangeResult<CommandOutput> {
+		panic!("external packages must not run publish commands");
+	}
+}
+
+struct TestPublishTrustHandler;
+
+impl PublishTrustHandler for TestPublishTrustHandler {
+	fn trust_outcome_for_skip(
+		&self,
+		_request: &PublishRequest,
+		_source: Option<&SourceConfiguration>,
+		_root: &Path,
+		_env_map: &BTreeMap<String, String>,
+	) -> TrustedPublishingOutcome {
+		disabled_trust_outcome()
+	}
+
+	fn planned_trust_outcome(
+		&self,
+		_request: &PublishRequest,
+		_source: Option<&SourceConfiguration>,
+		_root: &Path,
+		_env_map: &BTreeMap<String, String>,
+	) -> TrustedPublishingOutcome {
+		disabled_trust_outcome()
+	}
+
+	fn enforce_release_trust_prerequisites(
+		&self,
+		_request: &PublishRequest,
+		_source: Option<&SourceConfiguration>,
+		_root: &Path,
+		_env_map: &BTreeMap<String, String>,
+	) -> MonochangeResult<()> {
+		Ok(())
+	}
+}
+
+#[test]
+fn ecosystem_progress_presentation_uses_portable_emojis() {
+	assert_eq!(Ecosystem::Cargo.progress_emoji(), "🦀");
+	assert_eq!(Ecosystem::Npm.progress_emoji(), "📦");
+	assert_eq!(Ecosystem::Deno.progress_emoji(), "🦕");
+	assert_eq!(Ecosystem::Dart.progress_emoji(), "🎯");
+	assert_eq!(Ecosystem::Flutter.progress_emoji(), "🦋");
+	assert_eq!(Ecosystem::Python.progress_emoji(), "🐍");
+	assert_eq!(Ecosystem::Go.progress_emoji(), "🐹");
+	assert_eq!(Ecosystem::Cargo.progress_label(), "cargo");
+	assert_eq!(progress_emoji_for_label("future"), "🌐");
+}
+
+#[test]
+fn execute_publish_requests_uses_noop_progress_reporter_by_default() {
+	let report = execute_publish_requests_with_process(
+		Path::new("."),
+		None,
+		PackagePublishRunMode::Release,
+		false,
+		&[],
+		&build_publish_command_builder(),
+		&PlaceholderManifestWriterRegistry::new(),
+		&PublishReadinessRegistry::new(),
+		&TestPublishTrustHandler,
+	)
+	.unwrap();
+
+	assert!(report.packages.is_empty());
+}
+
+#[test]
+fn publish_progress_reports_external_skip_and_summary_events() {
+	let mut request = sample_publish_request_for_registry(RegistryKind::Npm);
+	request.mode = PublishMode::External;
+	let requests = vec![request];
+	let progress = RecordingPublishProgressReporter::default();
+	let mut executor = PanickingCommandExecutor;
+
+	let report = execute_publish_requests_with_progress(
+		Path::new("."),
+		None,
+		PackagePublishRunMode::Release,
+		false,
+		&requests,
+		&registry_client().unwrap(),
+		&RegistryEndpoints::from_env(),
+		&BTreeMap::new(),
+		&mut executor,
+		&build_publish_command_builder(),
+		&PlaceholderManifestWriterRegistry::new(),
+		&PublishReadinessRegistry::new(),
+		&TestPublishTrustHandler,
+		&progress,
+	)
+	.unwrap();
+
+	assert_eq!(
+		report.packages[0].status,
+		PackagePublishStatus::SkippedExternal
+	);
+	let events = progress.events.lock().unwrap();
+	assert!(matches!(
+		events.first(),
+		Some(PublishProgressEvent::RunStarted { total: 1, ecosystems, .. })
+			if ecosystems == &vec![Ecosystem::Npm]
+	));
+	assert!(matches!(
+		&events[1],
+		PublishProgressEvent::PackageSkipped { package, message }
+			if package.package_name == "pkg" && message == "package opted out of built-in publishing"
+	));
+	assert!(matches!(
+		events.last(),
+		Some(PublishProgressEvent::RunFinished {
+			total: 1,
+			published: 0,
+			skipped: 1,
+			failed: 0,
+			..
+		})
+	));
+}
+
 #[test]
 fn publish_readiness_registry_push_checker_and_missing_checker_paths() {
 	let request = sample_publish_request_for_registry(RegistryKind::Npm);
