@@ -67,7 +67,6 @@ use crate::cli_runtime::retarget_operation_label;
 use crate::cli_runtime::should_execute_cli_step;
 use crate::cli_runtime::template_value_to_input_values;
 use crate::discover_workspace;
-use crate::git_support::read_git_commit_message;
 use crate::git_support::run_git_capture;
 use crate::git_support::run_git_process;
 use crate::git_support::run_git_status;
@@ -88,6 +87,14 @@ use crate::workspace_ops::render_interactive_changeset_markdown;
 
 fn clear_dedup_cache() {
 	crate::release_artifacts::DEDUPLICATED_CACHE.with(|cache| cache.borrow_mut().clear());
+}
+
+fn read_git_commit_message(root: &Path, commit: &str) -> monochange_core::MonochangeResult<String> {
+	run_git_capture(
+		root,
+		&["show", "-s", "--format=%B", commit],
+		&format!("failed to read commit message for `{commit}`"),
+	)
 }
 
 #[allow(unused_macro_rules)]

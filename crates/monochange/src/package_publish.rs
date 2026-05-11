@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::path::Path;
-use std::path::PathBuf;
 
 use monochange_cargo::cargo_publish_readiness_blockers;
 use monochange_cargo::publish_blocked_message;
@@ -18,14 +17,10 @@ use monochange_dart::write_dart_placeholder_manifest;
 use monochange_deno::write_jsr_placeholder_manifest;
 use monochange_github::format_manual_trust_context;
 use monochange_github::resolve_github_trust_context;
-use monochange_github::trust_list_contains_context;
 use monochange_github::verify_github_trust_context;
 use monochange_go::write_go_placeholder_manifest;
-use monochange_npm::build_npm_trust_command;
 use monochange_npm::render_npm_trust_command;
 use monochange_npm::write_npm_placeholder_manifest;
-use monochange_publish::CommandExecutor;
-use monochange_publish::CommandSpec;
 pub(crate) use monochange_publish::PackagePublishOutcome;
 pub(crate) use monochange_publish::PackagePublishReport;
 pub(crate) use monochange_publish::PackagePublishRunMode;
@@ -34,33 +29,25 @@ use monochange_publish::PlaceholderManifestWriterRegistry;
 use monochange_publish::PublishReadinessRegistry;
 pub(crate) use monochange_publish::PublishRequest;
 use monochange_publish::PublishTrustHandler;
-use monochange_publish::RegistryEndpoints;
 use monochange_publish::TrustedPublishingIdentity;
 pub(crate) use monochange_publish::TrustedPublishingOutcome;
 pub(crate) use monochange_publish::TrustedPublishingStatus;
-use monochange_publish::build_placeholder_directory as build_placeholder_directory_with_writers;
 pub(crate) use monochange_publish::build_placeholder_requests;
 use monochange_publish::build_publish_command_builder;
 pub(crate) use monochange_publish::build_release_requests;
 use monochange_publish::detect_trusted_publishing_identity;
 use monochange_publish::disabled_trust_outcome;
-use monochange_publish::enforce_release_attestation_prerequisites as enforce_release_attestation_prerequisites_impl;
-use monochange_publish::execute_publish_requests as execute_publish_requests_impl;
 use monochange_publish::execute_publish_requests_with_process;
 use monochange_publish::manual_setup_url;
 use monochange_publish::merge_publish_resume_report;
 use monochange_publish::provider_registry_trust_capability;
 use monochange_publish::read_publish_report_artifact;
 use monochange_publish::reject_npm_token_environment;
-use monochange_publish::render_command;
-use monochange_publish::render_command_error;
 use monochange_publish::resume_publish_requests;
 use monochange_publish::select_release_publication_targets;
 use monochange_publish::trusted_publishing_capability_message;
 use monochange_publish::trusted_publishing_capability_message_for_builtin;
 use monochange_python::write_python_placeholder_manifest;
-use reqwest::blocking::Client;
-use tempfile::TempDir;
 
 use crate::PreparedRelease;
 use crate::discover_release_record;
@@ -247,48 +234,6 @@ impl PublishTrustHandler for CliPublishTrustHandler {
 	}
 }
 
-#[allow(clippy::too_many_arguments)]
-#[allow(dead_code)]
-fn execute_publish_requests(
-	root: &Path,
-	source: Option<&SourceConfiguration>,
-	mode: PackagePublishRunMode,
-	dry_run: bool,
-	requests: &[PublishRequest],
-	client: &Client,
-	endpoints: &RegistryEndpoints,
-	env_map: &BTreeMap<String, String>,
-	executor: &mut dyn CommandExecutor,
-) -> MonochangeResult<PackagePublishReport> {
-	execute_publish_requests_impl(
-		root,
-		source,
-		mode,
-		dry_run,
-		requests,
-		client,
-		endpoints,
-		env_map,
-		executor,
-		&build_publish_command_builder(),
-		&placeholder_manifest_writer_registry(),
-		&publish_readiness_registry(),
-		&CliPublishTrustHandler,
-	)
-}
-
-#[allow(dead_code)]
-pub(crate) fn enforce_release_attestation_prerequisites(
-	request: &PublishRequest,
-	env_map: &BTreeMap<String, String>,
-) -> MonochangeResult<()> {
-	enforce_release_attestation_prerequisites_impl(
-		request,
-		env_map,
-		&build_publish_command_builder(),
-	)
-}
-
 fn enforce_release_trust_prerequisites(
 	request: &PublishRequest,
 	source: Option<&SourceConfiguration>,
@@ -404,90 +349,6 @@ fn planned_trust_outcome(
 	} else {
 		manual_trust_outcome(request, source, root, env_map)
 	}
-}
-
-#[allow(dead_code)]
-fn build_npm_trust_list_command(request: &PublishRequest) -> CommandSpec {
-	CommandSpec {
-		program: "npm".to_string(),
-		args: vec![
-			"trust".to_string(),
-			"ls".to_string(),
-			request.package_name.clone(),
-		],
-		cwd: PathBuf::new(),
-	}
-}
-
-#[allow(dead_code)]
-fn configure_npm_trusted_publishing(
-	request: &PublishRequest,
-	source: Option<&SourceConfiguration>,
-	root: &Path,
-	env_map: &BTreeMap<String, String>,
-	executor: &mut dyn CommandExecutor,
-) -> MonochangeResult<TrustedPublishingOutcome> {
-	let context = resolve_github_trust_context(root, source, &request.trusted_publishing, env_map)?;
-	let list_command = build_npm_trust_list_command(request);
-	let list_output = executor.run(&list_command)?;
-	if trust_list_contains_context(&list_output.stdout, &context) {
-		return Ok(TrustedPublishingOutcome {
-			status: TrustedPublishingStatus::Configured,
-			repository: Some(context.repository),
-			workflow: Some(context.workflow),
-			environment: context.environment,
-			setup_url: Some(manual_setup_url(request)),
-			message: "npm trusted publishing already matches the current GitHub workflow"
-				.to_string(),
-		});
-	}
-
-	let trust_command = build_npm_trust_command(request, &context);
-	let trust_output = executor.run(&trust_command)?;
-	if !trust_output.success {
-		return Err(MonochangeError::Discovery(format!(
-			"`{}` failed: {}",
-			render_command(&trust_command),
-			render_command_error(&trust_output)
-		)));
-	}
-
-	let verify_output = executor.run(&list_command)?;
-	if !trust_list_contains_context(&verify_output.stdout, &context) {
-		return Err(MonochangeError::Discovery(format!(
-			"npm trusted publishing could not be verified for `{}` after running `{}`",
-			request.package_name,
-			render_command(&trust_command)
-		)));
-	}
-
-	Ok(TrustedPublishingOutcome {
-		status: TrustedPublishingStatus::Configured,
-		repository: Some(context.repository),
-		workflow: Some(context.workflow),
-		environment: context.environment,
-		setup_url: Some(manual_setup_url(request)),
-		message: "configured npm trusted publishing for the current GitHub workflow".to_string(),
-	})
-}
-
-#[allow(dead_code)]
-pub(crate) fn build_placeholder_directory(
-	root: &Path,
-	request: &PublishRequest,
-	source: Option<&SourceConfiguration>,
-) -> MonochangeResult<TempDir> {
-	build_placeholder_directory_with_writers(
-		root,
-		request,
-		source,
-		&placeholder_manifest_writer_registry(),
-	)
-}
-
-#[allow(dead_code)]
-fn placeholder_tempdir_error(error: &std::io::Error) -> MonochangeError {
-	MonochangeError::Io(format!("failed to create placeholder tempdir: {error}"))
 }
 
 fn publish_readiness_registry() -> PublishReadinessRegistry {

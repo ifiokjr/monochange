@@ -1,8 +1,6 @@
-use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
-use std::process::Stdio;
 
 use monochange_core::CommitMessage;
 use monochange_core::MonochangeError;
@@ -180,16 +178,6 @@ pub(crate) fn find_release_record_files_at_commit(
 	}
 }
 
-#[allow(dead_code)]
-#[must_use = "the commit message result must be checked"]
-pub(crate) fn read_git_commit_message(root: &Path, commit: &str) -> MonochangeResult<String> {
-	run_git_capture(
-		root,
-		&["show", "-s", "--format=%B", commit],
-		&format!("failed to read commit message for `{commit}`"),
-	)
-}
-
 #[tracing::instrument(skip_all, fields(args = ?args))]
 pub(crate) fn run_git_capture(
 	root: &Path,
@@ -362,28 +350,6 @@ pub(crate) fn run_git_process(
 ) -> MonochangeResult<()> {
 	let output = command
 		.output()
-		.map_err(|error| MonochangeError::Discovery(format!("{error_message}: {error}")))?;
-	handle_git_process_output(&output, error_message)
-}
-
-#[allow(dead_code)]
-pub(crate) fn run_git_process_with_stdin(
-	mut command: ProcessCommand,
-	input: &[u8],
-	error_message: &str,
-) -> MonochangeResult<()> {
-	let mut child = command
-		.stdout(Stdio::piped())
-		.stderr(Stdio::piped())
-		.spawn()
-		.map_err(|error| MonochangeError::Discovery(format!("{error_message}: {error}")))?;
-	if let Some(mut stdin) = child.stdin.take() {
-		stdin
-			.write_all(input)
-			.map_err(|error| MonochangeError::Discovery(format!("{error_message}: {error}")))?;
-	}
-	let output = child
-		.wait_with_output()
 		.map_err(|error| MonochangeError::Discovery(format!("{error_message}: {error}")))?;
 	handle_git_process_output(&output, error_message)
 }
