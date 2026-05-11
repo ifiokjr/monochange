@@ -81,6 +81,7 @@ pub(crate) use cli_runtime::execute_cli_command;
 use cli_runtime::execute_matches;
 pub(crate) use cli_runtime::maybe_render_markdown_for_terminal;
 pub(crate) use cli_runtime::parse_output_format;
+use command_wizard::run_command_wizard;
 use git_support::git_commit_paths;
 use git_support::git_head_commit;
 use git_support::git_stage_paths;
@@ -237,6 +238,7 @@ mod cli_help;
 mod cli_progress;
 mod cli_runtime;
 mod cli_theme;
+mod command_wizard;
 mod git_support;
 mod hosted_sources;
 mod interactive;
@@ -776,6 +778,12 @@ where
 					result.added_commands.join(", ")
 				))
 			}
+		}
+		Some(("command", _)) => {
+			if quiet {
+				return Ok(String::new());
+			}
+			run_command_wizard(root)
 		}
 		Some(("skill", skill_matches)) => {
 			let forwarded_args = skill_matches

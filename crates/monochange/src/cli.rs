@@ -211,6 +211,7 @@ When provided, the generated config includes:\n\
 			.subcommand(Command::new("populate").about(
 				"Add any missing built-in CLI commands to monochange.toml so you can customize them",
 			))
+			.subcommand(build_command_wizard_subcommand())
 			.subcommand(build_skill_subcommand())
 			.subcommand(build_subagents_subcommand())
 			.subcommand(build_analyze_subcommand())
@@ -247,6 +248,14 @@ When provided, the generated config includes:\n\
 	}
 
 	command
+}
+
+pub(crate) fn build_command_wizard_subcommand() -> Command {
+	Command::new("command")
+		.about("Open an interactive dashboard for adding or editing config-defined CLI commands")
+		.after_help(
+			"Examples:\n  mc command\n\nUse this wizard to create or revise [cli.<name>] entries in monochange.toml. It keeps existing command details unless you choose to replace them.",
+		)
 }
 
 pub(crate) fn build_skill_subcommand() -> Command {

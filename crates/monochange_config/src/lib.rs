@@ -140,11 +140,12 @@ use serde::Deserialize;
 use serde_yaml_ng::Mapping;
 
 const CONFIG_FILE: &str = "monochange.toml";
-const RESERVED_CLI_COMMAND_NAMES: &[&str] = &[
+pub const RESERVED_CLI_COMMAND_NAMES: &[&str] = &[
 	"agent",
 	"agents",
 	"analyze",
 	"check",
+	"command",
 	"fix",
 	"help",
 	"init",
