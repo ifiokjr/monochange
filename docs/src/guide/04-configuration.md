@@ -182,6 +182,9 @@ mode = "builtin"
 registry = "npm"
 trusted_publishing = true
 
+[ecosystems.npm.publish_order]
+dependency_fields = ["dependencies", "devDependencies", "peerDependencies", "catalogDependencies"]
+
 [ecosystems.npm.publish.trusted_publishing]
 workflow = "publish.yml"
 environment = "publisher"
@@ -208,6 +211,7 @@ Supported fields:
 - `attestations.require_registry_provenance` - require registry-native package provenance when the selected registry/provider capability supports it
 - `rate_limits.enforce` - block built-in publish runs when the selected package set exceeds a known single registry window
 - `placeholder.readme` - inline placeholder README content
+- `publish_order.dependency_fields` - ecosystem-level dependency fields used to topologically order package publishes
 - `placeholder.readme_file` - workspace-relative file to use as placeholder README content
 
 Inheritance flows from `[ecosystems.<name>.publish]` to matching packages, and package-level values override the inherited ecosystem defaults. Configure shared trusted-publishing, attestation, and context policy on the ecosystem, then use package-level publish settings for opt-outs or package-specific workflows.
@@ -237,6 +241,36 @@ For each managed package with built-in publishing enabled, monochange:
 - renders a default placeholder README unless `placeholder.readme` or `placeholder.readme_file` overrides it
 
 `placeholder.readme` and `placeholder.readme_file` are mutually exclusive. If both are set, config validation fails.
+
+### Publish order dependency fields
+
+`publish_order.dependency_fields` controls which manifest dependency fields create publish-order edges for an ecosystem. npm defaults to `dependencies` and `devDependencies`, so peer packages do not block publishing unless opted in. Cargo defaults stay `dependencies`, `dev-dependencies`, and `build-dependencies`. Deno defaults to `dependencies` and `imports`, Dart/Flutter default to `dependencies` and `dev_dependencies`, Python defaults to `dependencies`, and Go defaults to `require`. Optional Python extras (`optional-dependencies`) and Poetry groups (`group.dependencies`) only affect publish order when you opt in.
+
+```toml
+[ecosystems.npm.publish_order]
+# Add peer and custom package.json fields.
+dependency_fields = ["dependencies", "devDependencies", "peerDependencies", "catalogDependencies"]
+```
+
+```toml
+[ecosystems.npm.publish_order]
+# Or remove devDependencies from publish ordering.
+dependency_fields = ["dependencies"]
+```
+
+```toml
+[ecosystems.python.publish_order]
+# Include optional dependency groups in Python publish ordering.
+dependency_fields = ["dependencies", "optional-dependencies", "group.dependencies"]
+```
+
+```toml
+[ecosystems.go.publish_order]
+# An empty list disables Go require-based publish ordering.
+dependency_fields = []
+```
+
+The same resolved policy is used by `mc plan-release-publish` and `mc publish`.
 
 ### Trusted publishing
 

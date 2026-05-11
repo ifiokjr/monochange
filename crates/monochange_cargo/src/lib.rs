@@ -1045,6 +1045,7 @@ fn parse_dependency_table(
 							.and_then(|table| table.get("optional"))
 							.and_then(Value::as_bool)
 							.unwrap_or(false),
+						source_field: Some(section.to_string()),
 					}
 				})
 				.collect::<Vec<_>>()

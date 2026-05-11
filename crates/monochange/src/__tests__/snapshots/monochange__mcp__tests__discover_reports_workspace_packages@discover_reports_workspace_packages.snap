@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/src/__tests__/mcp_tests.rs
+assertion_line: 378
 expression: content_text(&result)
 ---
 {
@@ -12,6 +13,7 @@ expression: content_text(&result)
         "from_package_id": "cargo:crates/app/Cargo.toml",
         "is_direct": true,
         "is_optional": false,
+        "source_field": "dependencies",
         "source_kind": "manifest",
         "to_package_id": "cargo:crates/core/Cargo.toml",
         "version_constraint": null
@@ -25,6 +27,7 @@ expression: content_text(&result)
             "kind": "runtime",
             "name": "workflow-core",
             "optional": false,
+            "source_field": "dependencies",
             "version_constraint": null
           }
         ],

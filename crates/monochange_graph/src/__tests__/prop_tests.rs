@@ -86,6 +86,7 @@ proptest! {
 						version_constraint: None,
 						is_optional: false,
 						is_direct: true,
+		source_field: None,
 					}
 				})
 				.collect()

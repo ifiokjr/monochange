@@ -1970,6 +1970,14 @@ fn sample_npm_dependency(name: &str, kind: DependencyKind) -> monochange_core::P
 		kind,
 		version_constraint: Some("workspace:*".to_string()),
 		optional: false,
+		source_field: Some(
+			match kind {
+				DependencyKind::Development => "devDependencies",
+				DependencyKind::Peer => "peerDependencies",
+				_ => "dependencies",
+			}
+			.to_string(),
+		),
 	}
 }
 

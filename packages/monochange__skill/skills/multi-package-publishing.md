@@ -23,6 +23,9 @@ mode = "builtin"
 registry = "npm"
 trusted_publishing = true
 
+[ecosystems.npm.publish_order]
+dependency_fields = ["dependencies", "devDependencies"]
+
 [package."@acme/private-app"]
 path = "apps/private"
 type = "npm"
@@ -37,6 +40,8 @@ publish = { enabled = true, mode = "external" }
 Built-in publishing targets canonical public registries. Use external mode for private registries, custom scheduling, or registry-specific orchestration that monochange should not manage.
 
 Prefer ecosystem-level defaults when every public package publishes the same way, then override individual package tables for private packages, custom registries, or packages that need a different trust model.
+
+Publish ordering uses ecosystem-specific dependency fields. npm defaults to `dependencies` and `devDependencies`; add `peerDependencies` or custom package.json fields through `[ecosystems.npm.publish_order].dependency_fields`, or remove `devDependencies` by setting the list to only `dependencies`. Cargo continues to order by `dependencies`, `dev-dependencies`, and `build-dependencies`. Deno uses `dependencies` and `imports`, Dart/Flutter use `dependencies` and `dev_dependencies`, Python uses `dependencies`, and Go uses `require` by default. Opt Python into `optional-dependencies` or `group.dependencies` only when optional extras or Poetry groups should block publish order.
 
 ## Safety
 

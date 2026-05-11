@@ -9215,6 +9215,7 @@ fn build_cargo_manifest_updates_updates_dependents_of_released_packages() {
 			kind: monochange_core::DependencyKind::Runtime,
 			version_constraint: Some("1.0.0".to_string()),
 			optional: false,
+			source_field: None,
 		});
 
 	let plan = monochange_core::ReleasePlan {
@@ -12504,6 +12505,7 @@ fn discovery_report_helpers_include_version_groups_and_warnings() {
 			source_kind: monochange_core::DependencySourceKind::Manifest,
 			version_constraint: Some("^1.2.3".to_string()),
 			is_optional: false,
+			source_field: None,
 			is_direct: true,
 		}],
 		version_groups: vec![monochange_core::VersionGroup {

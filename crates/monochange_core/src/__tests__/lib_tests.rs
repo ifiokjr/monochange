@@ -69,6 +69,7 @@ use crate::VersionedFileDefinition;
 use crate::WorkspaceConfiguration;
 use crate::WorkspaceDefaults;
 use crate::default_cli_commands;
+use crate::default_publish_order_dependency_fields;
 use crate::git::git_checkout_branch_command;
 use crate::git::git_command;
 use crate::git::git_current_branch;
@@ -76,6 +77,38 @@ use crate::git::git_head_commit;
 use crate::git::git_push_branch_command;
 use crate::materialize_dependency_edges;
 use crate::render_release_notes;
+
+#[test]
+fn default_publish_order_dependency_fields_cover_all_ecosystems() {
+	assert_eq!(
+		default_publish_order_dependency_fields(Ecosystem::Cargo),
+		["dependencies", "dev-dependencies", "build-dependencies"]
+	);
+	assert_eq!(
+		default_publish_order_dependency_fields(Ecosystem::Npm),
+		["dependencies", "devDependencies"]
+	);
+	assert_eq!(
+		default_publish_order_dependency_fields(Ecosystem::Deno),
+		["dependencies", "imports"]
+	);
+	assert_eq!(
+		default_publish_order_dependency_fields(Ecosystem::Dart),
+		["dependencies", "dev_dependencies"]
+	);
+	assert_eq!(
+		default_publish_order_dependency_fields(Ecosystem::Flutter),
+		["dependencies", "dev_dependencies"]
+	);
+	assert_eq!(
+		default_publish_order_dependency_fields(Ecosystem::Python),
+		["dependencies"]
+	);
+	assert_eq!(
+		default_publish_order_dependency_fields(Ecosystem::Go),
+		["require"]
+	);
+}
 
 fn must_ok<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) -> T {
 	match result {
@@ -757,6 +790,7 @@ fn package_dependencies_preserve_kind_and_constraint() {
 		kind: DependencyKind::Runtime,
 		version_constraint: Some("^1.0.0".to_string()),
 		optional: false,
+		source_field: None,
 	};
 
 	assert_eq!(dependency.kind, DependencyKind::Runtime);
@@ -786,6 +820,7 @@ fn materialize_dependency_edges_matches_dependency_names_to_packages() {
 		kind: DependencyKind::Runtime,
 		version_constraint: Some("^1.0.0".to_string()),
 		optional: false,
+		source_field: None,
 	});
 
 	let edges = materialize_dependency_edges(&[source.clone(), target.clone()]);

@@ -447,6 +447,7 @@ fn parse_require_entry(entry: &str) -> Option<PackageDependency> {
 		kind,
 		version_constraint: constraint,
 		optional: false,
+		source_field: Some("require".to_string()),
 	})
 }
 

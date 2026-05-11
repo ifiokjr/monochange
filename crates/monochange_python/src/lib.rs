@@ -564,6 +564,7 @@ fn parse_pep621_dependencies(project: &Value) -> Vec<PackageDependency> {
 					kind: DependencyKind::Runtime,
 					version_constraint: extract_version_constraint(spec, &name),
 					optional: false,
+					source_field: Some("dependencies".to_string()),
 				});
 			}
 		}
@@ -584,6 +585,7 @@ fn parse_pep621_dependencies(project: &Value) -> Vec<PackageDependency> {
 							kind: DependencyKind::Development,
 							version_constraint: extract_version_constraint(spec, &name),
 							optional: true,
+							source_field: Some("optional-dependencies".to_string()),
 						});
 					}
 				}
@@ -617,6 +619,7 @@ fn parse_poetry_dependencies(poetry: &Value) -> Vec<PackageDependency> {
 				kind: DependencyKind::Runtime,
 				version_constraint: constraint,
 				optional: false,
+				source_field: Some("dependencies".to_string()),
 			});
 		}
 	}
@@ -645,6 +648,7 @@ fn parse_poetry_dependencies(poetry: &Value) -> Vec<PackageDependency> {
 						kind: DependencyKind::Development,
 						version_constraint: constraint,
 						optional: false,
+						source_field: Some("group.dependencies".to_string()),
 					});
 				}
 			}

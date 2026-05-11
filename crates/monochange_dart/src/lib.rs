@@ -611,9 +611,11 @@ fn manifest_publish_state(parsed: &Mapping) -> PublishState {
 fn parse_dependencies(parsed: &Mapping) -> Vec<PackageDependency> {
 	["dependencies", "dev_dependencies"]
 		.into_iter()
-		.filter_map(|section| yaml_mapping(parsed, section))
-		.flat_map(|dependencies| {
-			dependencies.iter().map(|(name, value)| {
+		.filter_map(|section| {
+			yaml_mapping(parsed, section).map(|dependencies| (section, dependencies))
+		})
+		.flat_map(|(section, dependencies)| {
+			dependencies.iter().map(move |(name, value)| {
 				PackageDependency {
 					name: name.as_str().unwrap_or_default().to_string(),
 					kind: DependencyKind::Runtime,
@@ -628,6 +630,7 @@ fn parse_dependencies(parsed: &Mapping) -> Vec<PackageDependency> {
 						_ => None,
 					},
 					optional: false,
+					source_field: Some(section.to_string()),
 				}
 			})
 		})

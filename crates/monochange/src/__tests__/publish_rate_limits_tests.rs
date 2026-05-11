@@ -257,6 +257,7 @@ fn dependency_packages(
 						kind: DependencyKind::Runtime,
 						version_constraint: None,
 						optional: false,
+						source_field: None,
 					}
 				})
 				.collect();
@@ -1455,6 +1456,7 @@ fn test_sort_requests_by_dependencies_orders_dependencies_first() {
 			kind: DependencyKind::Development,
 			version_constraint: None,
 			optional: false,
+			source_field: None,
 		});
 	let mut extra = monochange_core::PackageRecord::new(
 		monochange_core::Ecosystem::Cargo,
@@ -1471,6 +1473,7 @@ fn test_sort_requests_by_dependencies_orders_dependencies_first() {
 			kind: DependencyKind::Development,
 			version_constraint: None,
 			optional: false,
+			source_field: None,
 		});
 	let packages = vec![helper.clone(), dependent.clone(), extra.clone()];
 	let mut requests = vec![
@@ -1537,6 +1540,7 @@ fn test_sort_requests_by_dependencies_keeps_original_order_on_cycle() {
 			kind: DependencyKind::Development,
 			version_constraint: None,
 			optional: false,
+			source_field: None,
 		});
 	b.declared_dependencies
 		.push(monochange_core::PackageDependency {
@@ -1544,6 +1548,7 @@ fn test_sort_requests_by_dependencies_keeps_original_order_on_cycle() {
 			kind: DependencyKind::Development,
 			version_constraint: None,
 			optional: false,
+			source_field: None,
 		});
 	let packages = vec![a.clone(), b.clone()];
 	let original_ids = [a.id.clone(), b.id.clone()];

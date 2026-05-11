@@ -41,6 +41,10 @@ fn discovers_deno_workspace_packages() {
 	);
 	let dependency_edges = materialize_dependency_edges(&discovery.packages);
 	assert_eq!(dependency_edges.len(), 1);
+	assert_eq!(
+		dependency_edges.first().unwrap().source_field.as_deref(),
+		Some("dependencies")
+	);
 }
 
 #[test]
