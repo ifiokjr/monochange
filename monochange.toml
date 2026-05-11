@@ -835,6 +835,7 @@ steps = [{ name = "comment on released issues", type = "CommentReleasedIssues" }
 help_text = "Publish packages from this release using built-in publishing workflows"
 inputs = [
 	{ name = "package", type = "string_list" },
+	{ name = "all", type = "boolean", help_text = "Publish every configured package instead of only packages from the release record" },
 	{ name = "resume", type = "path", help_text = "JSON result artifact from an earlier mc publish run; completed package versions are skipped" },
 	{ name = "output", type = "path", help_text = "Write the package publish result JSON artifact for retry/resume" },
 	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },

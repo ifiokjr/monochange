@@ -5,10 +5,20 @@ changelog = false
 [cli.plan-release-publish]
 inputs = [
 	{ name = "format", type = "choice", choices = ["json"], default = "json" },
+	{ name = "all", type = "boolean", default = false },
 ]
 steps = [
 	{ name = "prepare release", type = "PrepareRelease" },
 	{ name = "plan publish rate limits", type = "PlanPublishRateLimits" },
+]
+
+[cli.publish]
+inputs = [
+	{ name = "format", type = "choice", choices = ["json"], default = "json" },
+	{ name = "all", type = "boolean", default = false },
+]
+steps = [
+	{ name = "publish packages", type = "PublishPackages" },
 ]
 
 [package.zeta_transport]
@@ -59,3 +69,6 @@ publish.rate_limits.enforce = true
 path = "crates/storefront_app"
 publish.rate_limits.enforce = true
 
+[package.orphan_tool]
+path = "crates/orphan_tool"
+publish.rate_limits.enforce = true

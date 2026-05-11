@@ -115,6 +115,7 @@ jobs:
         run: |
           "$RUNNER_TEMP/bin/mc" publish \
             --log-level info \
+            --all \
             --output "$RUNNER_TEMP/publish-result.json" \
             --format json
         shell: bash

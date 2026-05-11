@@ -834,18 +834,19 @@ pub(crate) fn execute_cli_command_with_options(
 					let selected_ecosystems = selected_ecosystem_ids(&step_inputs)?;
 					let resume_path = optional_publish_resume_artifact_path(&step_inputs)?;
 					let output_path = optional_publish_output_artifact_path(&step_inputs)?;
+					let publish_all = boolean_step_input(&step_inputs, "all");
 					if !context.dry_run {
 						#[rustfmt::skip]
 						release_branch_policy::verify_release_ref_for_publish(root, configuration.source.as_ref(), "HEAD")?;
 					}
 					#[rustfmt::skip]
-					let rate_limit_report = publish_rate_limits::plan_publish_rate_limits(root, configuration, context.prepared_release.as_ref(), &selected_packages, publish_rate_limits::PublishRateLimitMode::Publish, context.dry_run)?;
+					let rate_limit_report = publish_rate_limits::plan_publish_rate_limits_with_selection(root, configuration, context.prepared_release.as_ref(), &selected_packages, publish_rate_limits::PublishRateLimitMode::Publish, context.dry_run, publish_all)?;
 					if !context.dry_run {
 						#[rustfmt::skip]
 						publish_rate_limits::enforce_publish_rate_limits(configuration, &rate_limit_report, publish_rate_limits::PublishRateLimitMode::Publish)?;
 					}
 					#[rustfmt::skip]
-					let report = package_publish::run_publish_packages_with_resume(
+					let report = package_publish::run_publish_packages_with_resume_and_selection(
 						root,
 						configuration,
 						context.prepared_release.as_ref(),
@@ -853,7 +854,8 @@ pub(crate) fn execute_cli_command_with_options(
 						&selected_groups,
 						&selected_ecosystems,
 						context.dry_run,
-						resume_path.as_deref())?;
+						resume_path.as_deref(),
+						publish_all)?;
 					if !context.dry_run
 						&& let Some(output_path) = output_path.as_deref()
 					{
@@ -874,8 +876,9 @@ pub(crate) fn execute_cli_command_with_options(
 						&step_inputs,
 						mode,
 					)?;
+					let publish_all = boolean_step_input(&step_inputs, "all");
 					#[rustfmt::skip]
-					let report = publish_rate_limits::plan_publish_rate_limits(root, configuration, context.prepared_release.as_ref(), &selected_packages, mode, context.dry_run)?;
+					let report = publish_rate_limits::plan_publish_rate_limits_with_selection(root, configuration, context.prepared_release.as_ref(), &selected_packages, mode, context.dry_run, publish_all)?;
 					context.rate_limit_report = Some(report);
 					output = None;
 					Ok(())
