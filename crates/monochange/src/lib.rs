@@ -626,6 +626,63 @@ fn format_clap_error(error: &clap::Error, colored: bool) -> String {
 	}
 }
 
+fn paint(text: &str, style: anstyle::Style, colored: bool) -> String {
+	if colored {
+		format!("{style}{text}{style:#}")
+	} else {
+		text.to_string()
+	}
+}
+
+fn unexpected_argument_from_error(error: &clap::Error) -> Option<String> {
+	let message = error.to_string();
+	let (_, rest) = message.split_once("unexpected argument '")?;
+	let (argument, _) = rest.split_once('\'')?;
+	Some(argument.to_string())
+}
+
+fn custom_command_name_from_args(
+	args: &[OsString],
+	cli: &[CliCommandDefinition],
+) -> Option<String> {
+	args.iter()
+		.skip(1)
+		.filter_map(|arg| arg.to_str())
+		.find_map(|arg| {
+			cli.iter()
+				.any(|command| command.name == arg)
+				.then(|| arg.to_string())
+		})
+}
+
+fn render_custom_command_argument_error(
+	error: &clap::Error,
+	cli_command: &CliCommandDefinition,
+	colored: bool,
+) -> String {
+	let command = format!("mc {}", cli_command.name);
+	let argument =
+		unexpected_argument_from_error(error).unwrap_or_else(|| "the supplied option".to_string());
+	let heading = paint("✖ Unexpected command input", cli_theme::error(), colored);
+	let argument = paint(&argument, cli_theme::literal(), colored);
+	let command = paint(&command, cli_theme::usage(), colored);
+	let config_path = paint(
+		&format!("[cli.{}]", cli_command.name),
+		cli_theme::header(),
+		colored,
+	);
+	let usage = paint("Usage", cli_theme::header(), colored);
+	let fix = paint("How to fix", cli_theme::header(), colored);
+
+	format!(
+		"{heading}\n\n  Argument {argument} is not declared for custom command {command}.\n\n{usage}:\n  {}\n\n{fix}:\n  This command comes from {config_path} in monochange.toml.\n  Add a matching input there to make this option valid, for example:\n\n    [cli.{}]\n    inputs = [\n      {{ name = \"{}\", type = \"boolean\" }},\n    ]\n\n  Then run `mc help {}` to confirm the option is listed.",
+		cli::cli_command_usage(cli_command),
+		cli_command.name,
+		argument.trim_start_matches('-').replace('-', "_"),
+		cli_command.name
+	)
+}
+
 /// control both the argv payload and the workspace root used for config loading
 /// and command execution.
 #[doc(hidden)]
@@ -643,7 +700,7 @@ where
 	let cli = cli_commands_from_config(&configuration);
 	let quiet = extract_quiet_from_args(args.iter().cloned());
 	let root_help_requested = is_root_help_request(&args);
-	let matches = match build_command_with_cli(bin_name, &cli).try_get_matches_from(args) {
+	let matches = match build_command_with_cli(bin_name, &cli).try_get_matches_from(args.clone()) {
 		Ok(matches) => matches,
 		Err(error)
 			if matches!(
@@ -660,7 +717,21 @@ where
 				!cfg!(test) && std::io::stdout().is_terminal(),
 			));
 		}
-		Err(error) => return Err(MonochangeError::Config(error.to_string())),
+		Err(error) => {
+			if matches!(error.kind(), ErrorKind::UnknownArgument)
+				&& let Some(command_name) = custom_command_name_from_args(&args, &cli)
+				&& let Some(cli_command) = cli.iter().find(|command| command.name == command_name)
+			{
+				return Err(MonochangeError::Diagnostic(
+					render_custom_command_argument_error(
+						&error,
+						cli_command,
+						!cfg!(test) && std::io::stderr().is_terminal(),
+					),
+				));
+			}
+			return Err(MonochangeError::Config(error.to_string()));
+		}
 	};
 
 	let jq_expression = matches.get_one::<String>("jq").cloned();

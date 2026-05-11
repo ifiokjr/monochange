@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/cli_output.rs
+assertion_line: 184
 info:
   program: mc
   args:
@@ -14,7 +15,7 @@ exit_code: 0
 ----- stdout -----
 Create a change file for one or more packages
 
-Usage: mc change [OPTIONS]
+Usage: mc change [--dry-run] [--interactive] [--package <PACKAGE>] [--bump <BUMP>] [--version <VERSION>] [--reason <REASON>] [--type <TYPE>] [--caused-by <CAUSED_BY>] [--details <DETAILS>] [--output <PATH>]
 
 Options:
       --dry-run                   Run the command in dry-run mode when supported

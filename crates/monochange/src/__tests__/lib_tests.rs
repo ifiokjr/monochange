@@ -1037,6 +1037,103 @@ fn mcp_and_root_command_support_quiet_and_missing_subcommands() {
 }
 
 #[test]
+fn custom_command_diagnostic_colorizes_terminal_output() {
+	assert_eq!(
+		crate::paint("hello", crate::cli_theme::error(), true),
+		format!(
+			"{}hello{:#}",
+			crate::cli_theme::error(),
+			crate::cli_theme::error()
+		)
+	);
+}
+
+#[test]
+fn custom_command_unexpected_argument_error_explains_configured_inputs() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	fs::write(
+		root.join("monochange.toml"),
+		r#"
+[cli.publish]
+help_text = "Publish packages"
+inputs = [
+	{ name = "package", type = "string_list" },
+	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
+]
+steps = [{ name = "noop", type = "Command", command = "true" }]
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+
+	let error = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("publish"),
+			OsString::from("--all"),
+		],
+	)
+	.expect_err("unexpected custom command input should fail");
+	let report = error.render();
+
+	assert!(report.contains("✖ Unexpected command input"));
+	assert!(report.contains("Argument --all is not declared for custom command mc publish"));
+	assert!(
+		report
+			.contains("Usage:\n  mc publish [--dry-run] [--package <PACKAGE>] [--format <FORMAT>]")
+	);
+	assert!(report.contains("This command comes from [cli.publish] in monochange.toml"));
+	assert!(report.contains("{ name = \"all\", type = \"boolean\" }"));
+	assert!(!report.contains("config error: error:"));
+	assert!(!report.contains("[OPTIONS]"));
+}
+
+#[test]
+fn cli_command_usage_lists_configured_options() {
+	let cli_command = CliCommandDefinition {
+		name: "publish".to_string(),
+		help_text: Some("Publish packages".to_string()),
+		inputs: vec![
+			CliInputDefinition {
+				name: "package".to_string(),
+				kind: CliInputKind::StringList,
+				help_text: None,
+				required: false,
+				default: None,
+				choices: Vec::new(),
+				short: None,
+			},
+			CliInputDefinition {
+				name: "output".to_string(),
+				kind: CliInputKind::Path,
+				help_text: None,
+				required: false,
+				default: None,
+				choices: Vec::new(),
+				short: None,
+			},
+			CliInputDefinition {
+				name: "all".to_string(),
+				kind: CliInputKind::Boolean,
+				help_text: None,
+				required: false,
+				default: None,
+				choices: Vec::new(),
+				short: None,
+			},
+		],
+		steps: Vec::new(),
+		dry_run: false,
+	};
+
+	assert_eq!(
+		crate::cli::cli_command_usage(&cli_command),
+		"mc publish [--dry-run] [--package <PACKAGE>] [--output <PATH>] [--all]"
+	);
+}
+
+#[test]
 fn release_record_supports_json_output() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
