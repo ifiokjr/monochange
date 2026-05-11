@@ -653,20 +653,5 @@ fn planned_group(
 }
 
 #[cfg(test)]
-mod tests {
-
-	mod mutant_killers_tests {
-
-		include!("__tests__/mutant_killers_tests.rs");
-	}
-
-	mod lib_tests {
-
-		include!("__tests__/lib_tests.rs");
-	}
-
-	mod prop_tests {
-
-		include!("__tests__/prop_tests.rs");
-	}
-}
+#[path = "__tests__/lib_tests.rs"]
+mod tests;

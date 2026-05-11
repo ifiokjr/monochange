@@ -56,7 +56,7 @@ use temp_env::with_vars;
 use toml::Value as TomlValue;
 
 use super::*;
-use crate::TEST_ENV_LOCK;
+use crate::tests::TEST_ENV_LOCK;
 
 const NPM_TRUST_DOCS_URL: &str = "https://docs.npmjs.com/cli/v11/commands/npm-trust";
 const CRATES_TRUST_DOCS_URL: &str = "https://crates.io/docs/trusted-publishing";
@@ -2405,6 +2405,207 @@ fn planned_and_skip_trust_outcomes_cover_npm_and_manual_flows() {
 			.expect("expected setup url")
 			.contains("crates.io/crates/pkg")
 	);
+}
+
+#[test]
+fn configure_npm_trusted_publishing_skips_when_trust_list_matches_context() {
+	let root = workflow_root();
+	let env_map = BTreeMap::from([
+		(
+			"GITHUB_REPOSITORY".to_string(),
+			"monochange/monochange".to_string(),
+		),
+		(
+			"GITHUB_WORKFLOW_REF".to_string(),
+			"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
+		),
+		("GITHUB_JOB".to_string(), "release".to_string()),
+	]);
+	let request = trusted_request(RegistryKind::Npm);
+	let mut executor = FakeExecutor::new(vec![CommandOutput {
+		success: true,
+		stdout: "repository monochange/monochange workflow publish.yml environment publisher"
+			.to_string(),
+		stderr: String::new(),
+	}]);
+
+	let outcome = configure_npm_trusted_publishing(
+		&request,
+		Some(&sample_source()),
+		root.path(),
+		&env_map,
+		&mut executor,
+	)
+	.expect("configure npm trusted publishing");
+
+	assert_eq!(outcome.status, TrustedPublishingStatus::Configured);
+	assert_eq!(
+		outcome.message,
+		"npm trusted publishing already matches the current GitHub workflow"
+	);
+	assert_eq!(executor.commands.len(), 1);
+	assert_eq!(executor.commands[0].program, "npm");
+	assert_eq!(executor.commands[0].args, ["trust", "ls", "pkg"]);
+	assert!(executor.commands[0].cwd.as_os_str().is_empty());
+}
+
+#[test]
+fn configure_npm_trusted_publishing_runs_trust_command_and_verifies_result() {
+	let root = workflow_root();
+	let env_map = BTreeMap::from([
+		(
+			"GITHUB_REPOSITORY".to_string(),
+			"monochange/monochange".to_string(),
+		),
+		(
+			"GITHUB_WORKFLOW_REF".to_string(),
+			"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
+		),
+		("GITHUB_JOB".to_string(), "release".to_string()),
+	]);
+	let request = trusted_request(RegistryKind::Npm);
+	let mut executor = FakeExecutor::new(vec![
+		CommandOutput {
+			success: true,
+			stdout: String::new(),
+			stderr: String::new(),
+		},
+		CommandOutput {
+			success: true,
+			stdout: String::new(),
+			stderr: String::new(),
+		},
+		CommandOutput {
+			success: true,
+			stdout: "repository monochange/monochange workflow publish.yml environment publisher"
+				.to_string(),
+			stderr: String::new(),
+		},
+	]);
+
+	let outcome = configure_npm_trusted_publishing(
+		&request,
+		Some(&sample_source()),
+		root.path(),
+		&env_map,
+		&mut executor,
+	)
+	.expect("configure npm trusted publishing");
+
+	assert_eq!(outcome.status, TrustedPublishingStatus::Configured);
+	assert_eq!(
+		outcome.message,
+		"configured npm trusted publishing for the current GitHub workflow"
+	);
+	assert_eq!(executor.commands.len(), 3);
+	assert_eq!(executor.commands[0].args, ["trust", "ls", "pkg"]);
+	assert_eq!(
+		executor.commands[1].args,
+		[
+			"trust",
+			"github",
+			"pkg",
+			"--file",
+			"publish.yml",
+			"--repo",
+			"monochange/monochange",
+			"--yes",
+			"--env",
+			"publisher",
+		]
+	);
+	assert_eq!(executor.commands[2].args, ["trust", "ls", "pkg"]);
+}
+
+#[test]
+fn configure_npm_trusted_publishing_reports_trust_command_failure() {
+	let root = workflow_root();
+	let env_map = BTreeMap::from([
+		(
+			"GITHUB_REPOSITORY".to_string(),
+			"monochange/monochange".to_string(),
+		),
+		(
+			"GITHUB_WORKFLOW_REF".to_string(),
+			"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
+		),
+		("GITHUB_JOB".to_string(), "release".to_string()),
+	]);
+	let request = trusted_request(RegistryKind::Npm);
+	let mut executor = FakeExecutor::new(vec![
+		CommandOutput {
+			success: true,
+			stdout: String::new(),
+			stderr: String::new(),
+		},
+		CommandOutput {
+			success: false,
+			stdout: String::new(),
+			stderr: "permission denied".to_string(),
+		},
+	]);
+
+	let error = configure_npm_trusted_publishing(
+		&request,
+		Some(&sample_source()),
+		root.path(),
+		&env_map,
+		&mut executor,
+	)
+	.expect_err("expected trust command failure");
+
+	let message = error.to_string();
+	assert!(message.contains("`npm trust github pkg"));
+	assert!(message.contains("permission denied"));
+	assert_eq!(executor.commands.len(), 2);
+}
+
+#[test]
+fn configure_npm_trusted_publishing_reports_failed_verification() {
+	let root = workflow_root();
+	let env_map = BTreeMap::from([
+		(
+			"GITHUB_REPOSITORY".to_string(),
+			"monochange/monochange".to_string(),
+		),
+		(
+			"GITHUB_WORKFLOW_REF".to_string(),
+			"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
+		),
+		("GITHUB_JOB".to_string(), "release".to_string()),
+	]);
+	let request = trusted_request(RegistryKind::Npm);
+	let mut executor = FakeExecutor::new(vec![
+		CommandOutput {
+			success: true,
+			stdout: String::new(),
+			stderr: String::new(),
+		},
+		CommandOutput {
+			success: true,
+			stdout: String::new(),
+			stderr: String::new(),
+		},
+		CommandOutput {
+			success: true,
+			stdout: "repository other/repo workflow publish.yml".to_string(),
+			stderr: String::new(),
+		},
+	]);
+
+	let error = configure_npm_trusted_publishing(
+		&request,
+		Some(&sample_source()),
+		root.path(),
+		&env_map,
+		&mut executor,
+	)
+	.expect_err("expected failed verification");
+
+	let message = error.to_string();
+	assert!(message.contains("npm trusted publishing could not be verified for `pkg`"));
+	assert!(message.contains("npm trust github pkg"));
+	assert_eq!(executor.commands.len(), 3);
 }
 
 #[test]

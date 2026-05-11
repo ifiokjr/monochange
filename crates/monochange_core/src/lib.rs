@@ -4443,15 +4443,5 @@ pub mod schema {
 }
 
 #[cfg(test)]
-mod tests {
-
-	mod proptest_bump_severity_tests {
-
-		include!("__tests__/proptest_bump_severity_tests.rs");
-	}
-
-	mod lib_tests {
-
-		include!("__tests__/lib_tests.rs");
-	}
-}
+#[path = "__tests__/lib_tests.rs"]
+mod tests;

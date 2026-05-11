@@ -23,7 +23,7 @@ use serde::Serialize;
 use tempfile::tempdir;
 
 use super::*;
-use crate::TEST_ENV_LOCK;
+use crate::tests::TEST_ENV_LOCK;
 
 fn cli_context() -> CliContext {
 	CliContext {

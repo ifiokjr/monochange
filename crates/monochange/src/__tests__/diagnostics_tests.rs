@@ -7,6 +7,10 @@ use monochange_core::HostedIssueRelationshipKind;
 use monochange_core::HostedReviewRequestKind;
 use monochange_core::HostedReviewRequestRef;
 
+use super::super::discover_changeset_paths;
+use super::super::resolve_changeset_path;
+use super::super::*;
+
 #[test]
 fn resolve_changeset_path_and_discovery_cover_missing_and_empty_directories() {
 	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));

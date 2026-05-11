@@ -52,8 +52,6 @@ use std::io::IsTerminal;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
-use std::sync::LazyLock;
-use std::sync::Mutex;
 use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
@@ -108,9 +106,6 @@ use monochange_core::DEFAULT_RELEASE_TITLE_NAMESPACED;
 use monochange_core::DEFAULT_RELEASE_TITLE_PRIMARY;
 use monochange_core::DiscoveryReport;
 use monochange_core::Ecosystem;
-
-#[allow(dead_code)]
-pub(crate) static TEST_ENV_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 use monochange_core::HostedActorRef;
 use monochange_core::HostedActorSourceKind;
 use monochange_core::HostedCommitRef;
@@ -967,4 +962,4 @@ fn format_publish_state(publish_state: monochange_core::PublishState) -> &'stati
 
 #[cfg(test)]
 #[path = "__tests__/lib_tests.rs"]
-mod tests;
+pub(crate) mod tests;

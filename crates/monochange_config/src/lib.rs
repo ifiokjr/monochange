@@ -5290,15 +5290,5 @@ pub mod schema {
 }
 
 #[cfg(test)]
-mod tests {
-
-	mod mutant_killers_tests {
-
-		include!("__tests__/mutant_killers_tests.rs");
-	}
-
-	mod lib_tests {
-
-		include!("__tests__/lib_tests.rs");
-	}
-}
+#[path = "__tests__/lib_tests.rs"]
+mod tests;

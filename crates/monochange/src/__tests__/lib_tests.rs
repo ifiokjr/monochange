@@ -7,6 +7,10 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::LazyLock;
+use std::sync::Mutex;
+
+pub(crate) static TEST_ENV_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 use clap::Command;
 use httpmock::Method::GET;
@@ -12706,7 +12710,7 @@ fn batch_changeset_contexts_returns_empty_without_git_repo() {
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn batch_changeset_contexts_resolves_introduced_and_updated_commits() {
-	let _env_lock = crate::TEST_ENV_LOCK
+	let _env_lock = TEST_ENV_LOCK
 		.lock()
 		.unwrap_or_else(std::sync::PoisonError::into_inner);
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));

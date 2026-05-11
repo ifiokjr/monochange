@@ -1,3 +1,5 @@
+mod mutant_killers_tests;
+
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;

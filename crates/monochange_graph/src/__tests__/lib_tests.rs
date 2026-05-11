@@ -1,3 +1,6 @@
+mod mutant_killers_tests;
+mod prop_tests;
+
 use std::path::PathBuf;
 
 use monochange_core::BumpSeverity;

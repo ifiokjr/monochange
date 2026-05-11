@@ -58,8 +58,6 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
-use std::sync::LazyLock;
-use std::sync::Mutex;
 use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
@@ -72,9 +70,6 @@ const TELEMETRY_ENV: &str = "MC_TELEMETRY";
 const TELEMETRY_FILE_ENV: &str = "MC_TELEMETRY_FILE";
 const TELEMETRY_SCOPE_NAME: &str = "monochange.telemetry";
 const TELEMETRY_SCOPE_VERSION: &str = "0.1.0";
-
-#[allow(dead_code)]
-static TEST_ENV_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 #[derive(Debug, Clone)]
 pub enum TelemetrySink {
