@@ -2015,6 +2015,16 @@
 			},
 			"type": "object"
 		},
+		"lints": {
+			"default": {
+				"disable_gitignore": false,
+				"exclude": [],
+				"include": [],
+				"rules": {},
+				"scopes": [],
+				"use": []
+			}
+		},
 		"package": {
 			"additionalProperties": {
 				"$ref": "#/$defs/packageDefinition"
