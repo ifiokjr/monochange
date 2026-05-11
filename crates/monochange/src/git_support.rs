@@ -1,9 +1,7 @@
-#[cfg(test)]
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
-#[cfg(test)]
 use std::process::Stdio;
 
 use monochange_core::CommitMessage;
@@ -368,7 +366,6 @@ pub(crate) fn run_git_process(
 	handle_git_process_output(&output, error_message)
 }
 
-#[cfg(test)]
 pub(crate) fn run_git_process_with_stdin(
 	mut command: ProcessCommand,
 	input: &[u8],

@@ -1331,24 +1331,15 @@ fn run_lockfile_command_in_place(
 	)))
 }
 
-#[cfg(test)]
 use monochange_test_helpers::workspace_ops::collect_workspace_files;
-#[cfg(test)]
 use monochange_test_helpers::workspace_ops::copy_workspace_file;
-#[cfg(test)]
 use monochange_test_helpers::workspace_ops::copy_workspace_tree;
-#[cfg(test)]
 use monochange_test_helpers::workspace_ops::ensure_parent_directory;
-#[cfg(test)]
 use monochange_test_helpers::workspace_ops::read_optional_file;
-#[cfg(test)]
 use monochange_test_helpers::workspace_ops::remap_workspace_path;
-#[cfg(test)]
 use monochange_test_helpers::workspace_ops::run_lockfile_command;
-#[cfg(test)]
 use monochange_test_helpers::workspace_ops::strip_workspace_prefix;
 
-#[cfg(test)]
 fn collect_workspace_file_updates(
 	root: &Path,
 	temp_root: &Path,
@@ -1421,7 +1412,6 @@ pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedR
 		.map(|execution| execution.prepared_release)
 }
 
-#[cfg(test)]
 #[tracing::instrument(skip_all, fields(dry_run))]
 pub(crate) fn prepare_release_execution(
 	root: &Path,

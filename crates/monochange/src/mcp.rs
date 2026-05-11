@@ -923,7 +923,7 @@ pub async fn run_server() {
 	let _ = running.waiting().await;
 }
 
-#[cfg(test)]
 #[allow(clippy::disallowed_methods)]
+#[cfg(test)]
 #[path = "__tests__/mcp_tests.rs"]
 mod tests;

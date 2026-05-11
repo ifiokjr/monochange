@@ -634,7 +634,6 @@ fn join_existing_merge_request_lookup(
 	})?
 }
 
-#[cfg(test)]
 fn gitlab_client() -> MonochangeResult<Client> {
 	build_http_client("GitLab")
 }

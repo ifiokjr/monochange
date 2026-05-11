@@ -1,4 +1,3 @@
-#[cfg(test)]
 use std::cell::Cell;
 use std::io::IsTerminal;
 
@@ -6,7 +5,6 @@ use similar::TextDiff;
 
 use super::*;
 
-#[cfg(test)]
 thread_local! {
 	static FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR: Cell<bool> = const { Cell::new(false) };
 }
@@ -379,7 +377,6 @@ fn find_previous_tag_in(current_tag: &str, sorted_tags: &[String]) -> Option<Str
 		.map(|(tag, _)| tag)
 }
 
-#[cfg(test)]
 pub(crate) fn find_previous_tag(root: &Path, current_tag: &str) -> Option<String> {
 	find_previous_tag_in(current_tag, &load_sorted_tags(root))
 }
@@ -827,7 +824,6 @@ fn atomic_write(path: &Path, content: &[u8]) -> MonochangeResult<()> {
 #[rustfmt::skip]
 #[tracing::instrument(skip_all)]
 pub(crate) fn build_file_diff_previews(root: &Path, updates: &[FileUpdate]) -> MonochangeResult<Vec<PreparedFileDiff>> { let colorize_diffs = diff_output_colors_enabled();
-	#[cfg(test)]
 	if FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR.with(Cell::get) {
 		return Err(MonochangeError::Io(
 			"forced build_file_diff_previews test error".to_string(),
@@ -892,7 +888,6 @@ fn diff_output_colors_enabled() -> bool {
 	diff_output_supports_color(std::io::stdout().is_terminal())
 }
 
-#[cfg(test)]
 pub(crate) fn set_force_build_file_diff_previews_error(enabled: bool) {
 	FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR.with(|value| value.set(enabled));
 }

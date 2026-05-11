@@ -109,7 +109,6 @@ pub(crate) fn run_publish_readiness(
 	render_report(&report, options.format)
 }
 
-#[cfg(test)]
 pub(crate) fn validate_publish_readiness_artifact(
 	root: &Path,
 	configuration: &WorkspaceConfiguration,
@@ -438,7 +437,6 @@ fn read_report_artifact(input: &Path) -> MonochangeResult<PublishReadinessReport
 	serde_json::from_str(&body).map_err(publish_readiness_json_error)
 }
 
-#[cfg(test)]
 fn validate_publish_readiness_report(
 	artifact: &PublishReadinessReport,
 	current: &PublishReadinessReport,
@@ -477,7 +475,6 @@ fn validate_readiness_artifact_header(report: &PublishReadinessReport) -> Monoch
 	Ok(())
 }
 
-#[cfg(test)]
 fn validate_readiness_artifact_status(report: &PublishReadinessReport) -> MonochangeResult<()> {
 	if report.status == PublishReadinessGlobalStatus::Ready {
 		return Ok(());
@@ -487,7 +484,6 @@ fn validate_readiness_artifact_status(report: &PublishReadinessReport) -> Monoch
 	))
 }
 
-#[cfg(test)]
 fn validate_readiness_current_status(report: &PublishReadinessReport) -> MonochangeResult<()> {
 	if report.status == PublishReadinessGlobalStatus::Ready {
 		return Ok(());
@@ -510,7 +506,6 @@ fn validate_readiness_release_commit(
 	)))
 }
 
-#[cfg(test)]
 fn validate_readiness_packages(
 	artifact: &PublishReadinessReport,
 	current: &PublishReadinessReport,

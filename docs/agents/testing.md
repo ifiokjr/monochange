@@ -6,6 +6,7 @@
 - Keep `mc validate` green alongside the rest of the validation suite.
 - New integration tests must be added to the dedicated `crates/monochange_integration_tests` crate, not to individual package `tests/` directories.
 - Rust unit tests inside crate `src/` trees must be placed in a `__tests__/` directory beside the source module and named after the source file: `analysis.rs` uses `#[path = "__tests__/analysis_tests.rs"] mod tests;`, `lib.rs` uses `#[path = "__tests__/lib_tests.rs"] mod tests;`, and `mod.rs` uses `#[path = "__tests__/mod_tests.rs"] mod tests;`. Do not add inline `#[cfg(test)] mod tests { ... }` blocks or sibling `__tests.rs` files. Integration tests in `<crate>/tests/` keep the standard Rust integration-test layout and should not be moved into `__tests__/`.
+- `#[cfg(test)]` may only reference a test module and may appear at most once per source file. Keep test-only helpers, imports, state, and re-exports in test files; if helpers must be shared across crates, put them in the test helper crate instead of gating production source with `#[cfg(test)]`.
 - PRs must keep patch coverage at 100% for executable changed lines in the Rust coverage report.
 
 ## Fixture-first testing

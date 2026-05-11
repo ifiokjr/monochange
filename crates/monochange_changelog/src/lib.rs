@@ -17,7 +17,6 @@ use monochange_core::HostedActorRef;
 use monochange_core::HostedIssueRef;
 use monochange_core::HostedIssueRelationshipKind;
 use monochange_core::HostedReviewRequestRef;
-#[cfg(test)]
 use monochange_core::HostingCapabilities;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
@@ -1349,19 +1348,16 @@ fn push_unique_release_note_entry(entries: &mut Vec<String>, entry: String) {
 	}
 }
 
-#[cfg(test)]
 struct ResolvedSectionDefinition {
 	types: Vec<String>,
 }
 
-#[cfg(test)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 enum ResolvedReleaseSectionTarget {
 	Section(usize),
 	Uncategorized,
 }
 
-#[cfg(test)]
 fn section_matches_resolved_type(section: &ResolvedSectionDefinition, change_type: &str) -> bool {
 	section
 		.types
@@ -1369,7 +1365,6 @@ fn section_matches_resolved_type(section: &ResolvedSectionDefinition, change_typ
 		.any(|candidate| candidate.trim() == change_type)
 }
 
-#[cfg(test)]
 fn classify_release_note_change(
 	change: &ReleaseNoteChange,
 	sections: &[ResolvedSectionDefinition],

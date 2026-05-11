@@ -4434,10 +4434,6 @@ pub fn materialize_dependency_edges(packages: &[PackageRecord]) -> Vec<Dependenc
 	edges
 }
 
-#[cfg(test)]
-#[path = "__tests__/proptest_bump_severity_tests.rs"]
-mod proptest_bump_severity;
-
 #[cfg(feature = "schema")]
 pub mod schema {
 	/// Generate the JSON Schema for the monochange release record.
@@ -4447,5 +4443,16 @@ pub mod schema {
 }
 
 #[cfg(test)]
-#[path = "__tests__/lib_tests.rs"]
-mod tests;
+mod tests {
+	use super::*;
+
+	mod proptest_bump_severity_tests {
+		use super::*;
+		include!("__tests__/proptest_bump_severity_tests.rs");
+	}
+
+	mod lib_tests {
+		use super::*;
+		include!("__tests__/lib_tests.rs");
+	}
+}

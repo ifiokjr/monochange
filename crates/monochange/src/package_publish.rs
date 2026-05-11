@@ -1,8 +1,6 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-#[cfg(test)]
 use std::env;
-#[cfg(test)]
 use std::fs;
 use std::path::Path;
 
@@ -13,7 +11,6 @@ use monochange_core::Ecosystem;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PackagePublicationTarget;
-#[cfg(test)]
 pub(crate) use monochange_core::PublishMode;
 use monochange_core::PublishRegistry;
 use monochange_core::RegistryKind;
@@ -31,62 +28,48 @@ use monochange_npm::build_npm_trust_list_command;
 use monochange_npm::render_npm_trust_command;
 use monochange_npm::write_npm_placeholder_manifest;
 use monochange_publish::CommandExecutor;
-#[cfg(test)]
 pub(crate) use monochange_publish::PLACEHOLDER_VERSION;
 pub(crate) use monochange_publish::PackagePublishOutcome;
 pub(crate) use monochange_publish::PackagePublishReport;
 pub(crate) use monochange_publish::PackagePublishRunMode;
 pub(crate) use monochange_publish::PackagePublishStatus;
 use monochange_publish::PlaceholderManifestWriterRegistry;
-#[cfg(test)]
 pub(crate) use monochange_publish::ProcessCommandExecutor;
 use monochange_publish::PublishReadinessRegistry;
 pub(crate) use monochange_publish::PublishRequest;
 use monochange_publish::PublishTrustHandler;
-#[cfg(test)]
 use monochange_publish::RegistryEndpoints;
 use monochange_publish::TrustedPublishingIdentity;
 pub(crate) use monochange_publish::TrustedPublishingOutcome;
 pub(crate) use monochange_publish::TrustedPublishingStatus;
-#[cfg(test)]
 use monochange_publish::build_placeholder_directory as build_placeholder_directory_with_writers;
 pub(crate) use monochange_publish::build_placeholder_requests;
-#[cfg(test)]
 pub(crate) use monochange_publish::build_publish_command;
 use monochange_publish::build_publish_command_builder;
 pub(crate) use monochange_publish::build_release_requests;
-#[cfg(test)]
 pub(crate) use monochange_publish::default_registry_kind_for_ecosystem;
 use monochange_publish::detect_trusted_publishing_identity;
 use monochange_publish::disabled_trust_outcome;
-#[cfg(test)]
 use monochange_publish::enforce_release_attestation_prerequisites as enforce_release_attestation_prerequisites_impl;
-#[cfg(test)]
 use monochange_publish::execute_publish_requests as execute_publish_requests_impl;
 use monochange_publish::execute_publish_requests_with_process;
-#[cfg(test)]
 pub(crate) use monochange_publish::forbidden_npm_token_env_keys;
 use monochange_publish::manual_setup_url;
 use monochange_publish::merge_publish_resume_report;
 use monochange_publish::provider_registry_trust_capability;
 use monochange_publish::read_publish_report_artifact;
-#[cfg(test)]
 pub(crate) use monochange_publish::registry_version_exists;
 use monochange_publish::reject_npm_token_environment;
 use monochange_publish::render_command;
 use monochange_publish::render_command_error;
-#[cfg(test)]
 pub(crate) use monochange_publish::resolve_placeholder_readme;
-#[cfg(test)]
 pub(crate) use monochange_publish::resolve_registry_kind;
 use monochange_publish::resume_publish_requests;
 use monochange_publish::select_release_publication_targets;
 use monochange_publish::trusted_publishing_capability_message;
 use monochange_publish::trusted_publishing_capability_message_for_builtin;
 use monochange_python::write_python_placeholder_manifest;
-#[cfg(test)]
 use reqwest::blocking::Client;
-#[cfg(test)]
 use tempfile::TempDir;
 
 use crate::PreparedRelease;
@@ -289,7 +272,6 @@ impl PublishTrustHandler for CliPublishTrustHandler {
 	}
 }
 
-#[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 fn execute_publish_requests(
 	root: &Path,
@@ -319,7 +301,6 @@ fn execute_publish_requests(
 	)
 }
 
-#[cfg(test)]
 pub(crate) fn enforce_release_attestation_prerequisites(
 	request: &PublishRequest,
 	env_map: &BTreeMap<String, String>,
@@ -499,7 +480,6 @@ fn configure_npm_trusted_publishing(
 	})
 }
 
-#[cfg(test)]
 pub(crate) fn build_placeholder_directory(
 	root: &Path,
 	request: &PublishRequest,
@@ -513,7 +493,6 @@ pub(crate) fn build_placeholder_directory(
 	)
 }
 
-#[cfg(test)]
 fn placeholder_tempdir_error(error: &std::io::Error) -> MonochangeError {
 	MonochangeError::Io(format!("failed to create placeholder tempdir: {error}"))
 }
@@ -624,7 +603,7 @@ fn manual_trust_outcome(
 	}
 }
 
-#[cfg(test)]
 #[allow(clippy::disallowed_methods, clippy::cloned_ref_to_slice_refs)]
+#[cfg(test)]
 #[path = "__tests__/package_publish_tests.rs"]
 mod tests;
