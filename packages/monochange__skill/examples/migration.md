@@ -1,21 +1,38 @@
-# Migration example
+# Migration: mixed Cargo and npm repo
 
-## Recommend this when
+```toml
+[defaults]
+parent_bump = "patch"
 
-- the repository already has release scripts, CI workflows, or tag conventions
-- monochange must coexist with current tooling first
-- the user wants a phased migration instead of a big-bang switch
+[package.acme_core]
+path = "crates/acme_core"
+type = "cargo"
+versioned_files = ["Cargo.toml"]
 
-## Default recommendation
+[package."@acme/cli"]
+path = "packages/cli"
+type = "npm"
 
-- choose `migration` depth
-- inspect existing CI files, tag conventions, changelog flow, and competitor tooling first
-- keep publishing external more often during the first phase
-- move config validation, discovery, and release dry-runs into CI before replacing publish jobs
+[group.main]
+packages = ["acme_core", "@acme/cli"]
+tag = true
+release = true
+version_format = "primary"
+changelog = { path = "CHANGELOG.md", format = "keep_a_changelog" }
 
-## Good default output
+[ecosystems.cargo]
+enabled = true
+lockfile_commands = ["cargo generate-lockfile"]
 
-- current workflow summary
-- recommended coexistence phase
-- pieces safe to migrate now
-- pieces to delay until trust is established
+[ecosystems.npm]
+enabled = true
+lockfile_commands = ["pnpm install --lockfile-only"]
+```
+
+Validate with:
+
+```bash
+mc validate
+mc check
+mc step:discover --format json
+```

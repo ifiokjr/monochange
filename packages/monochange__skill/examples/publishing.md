@@ -1,21 +1,30 @@
-# Publishing example
+# Publishing workflow
 
-## Recommend this when
+Built-in readiness and bootstrap commands:
 
-- the user is choosing between local-only, builtin, and external publishing
-- trusted publishing or placeholder publication needs to be planned
-- the workspace contains public packages
+```bash
+mc publish-readiness --from HEAD --output readiness.json
+mc publish-bootstrap --from HEAD --output bootstrap.json
+```
 
-## Default recommendation
+Repository-specific workflow commands can wrap publish planning and publishing:
 
-- GitHub + npm: builtin is the preferred default
-- `crates.io` and `pub.dev`: external is often clearer when the registry-maintained workflow should own the publish step
-- GitLab: builtin planning still fits well, but publishing is external more often
-- ask about placeholder publication only when public names matter and the first real release may be delayed
+```toml
+[cli.publish-plan]
+help_text = "Plan package publishing"
+inputs = [
+	{ name = "format", type = "choice", choices = ["markdown", "json"], default = "markdown" },
+	{ name = "readiness", type = "path" },
+]
+steps = [{ name = "plan publish rate limits", type = "PlanPublishRateLimits" }]
 
-## Good default output
+[cli.publish]
+help_text = "Publish package artifacts"
+inputs = [
+	{ name = "output", type = "path" },
+	{ name = "resume", type = "path" },
+]
+steps = [{ name = "publish packages", type = "PublishPackages" }]
+```
 
-- public vs internal package split
-- recommended publish mode per ecosystem
-- trusted-publishing follow-up steps
-- placeholder strategy, if needed
+Use dry-run checks and keep JSON artifacts for resume/retry.

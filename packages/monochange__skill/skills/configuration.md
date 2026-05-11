@@ -1,258 +1,177 @@
-# Configuration skill
+# monochange.toml configuration
 
-Use this guide when the task is to create, review, or extend `monochange.toml`.
+`monochange.toml` is the source of truth for package ids, group release identities, changelog rendering, versioned files, source providers, lint rules, and custom CLI workflows.
 
-## First choice: generate, then edit
+Read it before editing changesets or suggesting commands. The same repository can mix package ecosystems, use group-level versions, hide private packages from release planning, and expose custom CLI workflows that do not exist anywhere else.
 
-Start with generated config whenever possible:
-
-```bash
-mc init
-```
-
-`mc init` seeds editable `[cli.*]` workflow commands. If you already have `monochange.toml`, edit existing workflow tables directly or add new `[cli.<name>]` tables; use immutable `mc step:*` commands when you need direct built-in step execution without a wrapper.
-
-Validate after every meaningful change:
-
-```bash
-mc validate
-```
-
-## Minimum viable config
-
-A small repo can start with defaults plus one package:
+## Minimal package configuration
 
 ```toml
 [defaults]
-package_type = "cargo"
+parent_bump = "patch"
+include_private = false
+package_type = "npm"
 
-[package.monochange]
-path = "crates/monochange"
+[package."@acme/api"]
+path = "packages/api"
+
+[package."@acme/ui"]
+path = "packages/ui"
+
+[ecosystems.npm]
+enabled = true
 ```
 
-Use this when the repo is simple and one ecosystem dominates.
+The minimal shape usually has defaults, package tables, and enabled ecosystems. `parent_bump` controls how dependency changes propagate, `include_private` decides whether private packages are included by default, and `package_type` supplies a default ecosystem for package tables that do not declare one.
 
-## Add changelog defaults early
-
-A useful next step is defining how changelogs should render:
+Use explicit `type` on packages when the repo mixes ecosystems:
 
 ```toml
-[defaults]
-package_type = "cargo"
+[package."@acme/ui"]
+path = "packages/ui"
+type = "npm"
 
-[defaults.changelog]
-path = "{{ path }}/changelog.md"
-format = "keep_a_changelog"
+[package.acme_core]
+path = "crates/acme_core"
+type = "cargo"
+
+[package.acme_cli]
+path = "crates/acme_cli"
+type = "cargo"
 ```
 
-Why:
+Supported ecosystem/package types in current code are `cargo`, `npm`, `deno`, `dart`, `flutter`, `python`, and `go`.
 
-- packages inherit the same changelog shape by default
-- you avoid repeating the same table everywhere
-- you can still override per package or group later
+## Grouped versions
 
-## Declare packages explicitly
-
-monochange works best when every managed package has a stable id.
-
-```toml
-[package.monochange_core]
-path = "crates/monochange_core"
-
-[package.monochange]
-path = "crates/monochange"
-versioned_files = ["Cargo.toml"]
-```
-
-Prefer ids you want to see in changesets and release output.
-
-## Use groups for shared release identity
-
-When several packages version together, create a group:
+Groups make multiple packages share one outward version and release identity.
 
 ```toml
 [group.sdk]
-packages = ["monochange_core", "monochange"]
+packages = ["@acme/api", "@acme/ui"]
 tag = true
 release = true
 version_format = "primary"
+changelog = { path = "CHANGELOG.md", format = "keep_a_changelog", include = "all" }
 ```
 
-Use a group when the outward release boundary is shared.
+Use package ids in changesets when a specific package changed. Use the group id only when the change is intentionally group-owned.
 
-Do not use a group just because packages depend on each other. Simple dependency propagation often does the right thing without grouping.
+Groups are best for products released as a unit: SDKs made of several packages, plugins that must stay version-aligned, or cross-language distributions that share one public changelog. Keep unrelated packages out of a group even if they live in the same workspace, because a group turns multiple package releases into one outward release identity.
 
-## Add extra changelog sections intentionally
+## Versioned files
 
-Use `extra_changelog_sections` when one change type deserves its own heading:
+`PrepareRelease` updates native manifests and configured `versioned_files`.
 
 ```toml
-[package.web-app]
-path = "apps/web"
+[package.acme_core]
+path = "crates/acme_core"
 type = "cargo"
-extra_changelog_sections = [
-	{ name = "User Experience", types = ["ux"], default_bump = "minor" },
-]
-```
+versioned_files = ["Cargo.toml"]
 
-Then create a changeset like:
-
-```bash
-mc change --package web-app --bump minor --type ux --reason "redesign settings navigation"
-```
-
-## Version more than manifests
-
-Use `versioned_files` when a release also needs to update README badges, install scripts, or extra manifests.
-
-### Ecosystem-aware entries
-
-```toml
-[package.monochange]
-path = "crates/monochange"
+[group.sdk]
+packages = ["@acme/api", "@acme/ui"]
 versioned_files = [
-	"Cargo.toml",
-	{ path = "crates/monochange/extra.toml", type = "cargo" },
+	{ path = "package.json", type = "npm" },
+	{ path = "README.md", regex = 'acme-sdk@(?<version>\\d+\\.\\d+\\.\\d+)' },
 ]
 ```
 
-### Regex entries for plain text
+String entries infer the package ecosystem when they appear under `[package.*]`. Group entries should be explicit because a group can span ecosystems.
+
+Use regex entries for docs, install snippets, generated metadata, or examples that are not native package manifests. The regex must include a named `version` capture so monochange knows exactly which portion to replace.
+
+## Ecosystem settings
 
 ```toml
-[package.monochange]
-path = "crates/monochange"
-versioned_files = [
-	{ path = "README.md", regex = 'v(?<version>\d+\.\d+\.\d+)' },
-]
-```
+[ecosystems.cargo]
+enabled = true
+versioned_files = ["Cargo.toml"]
+lockfile_commands = ["cargo generate-lockfile"]
 
-Use regex entries when no ecosystem parser applies.
-
-## Lockfile refresh strategy
-
-If the built-in lockfile rewriting is enough, keep config minimal.
-
-Add `lockfile_commands` only when the package manager must do the refresh:
-
-```toml
 [ecosystems.npm]
-lockfile_commands = [
-	{ command = "pnpm install --lockfile-only", cwd = "packages/web" },
-]
+enabled = true
+lockfile_commands = ["pnpm install --lockfile-only"]
 ```
 
-Use this when workspace-specific package-manager behavior matters more than raw speed.
+Use ecosystem `publish` defaults when most packages share the same publishing behavior, and override at `[package.*].publish` when needed.
 
-## Package publishing and trust
+Lockfile commands are command-driven. Configure them when the repository has a preferred package manager or when inferred defaults would update the wrong files. They normally run as part of a release workflow after versions are prepared and before the release commit is created.
 
-Publishing is separate from release planning.
+## Publishing settings
 
 ```toml
 [ecosystems.npm.publish]
+enabled = true
 mode = "builtin"
+registry = "npm"
 trusted_publishing = true
 
-[package.web.publish.placeholder]
-readme_file = "docs/web-placeholder.md"
+[package."@acme/private-tool"]
+path = "tools/private-tool"
+type = "npm"
+publish = { enabled = false }
+
+[package."@acme/custom-registry-package"]
+path = "packages/custom"
+type = "npm"
+publish = { enabled = true, mode = "external" }
 ```
 
-Use:
+Built-in publishing is for canonical public registries. Use `mode = "external"` for private registries or custom release jobs.
 
-- `mc placeholder-publish` to bootstrap missing public packages
-- `mc publish-readiness --from HEAD --output <path>` and `mc publish` for package-registry publishing
-- `mc publish-release` for hosted/provider releases
+Use `publish = { enabled = false }` for packages that should be versioned but never published. Use external mode when monochange should still plan versions and release records but another CI job owns registry credentials, custom rate limits, private feeds, or manual approval gates.
 
-Preference rules for trusted publishing:
-
-- for npm on GitHub, `mode = "builtin"` is the preferred path because monochange can verify and configure trust itself
-- for `crates.io`, prefer `rust-lang/crates-io-auth-action@v1` when you want a registry-native GitHub Actions publish workflow
-- for `pub.dev`, prefer `dart-lang/setup-dart/.github/workflows/publish.yml@v1` when you want the workflow shape recommended by the Dart team
-- for `crates.io` and `pub.dev`, `mode = "external"` is often the clearest fit when the registry-maintained workflow should own the publish command directly
-- if one repository publishes multiple public packages, use [multi-package-publishing.md](./multi-package-publishing.md) to decide between one shared readiness-enforced `mc publish` job, package-specific jobs, or fully external workflows
-
-## Release titles and changelog headings
-
-Customize outward release text with these fields:
+## Changelog configuration
 
 ```toml
-[defaults]
-release_title = "{{ version }} ({{ date }})"
-changelog_version_title = "[{{ version }}]({{ tag_url }}) ({{ date }})"
+[defaults.changelog]
+path = "{{ path }}/CHANGELOG.md"
+format = "keep_a_changelog"
+initial_header = """
+# Changelog
+
+All notable changes to this project will be documented in this file.
+"""
+
+[changelog.types]
+feat = { bump = "minor", section = "feat", description = "New user-facing functionality" }
+fix = { bump = "patch", section = "fix", description = "Bug fixes" }
+docs = { bump = "none", section = "docs", description = "Documentation only" }
+
+[changelog.sections]
+feat = { heading = "Added", priority = 20 }
+fix = { heading = "Fixed", priority = 30 }
+docs = { heading = "Documentation", priority = 40 }
 ```
 
-Use them when:
+## Custom CLI workflows
 
-- provider release titles need a consistent format
-- changelog headings should include links or dates
-- group releases should read differently from package releases
+`[cli.<name>]` creates `mc <name>` in that repository. These workflows are the maintainable place to compose built-in steps with local shell commands, input defaults, dry-run behavior, and CI-specific guards.
 
-## Add or override top-level commands
-
-`monochange.toml` can define or override `[cli.<command>]` entries.
+Name workflow commands after user intent (`change`, `release`, `publish-check`) rather than implementation detail. Keep destructive workflows explicit, and expose safe dry-run or JSON-producing workflows for agents and automation.
 
 ```toml
+[cli.change]
+help_text = "Create a changeset"
+inputs = [
+	{ name = "package", type = "string_list", required = true },
+	{ name = "bump", type = "choice", choices = ["none", "patch", "minor", "major"], default = "patch" },
+	{ name = "reason", type = "string", required = true },
+	{ name = "type", type = "string" },
+	{ name = "caused_by", type = "string_list" },
+]
+steps = [{ name = "create change file", type = "CreateChangeFile" }]
+
 [cli.release]
-help_text = "Prepare a release from discovered change files"
-
-[[cli.release.inputs]]
-name = "format"
-type = "choice"
-choices = ["markdown", "text", "json"]
-default = "markdown"
-
-[[cli.release.steps]]
-type = "PrepareRelease"
+help_text = "Prepare versioned package files"
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "markdown" },
+]
+steps = [
+	{ name = "plan release", type = "PrepareRelease" },
+	{ name = "refresh lockfiles", type = "Command", command = "pnpm install --lockfile-only" },
+]
 ```
 
-Use the `[cli.*]` workflow tables generated by `mc init` as the editable starting point, or add a new `[cli.<name>]` table yourself.
-
-## A safe config-edit workflow
-
-```bash
-mc init
-mc validate
-mc discover --format json
-mc validate
-mc release --dry-run --format json
-```
-
-If you touched grouped packages, changelog settings, or versioned files, add `--diff` to inspect the planned file changes:
-
-```bash
-mc release --dry-run --diff
-```
-
-## Common mistakes
-
-### Hand-writing ids before discovery
-
-**Avoid:** inventing ids from directory names.
-
-**Prefer:**
-
-```bash
-mc discover --format json
-```
-
-### Over-grouping packages
-
-**Avoid:** putting every related package into one group.
-
-**Prefer:** only group packages that should share one outward version and release identity.
-
-### Forgetting validation after config edits
-
-**Avoid:** editing `monochange.toml` and going straight to publishing.
-
-**Prefer:**
-
-```bash
-mc validate
-mc release --dry-run --format json
-```
-
-## Related references
-
-- [reference.md](./reference.md)
-- [commands.md](./commands.md)
-- [linting.md](./linting.md)
+Validate custom workflows with `mc validate` and inspect them with `mc help`.

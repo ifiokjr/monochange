@@ -1,271 +1,102 @@
 ---
 name: monochange
-description: Guides agents through monochange adoption planning, discovery, changesets, release planning, and provider-aware release workflows. Use when working on `monochange.toml`, `.changeset/*.md`, release automation, grouped versions, migration into existing monorepos, cross-ecosystem monorepo releases, CLI step composition, MCP tool interactions, or linting configuration.
+description: Use the monochange CLI and MCP tooling to configure monorepo package versioning, create changesets, preview releases, generate versioned package files, and run configured publish workflows. Use when working with monochange.toml, .changeset/*.md, [cli.*] workflow commands, package/group version plans, manifest linting, release records, or the monochange MCP server.
 ---
 
 # monochange
 
-## Quick start
-
-If the user is still deciding how deeply to adopt monochange, start with [skills/adoption.md](skills/adoption.md) and [examples/readme.md](examples/readme.md) before generating files.
-
-1. If `monochange.toml` does not exist yet, run `mc init`. `mc init` writes editable `[cli.*]` workflow commands; built-in steps are always available directly as immutable `mc step:*` commands.
-2. Read `monochange.toml` first — it is the single source of truth.
-3. Run `mc validate` before making release-affecting edits.
-4. Use `mc discover --format json` to inspect the workspace model.
-5. Use `mc change` to write explicit release intent as `.changeset/*.md` files.
-6. Use `mc diagnostics --format json` to inspect changeset context and git provenance.
-7. Use `mc check` to validate the workspace and run configured manifest lint rules.
-8. Use `mc release --dry-run --format json` or `mc release --dry-run --diff` before mutating release state.
-
-## Working rules
-
-- Treat `monochange.toml` as the source of truth for packages, groups, source providers, ecosystems, `[cli.<command>]` entries, and lint configuration.
-- Prefer configured package or group ids over guessing manifest names.
-- Use `.changeset/*.md` files for explicit release intent — each targets one or more package/group ids with a bump severity, optional `type`, optional explicit `version`, and a human-readable summary.
-- Use `caused_by` in changeset frontmatter when a dependent package is updating because of a dependency change — this provides context and replaces the matching automatic "dependency changed → patch" propagation.
-- `caused_by` uses object syntax in markdown changesets and can reference package ids or group ids; in CLI form, pass one or more `--caused-by <id>` flags.
-- When `mc step:affected-packages` flags a package that has no meaningful change, create a changeset with `bump: none` and `caused_by` listing the root cause package(s).
-- Review existing `.changeset/*.md` files before creating a new one so you can decide whether the right lifecycle action is create, update, replace, or remove.
-- Keep changesets package-centric and granular. Distinct features should get distinct changesets even when they land in the same package; only expand an existing changeset when the new work is clearly the same feature growing in scope.
-- Combine near-duplicate changesets when the outward change is the same across multiple related packages. Do not emit cloned compatibility notes that differ only by package name.
-- Breaking changes must always get their own dedicated changeset with a migration path instead of being bundled into a broader feature note.
-- Run dry-run flows before real release commands.
-- Run `mc check` before releases to catch manifest inconsistencies early.
-- Keep docs, templates, and changelog behavior aligned with config changes.
-- Use `mc diagnostics --format json` to audit changesets before release — it shows git provenance, linked PRs, related issues, and introduced/last-updated commits.
-
-## Recommended command flow
-
-<!-- {=recommendedCommandFlow} -->
-
-1. **Validate** — `mc validate` checks config and changeset targets.
-2. **Discover** — `mc discover --format json` inspects the workspace model.
-3. **Create changesets** — `mc change --package <id> --bump <severity> --reason "..."` writes explicit release intent.
-4. **Preview release** — `mc release --dry-run --format json` shows planned bumps, changelog output, and changed files.
-5. **Inspect changeset context** — `mc diagnostics --format json` shows git provenance and linked review metadata for all pending changesets.
-6. **Inspect cached manifest** — `mc release --dry-run --format json` refreshes the cached manifest and shows the downstream automation payload.
-7. **Publish** — `mc publish-release --format json` creates provider releases after human review.
-
-<!-- {/recommendedCommandFlow} -->
-
-Release-oriented commands default to markdown output. Use `--format json` for automation and `--diff` when you want unified file previews without mutating the workspace.
-
-## Deep dives
-
-- [skills/reference.md](skills/reference.md) — high-context reference with more examples
-- [skills/readme.md](skills/readme.md) — index of focused skill modules
-- [skills/adoption.md](skills/adoption.md) — interactive setup planning, migration questions, and recommendation patterns
-- [skills/changesets.md](skills/changesets.md) — creating, auditing, cleaning up, and managing changesets
-- [skills/commands.md](skills/commands.md) — built-in commands and workflow selection
-- [skills/configuration.md](skills/configuration.md) — creating and extending `monochange.toml`
-- [skills/linting.md](skills/linting.md) — `mc check`, `[lints]`, presets, and manifest-focused rule explanations with examples
-- [examples/readme.md](examples/readme.md) — condensed setup examples for quick recommendations
-- [skills/multi-package-publishing.md](skills/multi-package-publishing.md) — patterns for publishing multiple public packages from one repository
-- [skills/changeset-guide.md](skills/changeset-guide.md) — full lifecycle guidance
-- [skills/artifact-types.md](skills/artifact-types.md) — package-type-specific release-note guidance
-
-## CLI commands
-
-| Command                       | Purpose                                                                |
-| ----------------------------- | ---------------------------------------------------------------------- |
-| `mc init`                     | Generate a starter `monochange.toml` from detected packages            |
-| `mc validate`                 | Validate config and changeset targets                                  |
-| `mc check`                    | Validate config and run lint rules against package manifests           |
-| `mc lint`                     | Inspect registered lint rules and presets                              |
-| `mc discover`                 | Discover packages across ecosystems                                    |
-| `mc change`                   | Create a `.changeset/*.md` file                                        |
-| `mc release`                  | Prepare a release plan from changesets and refresh the cached manifest |
-| `mc placeholder-publish`      | Publish placeholder versions for packages missing from registries      |
-| `mc publish-bootstrap`        | Bootstrap release package placeholders and write a result artifact     |
-| `mc publish-readiness`        | Check package-registry readiness and write a validation artifact       |
-| `mc publish-plan --readiness` | Plan rate-limit batches from ready package work only                   |
-| `mc publish --output`         | Publish package artifacts and write a resumable result artifact        |
-| `mc commit-release`           | Prepare a release and create a local commit                            |
-| `mc publish-release`          | Create provider releases                                               |
-| `mc release-pr`               | Open or update a release pull request                                  |
-| `mc step:affected-packages`   | Evaluate changeset policy from changed paths without a config wrapper  |
-| `mc diagnostics`              | Show changeset context with git and review metadata                    |
-| `mc release-record`           | Inspect a durable release declaration from git history                 |
-| `mc repair-release`           | Repair a recent release by retargeting tags                            |
-| `mc subagents`                | Generate repo-local monochange agent, subagent, and rule files         |
-| `mc mcp`                      | Start the stdio MCP server                                             |
-
-## CLI step types
-
-<!-- {=cliStepTypes} -->
-
-**Standalone steps** (no prerequisites):
-
-- `Validate` — validate config and changeset targets
-- `Discover` — discover packages across ecosystems
-- `CreateChangeFile` — write a `.changeset/*.md` file
-- `AffectedPackages` — evaluate changeset policy from CI-supplied paths and labels
-- `DiagnoseChangesets` — show changeset context and review metadata
-- `RetargetRelease` — repair a recent release by moving its tags
-
-**Release-state consumer steps** (require `PrepareRelease`):
-
-- `PrepareRelease` — compute release plan, update versions, changelogs, and versioned files
-- `CommitRelease` — create a local release commit
-- `PublishRelease` — create provider releases
-- `OpenReleaseRequest` — open or update a release pull request
-- `CommentReleasedIssues` — comment on issues referenced in changesets
-
-**Generic step:**
-
-- `Command` — run an arbitrary shell command with template interpolation
-
-<!-- {/cliStepTypes} -->
-
-## MCP tools
-
-<!-- {=mcpToolsList} -->
-
-- `monochange_validate` — validate `monochange.toml` and `.changeset` targets
-- `monochange_discover` — discover packages, dependencies, and groups across the repository
-- `monochange_diagnostics` — inspect pending changesets with git and review context as structured JSON
-- `monochange_change` — write a `.changeset` markdown file for one or more package or group ids
-- `monochange_release_preview` — prepare a dry-run release preview from discovered `.changeset` files
-- `monochange_release_manifest` — generate a dry-run release manifest JSON document for downstream automation
-- `monochange_affected_packages` — evaluate changeset policy from changed paths and optional labels
-- `monochange_lint_catalog` — list registered manifest lint rules and presets
-- `monochange_lint_explain` — explain one manifest lint rule or preset
-- `monochange_analyze_changes` — analyze git diff state and return ecosystem-specific semantic changes
-- `monochange_validate_changeset` — validate one changeset against the current semantic diff
-
-<!-- {/mcpToolsList} -->
-
-## Key configuration concepts
-
-### Changeset generation
-
-- Start by checking existing `.changeset/*.md` files and the current diff before you write anything new.
-- Prefer one package per changeset unless a configured group is the real outward release boundary.
-- Keep related changes together, but split unrelated features apart even if they touch the same package.
-- If a package is only changing because of dependency propagation, prefer `caused_by` frontmatter and use `bump: none` when there is no real user-facing change.
-- If multiple packages changed for the same reason and the release note would otherwise be nearly identical, combine them into one multi-package changeset instead of cloning the same body four times.
-- Update an existing changeset only when the new work is clearly the same feature expanding in scope.
-- Remove stale changesets when the feature was reverted or replaced before release.
-- Breaking changes always get their own dedicated changeset with a migration guide.
-- Changeset bodies still need the user-facing quality bar: headline, impact summary, and concrete before/after or usage examples.
-
-### Versioned files
-
-`versioned_files` update additional managed files beyond native manifests when versions change. Three forms:
-
-- **Package-scoped shorthand**: `versioned_files = ["Cargo.toml"]` — infers the package ecosystem
-- **Explicit typed entries**: `versioned_files = [{ path = "group.toml", type = "cargo" }]`
-- **Regex entries**: `versioned_files = [{ path = "README.md", regex = 'v(?<version>\d+\.\d+\.\d+)' }]` — for plain-text files; must include a named `version` capture
-
-### Lockfile commands
-
-Lockfile refresh is command-driven via `[ecosystems.<name>].lockfile_commands`. monochange infers sensible defaults for Cargo, npm-family, Dart/Flutter, Python (`uv lock` / `poetry lock --no-update`), and Go (`go mod tidy`). Explicit configuration overrides inference.
-
-### Publishing and trust
-
-- Package publishing is configured through `publish` on packages and ecosystems.
-- Built-in publishing currently supports the canonical public registries and Go proxy/tag flow: `crates.io`, `npm`, `jsr`, `pub.dev`, `pypi`, and `go_proxy`. Use `mode = "external"` for private registries or custom publication flows.
-- `mc publish-readiness` blocks built-in Cargo publishes to crates.io when the current `Cargo.toml` is not publishable: `publish = false`, `publish = [...]` without `crates-io`, missing `description`, or missing both `license` and `license-file`. Workspace-inherited Cargo metadata is accepted.
-- `mc publish-plan --readiness <path>` validates a readiness artifact for the current release record, selected package set, and publish input fingerprint, then excludes package ids that are not ready in both the artifact and the fresh local readiness check. Placeholder planning does not accept readiness artifacts.
-- `mc publish-bootstrap --from HEAD --output <path>` is the release-scoped first-release bootstrap command. It reads package ids from the release record, runs placeholder publishing, writes a JSON result artifact, and should be followed by a fresh `mc publish-readiness` run.
-- Rerun `mc publish-readiness` whenever `monochange.toml`, package manifests, lockfiles, `.npmrc`, Cargo config/toolchain files, workspace `Cargo.toml`, or other publish tooling inputs change after an artifact was written.
-- `mc placeholder-publish` remains the lower-level bootstrap command. It checks whether each managed package already exists in its registry and publishes a placeholder `0.0.0` version only for the missing ones.
-- Placeholder README content can come from `publish.placeholder.readme` or `publish.placeholder.readme_file`.
-- `publish.trusted_publishing = true` tells monochange to manage or verify trusted publishing for that package when supported.
-- npm trusted publishing can be configured automatically from GitHub Actions context. pnpm workspaces use `pnpm exec npm trust ...` and `pnpm publish`, and monochange verifies the trust state before changing it.
-- Cargo, `jsr`, `pub.dev`, and PyPI currently require manual trusted-publishing setup. monochange reports the setup URL and blocks the next built-in release publish until trust is configured.
-- Prefer the official GitHub publishing workflows for manual registries when they exist: `rust-lang/crates-io-auth-action@v1` for `crates.io` and `dart-lang/setup-dart/.github/workflows/publish.yml@v1` for `pub.dev`.
-- See [skills/trusted-publishing.md](skills/trusted-publishing.md) for the exact registry fields, commands, official workflow preferences, and GitHub Actions requirements across `npm`, `crates.io`, `jsr`, `pub.dev`, PyPI, and Go module tags.
-- See [skills/multi-package-publishing.md](skills/multi-package-publishing.md) when one repository publishes multiple packages and you need to choose between shared readiness-enforced `mc publish` flows, package-specific jobs, or external workflows.
-- Built-in publishing does not yet manage registry rate-limit retries or delayed requeues. Use `mode = "external"` if your workflow needs custom scheduling.
-
-### Release titles
-
-<!-- {=releaseTitleConfig} -->
-
-Two template fields control how release names and changelog version headings render:
-
-- **`release_title`** — plain text title for provider releases (GitHub, GitLab, Gitea)
-- **`changelog_version_title`** — markdown-capable title for changelog version headings
-
-Both are configurable at `[defaults]`, `[package.*]`, and `[group.*]` levels.
-
-Available template variables: `{{ version }}`, `{{ id }}`, `{{ date }}`, `{{ time }}`, `{{ datetime }}`, `{{ changes_count }}`, `{{ tag_url }}`, `{{ compare_url }}`.
-
-```toml
-[defaults]
-release_title = "{{ version }} ({{ date }})"
-changelog_version_title = "[{{ version }}]({{ tag_url }}) ({{ date }})"
-
-[group.main]
-release_title = "v{{ version }} — released {{ date }}"
-```
-
-<!-- {/releaseTitleConfig} -->
-
-### Groups and changelog filtering
-
-Groups synchronize versions across packages. Group changelogs can filter included entries:
-
-- `include = "all"` — all member changesets (default)
-- `include = "group-only"` — only direct group-targeted changesets
-- `include = ["package-id"]` — specific member changesets plus group-targeted ones
-
-## Changeset lifecycle
-
-**Changesets must be actively managed, not just created.** Before writing a new changeset:
-
-1. Read all existing `.changeset/*.md` files to understand current coverage
-2. Determine the right action: **create new**, **update existing**, or **remove stale**
-3. Choose bump level and section type based on artifact type (library, application, CLI, LSP/MCP)
-4. Validate with `mc validate` or `mc diagnostics --format json`
-
-See [skills/changeset-guide.md](skills/changeset-guide.md) for the full lifecycle management guide.
-
-## Artifact types
-
-Different package types have different user-facing boundaries. Libraries expose APIs, applications expose UI, CLI tools expose commands, and LSP/MCP servers expose protocols. Changeset content, bump levels, and section types should adapt accordingly.
-
-Applications and websites should use the `ux` changelog section type for visual and interaction changes, with screenshots when configured.
-
-See [skills/artifact-types.md](skills/artifact-types.md) for per-type rules, templates, examples, and configuration.
-
-### Lint configuration
-
-Configure manifest lint presets, global rules, and scoped overrides in the top-level `[lints]` section of `monochange.toml`, then run them with `mc check`:
-
-```toml
-[lints]
-use = ["cargo/recommended", "npm/recommended"]
-
-[lints.rules]
-"cargo/internal-dependency-workspace" = "error"
-"npm/workspace-protocol" = "error"
-
-[[lints.scopes]]
-name = "published cargo packages"
-match = { ecosystems = ["cargo"], managed = true, publishable = true }
-rules = { "cargo/required-package-fields" = "error" }
-```
-
-Each rule can be configured as:
-
-- Simple severity: `"rule-id" = "error"`, `"rule-id" = "warning"`, or `"rule-id" = "off"`
-- Detailed config: `{ level = "error", ...rule_specific_options }`
-
-Use `mc lint list` or `mc lint explain <id>` to inspect available rules and presets.
-
-Use `mc check --fix` to auto-fix issues where possible. Today the built-in rule sets focus on Cargo and npm-family manifests.
-
-## Guidance
-
-Start with [skills/reference.md](skills/reference.md) for the broad reference.
-
-Open [skills/readme.md](skills/readme.md) when you need the focused deep dives for adoption planning, changesets, commands, configuration, or linting.
-
-Open [examples/readme.md](examples/readme.md) when a short scenario-based recommendation is more useful than a long reference document.
-
-See [skills/trusted-publishing.md](skills/trusted-publishing.md) for GitHub/OIDC trusted-publishing setup details across the registries that monochange supports.
-
-See [skills/multi-package-publishing.md](skills/multi-package-publishing.md) for monorepo publishing patterns when one repository ships multiple public packages.
+Use this skill when the user wants to operate monochange in a repository or author a `monochange.toml` configuration for versioned package releases.
+
+monochange is a release-planning harness rather than a single fixed workflow. It discovers package manifests, maps them to configured package and group ids, reads `.changeset/*.md` release intent, computes versions, updates native manifests and extra versioned files, and then exposes release, source-provider, and package-publishing actions through built-in steps or repository-defined workflows.
+
+Agents should optimize for safety and traceability: inspect config first, prefer JSON/dry-run output while planning, preserve changeset intent in files, and only run mutating release or publish flows after the user has approved the exact command path.
+
+## Source-of-truth rules
+
+- Read `monochange.toml` before recommending commands. Top-level `mc <name>` workflow commands can be user-defined by `[cli.<name>]` and vary per repository.
+- Do not assume `mc discover`, `mc change`, `mc release`, `mc publish`, or similar workflow names exist in every repo. They are user-defined unless they appear in `mc help` for that workspace.
+- Built-in commands are hardcoded by the CLI. Step commands are always exposed as `mc step:<step-name>` for built-in step variants, except the generic `Command` step.
+- Prefer package or group ids from `monochange.toml` over manifest names.
+- Use dry-run or preview commands before mutating versions, committing, tagging, releasing, or publishing.
+- Never publish with local credentials on behalf of a user unless they explicitly own that operation and the project rules allow it.
+
+## Fast workflow
+
+1. Inspect configuration: `mc validate`, `mc step:config --format json`, or `mc help`. Use this to learn package ids, enabled ecosystems, groups, and which top-level workflow commands actually exist.
+2. Inspect packages: use the configured workflow command (often `mc discover --format json`) or `mc step:discover --format json`. Prefer JSON when another tool or agent will consume the package graph.
+3. Create release intent: use a configured workflow command (often `mc change ...`) or write `.changeset/*.md` manually. Read existing changesets first so you can update or merge related intent instead of creating duplicates.
+4. Preview versioned files: use the configured workflow command (often `mc release --dry-run --format json` or `--diff`) or `mc step:prepare-release --dry-run`. The preview is where you verify versions, changelog entries, generated manifests, and lockfile work before mutating the tree.
+5. Run validation and linting: `mc check` and `mc validate`. `validate` catches monochange configuration and target issues; `check` also runs manifest lint rules.
+6. Only after review, run configured commit/release/publish workflows. Keep release-record, readiness, bootstrap, plan, and publish artifacts when the workflow emits them.
+
+## What to open next
+
+- [skills/readme.md](skills/readme.md) — index of all focused skill modules.
+- [skills/commands.md](skills/commands.md) — verified built-in commands, step commands, user-defined command behavior, and all CLI step types.
+- [skills/configuration.md](skills/configuration.md) — current `monochange.toml` structure and examples.
+- [skills/changesets.md](skills/changesets.md) — changeset file shape, CLI creation, and lifecycle rules.
+- [skills/linting.md](skills/linting.md) — `mc check`, lint presets, and manifest policy.
+- [skills/multi-package-publishing.md](skills/multi-package-publishing.md) — readiness, bootstrap, and package publishing flows.
+- [skills/trusted-publishing.md](skills/trusted-publishing.md) — registry trust/OIDC notes for publishing.
+- [skills/reference.md](skills/reference.md) — full operating guide.
+- [examples/readme.md](examples/readme.md) — copyable example scenarios.
+
+## Verified command inventory
+
+The command inventory in this skill is based on `crates/monochange/src/cli.rs`, `crates/monochange_core/src/lib.rs`, and the CLI help snapshot `crates/monochange/tests/snapshots/cli_help__help_overview_lists_all_commands@help_overview_lists_all_commands.snap`.
+
+Built-in commands in the current CLI:
+
+- `mc init` — create a starter `monochange.toml` from discovered manifests.
+- `mc populate` — add missing configurable workflow definitions to an existing config.
+- `mc skill` — install or update the monochange skill bundle.
+- `mc subagents` — generate repository-local agent/subagent guidance for monochange work.
+- `mc analyze` — inspect semantic changes for a package.
+- `mc tag-release` — create release tags from an embedded release record.
+- `mc release-record` — inspect the release record reachable from a tag or commit.
+- `mc check` — validate configuration, changesets, and manifest lint rules.
+- `mc lint` — list or explain lint rules and presets.
+- `mc mcp` — run the stdio MCP server.
+- `mc validate` — validate `monochange.toml` and changeset targets.
+- `mc publish-readiness` — verify publishability from a release record without publishing.
+- `mc publish-bootstrap` — publish first-time placeholder versions for packages in a release record.
+
+Built-in step commands:
+
+- `mc step:config`
+- `mc step:validate`
+- `mc step:discover`
+- `mc step:display-versions`
+- `mc step:create-change-file`
+- `mc step:prepare-release`
+- `mc step:commit-release`
+- `mc step:verify-release-branch`
+- `mc step:publish-release`
+- `mc step:placeholder-publish`
+- `mc step:publish-packages`
+- `mc step:plan-publish-rate-limits`
+- `mc step:open-release-request`
+- `mc step:comment-released-issues`
+- `mc step:affected-packages`
+- `mc step:diagnose-changesets`
+- `mc step:retarget-release`
+
+`Command` is a valid `[cli.*].steps[].type` for running shell commands, but it is not exposed as `mc step:command`.
+
+## Current MCP tools
+
+The `mc mcp` server exposes these tools:
+
+- `monochange_validate` — validate config and changeset targets.
+- `monochange_discover` — return structured packages, groups, dependencies, and ecosystems.
+- `monochange_diagnostics` — inspect pending changesets with git and review context.
+- `monochange_change` — create a changeset through structured tool input.
+- `monochange_release_preview` — run a dry-run release preview.
+- `monochange_release_manifest` — produce a release manifest payload for downstream automation.
+- `monochange_affected_packages` — evaluate changed paths and changeset coverage.
+- `monochange_lint_catalog` — list lint rules and presets.
+- `monochange_lint_explain` — explain one lint rule or preset.
+- `monochange_analyze_changes` — inspect semantic diffs for package-aware changes.
+- `monochange_validate_changeset` — check one changeset against the current semantic diff.
+
+Prefer MCP tools when the caller needs structured data and the shell when you need to run the exact repository workflow that maintainers use locally or in CI.
