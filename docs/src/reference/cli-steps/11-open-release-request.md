@@ -87,9 +87,11 @@ default = "text"
 
 [[cli.release-pr.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.release-pr.steps]]
 type = "OpenReleaseRequest"
+inputs = ["format"]
 ```
 
 <!-- {/cliStepOpenReleaseRequestExample} -->

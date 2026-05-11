@@ -113,6 +113,17 @@ type = "string"
 
 [[cli.change.steps]]
 type = "CreateChangeFile"
+inputs = [
+	"interactive",
+	"package",
+	"bump",
+	"version",
+	"type",
+	"caused_by",
+	"reason",
+	"details",
+	"output",
+]
 ```
 
 <!-- {/cliStepCreateChangeFileExample} -->

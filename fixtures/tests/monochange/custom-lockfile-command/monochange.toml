@@ -10,5 +10,12 @@ lockfile_commands = [{ command = "custom-lock", cwd = "packages/app", shell = tr
 
 [cli.release]
 
+[[cli.release.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
 [[cli.release.steps]]
 type = "PrepareRelease"
+inputs = ["format"]

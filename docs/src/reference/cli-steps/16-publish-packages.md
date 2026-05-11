@@ -151,6 +151,7 @@ help_text = "Write the package publish result JSON artifact for retry/resume"
 [[cli.publish.steps]]
 name = "publish packages"
 type = "PublishPackages"
+inputs = ["format", "package", "group", "ecosystem", "resume", "output"]
 ```
 
 <!-- {/cliStepPublishPackagesExample} -->

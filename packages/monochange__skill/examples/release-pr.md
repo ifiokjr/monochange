@@ -10,10 +10,10 @@ inputs = [
 	{ name = "no_verify", type = "boolean", default = false },
 ]
 steps = [
-	{ name = "plan release", type = "PrepareRelease", allow_empty_changesets = true },
+	{ name = "plan release", type = "PrepareRelease", allow_empty_changesets = true, inputs = ["format"] },
 	{ name = "refresh lockfile", type = "Command", command = "pnpm install --lockfile-only", when = "{{ number_of_changesets > 0 }}" },
 	{ name = "create release commit", type = "CommitRelease", when = "{{ number_of_changesets > 0 }}" },
-	{ name = "open release request", type = "OpenReleaseRequest", when = "{{ number_of_changesets > 0 }}" },
+	{ name = "open release request", type = "OpenReleaseRequest", when = "{{ number_of_changesets > 0 }}", inputs = ["format"] },
 ]
 ```
 

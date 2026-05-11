@@ -243,11 +243,8 @@
 							"type": "boolean"
 						},
 						"inputs": {
-							"additionalProperties": {
-								"$ref": "#/$defs/CliStepInputValue"
-							},
-							"default": {},
-							"type": "object"
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
 						},
 						"name": {
 							"default": null,
@@ -282,11 +279,8 @@
 							"type": "boolean"
 						},
 						"inputs": {
-							"additionalProperties": {
-								"$ref": "#/$defs/CliStepInputValue"
-							},
-							"default": {},
-							"type": "object"
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
 						},
 						"name": {
 							"default": null,
@@ -321,11 +315,8 @@
 							"type": "boolean"
 						},
 						"inputs": {
-							"additionalProperties": {
-								"$ref": "#/$defs/CliStepInputValue"
-							},
-							"default": {},
-							"type": "object"
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
 						},
 						"name": {
 							"default": null,
@@ -360,11 +351,8 @@
 							"type": "boolean"
 						},
 						"inputs": {
-							"additionalProperties": {
-								"$ref": "#/$defs/CliStepInputValue"
-							},
-							"default": {},
-							"type": "object"
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
 						},
 						"name": {
 							"default": null,
@@ -399,11 +387,8 @@
 							"type": "boolean"
 						},
 						"inputs": {
-							"additionalProperties": {
-								"$ref": "#/$defs/CliStepInputValue"
-							},
-							"default": {},
-							"type": "object"
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
 						},
 						"name": {
 							"default": null,
@@ -450,11 +435,8 @@
 							"type": "boolean"
 						},
 						"inputs": {
-							"additionalProperties": {
-								"$ref": "#/$defs/CliStepInputValue"
-							},
-							"default": {},
-							"type": "object"
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
 						},
 						"name": {
 							"default": null,
@@ -489,11 +471,8 @@
 							"type": "boolean"
 						},
 						"inputs": {
-							"additionalProperties": {
-								"$ref": "#/$defs/CliStepInputValue"
-							},
-							"default": {},
-							"type": "object"
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
 						},
 						"name": {
 							"default": null,
@@ -536,11 +515,8 @@
 							"type": "boolean"
 						},
 						"inputs": {
-							"additionalProperties": {
-								"$ref": "#/$defs/CliStepInputValue"
-							},
-							"default": {},
-							"type": "object"
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
 						},
 						"name": {
 							"default": null,
@@ -575,11 +551,8 @@
 							"type": "boolean"
 						},
 						"inputs": {
-							"additionalProperties": {
-								"$ref": "#/$defs/CliStepInputValue"
-							},
-							"default": {},
-							"type": "object"
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
 						},
 						"name": {
 							"default": null,
@@ -614,11 +587,8 @@
 							"type": "boolean"
 						},
 						"inputs": {
-							"additionalProperties": {
-								"$ref": "#/$defs/CliStepInputValue"
-							},
-							"default": {},
-							"type": "object"
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
 						},
 						"name": {
 							"default": null,
@@ -653,11 +623,8 @@
 							"type": "boolean"
 						},
 						"inputs": {
-							"additionalProperties": {
-								"$ref": "#/$defs/CliStepInputValue"
-							},
-							"default": {},
-							"type": "object"
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
 						},
 						"name": {
 							"default": null,
@@ -692,11 +659,8 @@
 							"type": "boolean"
 						},
 						"inputs": {
-							"additionalProperties": {
-								"$ref": "#/$defs/CliStepInputValue"
-							},
-							"default": {},
-							"type": "object"
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
 						},
 						"name": {
 							"default": null,
@@ -731,11 +695,8 @@
 							"type": "boolean"
 						},
 						"inputs": {
-							"additionalProperties": {
-								"$ref": "#/$defs/CliStepInputValue"
-							},
-							"default": {},
-							"type": "object"
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
 						},
 						"name": {
 							"default": null,
@@ -774,11 +735,8 @@
 							"type": "boolean"
 						},
 						"inputs": {
-							"additionalProperties": {
-								"$ref": "#/$defs/CliStepInputValue"
-							},
-							"default": {},
-							"type": "object"
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
 						},
 						"name": {
 							"default": null,
@@ -813,11 +771,8 @@
 							"type": "boolean"
 						},
 						"inputs": {
-							"additionalProperties": {
-								"$ref": "#/$defs/CliStepInputValue"
-							},
-							"default": {},
-							"type": "object"
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
 						},
 						"name": {
 							"default": null,
@@ -852,11 +807,8 @@
 							"type": "boolean"
 						},
 						"inputs": {
-							"additionalProperties": {
-								"$ref": "#/$defs/CliStepInputValue"
-							},
-							"default": {},
-							"type": "object"
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
 						},
 						"name": {
 							"default": null,
@@ -891,11 +843,8 @@
 							"type": "boolean"
 						},
 						"inputs": {
-							"additionalProperties": {
-								"$ref": "#/$defs/CliStepInputValue"
-							},
-							"default": {},
-							"type": "object"
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
 						},
 						"name": {
 							"default": null,
@@ -947,11 +896,8 @@
 							]
 						},
 						"inputs": {
-							"additionalProperties": {
-								"$ref": "#/$defs/CliStepInputValue"
-							},
-							"default": {},
-							"type": "object"
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
 						},
 						"name": {
 							"default": null,
@@ -1001,13 +947,29 @@
 				}
 			]
 		},
-		"CliStepInputValue": {
+		"CliStepInputOverrideValueSchema": {
 			"anyOf": [
 				{
 					"type": "string"
 				},
 				{
 					"type": "boolean"
+				},
+				{
+					"items": {
+						"type": "string"
+					},
+					"type": "array"
+				}
+			]
+		},
+		"CliStepInputsSchema": {
+			"anyOf": [
+				{
+					"additionalProperties": {
+						"$ref": "#/$defs/CliStepInputOverrideValueSchema"
+					},
+					"type": "object"
 				},
 				{
 					"items": {

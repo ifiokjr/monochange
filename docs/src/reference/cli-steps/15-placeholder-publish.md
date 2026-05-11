@@ -88,6 +88,7 @@ help_text = "Show already-published and skipped placeholder packages instead of 
 [[cli.placeholder-publish.steps]]
 name = "publish placeholder packages"
 type = "PlaceholderPublish"
+inputs = ["format", "package", "show-all"]
 ```
 
 <!-- {/cliStepPlaceholderPublishExample} -->

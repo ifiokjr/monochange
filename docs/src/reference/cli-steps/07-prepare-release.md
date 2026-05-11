@@ -94,6 +94,7 @@ default = "text"
 
 [[cli.release.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 ```
 
 <!-- {/cliStepPrepareReleaseExample} -->
@@ -116,6 +117,7 @@ default = "text"
 
 [[cli.release-with-notes.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.release-with-notes.steps]]
 type = "Command"

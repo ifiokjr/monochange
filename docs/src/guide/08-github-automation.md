@@ -189,6 +189,7 @@ default = "text"
 
 [[cli.publish-release.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.publish-release.steps]]
 type = "PublishRelease"
@@ -207,9 +208,11 @@ default = "text"
 
 [[cli.release-pr.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.release-pr.steps]]
 type = "OpenReleaseRequest"
+inputs = ["format"]
 ```
 
 <!-- {/githubAutomationReleaseConfigExample} -->

@@ -128,6 +128,7 @@ default = "text"
 
 [[cli.repair-release.steps]]
 type = "RetargetRelease"
+inputs = ["from", "target", "force", "sync_provider"]
 ```
 
 <!-- {/cliStepRetargetReleaseExample} -->
@@ -154,6 +155,7 @@ default = "HEAD"
 
 [[cli.repair-and-notify.steps]]
 type = "RetargetRelease"
+inputs = ["from", "target"]
 
 [[cli.repair-and-notify.steps]]
 type = "Command"

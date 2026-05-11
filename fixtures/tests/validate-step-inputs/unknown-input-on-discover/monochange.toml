@@ -5,6 +5,12 @@ package_type = "cargo"
 path = "crates/core"
 
 [cli.discover]
+[[cli.discover.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
 
 [[cli.discover.steps]]
 type = "Discover"

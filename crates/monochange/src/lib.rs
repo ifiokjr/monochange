@@ -224,7 +224,7 @@ pub(crate) fn synthetic_step_command_definition(
 		name: cli_command_name.to_string(),
 		help_text: step.name().map(ToString::to_string),
 		inputs: step.step_inputs_schema(),
-		steps: vec![step],
+		steps: vec![step.with_inherited_step_inputs()],
 		dry_run: false,
 	})
 }

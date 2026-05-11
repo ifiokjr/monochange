@@ -161,7 +161,9 @@ inputs = [
 	{ name = "type", type = "string" },
 	{ name = "caused_by", type = "string_list" },
 ]
-steps = [{ name = "create change file", type = "CreateChangeFile" }]
+steps = [
+	{ name = "create change file", type = "CreateChangeFile", inputs = ["interactive", "package", "bump", "version", "type", "caused_by", "reason", "details", "output"] },
+]
 
 [cli.release]
 help_text = "Prepare versioned package files"
@@ -169,7 +171,7 @@ inputs = [
 	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "markdown" },
 ]
 steps = [
-	{ name = "plan release", type = "PrepareRelease" },
+	{ name = "plan release", type = "PrepareRelease", inputs = ["format"] },
 	{ name = "refresh lockfiles", type = "Command", command = "pnpm install --lockfile-only" },
 ]
 ```

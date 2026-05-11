@@ -229,6 +229,7 @@ When provided, the generated config includes:\n\
 
 	command = command.next_help_heading("Step Commands");
 	for step in monochange_core::all_step_variants() {
+		let step = step.with_inherited_step_inputs();
 		let kebab = step.step_kebab_name();
 		let synthetic = CliCommandDefinition {
 			name: format!("step:{kebab}"),

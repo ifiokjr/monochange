@@ -67,6 +67,7 @@ default = "text"
 
 [[cli.discover.steps]]
 type = "Discover"
+inputs = ["format"]
 ```
 
 <!-- {/cliStepDiscoverExample} -->

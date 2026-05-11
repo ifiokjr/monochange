@@ -6655,13 +6655,16 @@ fn execute_cli_command_change_step_requires_reason_input() {
 		name: "change".to_string(),
 		help_text: None,
 		inputs: Vec::new(),
-		steps: vec![monochange_core::CliStepDefinition::CreateChangeFile {
-			show_progress: None,
-			name: None,
-			when: None,
-			always_run: false,
-			inputs: BTreeMap::new(),
-		}],
+		steps: vec![
+			monochange_core::CliStepDefinition::CreateChangeFile {
+				show_progress: None,
+				name: None,
+				when: None,
+				always_run: false,
+				inputs: BTreeMap::new(),
+			}
+			.with_inherited_step_inputs(),
+		],
 		dry_run: false,
 	};
 	let error = crate::execute_cli_command(
@@ -6709,7 +6712,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 			name: None,
 			when: None,
 			always_run: false,
-			inputs: BTreeMap::new(),
+			inputs: text_format_step_inputs(),
 			allow_empty_changesets: false,
 		}],
 		dry_run: false,
@@ -6736,14 +6739,14 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 				name: None,
 				when: None,
 				always_run: false,
-				inputs: BTreeMap::new(),
+				inputs: text_format_step_inputs(),
 				allow_empty_changesets: false,
 			},
 			monochange_core::CliStepDefinition::PublishRelease {
 				name: None,
 				when: None,
 				always_run: false,
-				inputs: BTreeMap::new(),
+				inputs: text_format_step_inputs(),
 			},
 		],
 		dry_run: false,
@@ -6768,7 +6771,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 				name: None,
 				when: None,
 				always_run: false,
-				inputs: BTreeMap::new(),
+				inputs: text_format_step_inputs(),
 				allow_empty_changesets: false,
 			},
 			monochange_core::CliStepDefinition::OpenReleaseRequest {
@@ -6776,7 +6779,7 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 				when: None,
 				always_run: false,
 				no_verify: false,
-				inputs: BTreeMap::new(),
+				inputs: text_format_step_inputs(),
 			},
 		],
 		dry_run: false,
@@ -6801,14 +6804,14 @@ fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_follow_
 				name: None,
 				when: None,
 				always_run: false,
-				inputs: BTreeMap::new(),
+				inputs: text_format_step_inputs(),
 				allow_empty_changesets: false,
 			},
 			monochange_core::CliStepDefinition::CommentReleasedIssues {
 				name: None,
 				when: None,
 				always_run: false,
-				inputs: BTreeMap::new(),
+				inputs: text_format_step_inputs(),
 			},
 		],
 		dry_run: false,
@@ -6894,7 +6897,7 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 					name: None,
 					when: None,
 					always_run: false,
-					inputs: BTreeMap::new(),
+					inputs: inherited_format_package_step_inputs(),
 				}],
 				dry_run: false,
 			};
@@ -6919,14 +6922,14 @@ fn execute_cli_command_supports_placeholder_and_package_publish_steps() {
 						name: None,
 						when: None,
 						always_run: false,
-						inputs: BTreeMap::new(),
+						inputs: text_format_step_inputs(),
 						allow_empty_changesets: false,
 					},
 					monochange_core::CliStepDefinition::PublishPackages {
 						name: None,
 						when: None,
 						always_run: false,
-						inputs: BTreeMap::new(),
+						inputs: inherited_format_package_step_inputs(),
 					},
 				],
 				dry_run: false,
@@ -6976,7 +6979,7 @@ fn execute_cli_command_allows_package_publish_steps_without_readiness_or_matchin
 					name: None,
 					when: None,
 					always_run: false,
-					inputs: BTreeMap::new(),
+					inputs: inherited_format_package_step_inputs(),
 				}],
 				dry_run: false,
 			};
@@ -7004,14 +7007,14 @@ fn execute_cli_command_allows_package_publish_steps_without_readiness_or_matchin
 						name: None,
 						when: None,
 						always_run: false,
-						inputs: BTreeMap::new(),
+						inputs: text_format_step_inputs(),
 						allow_empty_changesets: false,
 					},
 					monochange_core::CliStepDefinition::PublishPackages {
 						name: None,
 						when: None,
 						always_run: false,
-						inputs: BTreeMap::new(),
+						inputs: inherited_format_package_step_inputs(),
 					},
 				],
 				dry_run: false,
@@ -7047,7 +7050,7 @@ fn execute_cli_command_allows_package_publish_steps_without_readiness_or_matchin
 					name: None,
 					when: None,
 					always_run: false,
-					inputs: BTreeMap::new(),
+					inputs: inherited_format_package_output_step_inputs(),
 				}],
 				dry_run: false,
 			};
@@ -7080,7 +7083,7 @@ fn execute_cli_command_allows_package_publish_steps_without_readiness_or_matchin
 					name: None,
 					when: None,
 					always_run: false,
-					inputs: BTreeMap::new(),
+					inputs: inherited_publish_plan_step_inputs(),
 				}],
 				dry_run: false,
 			};
@@ -10421,6 +10424,65 @@ fn versioned_test_context<'a>(
 fn write_blank_monochange_config(root: &Path) {
 	fs::write(root.join("monochange.toml"), "")
 		.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+}
+
+fn text_format_step_inputs() -> BTreeMap<String, monochange_core::CliStepInputValue> {
+	BTreeMap::from([(
+		"format".to_string(),
+		monochange_core::CliStepInputValue::String("text".to_string()),
+	)])
+}
+
+fn inherited_format_package_step_inputs() -> BTreeMap<String, monochange_core::CliStepInputValue> {
+	BTreeMap::from([
+		(
+			"format".to_string(),
+			monochange_core::CliStepInputValue::Inherited,
+		),
+		(
+			"package".to_string(),
+			monochange_core::CliStepInputValue::Inherited,
+		),
+	])
+}
+
+fn inherited_format_package_output_step_inputs()
+-> BTreeMap<String, monochange_core::CliStepInputValue> {
+	BTreeMap::from([
+		(
+			"format".to_string(),
+			monochange_core::CliStepInputValue::Inherited,
+		),
+		(
+			"package".to_string(),
+			monochange_core::CliStepInputValue::Inherited,
+		),
+		(
+			"output".to_string(),
+			monochange_core::CliStepInputValue::Inherited,
+		),
+	])
+}
+
+fn inherited_publish_plan_step_inputs() -> BTreeMap<String, monochange_core::CliStepInputValue> {
+	BTreeMap::from([
+		(
+			"format".to_string(),
+			monochange_core::CliStepInputValue::Inherited,
+		),
+		(
+			"mode".to_string(),
+			monochange_core::CliStepInputValue::Inherited,
+		),
+		(
+			"package".to_string(),
+			monochange_core::CliStepInputValue::Inherited,
+		),
+		(
+			"readiness".to_string(),
+			monochange_core::CliStepInputValue::Inherited,
+		),
+	])
 }
 
 fn create_release_record_history(root: &Path) {

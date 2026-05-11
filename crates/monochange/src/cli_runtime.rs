@@ -189,17 +189,16 @@ fn resolve_step_inputs(
 	context: &CliContext,
 	step: &CliStepDefinition,
 ) -> MonochangeResult<BTreeMap<String, Vec<String>>> {
-	let mut resolved = context.inputs.clone();
-	if step.inputs().is_empty() {
-		return Ok(resolved);
-	}
-
+	let mut resolved = BTreeMap::new();
 	let template_context = build_cli_template_context(context, &context.inputs, None);
 	for (input_name, input_value) in step.inputs() {
-		resolved.insert(
-			input_name.clone(),
-			resolve_step_input_override(input_value, &template_context)?,
-		);
+		let values = match input_value {
+			CliStepInputValue::Inherited => {
+				context.inputs.get(input_name).cloned().unwrap_or_default()
+			}
+			_ => resolve_step_input_override(input_value, &template_context)?,
+		};
+		resolved.insert(input_name.clone(), values);
 	}
 
 	Ok(resolved)
@@ -210,6 +209,7 @@ fn resolve_step_input_override(
 	template_context: &serde_json::Map<String, serde_json::Value>,
 ) -> MonochangeResult<Vec<String>> {
 	match input_value {
+		CliStepInputValue::Inherited => Ok(Vec::new()),
 		CliStepInputValue::Boolean(value) => Ok(vec![value.to_string()]),
 		CliStepInputValue::List(values) => {
 			let mut resolved = Vec::new();
@@ -1284,10 +1284,10 @@ fn step_references_release_file_diffs(step: &CliStepDefinition) -> bool {
 	let inputs_mention_file_diffs = step.inputs().values().any(|value| {
 		match value {
 			CliStepInputValue::String(value) => mentions_file_diffs(value),
-			CliStepInputValue::Boolean(_) => false,
 			CliStepInputValue::List(values) => {
 				values.iter().any(|value| mentions_file_diffs(value))
 			}
+			CliStepInputValue::Inherited | CliStepInputValue::Boolean(_) => false,
 		}
 	});
 	if step.when().is_some_and(mentions_file_diffs) || inputs_mention_file_diffs {

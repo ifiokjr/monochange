@@ -32,3 +32,4 @@ default = "text"
 
 [[cli.release.steps]]
 type = "PrepareRelease"
+inputs = ["format"]

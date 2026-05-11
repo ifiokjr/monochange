@@ -207,7 +207,7 @@ help_text = "Discover packages across supported ecosystems"
 inputs = [
 	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
 ]
-steps = [{ name = "discover packages", type = "Discover" }]
+steps = [{ name = "discover packages", type = "Discover", inputs = ["format"] }]
 "#,
 	),
 	(
@@ -225,7 +225,7 @@ inputs = [
 	{ name = "details", type = "string", help_text = "Optional multi-line release-note details" },
 	{ name = "output", type = "path", help_text = "Write the generated change file to a specific path" },
 ]
-steps = [{ name = "create change file", type = "CreateChangeFile" }]
+steps = [{ name = "create change file", type = "CreateChangeFile", inputs = ["interactive", "package", "bump", "version", "reason", "type", "details", "output"] }]
 "#,
 	),
 	(
@@ -235,7 +235,7 @@ help_text = "Prepare a release from discovered change files"
 inputs = [
 	{ name = "format", type = "choice", choices = ["markdown", "text", "json"], default = "markdown" },
 ]
-steps = [{ name = "prepare release", type = "PrepareRelease" }]
+steps = [{ name = "prepare release", type = "PrepareRelease", inputs = ["format"] }]
 "#,
 	),
 	(
@@ -245,7 +245,7 @@ help_text = "Display planned package and group versions from discovered change f
 inputs = [
 	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
 ]
-steps = [{ name = "display versions", type = "DisplayVersions" }]
+steps = [{ name = "display versions", type = "DisplayVersions", inputs = ["format"] }]
 "#,
 	),
 	(
@@ -256,7 +256,7 @@ inputs = [
 	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
 	{ name = "package", type = "string_list", help_text = "Restrict placeholder publishing to explicit package ids" },
 ]
-steps = [{ name = "publish placeholder packages", type = "PlaceholderPublish" }]
+steps = [{ name = "publish placeholder packages", type = "PlaceholderPublish", inputs = ["format", "package"] }]
 "#,
 	),
 	(
@@ -267,7 +267,7 @@ inputs = [
 	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
 	{ name = "changeset", type = "string_list", help_text = "Changeset path(s) to inspect, relative to .changeset (omit for all changesets)" },
 ]
-steps = [{ name = "diagnose changesets", type = "DiagnoseChangesets" }]
+steps = [{ name = "diagnose changesets", type = "DiagnoseChangesets", inputs = ["format", "changeset"] }]
 "#,
 	),
 ];

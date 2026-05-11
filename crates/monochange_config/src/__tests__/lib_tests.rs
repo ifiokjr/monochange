@@ -79,6 +79,7 @@ fn infer_group_bump_from_explicit_version(
 }
 
 use crate::apply_version_groups;
+use crate::cli_input_kind_matches_step_input;
 use crate::frontmatter_span_for_line_column;
 use crate::line_and_column_for_offset;
 use crate::line_index_for_offset;
@@ -92,7 +93,123 @@ use crate::render_source_snippet;
 use crate::render_source_snippets;
 use crate::resolve_package_reference;
 use crate::sort_labels_by_location;
+use crate::validate_step_input_overrides;
+use crate::validate_step_override_kind;
 use crate::validate_workspace;
+
+fn validate_step() -> CliStepDefinition {
+	CliStepDefinition::Validate {
+		name: None,
+		when: None,
+		always_run: false,
+		inputs: BTreeMap::new(),
+	}
+}
+
+#[test]
+fn cli_step_override_validation_covers_type_helpers_and_missing_inherited_inputs() {
+	let command = CliCommandDefinition {
+		name: "release".to_string(),
+		help_text: None,
+		inputs: vec![
+			cli_input("fix", CliInputKind::Boolean),
+			cli_input("format", CliInputKind::Choice),
+		],
+		steps: Vec::new(),
+		dry_run: false,
+	};
+	let validate = validate_step();
+	validate_step_override_kind(
+		&command,
+		&validate,
+		"fix",
+		Some(&CliStepInputValue::Boolean(true)),
+		true,
+	)
+	.unwrap_or_else(|error| panic!("boolean override should validate: {error}"));
+	validate_step_override_kind(
+		&command,
+		&validate,
+		"fix",
+		Some(&CliStepInputValue::String("{{ inputs.fix }}".to_string())),
+		true,
+	)
+	.unwrap_or_else(|error| panic!("boolean template override should validate: {error}"));
+	validate_step_override_kind(
+		&command,
+		&validate,
+		"format",
+		Some(&CliStepInputValue::String("json".to_string())),
+		false,
+	)
+	.unwrap_or_else(|error| panic!("string override should validate: {error}"));
+	validate_step_override_kind(
+		&command,
+		&validate,
+		"format",
+		Some(&CliStepInputValue::List(vec!["json".to_string()])),
+		false,
+	)
+	.unwrap_or_else(|error| panic!("list override should validate: {error}"));
+	assert!(
+		validate_step_override_kind(
+			&command,
+			&validate,
+			"fix",
+			Some(&CliStepInputValue::List(vec!["true".to_string()])),
+			true,
+		)
+		.is_err()
+	);
+	assert!(
+		validate_step_override_kind(
+			&command,
+			&validate,
+			"format",
+			Some(&CliStepInputValue::Boolean(true)),
+			false,
+		)
+		.is_err()
+	);
+
+	assert!(cli_input_kind_matches_step_input(
+		CliInputKind::String,
+		CliInputKind::Choice,
+	));
+	assert!(cli_input_kind_matches_step_input(
+		CliInputKind::Path,
+		CliInputKind::String,
+	));
+	assert!(cli_input_kind_matches_step_input(
+		CliInputKind::Choice,
+		CliInputKind::Path,
+	));
+
+	let mut inherited_inputs = BTreeMap::new();
+	inherited_inputs.insert("format".to_string(), CliStepInputValue::Inherited);
+	let step = CliStepDefinition::PrepareRelease {
+		name: None,
+		when: None,
+		always_run: false,
+		allow_empty_changesets: false,
+		inputs: inherited_inputs,
+	};
+	let command_without_format = CliCommandDefinition {
+		name: "release".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: Vec::new(),
+		dry_run: false,
+	};
+	let error = validate_step_input_overrides(&command_without_format, &step)
+		.err()
+		.unwrap_or_else(|| panic!("expected missing inherited input error"));
+	assert!(
+		error
+			.to_string()
+			.contains("inherits input `format` but the command does not declare it")
+	);
+}
 
 fn fixture_path(relative: &str) -> PathBuf {
 	monochange_test_helpers::fs::fixture_path_from(env!("CARGO_MANIFEST_DIR"), relative)
@@ -5353,7 +5470,10 @@ fn validate_cli_runtime_requirements_enforce_affected_package_inputs() {
 			name: None,
 			when: None,
 			always_run: false,
-			inputs: BTreeMap::new(),
+			inputs: BTreeMap::from([
+				("changed_paths".to_string(), CliStepInputValue::Inherited),
+				("label".to_string(), CliStepInputValue::Inherited),
+			]),
 		}],
 	);
 	command.inputs = vec![
@@ -5370,7 +5490,7 @@ fn validate_cli_runtime_requirements_enforce_affected_package_inputs() {
 	assert!(
 		invalid_label
 			.to_string()
-			.contains("input `label` must use type `string_list`")
+			.contains("inherits input `label` with incompatible type")
 	);
 }
 

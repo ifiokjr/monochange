@@ -35,6 +35,7 @@ default = "text"
 
 [[cli.release.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [cli.commit-from-cache]
 
@@ -58,6 +59,7 @@ default = "text"
 
 [[cli.release-with-manifest.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.release-with-manifest.steps]]
 type = "CommitRelease"

@@ -5,6 +5,12 @@ package_type = "cargo"
 path = "crates/core"
 
 [cli.inspect]
+[[cli.inspect.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
 
 [[cli.inspect.steps]]
 type = "Validate"

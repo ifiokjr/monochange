@@ -14,6 +14,7 @@ use monochange_core::ChangesetPolicyEvaluation;
 use monochange_core::ChangesetPolicyStatus;
 use monochange_core::CliCommandDefinition;
 use monochange_core::CliStepDefinition;
+use monochange_core::CliStepInputValue;
 use monochange_core::ReleaseOwnerKind;
 use monochange_core::ReleasePlan;
 use monochange_core::ShellConfig;
@@ -51,6 +52,14 @@ fn cli_context() -> CliContext {
 		step_outputs: BTreeMap::new(),
 		command_logs: Vec::new(),
 	}
+}
+
+#[test]
+fn resolve_step_input_override_treats_inherited_as_empty() {
+	let template_context = serde_json::Map::new();
+	let values = resolve_step_input_override(&CliStepInputValue::Inherited, &template_context)
+		.unwrap_or_else(|error| panic!("resolve inherited step input: {error}"));
+	assert!(values.is_empty());
 }
 
 fn sample_source_configuration() -> SourceConfiguration {
@@ -1867,7 +1876,10 @@ fn execute_cli_command_with_options_rejects_readiness_for_placeholder_publish_pl
 			name: None,
 			when: None,
 			always_run: false,
-			inputs: BTreeMap::new(),
+			inputs: BTreeMap::from([
+				("mode".to_string(), CliStepInputValue::Inherited),
+				("readiness".to_string(), CliStepInputValue::Inherited),
+			]),
 		}],
 		dry_run: false,
 	};
