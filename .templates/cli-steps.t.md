@@ -25,6 +25,49 @@ The reference pages in this section document each built-in step with:
 
 <!-- {/cliStepReferenceOverview} -->
 
+<!-- {@cliStepExplicitInputInheritance} -->
+
+## Explicit step input inheritance
+
+Config-defined workflow commands have two input layers:
+
+1. `[[cli.<command>.inputs]]` declares the flags and arguments accepted by `mc <command>`.
+2. `inputs` on each step decides which of those parsed command inputs are visible while that step runs.
+
+Command inputs are **not inherited automatically**. A step receives a command input only when the step explicitly lists it. This makes wrappers predictable when a command-level flag and a step-specific input share the same name.
+
+Use the array shorthand when a step should inherit command inputs unchanged:
+
+```toml
+[cli.discover]
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
+]
+steps = [
+	{ type = "Discover", inputs = ["format"] },
+]
+```
+
+Use the map form when a step needs fixed values, renamed values, templates, or a mixture of inherited and overridden values:
+
+```toml
+[cli.release-pr]
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json", "markdown"], default = "markdown" },
+	{ name = "open_as_draft", type = "boolean", default = false },
+]
+steps = [
+	{ type = "PrepareRelease", inputs = ["format"] },
+	{ type = "OpenReleaseRequest", inputs = { format = "markdown", draft = "{{ inputs.open_as_draft }}" } },
+]
+```
+
+Step-local `when` expressions and command templates evaluate against the same explicit step input context. If a `when` condition references `inputs.publish`, the step must include `publish` in its `inputs` array or map. Use `inputs = ["publish"]` for unchanged inheritance, or `inputs = { publish = "{{ inputs.publish }}" }` when you need the map form for other overrides.
+
+Built-in `mc step:*` commands are different: they are generated directly from the step schema, so their CLI flags map to that single step without a `[cli.*]` wrapper.
+
+<!-- {/cliStepExplicitInputInheritance} -->
+
 <!-- {@cliStepReferenceChoosingGuide} -->
 
 | Step                    | Use it when you want to…                                                  | Requires previous step?          | Typical follow-up                                                                           |
@@ -82,6 +125,7 @@ default = "text"
 
 [[cli.discover.steps]]
 type = "Discover"
+inputs = ["format"]
 ```
 
 <!-- {/cliStepDiscoverExample} -->
@@ -133,6 +177,17 @@ type = "string"
 
 [[cli.change.steps]]
 type = "CreateChangeFile"
+inputs = [
+	"interactive",
+	"package",
+	"bump",
+	"version",
+	"type",
+	"caused_by",
+	"reason",
+	"details",
+	"output",
+]
 ```
 
 <!-- {/cliStepCreateChangeFileExample} -->
@@ -151,6 +206,7 @@ default = "text"
 
 [[cli.release.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 ```
 
 <!-- {/cliStepPrepareReleaseExample} -->
@@ -169,6 +225,7 @@ default = "text"
 
 [[cli.commit-release.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.commit-release.steps]]
 type = "CommitRelease"
@@ -190,9 +247,11 @@ default = "text"
 
 [[cli.publish-release.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.publish-release.steps]]
 type = "PublishRelease"
+inputs = ["format"]
 ```
 
 <!-- {/cliStepPublishReleaseExample} -->
@@ -211,9 +270,11 @@ default = "text"
 
 [[cli.release-pr.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.release-pr.steps]]
 type = "OpenReleaseRequest"
+inputs = ["format"]
 ```
 
 <!-- {/cliStepOpenReleaseRequestExample} -->
@@ -250,9 +311,11 @@ default = "text"
 
 [[cli.publish-and-comment.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.publish-and-comment.steps]]
 type = "PublishRelease"
+inputs = ["format"]
 
 [[cli.publish-and-comment.steps]]
 type = "CommentReleasedIssues"
@@ -287,6 +350,7 @@ type = "boolean"
 
 [[cli.affected.steps]]
 type = "AffectedPackages"
+inputs = ["format", "changed_paths", "label", "verify"]
 ```
 
 <!-- {/cliStepAffectedPackagesExample} -->
@@ -309,6 +373,7 @@ type = "string_list"
 
 [[cli.diagnostics.steps]]
 type = "DiagnoseChangesets"
+inputs = ["format", "changeset"]
 ```
 
 <!-- {/cliStepDiagnoseChangesetsExample} -->
@@ -347,6 +412,7 @@ default = "text"
 
 [[cli.repair-release.steps]]
 type = "RetargetRelease"
+inputs = ["from", "target", "force", "sync_provider"]
 ```
 
 <!-- {/cliStepRetargetReleaseExample} -->
@@ -380,6 +446,7 @@ default = "text"
 
 [[cli.release-with-notes.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.release-with-notes.steps]]
 type = "Command"
@@ -436,6 +503,7 @@ help_text = "Show already-published and skipped placeholder packages instead of 
 [[cli.placeholder-publish.steps]]
 name = "publish placeholder packages"
 type = "PlaceholderPublish"
+inputs = ["format", "package", "show-all"]
 ```
 
 <!-- {/cliStepPlaceholderPublishExample} -->
@@ -479,6 +547,7 @@ help_text = "Write the package publish result JSON artifact for retry/resume"
 [[cli.publish.steps]]
 name = "publish packages"
 type = "PublishPackages"
+inputs = ["format", "package", "group", "ecosystem", "resume", "output"]
 ```
 
 <!-- {/cliStepPublishPackagesExample} -->
@@ -501,6 +570,7 @@ default = "HEAD"
 
 [[cli.repair-and-notify.steps]]
 type = "RetargetRelease"
+inputs = ["from", "target"]
 
 [[cli.repair-and-notify.steps]]
 type = "Command"

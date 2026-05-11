@@ -25,5 +25,12 @@ enabled = true
 [cli.release]
 help_text = "Prepare a release and refresh the cached release manifest"
 
+[[cli.release.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
 [[cli.release.steps]]
 type = "PrepareRelease"
+inputs = ["format"]

@@ -352,6 +352,7 @@ default = "text"
 [[cli.discover.steps]]
 name = "discover packages"
 type = "Discover"
+inputs = ["format"]
 
 [cli.change]
 help_text = "Create a change file for one or more packages"
@@ -394,6 +395,7 @@ type = "path"
 [[cli.change.steps]]
 name = "create change file"
 type = "CreateChangeFile"
+inputs = ["interactive", "package", "bump", "version", "type", "reason", "details", "output"]
 
 [cli.release]
 help_text = "Prepare a release from discovered change files"
@@ -407,6 +409,7 @@ default = "text"
 [[cli.release.steps]]
 name = "prepare release"
 type = "PrepareRelease"
+inputs = ["format"]
 
 [cli.publish-release]
 help_text = "Prepare a release and publish provider releases"
@@ -420,10 +423,12 @@ default = "text"
 [[cli.publish-release.steps]]
 name = "prepare release"
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.publish-release.steps]]
 name = "publish release"
 type = "PublishRelease"
+inputs = ["format"]
 
 [cli.release-pr]
 help_text = "Prepare a release and open or update a provider release request"
@@ -437,17 +442,12 @@ default = "text"
 [[cli.release-pr.steps]]
 name = "prepare release"
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.release-pr.steps]]
 name = "open release request"
 type = "OpenReleaseRequest"
-
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-type = "PrepareRelease"
+inputs = ["format"]
 
 [cli.affected]
 help_text = "Evaluate pull-request changeset policy"
@@ -470,6 +470,7 @@ type = "string_list"
 [[cli.affected.steps]]
 name = "evaluate affected packages"
 type = "AffectedPackages"
+inputs = ["format", "changed_paths", "label"]
 ```
 
 <!-- {/projectSetupConfig} -->

@@ -16,6 +16,7 @@ Agents should optimize for safety and traceability: inspect config first, prefer
 - Read `monochange.toml` before recommending commands. Top-level `mc <name>` workflow commands can be user-defined by `[cli.<name>]` and vary per repository.
 - Do not assume `mc discover`, `mc change`, `mc release`, `mc publish`, or similar workflow names exist in every repo. They are user-defined unless they appear in `mc help` for that workspace.
 - Built-in commands are hardcoded by the CLI. Step commands are always exposed as `mc step:<step-name>` for built-in step variants, except the generic `Command` step.
+- When authoring `[cli.*]` workflows, command inputs are explicit per step. Add `inputs = ["name"]` on a step to inherit a command input unchanged, or use the map form for overrides and renamed values.
 - Prefer package or group ids from `monochange.toml` over manifest names.
 - Use dry-run or preview commands before mutating versions, committing, tagging, releasing, or publishing.
 - Never publish with local credentials on behalf of a user unless they explicitly own that operation and the project rules allow it.

@@ -65,6 +65,102 @@ fn create_change_file_step_can_hardcode_inputs_without_cli_inputs() {
 }
 
 #[test]
+fn command_inputs_do_not_implicitly_flow_into_steps() {
+	let tempdir = setup_scenario_workspace("cli-step-input-overrides/workspace");
+	append_config(
+		tempdir.path(),
+		r#"
+[cli.implicit-command-input]
+inputs = [{ name = "message", type = "string" }]
+
+[[cli.implicit-command-input.steps]]
+type = "Command"
+command = "printf '%s' '{{ inputs.message is defined }}' > command-output.txt"
+shell = true
+"#,
+	);
+
+	let output = run_command_args_without_dry_run(
+		tempdir.path(),
+		&["implicit-command-input", "--message", "hello"],
+	);
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let contents = fs::read_to_string(tempdir.path().join("command-output.txt"))
+		.unwrap_or_else(|error| panic!("command output file: {error}"));
+	assert_eq!(contents, "false");
+}
+
+#[test]
+fn step_inputs_array_inherits_selected_command_inputs() {
+	let tempdir = setup_scenario_workspace("cli-step-input-overrides/workspace");
+	append_config(
+		tempdir.path(),
+		r#"
+[cli.selected-command-input]
+inputs = [{ name = "message", type = "string" }]
+
+[[cli.selected-command-input.steps]]
+type = "Command"
+command = "printf '%s' '{{ inputs.message }}' > command-output.txt"
+shell = true
+inputs = ["message"]
+"#,
+	);
+
+	let output = run_command_args_without_dry_run(
+		tempdir.path(),
+		&["selected-command-input", "--message", "hello"],
+	);
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let contents = fs::read_to_string(tempdir.path().join("command-output.txt"))
+		.unwrap_or_else(|error| panic!("command output file: {error}"));
+	assert_eq!(contents, "hello");
+}
+
+#[test]
+fn when_conditions_use_explicit_step_input_context() {
+	let tempdir = setup_scenario_workspace("cli-step-input-overrides/workspace");
+	append_config(
+		tempdir.path(),
+		r#"
+[cli.when-explicit-inputs]
+inputs = [{ name = "enabled", type = "boolean" }]
+
+[[cli.when-explicit-inputs.steps]]
+type = "Command"
+when = "{{ inputs.enabled is defined }}"
+command = "touch implicit-output.txt"
+shell = true
+
+[[cli.when-explicit-inputs.steps]]
+type = "Command"
+when = "{{ inputs.enabled }}"
+command = "touch selected-output.txt"
+shell = true
+inputs = ["enabled"]
+"#,
+	);
+
+	let output =
+		run_command_args_without_dry_run(tempdir.path(), &["when-explicit-inputs", "--enabled"]);
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	assert!(!tempdir.path().join("implicit-output.txt").exists());
+	assert!(tempdir.path().join("selected-output.txt").exists());
+}
+
+#[test]
 fn command_step_can_hardcode_inputs_without_cli_inputs() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
@@ -93,11 +189,24 @@ fn run_command(root: &Path, command: &str) -> std::process::Output {
 }
 
 fn run_command_without_dry_run(root: &Path, command: &str) -> std::process::Output {
+	run_command_args_without_dry_run(root, &[command])
+}
+
+fn run_command_args_without_dry_run(root: &Path, args: &[&str]) -> std::process::Output {
 	monochange_command(None)
 		.current_dir(root)
-		.arg(command)
+		.args(args)
 		.output()
 		.unwrap_or_else(|error| panic!("command output: {error}"))
+}
+
+fn append_config(root: &Path, config: &str) {
+	let config_path = root.join("monochange.toml");
+	let mut contents = fs::read_to_string(&config_path)
+		.unwrap_or_else(|error| panic!("read monochange config: {error}"));
+	contents.push_str(config);
+	fs::write(&config_path, contents)
+		.unwrap_or_else(|error| panic!("write monochange config: {error}"));
 }
 
 fn run_json_command(root: &Path, command: &str) -> Value {

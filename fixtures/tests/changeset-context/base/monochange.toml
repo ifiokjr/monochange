@@ -34,8 +34,15 @@ path = "crates/core"
 [cli.release]
 help_text = "Prepare a release and refresh the cached release manifest"
 
+[[cli.release.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
 [[cli.release.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [cli.diagnostics]
 help_text = "Show changeset diagnostics and context"
@@ -52,3 +59,4 @@ type = "string_list"
 
 [[cli.diagnostics.steps]]
 type = "DiagnoseChangesets"
+inputs = ["format", "changeset"]

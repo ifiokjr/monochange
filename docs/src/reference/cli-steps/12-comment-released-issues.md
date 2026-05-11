@@ -67,9 +67,11 @@ default = "text"
 
 [[cli.publish-and-comment.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.publish-and-comment.steps]]
 type = "PublishRelease"
+inputs = ["format"]
 
 [[cli.publish-and-comment.steps]]
 type = "CommentReleasedIssues"

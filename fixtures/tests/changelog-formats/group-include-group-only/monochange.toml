@@ -26,6 +26,13 @@ include = "group-only"
 enabled = true
 
 [cli.release]
+[[cli.release.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
 
 [[cli.release.steps]]
 type = "PrepareRelease"
+inputs = ["format"]

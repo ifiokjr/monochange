@@ -4190,22 +4190,11 @@ fn validate_cli_runtime_requirements(
 			if let CliStepDefinition::AffectedPackages { inputs, .. } = step {
 				validate_affected_packages_step_enabled(cli_command, changesets.affected.enabled)?;
 
-				let has_changed_paths = inputs.contains_key("changed_paths")
-					|| cli_command_input(cli_command, "changed_paths")
-						.is_some_and(|input| matches!(input.kind, CliInputKind::StringList));
-				let has_from =
-					inputs.contains_key("from") || cli_command_input(cli_command, "from").is_some();
+				let has_changed_paths = inputs.contains_key("changed_paths");
+				let has_from = inputs.contains_key("from");
 				if !has_changed_paths && !has_from {
 					return Err(MonochangeError::Config(format!(
 						"CLI command `{}` uses `AffectedPackages` but declares neither a `changed_paths` nor a `from` input and does not override either on the step",
-						cli_command.name
-					)));
-				}
-				if let Some(label_input) = cli_command_input(cli_command, "label")
-					&& !matches!(label_input.kind, CliInputKind::StringList)
-				{
-					return Err(MonochangeError::Config(format!(
-						"CLI command `{}` input `label` must use type `string_list` when used with `AffectedPackages`",
 						cli_command.name
 					)));
 				}
@@ -4255,17 +4244,18 @@ fn validate_step_override_kind(
 	let Some(value) = value else {
 		return Ok(());
 	};
-	let valid = if expect_boolean {
-		matches!(
-			value,
-			CliStepInputValue::Boolean(_) | CliStepInputValue::String(_)
-		)
-	} else {
-		matches!(
-			value,
-			CliStepInputValue::String(_) | CliStepInputValue::List(_)
-		)
-	};
+	let valid = matches!(value, CliStepInputValue::Inherited)
+		|| if expect_boolean {
+			matches!(
+				value,
+				CliStepInputValue::Boolean(_) | CliStepInputValue::String(_)
+			)
+		} else {
+			matches!(
+				value,
+				CliStepInputValue::String(_) | CliStepInputValue::List(_)
+			)
+		};
 	if valid {
 		return Ok(());
 	}
@@ -4280,6 +4270,18 @@ fn validate_step_override_kind(
 			"string or string_list value"
 		}
 	)))
+}
+
+fn cli_input_kind_matches_step_input(actual: CliInputKind, expected: CliInputKind) -> bool {
+	match expected {
+		CliInputKind::Boolean => matches!(actual, CliInputKind::Boolean),
+		CliInputKind::StringList => matches!(actual, CliInputKind::StringList),
+		CliInputKind::String | CliInputKind::Path | CliInputKind::Choice => {
+			actual == CliInputKind::String
+				|| actual == CliInputKind::Path
+				|| actual == CliInputKind::Choice
+		}
+	}
 }
 
 /// Validate that every input override key on a step is recognised and that
@@ -4314,7 +4316,31 @@ fn validate_step_input_overrides(
 			)));
 		}
 
-		// Validate value type against expected kind.
+		// Validate inherited command inputs and literal override types against the step schema.
+		if matches!(value, CliStepInputValue::Inherited) {
+			let Some(command_input) = cli_command_input(cli_command, name) else {
+				return Err(MonochangeError::Config(format!(
+					"CLI command `{}` step `{}` inherits input `{}` but the command does not declare it",
+					cli_command.name,
+					step.kind_name(),
+					name,
+				)));
+			};
+			if let Some(expected_kind) = step.expected_input_kind(name)
+				&& !cli_input_kind_matches_step_input(command_input.kind, expected_kind)
+			{
+				return Err(MonochangeError::Config(format!(
+					"CLI command `{}` step `{}` inherits input `{}` with incompatible type `{:?}`; expected `{:?}`",
+					cli_command.name,
+					step.kind_name(),
+					name,
+					command_input.kind,
+					expected_kind,
+				)));
+			}
+			continue;
+		}
+
 		if let Some(expected_kind) = step.expected_input_kind(name) {
 			let type_ok = match expected_kind {
 				CliInputKind::Boolean => {

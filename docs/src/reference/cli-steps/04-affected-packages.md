@@ -88,6 +88,7 @@ type = "boolean"
 
 [[cli.affected.steps]]
 type = "AffectedPackages"
+inputs = ["format", "changed_paths", "label", "verify"]
 ```
 
 <!-- {/cliStepAffectedPackagesExample} -->

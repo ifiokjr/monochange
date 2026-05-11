@@ -2081,6 +2081,27 @@ fn shell_config_serializes_roundtrip() {
 }
 
 #[test]
+fn cli_step_inputs_serialize_inherited_entries_inside_mixed_maps() {
+	let mut inputs = BTreeMap::new();
+	inputs.insert("format".to_string(), crate::CliStepInputValue::Inherited);
+	inputs.insert(
+		"message".to_string(),
+		crate::CliStepInputValue::String("fixed".to_string()),
+	);
+	let step = CliStepDefinition::PrepareRelease {
+		name: None,
+		when: None,
+		always_run: false,
+		allow_empty_changesets: false,
+		inputs,
+	};
+	let value = serde_json::to_value(&step)
+		.unwrap_or_else(|error| panic!("serialize step inputs: {error}"));
+	assert_eq!(value["inputs"]["format"], "{{ inputs.format }}");
+	assert_eq!(value["inputs"]["message"], "fixed");
+}
+
+#[test]
 fn cli_step_command_with_id_deserializes() {
 	let json_str = r#"{"type":"Command","command":"echo hello","id":"greet","shell":"bash"}"#;
 	let step: CliStepDefinition =

@@ -87,6 +87,7 @@ type = "string_list"
 
 [[cli.diagnostics.steps]]
 type = "DiagnoseChangesets"
+inputs = ["format", "changeset"]
 ```
 
 <!-- {/cliStepDiagnoseChangesetsExample} -->

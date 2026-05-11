@@ -16,7 +16,9 @@ inputs = [
 	{ name = "format", type = "choice", choices = ["markdown", "json"], default = "markdown" },
 	{ name = "readiness", type = "path" },
 ]
-steps = [{ name = "plan publish rate limits", type = "PlanPublishRateLimits" }]
+steps = [
+	{ name = "plan publish rate limits", type = "PlanPublishRateLimits", inputs = ["format", "mode", "package", "readiness", "ci"] },
+]
 
 [cli.publish]
 help_text = "Publish package artifacts"
@@ -24,7 +26,9 @@ inputs = [
 	{ name = "output", type = "path" },
 	{ name = "resume", type = "path" },
 ]
-steps = [{ name = "publish packages", type = "PublishPackages" }]
+steps = [
+	{ name = "publish packages", type = "PublishPackages", inputs = ["format", "package", "group", "ecosystem", "resume", "output"] },
+]
 ```
 
 Use dry-run checks and keep JSON artifacts for resume/retry.

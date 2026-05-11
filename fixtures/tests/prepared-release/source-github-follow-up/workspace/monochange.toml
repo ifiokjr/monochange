@@ -35,6 +35,7 @@ default = "text"
 
 [[cli.release.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [cli.commit-release]
 
@@ -46,6 +47,7 @@ default = "text"
 
 [[cli.commit-release.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.commit-release.steps]]
 type = "CommitRelease"
@@ -61,6 +63,8 @@ default = "text"
 
 [[cli.release-pr.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.release-pr.steps]]
 type = "OpenReleaseRequest"
+inputs = ["format"]

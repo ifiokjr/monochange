@@ -8,8 +8,8 @@ inputs = [
 	{ name = "all", type = "boolean", default = false },
 ]
 steps = [
-	{ name = "prepare release", type = "PrepareRelease" },
-	{ name = "plan publish rate limits", type = "PlanPublishRateLimits" },
+	{ name = "prepare release", type = "PrepareRelease", inputs = ["format"] },
+	{ name = "plan publish rate limits", type = "PlanPublishRateLimits", inputs = ["format", "all"] },
 ]
 
 [cli.publish]
@@ -18,7 +18,7 @@ inputs = [
 	{ name = "all", type = "boolean", default = false },
 ]
 steps = [
-	{ name = "publish packages", type = "PublishPackages" },
+	{ name = "publish packages", type = "PublishPackages", inputs = ["format", "all"] },
 ]
 
 [package.zeta_transport]

@@ -33,9 +33,17 @@ labels = ["release", "automated"]
 enabled = true
 
 [cli.release-pr]
+[[cli.release-pr.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
 
 [[cli.release-pr.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.release-pr.steps]]
 type = "OpenReleaseRequest"
+inputs = ["format"]

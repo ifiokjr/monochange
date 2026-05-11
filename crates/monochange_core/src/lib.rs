@@ -1807,9 +1807,97 @@ where
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum CliStepInputValue {
+	#[serde(skip)]
+	Inherited,
 	String(String),
 	Boolean(bool),
 	List(Vec<String>),
+}
+
+#[cfg(feature = "schema")]
+#[allow(dead_code)]
+#[derive(schemars::JsonSchema, Serialize, Deserialize)]
+#[serde(untagged)]
+enum CliStepInputOverrideValueSchema {
+	String(String),
+	Boolean(bool),
+	List(Vec<String>),
+}
+
+#[cfg(feature = "schema")]
+#[allow(dead_code)]
+#[derive(schemars::JsonSchema, Serialize, Deserialize)]
+#[serde(untagged)]
+enum CliStepInputsSchema {
+	Overrides(BTreeMap<String, CliStepInputOverrideValueSchema>),
+	Inherited(Vec<String>),
+}
+
+fn serialize_cli_step_inputs<S>(
+	inputs: &BTreeMap<String, CliStepInputValue>,
+	serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+	S: serde::Serializer,
+{
+	if inputs
+		.values()
+		.all(|value| matches!(value, CliStepInputValue::Inherited))
+	{
+		return inputs.keys().collect::<Vec<_>>().serialize(serializer);
+	}
+
+	#[derive(Serialize)]
+	#[serde(untagged)]
+	enum SerializableCliStepInputValue {
+		String(String),
+		Boolean(bool),
+		List(Vec<String>),
+	}
+
+	let serialized_inputs = inputs
+		.iter()
+		.map(|(name, value)| {
+			let value = match value {
+				CliStepInputValue::Inherited => {
+					SerializableCliStepInputValue::String(format!("{{{{ inputs.{name} }}}}"))
+				}
+				CliStepInputValue::String(value) => {
+					SerializableCliStepInputValue::String(value.clone())
+				}
+				CliStepInputValue::Boolean(value) => SerializableCliStepInputValue::Boolean(*value),
+				CliStepInputValue::List(value) => {
+					SerializableCliStepInputValue::List(value.clone())
+				}
+			};
+			(name, value)
+		})
+		.collect::<BTreeMap<_, _>>();
+	serialized_inputs.serialize(serializer)
+}
+
+fn deserialize_cli_step_inputs<'de, D>(
+	deserializer: D,
+) -> Result<BTreeMap<String, CliStepInputValue>, D::Error>
+where
+	D: serde::Deserializer<'de>,
+{
+	#[derive(Deserialize)]
+	#[serde(untagged)]
+	enum RawInputs {
+		Overrides(BTreeMap<String, CliStepInputValue>),
+		Inherited(Vec<String>),
+	}
+
+	match RawInputs::deserialize(deserializer)? {
+		RawInputs::Overrides(overrides) => Ok(overrides),
+		RawInputs::Inherited(names) => {
+			Ok(names
+				.into_iter()
+				.map(|name| (name, CliStepInputValue::Inherited))
+				.collect())
+		}
+	}
 }
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
@@ -1916,7 +2004,12 @@ pub enum CliStepDefinition {
 		when: Option<String>,
 		#[serde(default)]
 		always_run: bool,
-		#[serde(default)]
+		#[serde(
+			default,
+			deserialize_with = "deserialize_cli_step_inputs",
+			serialize_with = "serialize_cli_step_inputs"
+		)]
+		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Validate `monochange` configuration and changesets, and run lint rules
@@ -1928,7 +2021,12 @@ pub enum CliStepDefinition {
 		when: Option<String>,
 		#[serde(default)]
 		always_run: bool,
-		#[serde(default)]
+		#[serde(
+			default,
+			deserialize_with = "deserialize_cli_step_inputs",
+			serialize_with = "serialize_cli_step_inputs"
+		)]
+		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Discover packages across supported ecosystems and render the result.
@@ -1939,7 +2037,12 @@ pub enum CliStepDefinition {
 		when: Option<String>,
 		#[serde(default)]
 		always_run: bool,
-		#[serde(default)]
+		#[serde(
+			default,
+			deserialize_with = "deserialize_cli_step_inputs",
+			serialize_with = "serialize_cli_step_inputs"
+		)]
+		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Display planned package and group versions without mutating release files.
@@ -1950,7 +2053,12 @@ pub enum CliStepDefinition {
 		when: Option<String>,
 		#[serde(default)]
 		always_run: bool,
-		#[serde(default)]
+		#[serde(
+			default,
+			deserialize_with = "deserialize_cli_step_inputs",
+			serialize_with = "serialize_cli_step_inputs"
+		)]
+		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Create a `.changeset/*.md` file from typed CLI inputs or interactive
@@ -1964,7 +2072,12 @@ pub enum CliStepDefinition {
 		always_run: bool,
 		#[serde(default)]
 		show_progress: Option<bool>,
-		#[serde(default)]
+		#[serde(
+			default,
+			deserialize_with = "deserialize_cli_step_inputs",
+			serialize_with = "serialize_cli_step_inputs"
+		)]
+		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Prepare a release and expose structured `release.*` context to later
@@ -1976,7 +2089,12 @@ pub enum CliStepDefinition {
 		when: Option<String>,
 		#[serde(default)]
 		always_run: bool,
-		#[serde(default)]
+		#[serde(
+			default,
+			deserialize_with = "deserialize_cli_step_inputs",
+			serialize_with = "serialize_cli_step_inputs"
+		)]
+		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
 		inputs: BTreeMap<String, CliStepInputValue>,
 		/// When true, do not error when there are no pending changesets.
 		/// Instead, succeed with zero changesets, allowing downstream steps
@@ -1998,7 +2116,12 @@ pub enum CliStepDefinition {
 		no_verify: bool,
 		#[serde(default)]
 		update_release_json: bool,
-		#[serde(default)]
+		#[serde(
+			default,
+			deserialize_with = "deserialize_cli_step_inputs",
+			serialize_with = "serialize_cli_step_inputs"
+		)]
+		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Verify a commit is reachable from one of the configured release branches.
@@ -2009,7 +2132,12 @@ pub enum CliStepDefinition {
 		when: Option<String>,
 		#[serde(default)]
 		always_run: bool,
-		#[serde(default)]
+		#[serde(
+			default,
+			deserialize_with = "deserialize_cli_step_inputs",
+			serialize_with = "serialize_cli_step_inputs"
+		)]
+		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Publish hosted releases from a prepared `monochange` release.
@@ -2023,7 +2151,12 @@ pub enum CliStepDefinition {
 		when: Option<String>,
 		#[serde(default)]
 		always_run: bool,
-		#[serde(default)]
+		#[serde(
+			default,
+			deserialize_with = "deserialize_cli_step_inputs",
+			serialize_with = "serialize_cli_step_inputs"
+		)]
+		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Publish placeholder package versions for missing registry packages.
@@ -2034,7 +2167,12 @@ pub enum CliStepDefinition {
 		when: Option<String>,
 		#[serde(default)]
 		always_run: bool,
-		#[serde(default)]
+		#[serde(
+			default,
+			deserialize_with = "deserialize_cli_step_inputs",
+			serialize_with = "serialize_cli_step_inputs"
+		)]
+		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Publish package versions from durable monochange release state.
@@ -2045,7 +2183,12 @@ pub enum CliStepDefinition {
 		when: Option<String>,
 		#[serde(default)]
 		always_run: bool,
-		#[serde(default)]
+		#[serde(
+			default,
+			deserialize_with = "deserialize_cli_step_inputs",
+			serialize_with = "serialize_cli_step_inputs"
+		)]
+		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Plan package-registry rate-limit windows for publish operations.
@@ -2056,7 +2199,12 @@ pub enum CliStepDefinition {
 		when: Option<String>,
 		#[serde(default)]
 		always_run: bool,
-		#[serde(default)]
+		#[serde(
+			default,
+			deserialize_with = "deserialize_cli_step_inputs",
+			serialize_with = "serialize_cli_step_inputs"
+		)]
+		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Open or update a hosted release request from prepared release state.
@@ -2072,7 +2220,12 @@ pub enum CliStepDefinition {
 		always_run: bool,
 		#[serde(default)]
 		no_verify: bool,
-		#[serde(default)]
+		#[serde(
+			default,
+			deserialize_with = "deserialize_cli_step_inputs",
+			serialize_with = "serialize_cli_step_inputs"
+		)]
+		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Comment on linked released issues after a prepared release.
@@ -2086,7 +2239,12 @@ pub enum CliStepDefinition {
 		when: Option<String>,
 		#[serde(default)]
 		always_run: bool,
-		#[serde(default)]
+		#[serde(
+			default,
+			deserialize_with = "deserialize_cli_step_inputs",
+			serialize_with = "serialize_cli_step_inputs"
+		)]
+		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Evaluate affected packages and changeset coverage for changed files.
@@ -2099,7 +2257,12 @@ pub enum CliStepDefinition {
 		when: Option<String>,
 		#[serde(default)]
 		always_run: bool,
-		#[serde(default)]
+		#[serde(
+			default,
+			deserialize_with = "deserialize_cli_step_inputs",
+			serialize_with = "serialize_cli_step_inputs"
+		)]
+		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Inspect parsed changeset data, provenance, and linked metadata.
@@ -2110,7 +2273,12 @@ pub enum CliStepDefinition {
 		when: Option<String>,
 		#[serde(default)]
 		always_run: bool,
-		#[serde(default)]
+		#[serde(
+			default,
+			deserialize_with = "deserialize_cli_step_inputs",
+			serialize_with = "serialize_cli_step_inputs"
+		)]
+		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Repair a recent release by retargeting its stored release tag set.
@@ -2124,7 +2292,12 @@ pub enum CliStepDefinition {
 		when: Option<String>,
 		#[serde(default)]
 		always_run: bool,
-		#[serde(default)]
+		#[serde(
+			default,
+			deserialize_with = "deserialize_cli_step_inputs",
+			serialize_with = "serialize_cli_step_inputs"
+		)]
+		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 	/// Run an arbitrary command with `monochange` template context.
@@ -2148,7 +2321,12 @@ pub enum CliStepDefinition {
 		id: Option<String>,
 		#[serde(default)]
 		variables: Option<BTreeMap<String, CommandVariable>>,
-		#[serde(default)]
+		#[serde(
+			default,
+			deserialize_with = "deserialize_cli_step_inputs",
+			serialize_with = "serialize_cli_step_inputs"
+		)]
+		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
 }
@@ -2177,6 +2355,38 @@ impl CliStepDefinition {
 			| Self::RetargetRelease { inputs, .. }
 			| Self::Command { inputs, .. } => inputs,
 		}
+	}
+
+	/// Return a copy of this step that explicitly inherits every supported
+	/// command input for the step kind.
+	#[must_use]
+	pub fn with_inherited_step_inputs(mut self) -> Self {
+		let inherited = self
+			.step_inputs_schema()
+			.into_iter()
+			.map(|input| (input.name, CliStepInputValue::Inherited))
+			.collect();
+		match &mut self {
+			Self::Config { inputs, .. }
+			| Self::Validate { inputs, .. }
+			| Self::Discover { inputs, .. }
+			| Self::DisplayVersions { inputs, .. }
+			| Self::CreateChangeFile { inputs, .. }
+			| Self::PrepareRelease { inputs, .. }
+			| Self::CommitRelease { inputs, .. }
+			| Self::VerifyReleaseBranch { inputs, .. }
+			| Self::PublishRelease { inputs, .. }
+			| Self::PlaceholderPublish { inputs, .. }
+			| Self::PublishPackages { inputs, .. }
+			| Self::PlanPublishRateLimits { inputs, .. }
+			| Self::OpenReleaseRequest { inputs, .. }
+			| Self::CommentReleasedIssues { inputs, .. }
+			| Self::AffectedPackages { inputs, .. }
+			| Self::DiagnoseChangesets { inputs, .. }
+			| Self::RetargetRelease { inputs, .. }
+			| Self::Command { inputs, .. } => *inputs = inherited,
+		}
+		self
 	}
 
 	/// Return the optional configured display name for this step.

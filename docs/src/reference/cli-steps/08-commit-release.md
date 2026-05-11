@@ -103,6 +103,7 @@ default = "text"
 
 [[cli.commit-release.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.commit-release.steps]]
 type = "CommitRelease"

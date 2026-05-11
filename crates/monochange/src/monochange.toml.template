@@ -838,11 +838,12 @@ help_text = "Discover packages across supported ecosystems"
 inputs = [
 	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
 ]
-steps = [{ name = "discover packages", type = "Discover" }]
+steps = [{ name = "discover packages", type = "Discover", inputs = ["format"] }]
 
 [cli.change]
 help_text = "Create a change file for one or more packages"
 inputs = [
+	{ name = "interactive", type = "boolean", default = false },
 	{ name = "package", type = "string_list", required = true },
 	{ name = "bump", type = "choice", choices = ["none", "patch", "minor", "major"], default = "patch" },
 	{ name = "reason", type = "string", required = true },
@@ -852,21 +853,21 @@ inputs = [
 	{ name = "details", type = "string" },
 	{ name = "output", type = "path" },
 ]
-steps = [{ name = "create change file", type = "CreateChangeFile" }]
+steps = [{ name = "create change file", type = "CreateChangeFile", inputs = ["interactive", "package", "bump", "version", "reason", "type", "details", "output"] }]
 
 [cli.release]
 help_text = "Prepare a release from discovered change files"
 inputs = [
 	{ name = "format", type = "choice", choices = ["markdown", "text", "json"], default = "markdown" },
 ]
-steps = [{ name = "prepare release", type = "PrepareRelease" }]
+steps = [{ name = "prepare release", type = "PrepareRelease", inputs = ["format"] }]
 
 [cli.versions]
 help_text = "Display planned package and group versions from discovered change files"
 inputs = [
 	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
 ]
-steps = [{ name = "display versions", type = "DisplayVersions" }]
+steps = [{ name = "display versions", type = "DisplayVersions", inputs = ["format"] }]
 
 [cli.placeholder-publish]
 help_text = "Publish placeholder package versions for missing registry packages"
@@ -875,17 +876,19 @@ inputs = [
 	{ name = "package", type = "string_list" },
 	{ name = "show-all", type = "boolean", help_text = "Show already-published and skipped placeholder packages instead of only packages that need action" },
 ]
-steps = [{ name = "publish placeholder packages", type = "PlaceholderPublish" }]
+steps = [{ name = "publish placeholder packages", type = "PlaceholderPublish", inputs = ["format", "package", "show-all"] }]
 
 [cli.publish]
 help_text = "Publish package versions from monochange release state using built-in workflows"
 inputs = [
 	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "text" },
 	{ name = "package", type = "string_list" },
+	{ name = "group", type = "string_list" },
+	{ name = "ecosystem", type = "string_list" },
 	{ name = "resume", type = "path", help_text = "JSON result artifact from an earlier mc publish run; completed package versions are skipped" },
 	{ name = "output", type = "path", help_text = "Write the package publish result JSON artifact for retry/resume" },
 ]
-steps = [{ name = "publish packages", type = "PublishPackages" }]
+steps = [{ name = "publish packages", type = "PublishPackages", inputs = ["format", "package", "group", "ecosystem", "resume", "output"] }]
 
 [cli.publish-plan]
 help_text = "Plan package-registry publish work against known ecosystem rate limits"
@@ -896,7 +899,7 @@ inputs = [
 	{ name = "readiness", type = "path", help_text = "JSON artifact from mc publish-readiness; limits publish plans to ready package work" },
 	{ name = "ci", type = "choice", choices = ["github-actions", "gitlab-ci"] },
 ]
-steps = [{ name = "plan publish rate limits", type = "PlanPublishRateLimits" }]
+steps = [{ name = "plan publish rate limits", type = "PlanPublishRateLimits", inputs = ["format", "mode", "package", "readiness", "ci"] }]
 
 [cli.affected]
 help_text = "Evaluate pull-request changeset policy"
@@ -908,7 +911,7 @@ inputs = [
 {% raw -%}
 # Step inputs example: { changed_paths = "{{ inputs.changed_paths }}", label = "{{ inputs.label }}", verify = true }
 {% endraw -%}
-steps = [{ name = "evaluate affected packages", type = "AffectedPackages" }]
+steps = [{ name = "evaluate affected packages", type = "AffectedPackages", inputs = ["changed_paths", "label"] }]
 
 [cli.diagnostics]
 help_text = "Show changeset diagnostics and context"
@@ -916,7 +919,7 @@ inputs = [
 	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
 	{ name = "changeset", type = "string_list", help_text = "changeset path(s), e.g. .changeset/feature.md (omit for all changesets)" },
 ]
-steps = [{ name = "diagnose changesets", type = "DiagnoseChangesets" }]
+steps = [{ name = "diagnose changesets", type = "DiagnoseChangesets", inputs = ["format", "changeset"] }]
 
 [cli.repair-release]
 help_text = "Repair a recent release by moving its release tags to a later commit"
@@ -927,7 +930,7 @@ inputs = [
 	{ name = "sync_provider", type = "boolean", help_text = "sync hosted release state after tag movement (disable with --sync-provider=false)", default = "true" },
 	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
 ]
-steps = [{ name = "retarget release", type = "RetargetRelease" }]
+steps = [{ name = "retarget release", type = "RetargetRelease", inputs = ["from", "target", "force", "sync_provider"] }]
 {% if provider %}
 
 [cli.commit-release]
@@ -936,7 +939,7 @@ inputs = [
 	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
 ]
 steps = [
-	{ type = "PrepareRelease" },
+	{ type = "PrepareRelease", inputs = ["format"] },
 	{ type = "CommitRelease" },
 ]
 
@@ -946,8 +949,8 @@ inputs = [
 	{ name = "format", type = "choice", choices = ["text", "json", "markdown"], default = "markdown" },
 ]
 steps = [
-	{ type = "PrepareRelease", name = "plan release" },
-	{ type = "OpenReleaseRequest", name = "open release PR" },
+	{ type = "PrepareRelease", name = "plan release", inputs = ["format"] },
+	{ type = "OpenReleaseRequest", name = "open release PR", inputs = ["format"] },
 ]
 
 [cli.publish-release]
@@ -957,14 +960,15 @@ inputs = [
 	{ name = "draft", type = "boolean", default = false },
 	{ name = "format", type = "choice", choices = ["text", "json", "markdown"], default = "text" },
 ]
-steps = [{ name = "publish release", type = "PublishRelease" }]
+steps = [{ name = "publish release", type = "PublishRelease", inputs = ["format", "from-ref", "draft"] }]
 
 [cli.comment-released-issues]
 help_text = "Comment on and optionally close issues referenced in released changesets"
 inputs = [
 	{ name = "from-ref", type = "string", default = "HEAD" },
+	{ name = "format", type = "choice", choices = ["text", "json", "markdown"], default = "text" },
 	{ name = "auto-close-issues", type = "boolean", default = false },
 ]
-steps = [{ name = "comment on released issues", type = "CommentReleasedIssues" }]
+steps = [{ name = "comment on released issues", type = "CommentReleasedIssues", inputs = ["format", "auto-close-issues"] }]
 
 {% endif %}

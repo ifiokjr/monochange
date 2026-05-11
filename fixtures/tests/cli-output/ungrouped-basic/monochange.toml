@@ -50,6 +50,7 @@ type = "path"
 
 [[cli.change.steps]]
 type = "CreateChangeFile"
+inputs = ["interactive", "package", "bump", "version", "reason", "type", "details", "output"]
 
 [cli.release]
 
@@ -61,3 +62,4 @@ default = "text"
 
 [[cli.release.steps]]
 type = "PrepareRelease"
+inputs = ["format"]

@@ -13,6 +13,7 @@ default = "false"
 
 [[cli.when-command.steps]]
 type = "Command"
+inputs = ["run", "extra"]
 when = "{{ inputs.run && inputs.extra }}"
 command = "printf '%s' hello > when-command-output.txt"
 shell = true
@@ -27,6 +28,7 @@ default = "true"
 
 [[cli.not-condition.steps]]
 type = "Command"
+inputs = ["skip"]
 when = "{{ ! inputs.skip }}"
 command = "printf '%s' okay > not-output.txt"
 shell = true
@@ -35,10 +37,11 @@ shell = true
 help_text = "Conditionally run Validate"
 
 [[cli.when-validate.inputs]]
-name = "skip"
+name = "fix"
 type = "boolean"
 default = "true"
 
 [[cli.when-validate.steps]]
 type = "Validate"
-when = "{{ ! inputs.skip }}"
+inputs = ["fix"]
+when = "{{ ! inputs.fix }}"

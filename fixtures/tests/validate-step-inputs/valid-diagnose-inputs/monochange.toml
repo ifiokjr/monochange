@@ -5,6 +5,12 @@ package_type = "cargo"
 path = "crates/core"
 
 [cli.diag]
+[[cli.diag.inputs]]
+name = "format"
+type = "choice"
+choices = ["text", "json"]
+default = "text"
+
 
 [[cli.diag.steps]]
 type = "DiagnoseChangesets"

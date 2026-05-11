@@ -265,6 +265,7 @@ default = "text"
 [[cli.discover.steps]]
 name = "discover packages"
 type = "Discover"
+inputs = ["format"]
 
 [cli.release]
 help_text = "Prepare a release from discovered change files"
@@ -278,6 +279,7 @@ default = "text"
 [[cli.release.steps]]
 name = "prepare release"
 type = "PrepareRelease"
+inputs = ["format"]
 
 [cli.publish-release]
 help_text = "Prepare a release and publish provider releases"
@@ -291,10 +293,12 @@ default = "text"
 [[cli.publish-release.steps]]
 name = "prepare release"
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.publish-release.steps]]
 name = "publish release"
 type = "PublishRelease"
+inputs = ["format"]
 
 [[cli.publish-release.steps]]
 name = "comment released issues"
@@ -312,10 +316,12 @@ default = "text"
 [[cli.release-pr.steps]]
 name = "prepare release"
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.release-pr.steps]]
 name = "open release request"
 type = "OpenReleaseRequest"
+inputs = ["format"]
 
 name = "format"
 type = "choice"
@@ -350,6 +356,7 @@ type = "string_list"
 [[cli.affected.steps]]
 name = "evaluate affected packages"
 type = "AffectedPackages"
+inputs = ["format", "changed_paths", "label"]
 ```
 
 <!-- {/configurationWorkflowsSnippet} -->
@@ -774,6 +781,7 @@ default = "text"
 
 [[cli.publish-release.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.publish-release.steps]]
 type = "PublishRelease"
@@ -792,9 +800,11 @@ default = "text"
 
 [[cli.release-pr.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.release-pr.steps]]
 type = "OpenReleaseRequest"
+inputs = ["format"]
 ```
 
 <!-- {/githubAutomationReleaseConfigExample} -->

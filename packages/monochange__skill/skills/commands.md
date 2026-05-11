@@ -184,6 +184,49 @@ Inputs may also use `help_text`, `required`, `default`, `choices`, and `short`.
 
 Use `choice` for values that should be self-documenting in `mc help`, such as output formats or bump severities. Use `string_list` for repeatable selectors such as packages, groups, labels, or `caused_by` references. Use `path` when the workflow reads or writes artifacts so shell completion and help text communicate that a filesystem path is expected.
 
+<!-- {=cliStepExplicitInputInheritance} -->
+
+## Explicit step input inheritance
+
+Config-defined workflow commands have two input layers:
+
+1. `[[cli.<command>.inputs]]` declares the flags and arguments accepted by `mc <command>`.
+2. `inputs` on each step decides which of those parsed command inputs are visible while that step runs.
+
+Command inputs are **not inherited automatically**. A step receives a command input only when the step explicitly lists it. This makes wrappers predictable when a command-level flag and a step-specific input share the same name.
+
+Use the array shorthand when a step should inherit command inputs unchanged:
+
+```toml
+[cli.discover]
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json"], default = "text" },
+]
+steps = [
+	{ type = "Discover", inputs = ["format"] },
+]
+```
+
+Use the map form when a step needs fixed values, renamed values, templates, or a mixture of inherited and overridden values:
+
+```toml
+[cli.release-pr]
+inputs = [
+	{ name = "format", type = "choice", choices = ["text", "json", "markdown"], default = "markdown" },
+	{ name = "open_as_draft", type = "boolean", default = false },
+]
+steps = [
+	{ type = "PrepareRelease", inputs = ["format"] },
+	{ type = "OpenReleaseRequest", inputs = { format = "markdown", draft = "{{ inputs.open_as_draft }}" } },
+]
+```
+
+Step-local `when` expressions and command templates evaluate against the same explicit step input context. If a `when` condition references `inputs.publish`, the step must include `publish` in its `inputs` array or map. Use `inputs = ["publish"]` for unchanged inheritance, or `inputs = { publish = "{{ inputs.publish }}" }` when you need the map form for other overrides.
+
+Built-in `mc step:*` commands are different: they are generated directly from the step schema, so their CLI flags map to that single step without a `[cli.*]` wrapper.
+
+<!-- {/cliStepExplicitInputInheritance} -->
+
 ## User-defined workflow example
 
 ```toml
@@ -193,7 +236,7 @@ inputs = [
 	{ name = "format", type = "choice", choices = ["text", "json"], default = "json" },
 ]
 steps = [
-	{ name = "discover packages", type = "Discover" },
+	{ name = "discover packages", type = "Discover", inputs = ["format"] },
 ]
 
 [cli.release-preview]
@@ -203,7 +246,7 @@ inputs = [
 	{ name = "format", type = "choice", choices = ["markdown", "json"], default = "markdown" },
 ]
 steps = [
-	{ name = "plan release", type = "PrepareRelease" },
+	{ name = "plan release", type = "PrepareRelease", inputs = ["format"] },
 ]
 ```
 

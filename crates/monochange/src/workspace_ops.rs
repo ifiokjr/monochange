@@ -404,12 +404,16 @@ fn render_step_inputs_toml(
 	if inputs.is_empty() {
 		return;
 	}
-	writeln!(
-		rendered,
-		"inputs = {}",
+	let rendered_inputs = if inputs
+		.values()
+		.all(|value| matches!(value, monochange_core::CliStepInputValue::Inherited))
+	{
+		render_toml_array(&inputs.keys().cloned().collect::<Vec<_>>())
+	} else {
 		render_step_inputs_inline_table(inputs)
-	)
-	.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
+	};
+	writeln!(rendered, "inputs = {rendered_inputs}")
+		.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
 }
 
 fn render_step_inputs_inline_table(
@@ -419,14 +423,17 @@ fn render_step_inputs_inline_table(
 		"{{ {} }}",
 		inputs
 			.iter()
-			.map(|(name, value)| format!("{name} = {}", render_step_input_value(value)))
+			.map(|(name, value)| format!("{name} = {}", render_step_input_value(name, value)))
 			.collect::<Vec<_>>()
 			.join(", ")
 	)
 }
 
-fn render_step_input_value(value: &monochange_core::CliStepInputValue) -> String {
+fn render_step_input_value(name: &str, value: &monochange_core::CliStepInputValue) -> String {
 	match value {
+		monochange_core::CliStepInputValue::Inherited => {
+			render_toml_string(&format!("{{{{ inputs.{name} }}}}"))
+		}
 		monochange_core::CliStepInputValue::String(value) => render_toml_string(value),
 		monochange_core::CliStepInputValue::Boolean(value) => value.to_string(),
 		monochange_core::CliStepInputValue::List(values) => render_toml_array(values),

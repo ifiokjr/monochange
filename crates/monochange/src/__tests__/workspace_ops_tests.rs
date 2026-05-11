@@ -90,6 +90,28 @@ use monochange_test_helpers::workspace_ops::strip_workspace_prefix;
 
 use super::*;
 
+#[test]
+fn render_step_inputs_toml_uses_array_for_inherited_and_map_for_mixed_inputs() {
+	let mut inherited_inputs = BTreeMap::new();
+	inherited_inputs.insert(
+		"format".to_string(),
+		monochange_core::CliStepInputValue::Inherited,
+	);
+	let mut rendered = String::new();
+	render_step_inputs_toml(&mut rendered, &inherited_inputs);
+	assert_eq!(rendered, "inputs = [\"format\"]\n");
+
+	inherited_inputs.insert(
+		"draft".to_string(),
+		monochange_core::CliStepInputValue::Boolean(true),
+	);
+	let rendered = render_step_inputs_inline_table(&inherited_inputs);
+	assert_eq!(
+		rendered,
+		"{ draft = true, format = \"{{ inputs.format }}\" }"
+	);
+}
+
 fn setup_workspace_ops_fixture() -> tempfile::TempDir {
 	monochange_test_helpers::fs::setup_fixture_from(
 		env!("CARGO_MANIFEST_DIR"),

@@ -87,6 +87,7 @@ default = "text"
 
 [[cli.release-with-notes.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.release-with-notes.steps]]
 type = "Command"
@@ -141,6 +142,7 @@ default = "HEAD"
 
 [[cli.repair-and-notify.steps]]
 type = "RetargetRelease"
+inputs = ["from", "target"]
 
 [[cli.repair-and-notify.steps]]
 type = "Command"

@@ -38,8 +38,20 @@ type = "choice"
 choices = ["text", "json"]
 default = "text"
 
+[[cli.publish-release.inputs]]
+name = "from-ref"
+type = "string"
+default = "HEAD"
+
+[[cli.publish-release.inputs]]
+name = "draft"
+type = "boolean"
+default = false
+
 [[cli.publish-release.steps]]
 type = "PrepareRelease"
+inputs = ["format"]
 
 [[cli.publish-release.steps]]
 type = "PublishRelease"
+inputs = ["format", "from-ref", "draft"]
