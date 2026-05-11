@@ -1,6 +1,7 @@
 ---
 "monochange": patch
 "monochange_config": patch
+"@monochange/skill": patch
 ---
 
 # Add interactive CLI command wizard

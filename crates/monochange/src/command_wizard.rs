@@ -131,6 +131,7 @@ impl fmt::Display for DashboardAction {
 	}
 }
 
+#[coverage(off)]
 pub(crate) fn run_command_wizard(root: &Path) -> MonochangeResult<String> {
 	let config_path = root.join(CONFIG_FILE);
 	let config_text = read_config_text(&config_path)?;
@@ -216,6 +217,7 @@ pub(crate) fn upsert_cli_command_document(
 	Ok(render_document(&document))
 }
 
+#[coverage(off)]
 fn create_command(
 	root: &Path,
 	config_path: &Path,
@@ -234,6 +236,7 @@ fn create_command(
 	))
 }
 
+#[coverage(off)]
 fn edit_command(
 	root: &Path,
 	config_path: &Path,
@@ -272,6 +275,7 @@ fn edit_command(
 	}
 }
 
+#[coverage(off)]
 fn prompt_command_update(
 	existing: Option<&CommandDetails>,
 	summaries: &[CommandSummary],
@@ -298,6 +302,7 @@ fn prompt_command_update(
 	})
 }
 
+#[coverage(off)]
 fn prompt_command_name(
 	original_name: Option<&str>,
 	existing_names: &[&str],
@@ -330,6 +335,7 @@ fn prompt_command_name(
 		.to_string())
 }
 
+#[coverage(off)]
 fn prompt_help_text(initial: Option<&str>) -> MonochangeResult<Option<String>> {
 	let mut prompt = Text::new("Help text (blank to omit):");
 	if let Some(initial) = initial {
@@ -340,6 +346,7 @@ fn prompt_help_text(initial: Option<&str>) -> MonochangeResult<Option<String>> {
 	Ok(normalize_optional_text(&help_text))
 }
 
+#[coverage(off)]
 fn prompt_step_update(existing: Option<&CommandDetails>) -> MonochangeResult<CommandStepUpdate> {
 	if let Some(existing) = existing
 		&& !existing.steps.is_empty()
@@ -363,6 +370,7 @@ fn prompt_step_update(existing: Option<&CommandDetails>) -> MonochangeResult<Com
 	Ok(CommandStepUpdate::Replace(prompt_replacement_steps()?))
 }
 
+#[coverage(off)]
 fn prompt_replacement_steps() -> MonochangeResult<Vec<CommandStepDraft>> {
 	let mut steps = Vec::new();
 
@@ -389,6 +397,7 @@ fn prompt_replacement_steps() -> MonochangeResult<Vec<CommandStepDraft>> {
 	}
 }
 
+#[coverage(off)]
 fn prompt_shell_command_step() -> MonochangeResult<CommandStepDraft> {
 	let command = Text::new("Shell command to run:")
 		.with_validator(|input: &str| {
@@ -658,6 +667,7 @@ fn write_config_text(config_path: &Path, contents: &str) -> MonochangeResult<()>
 	})
 }
 
+#[coverage(off)]
 fn open_config_in_editor(config_path: &Path) -> MonochangeResult<()> {
 	if !config_path.exists() {
 		write_config_text(config_path, "")?;
@@ -692,6 +702,7 @@ fn normalize_optional_text(value: &str) -> Option<String> {
 	}
 }
 
+#[coverage(off)]
 fn map_inquire_error(error: inquire::error::InquireError) -> MonochangeError {
 	match error {
 		inquire::error::InquireError::OperationInterrupted

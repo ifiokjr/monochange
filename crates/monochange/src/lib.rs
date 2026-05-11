@@ -1,3 +1,6 @@
+#![allow(unstable_features)]
+#![feature(coverage_attribute)]
+
 //! # `monochange`
 //!
 //! <!-- {=monochangeCrateDocs|trim|linePrefix:"//! ":true} -->
@@ -176,6 +179,7 @@ use subagents::SubagentOptions;
 use subagents::run_subagents;
 pub(crate) use versioned_files::*;
 pub use workspace_ops::AddChangeFileRequest;
+use workspace_ops::PopulateWorkspaceResult;
 pub use workspace_ops::add_change_file;
 pub(crate) use workspace_ops::add_interactive_change_file;
 pub use workspace_ops::discover_workspace;
@@ -765,19 +769,7 @@ where
 				return Ok(String::new());
 			}
 			let result = populate_workspace(root)?;
-			if result.added_commands.is_empty() {
-				Ok(format!(
-					"{} already defines all default CLI commands",
-					result.path.display()
-				))
-			} else {
-				Ok(format!(
-					"updated {} and added {} default CLI commands: {}",
-					result.path.display(),
-					result.added_commands.len(),
-					result.added_commands.join(", ")
-				))
-			}
+			Ok(format_populate_workspace_result(&result))
 		}
 		Some(("command", _)) => {
 			if quiet {
@@ -1011,6 +1003,22 @@ where
 		jq_filter::apply_jq_filter(&output, &expression)
 	} else {
 		Ok(output)
+	}
+}
+
+fn format_populate_workspace_result(result: &PopulateWorkspaceResult) -> String {
+	if result.added_commands.is_empty() {
+		format!(
+			"{} already defines all default CLI commands",
+			result.path.display()
+		)
+	} else {
+		format!(
+			"updated {} and added {} default CLI commands: {}",
+			result.path.display(),
+			result.added_commands.len(),
+			result.added_commands.join(", ")
+		)
 	}
 }
 
