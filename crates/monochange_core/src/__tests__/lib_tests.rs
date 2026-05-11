@@ -1242,7 +1242,8 @@ fn valid_input_names_returns_expected_names_for_display_and_publish_steps() {
 				"package",
 				"group",
 				"ecosystem",
-				"resume"
+				"resume",
+				"all"
 			]
 			.as_slice()
 		)
