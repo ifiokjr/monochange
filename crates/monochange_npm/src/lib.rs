@@ -1056,18 +1056,6 @@ pub fn write_npm_placeholder_manifest(
 	})
 }
 
-pub fn build_npm_trust_list_command(request: &PublishRequest) -> CommandSpec {
-	build_npm_cli_command(
-		request,
-		vec![
-			"trust".to_string(),
-			"list".to_string(),
-			request.package_name.clone(),
-			"--json".to_string(),
-		],
-	)
-}
-
 pub fn build_npm_trust_command(
 	request: &PublishRequest,
 	context: &GitHubTrustContext,

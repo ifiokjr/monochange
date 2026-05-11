@@ -11,6 +11,7 @@ use monochange_cargo::write_cargo_placeholder_manifest;
 use monochange_core::DependencyKind;
 use monochange_core::PackageRecord;
 use monochange_core::PublishAttestationSettings;
+use monochange_core::PublishMode;
 use monochange_core::PublishRegistry;
 use monochange_core::PublishState;
 use monochange_core::ReleaseRecord;
@@ -22,20 +23,29 @@ use monochange_github::GitHubTrustContext;
 use monochange_github::json_value_contains;
 use monochange_github::parse_github_workflow_ref;
 use monochange_github::resolve_github_job_environment;
+use monochange_github::trust_list_contains_context;
 use monochange_npm::append_npm_trust_environment_arg;
 use monochange_publish::CommandExecutor;
 use monochange_publish::CommandOutput;
 use monochange_publish::CommandSpec;
+use monochange_publish::PLACEHOLDER_VERSION;
+use monochange_publish::ProcessCommandExecutor;
 use monochange_publish::append_publish_dry_run_args;
 use monochange_publish::build_npm_placeholder_publish_command;
 use monochange_publish::build_npm_release_publish_command;
+use monochange_publish::build_publish_command;
 use monochange_publish::crates_io_index_entry_path;
 use monochange_publish::crates_io_index_version_exists;
+use monochange_publish::default_registry_kind_for_ecosystem;
 use monochange_publish::ensure_publish_report_succeeded;
 use monochange_publish::filter_pending_publish_requests_with_transport;
+use monochange_publish::forbidden_npm_token_env_keys;
 use monochange_publish::publish_report_json_error;
+use monochange_publish::registry_version_exists;
 use monochange_publish::render_command;
 use monochange_publish::render_command_error;
+use monochange_publish::resolve_placeholder_readme;
+use monochange_publish::resolve_registry_kind;
 use monochange_publish::write_publish_report_artifact;
 use monochange_test_helpers::git;
 use semver::Version;
@@ -985,54 +995,6 @@ fn build_publish_command_appends_dry_run_flags_for_supported_registries() {
 		true,
 	);
 	assert!(!go.args.contains(&"--dry-run".to_string()));
-}
-
-#[test]
-fn build_npm_trust_commands_use_pnpm_exec_when_needed() {
-	let request = PublishRequest {
-		package_manager: Some("pnpm".to_string()),
-		..sample_request(RegistryKind::Npm)
-	};
-	let list_command = build_npm_trust_list_command(&request);
-	assert_eq!(list_command.program, "pnpm");
-	assert_eq!(
-		list_command.args,
-		vec![
-			"exec".to_string(),
-			"npm".to_string(),
-			"trust".to_string(),
-			"list".to_string(),
-			"pkg".to_string(),
-			"--json".to_string(),
-		]
-	);
-
-	let trust_command = build_npm_trust_command(
-		&request,
-		&GitHubTrustContext {
-			repository: "monochange/monochange".to_string(),
-			workflow: "publish.yml".to_string(),
-			environment: Some("publisher".to_string()),
-		},
-	);
-	assert_eq!(trust_command.program, "pnpm");
-	assert_eq!(
-		trust_command.args,
-		vec![
-			"exec".to_string(),
-			"npm".to_string(),
-			"trust".to_string(),
-			"github".to_string(),
-			"pkg".to_string(),
-			"--file".to_string(),
-			"publish.yml".to_string(),
-			"--repo".to_string(),
-			"monochange/monochange".to_string(),
-			"--yes".to_string(),
-			"--env".to_string(),
-			"publisher".to_string(),
-		]
-	);
 }
 
 #[test]
@@ -2651,186 +2613,6 @@ fn planned_and_skip_trust_outcomes_fall_back_to_manual_setup_when_context_missin
 }
 
 #[test]
-fn configure_npm_trusted_publishing_creates_configuration_when_missing() {
-	let request = sample_request(RegistryKind::Npm);
-	let root = tempfile::tempdir().expect("tempdir:");
-	let workflows = root.path().join(".github/workflows");
-	fs::create_dir_all(&workflows).expect("mkdir:");
-	fs::write(
-		workflows.join("publish.yml"),
-		"jobs:\n  release:\n    environment: publisher\n",
-	)
-	.expect("write workflow:");
-	let env_map = BTreeMap::from([
-		(
-			"GITHUB_REPOSITORY".to_string(),
-			"monochange/monochange".to_string(),
-		),
-		(
-			"GITHUB_WORKFLOW_REF".to_string(),
-			"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
-		),
-		("GITHUB_JOB".to_string(), "release".to_string()),
-	]);
-	let mut executor = FakeExecutor::new(vec![
-		CommandOutput {
-			success: true,
-			stdout: "[]".to_string(),
-			stderr: String::new(),
-		},
-		CommandOutput {
-			success: true,
-			stdout: String::new(),
-			stderr: String::new(),
-		},
-		CommandOutput {
-			success: true,
-			stdout: r#"{"repository":"monochange/monochange","workflow":"publish.yml","environment":"publisher"}"#.to_string(),
-			stderr: String::new(),
-		},
-	]);
-
-	let outcome = configure_npm_trusted_publishing(
-		&request,
-		Some(&sample_source()),
-		root.path(),
-		&env_map,
-		&mut executor,
-	)
-	.expect("npm trust:");
-
-	assert_eq!(outcome.status, TrustedPublishingStatus::Configured);
-	assert_eq!(
-		outcome.setup_url.as_deref(),
-		Some("https://www.npmjs.com/package/pkg/access")
-	);
-	assert_eq!(executor.commands.len(), 3);
-	assert_eq!(executor.commands[1].program, "npm");
-	assert!(executor.commands[1].args.contains(&"github".to_string()));
-}
-
-#[test]
-fn configure_npm_trusted_publishing_short_circuits_when_already_configured() {
-	let request = trusted_request(RegistryKind::Npm);
-	let root = workflow_root();
-	let env_map = BTreeMap::from([
-		(
-			"GITHUB_REPOSITORY".to_string(),
-			"monochange/monochange".to_string(),
-		),
-		(
-			"GITHUB_WORKFLOW_REF".to_string(),
-			"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
-		),
-		("GITHUB_JOB".to_string(), "release".to_string()),
-	]);
-	let mut executor = FakeExecutor::new(vec![CommandOutput {
-		success: true,
-		stdout: r#"{"repository":"monochange/monochange","workflow":"publish.yml","environment":"publisher"}"#.to_string(),
-		stderr: String::new(),
-	}]);
-
-	let outcome = configure_npm_trusted_publishing(
-		&request,
-		Some(&sample_source()),
-		root.path(),
-		&env_map,
-		&mut executor,
-	)
-	.expect("npm trust:");
-
-	assert_eq!(outcome.status, TrustedPublishingStatus::Configured);
-	assert_eq!(
-		outcome.setup_url.as_deref(),
-		Some("https://www.npmjs.com/package/pkg/access")
-	);
-	assert_eq!(executor.commands.len(), 1);
-}
-
-#[test]
-fn configure_npm_trusted_publishing_reports_trust_command_failures() {
-	let request = trusted_request(RegistryKind::Npm);
-	let root = workflow_root();
-	let env_map = BTreeMap::from([
-		(
-			"GITHUB_REPOSITORY".to_string(),
-			"monochange/monochange".to_string(),
-		),
-		(
-			"GITHUB_WORKFLOW_REF".to_string(),
-			"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
-		),
-		("GITHUB_JOB".to_string(), "release".to_string()),
-	]);
-	let mut executor = FakeExecutor::new(vec![
-		CommandOutput {
-			success: true,
-			stdout: "[]".to_string(),
-			stderr: String::new(),
-		},
-		CommandOutput {
-			success: false,
-			stdout: String::new(),
-			stderr: "trust failed".to_string(),
-		},
-	]);
-
-	let error = configure_npm_trusted_publishing(
-		&request,
-		Some(&sample_source()),
-		root.path(),
-		&env_map,
-		&mut executor,
-	)
-	.expect_err("expected npm trust failure");
-	assert!(error.to_string().contains("trust failed"));
-}
-
-#[test]
-fn configure_npm_trusted_publishing_requires_post_command_verification() {
-	let request = trusted_request(RegistryKind::Npm);
-	let root = workflow_root();
-	let env_map = BTreeMap::from([
-		(
-			"GITHUB_REPOSITORY".to_string(),
-			"monochange/monochange".to_string(),
-		),
-		(
-			"GITHUB_WORKFLOW_REF".to_string(),
-			"monochange/monochange/.github/workflows/publish.yml@refs/heads/main".to_string(),
-		),
-		("GITHUB_JOB".to_string(), "release".to_string()),
-	]);
-	let mut executor = FakeExecutor::new(vec![
-		CommandOutput {
-			success: true,
-			stdout: "[]".to_string(),
-			stderr: String::new(),
-		},
-		CommandOutput {
-			success: true,
-			stdout: String::new(),
-			stderr: String::new(),
-		},
-		CommandOutput {
-			success: true,
-			stdout: "[]".to_string(),
-			stderr: String::new(),
-		},
-	]);
-
-	let error = configure_npm_trusted_publishing(
-		&request,
-		Some(&sample_source()),
-		root.path(),
-		&env_map,
-		&mut executor,
-	)
-	.expect_err("expected npm verify failure");
-	assert!(error.to_string().contains("could not be verified"));
-}
-
-#[test]
 fn enforce_release_trust_prerequisites_accepts_configured_github_oidc_contexts() {
 	let root = workflow_root();
 	let env_map = BTreeMap::from([
@@ -3642,7 +3424,7 @@ fn filter_pending_publish_requests_skips_external_and_existing_versions() {
 }
 
 #[test]
-fn execute_publish_requests_publishes_release_and_configures_npm_trust() {
+fn execute_publish_requests_publishes_release_with_trust_outcome() {
 	let server = MockServer::start();
 	server.mock(|when, then| {
 		when.method(GET).path("/pkg");
@@ -3670,28 +3452,11 @@ fn execute_publish_requests_publishes_release_and_configures_npm_trust() {
 			"request-token".to_string(),
 		),
 	]);
-	let mut executor = FakeExecutor::new(vec![
-		CommandOutput {
-			success: true,
-			stdout: String::new(),
-			stderr: String::new(),
-		},
-		CommandOutput {
-			success: true,
-			stdout: "[]".to_string(),
-			stderr: String::new(),
-		},
-		CommandOutput {
-			success: true,
-			stdout: String::new(),
-			stderr: String::new(),
-		},
-		CommandOutput {
-			success: true,
-			stdout: r#"{"repository":"monochange/monochange","workflow":"publish.yml","environment":"publisher"}"#.to_string(),
-			stderr: String::new(),
-		},
-	]);
+	let mut executor = FakeExecutor::new(vec![CommandOutput {
+		success: true,
+		stdout: String::new(),
+		stderr: String::new(),
+	}]);
 
 	let report = execute_publish_requests(
 		root.path(),
@@ -3712,7 +3477,14 @@ fn execute_publish_requests_publishes_release_and_configures_npm_trust() {
 		report.packages[0].trusted_publishing.status,
 		TrustedPublishingStatus::Configured
 	);
-	assert_eq!(executor.commands.len(), 4);
+	assert!(
+		report.packages[0]
+			.trusted_publishing
+			.message
+			.contains("npm trusted publishing")
+	);
+	// No trust commands are executed — trust configuration is manual
+	assert_eq!(executor.commands.len(), 1);
 }
 
 #[test]

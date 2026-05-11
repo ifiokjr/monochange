@@ -1,5 +1,6 @@
 use std::fs;
 
+use monochange_core::ChangesetTargetKind;
 use monochange_core::HostedCommitRef;
 use monochange_core::HostedIssueRef;
 use monochange_core::HostedIssueRelationshipKind;

@@ -15,6 +15,7 @@ use httpmock::MockServer;
 use monochange_changelog::ReleaseNoteChange;
 use monochange_changelog::filter_group_release_note_change;
 use monochange_changelog::group_changelog_include_allows;
+use monochange_changelog::render_group_filtered_update_message;
 use monochange_config::load_workspace_configuration;
 use monochange_core::BumpSeverity;
 use monochange_core::ChangesetTargetKind;
@@ -36,22 +37,50 @@ use crate::PreparedFileDiff;
 use crate::add_change_file;
 use crate::add_interactive_change_file;
 use crate::affected_packages;
-use crate::build_command_for_root;
-use crate::build_lockfile_command_executions;
+use crate::cli::apply_runtime_change_type_choices;
+use crate::cli::apply_runtime_prepare_release_markdown_defaults;
+use crate::cli::build_cli_command_subcommand;
+use crate::cli::build_command_for_root;
+use crate::cli::build_release_record_subcommand;
+use crate::cli::build_skill_subcommand;
+use crate::cli::build_subagents_subcommand;
+use crate::cli::cli_command_after_help;
+use crate::cli::cli_commands_for_root;
+use crate::cli::configured_change_type_choices;
+use crate::cli_runtime::build_cli_template_context;
+use crate::cli_runtime::build_retarget_release_report;
+use crate::cli_runtime::inferred_retarget_source_configuration;
+use crate::cli_runtime::lookup_template_value;
 use crate::cli_runtime::normalize_when_expression;
+use crate::cli_runtime::parse_boolean_step_input;
+use crate::cli_runtime::parse_change_bump;
+use crate::cli_runtime::parse_direct_template_reference;
+use crate::cli_runtime::render_cli_command_markdown_result;
+use crate::cli_runtime::render_cli_command_result;
+use crate::cli_runtime::render_markdown_if_terminal;
+use crate::cli_runtime::render_retarget_release_report;
+use crate::cli_runtime::retarget_operation_label;
 use crate::cli_runtime::should_execute_cli_step;
+use crate::cli_runtime::template_value_to_input_values;
 use crate::discover_workspace;
+use crate::git_support::read_git_commit_message;
+use crate::git_support::run_git_capture;
+use crate::git_support::run_git_process;
+use crate::git_support::run_git_status;
 use crate::interactive::InteractiveChangeResult;
 use crate::interactive::InteractiveTarget;
-use crate::parse_change_bump;
 use crate::plan_release;
-use crate::prepare_release_execution;
 use crate::release_artifacts::set_force_build_file_diff_previews_error;
 use crate::release_artifacts::validate_release_record_file;
 use crate::release_artifacts::write_release_record_file;
 use crate::render_change_target_markdown;
 use crate::run_with_args;
 use crate::run_with_args_in_dir;
+use crate::workspace_ops::build_lockfile_command_executions;
+use crate::workspace_ops::change_type_default_bump;
+use crate::workspace_ops::prepare_release_execution;
+use crate::workspace_ops::render_cli_commands_toml;
+use crate::workspace_ops::render_interactive_changeset_markdown;
 
 fn clear_dedup_cache() {
 	crate::release_artifacts::DEDUPLICATED_CACHE.with(|cache| cache.borrow_mut().clear());
@@ -609,7 +638,7 @@ fn boolean_cli_inputs_support_explicit_false_values() {
 		steps: vec![],
 		dry_run: false,
 	};
-	let subcommand = crate::build_cli_command_subcommand(&cli_command);
+	let subcommand = build_cli_command_subcommand(&cli_command);
 	let matches = Command::new("mc")
 		.subcommand(subcommand)
 		.try_get_matches_from(["mc", "test-bool", "--flag=false"])
@@ -1445,7 +1474,7 @@ fn populate_adds_default_cli_commands_to_an_empty_configuration_file() {
 
 #[test]
 fn render_cli_commands_toml_handles_release_and_command_step_variants() {
-	let rendered = crate::render_cli_commands_toml(&[CliCommandDefinition {
+	let rendered = render_cli_commands_toml(&[CliCommandDefinition {
 		name: "custom".to_string(),
 		help_text: None,
 		inputs: vec![CliInputDefinition {
@@ -1935,7 +1964,7 @@ fn change_command_sources_type_choices_from_workspace_configuration() {
 		}],
 		dry_run: false,
 	}];
-	crate::apply_runtime_change_type_choices(&mut cli, &configuration);
+	apply_runtime_change_type_choices(&mut cli, &configuration);
 	let change = cli
 		.iter()
 		.find(|c| c.name == "change")
@@ -1951,7 +1980,7 @@ fn change_command_sources_type_choices_from_workspace_configuration() {
 	);
 
 	let error = Command::new("mc")
-		.subcommand(crate::build_cli_command_subcommand(&cli[0]))
+		.subcommand(build_cli_command_subcommand(&cli[0]))
 		.try_get_matches_from([
 			OsString::from("mc"),
 			OsString::from("change"),
@@ -2367,15 +2396,15 @@ fn change_type_default_bump_resolves_package_group_and_unknown_targets() {
 	let configuration =
 		load_workspace_configuration(&root).unwrap_or_else(|error| panic!("config: {error}"));
 	assert_eq!(
-		crate::change_type_default_bump(&configuration, "core", "security"),
+		change_type_default_bump(&configuration, "core", "security"),
 		Some(BumpSeverity::Patch)
 	);
 	assert_eq!(
-		crate::change_type_default_bump(&configuration, "sdk", "test"),
+		change_type_default_bump(&configuration, "sdk", "test"),
 		Some(BumpSeverity::Minor)
 	);
 	assert_eq!(
-		crate::change_type_default_bump(&configuration, "unknown", "test"),
+		change_type_default_bump(&configuration, "unknown", "test"),
 		Some(BumpSeverity::Minor) // unknown targets inherit workspace defaults
 	);
 }
@@ -2705,7 +2734,7 @@ fn template_context_exposes_resolved_config_by_default() {
 	let mut context = cli_context_for_when_evaluation_tests();
 	context.root = tempdir.path().to_path_buf();
 
-	let template_context = crate::build_cli_template_context(&context, &BTreeMap::new(), None);
+	let template_context = build_cli_template_context(&context, &BTreeMap::new(), None);
 	let project_root = tempdir
 		.path()
 		.canonicalize()
@@ -2751,7 +2780,7 @@ fn render_interactive_changeset_markdown_uses_natural_summary_heading() {
 		reason: "interactive heading".to_string(),
 		details: Some("Details body".to_string()),
 	};
-	let rendered = crate::render_interactive_changeset_markdown(&configuration, &result)
+	let rendered = render_interactive_changeset_markdown(&configuration, &result)
 		.unwrap_or_else(|error| panic!("render interactive markdown: {error}"));
 	assert!(rendered.contains("# interactive heading"));
 	assert!(rendered.contains("Details body"));
@@ -2773,7 +2802,7 @@ fn render_interactive_changeset_markdown_renders_caused_by_context() {
 		reason: "interactive caused_by".to_string(),
 		details: None,
 	};
-	let rendered = crate::render_interactive_changeset_markdown(&configuration, &result)
+	let rendered = render_interactive_changeset_markdown(&configuration, &result)
 		.unwrap_or_else(|error| panic!("render interactive caused_by markdown: {error}"));
 	assert!(rendered.contains("core:"));
 	assert!(rendered.contains("  bump: none"));
@@ -4204,7 +4233,6 @@ fn step_override_missing_template_reference_produces_empty_changed_paths() {
 
 #[test]
 fn parse_direct_template_reference_returns_inner_path_for_valid_refs() {
-	use super::parse_direct_template_reference;
 	assert_eq!(
 		parse_direct_template_reference("{{ inputs.message }}"),
 		Some("inputs.message")
@@ -4217,28 +4245,24 @@ fn parse_direct_template_reference_returns_inner_path_for_valid_refs() {
 
 #[test]
 fn parse_direct_template_reference_returns_none_for_empty_inner() {
-	use super::parse_direct_template_reference;
 	assert_eq!(parse_direct_template_reference("{{  }}"), None);
 	assert_eq!(parse_direct_template_reference("{{}}"), None);
 }
 
 #[test]
 fn parse_direct_template_reference_returns_none_for_invalid_chars() {
-	use super::parse_direct_template_reference;
 	assert_eq!(parse_direct_template_reference("{{ foo-bar }}"), None);
 	assert_eq!(parse_direct_template_reference("{{ foo bar }}"), None);
 }
 
 #[test]
 fn parse_direct_template_reference_returns_none_for_literals() {
-	use super::parse_direct_template_reference;
 	assert_eq!(parse_direct_template_reference("{{ false }}"), None);
 	assert_eq!(parse_direct_template_reference("{{ 1 }}"), None);
 }
 
 #[test]
 fn parse_direct_template_reference_returns_none_when_not_a_bare_ref() {
-	use super::parse_direct_template_reference;
 	assert_eq!(parse_direct_template_reference("prefix-{{ foo }}"), None);
 	assert_eq!(parse_direct_template_reference("hello world"), None);
 }
@@ -4473,7 +4497,6 @@ fn should_execute_cli_step_rejects_non_scalar_condition_value() {
 fn lookup_template_value_traverses_nested_objects() {
 	use serde_json::json;
 
-	use super::lookup_template_value;
 	let v = json!({"inputs": {"message": "hello"}});
 	assert_eq!(
 		lookup_template_value(&v, "inputs.message"),
@@ -4485,7 +4508,6 @@ fn lookup_template_value_traverses_nested_objects() {
 fn lookup_template_value_traverses_array_by_index() {
 	use serde_json::json;
 
-	use super::lookup_template_value;
 	let v = json!({"items": ["a", "b", "c"]});
 	assert_eq!(lookup_template_value(&v, "items.1"), Some(&json!("b")));
 }
@@ -4494,7 +4516,6 @@ fn lookup_template_value_traverses_array_by_index() {
 fn lookup_template_value_returns_none_for_missing_key() {
 	use serde_json::json;
 
-	use super::lookup_template_value;
 	let v = json!({"inputs": {}});
 	assert_eq!(lookup_template_value(&v, "inputs.missing"), None);
 }
@@ -4503,14 +4524,12 @@ fn lookup_template_value_returns_none_for_missing_key() {
 fn lookup_template_value_returns_none_for_primitive_descent() {
 	use serde_json::json;
 
-	use super::lookup_template_value;
 	let v = json!({"foo": "string_value"});
 	assert_eq!(lookup_template_value(&v, "foo.nested"), None);
 }
 
 #[test]
 fn template_value_to_input_values_null_returns_empty() {
-	use super::template_value_to_input_values;
 	assert_eq!(
 		template_value_to_input_values(&serde_json::Value::Null),
 		Vec::<String>::new()
@@ -4521,7 +4540,6 @@ fn template_value_to_input_values_null_returns_empty() {
 fn template_value_to_input_values_number_returns_string() {
 	use serde_json::json;
 
-	use super::template_value_to_input_values;
 	assert_eq!(
 		template_value_to_input_values(&json!(42)),
 		vec!["42".to_string()]
@@ -4536,7 +4554,6 @@ fn template_value_to_input_values_number_returns_string() {
 fn template_value_to_input_values_array_flattens_elements() {
 	use serde_json::json;
 
-	use super::template_value_to_input_values;
 	assert_eq!(
 		template_value_to_input_values(&json!(["a", "b", "c"])),
 		vec!["a", "b", "c"]
@@ -4551,7 +4568,6 @@ fn template_value_to_input_values_array_flattens_elements() {
 fn template_value_to_input_values_object_returns_json_serialization() {
 	use serde_json::json;
 
-	use super::template_value_to_input_values;
 	let obj = json!({"k": "v"});
 	let result = template_value_to_input_values(&obj);
 	assert_eq!(result.len(), 1);
@@ -5742,7 +5758,7 @@ fn template_context_exposes_release_commit_namespace() {
 		step_outputs: BTreeMap::new(),
 		command_logs: Vec::new(),
 	};
-	let template_context = crate::build_cli_template_context(&context, &BTreeMap::new(), None);
+	let template_context = build_cli_template_context(&context, &BTreeMap::new(), None);
 	assert_eq!(
 		template_context
 			.get("release_commit")
@@ -5779,7 +5795,7 @@ fn template_context_exposes_retarget_namespace() {
 		step_outputs: BTreeMap::new(),
 		command_logs: Vec::new(),
 	};
-	let template_context = crate::build_cli_template_context(&context, &BTreeMap::new(), None);
+	let template_context = build_cli_template_context(&context, &BTreeMap::new(), None);
 	assert_eq!(
 		template_context
 			.get("retarget")
@@ -5864,7 +5880,7 @@ fn template_context_exposes_publish_namespace() {
 		step_outputs: BTreeMap::new(),
 		command_logs: Vec::new(),
 	};
-	let template_context = crate::build_cli_template_context(&context, &BTreeMap::new(), None);
+	let template_context = build_cli_template_context(&context, &BTreeMap::new(), None);
 	assert_eq!(
 		template_context
 			.get("publish")
@@ -5957,7 +5973,7 @@ fn template_context_exposes_manifest_affected_steps_and_custom_variables() {
 			monochange_core::CommandVariable::Changesets,
 		),
 	]);
-	let template_context = crate::build_cli_template_context(&context, &inputs, Some(&variables));
+	let template_context = build_cli_template_context(&context, &inputs, Some(&variables));
 	assert_eq!(
 		template_context
 			.get("manifest")
@@ -6057,7 +6073,7 @@ fn render_cli_command_result_prefers_retarget_report() {
 		step_outputs: BTreeMap::new(),
 		command_logs: Vec::new(),
 	};
-	let rendered = crate::render_cli_command_result(&cli_command, &context);
+	let rendered = render_cli_command_result(&cli_command, &context);
 	assert!(rendered.contains("repair release:"));
 	assert!(rendered.contains("status: dry-run"));
 }
@@ -6098,7 +6114,7 @@ fn render_cli_command_result_renders_release_follow_up_sections() {
 		step_outputs: BTreeMap::new(),
 		command_logs: Vec::new(),
 	};
-	let rendered = crate::render_cli_command_result(&cli_command, &context);
+	let rendered = render_cli_command_result(&cli_command, &context);
 	assert!(rendered.contains("release manifest: target/release-manifest.json"));
 	assert!(rendered.contains("releases:"));
 	assert!(rendered.contains("release request:"));
@@ -6144,7 +6160,7 @@ fn render_cli_command_markdown_result_uses_markdown_sections_for_prepare_release
 		step_outputs: BTreeMap::new(),
 		command_logs: vec!["skipped command `cargo publish` (dry-run)".to_string()],
 	};
-	let rendered = crate::render_cli_command_markdown_result(&cli_command, &context);
+	let rendered = render_cli_command_markdown_result(&cli_command, &context);
 	assert!(rendered.contains("# `release` (dry-run)"));
 	assert!(rendered.contains("## Summary"));
 	assert!(rendered.contains("## Release targets"));
@@ -6200,7 +6216,7 @@ fn render_cli_command_markdown_result_renders_release_follow_up_sections() {
 		command_logs: vec!["executed release workflow".to_string()],
 	};
 
-	let rendered = crate::render_cli_command_markdown_result(&cli_command, &context);
+	let rendered = render_cli_command_markdown_result(&cli_command, &context);
 	assert!(rendered.contains("## Releases"));
 	assert!(rendered.contains("published monochange v1.2.3"));
 	assert!(rendered.contains("## Release commit"));
@@ -7070,14 +7086,14 @@ fn execute_matches_rejects_unknown_cli_command_names() {
 fn run_git_capture_and_process_report_io_failures_for_missing_worktrees() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let missing = tempdir.path().join("missing");
-	let capture_error = crate::run_git_capture(&missing, &["status"], "capture failure")
+	let capture_error = run_git_capture(&missing, &["status"], "capture failure")
 		.err()
 		.unwrap_or_else(|| panic!("expected capture error"));
 	assert!(capture_error.to_string().contains("capture failure"));
 
 	let mut command = std::process::Command::new("git");
 	command.current_dir(&missing).arg("status");
-	let process_error = crate::run_git_process(command, "process failure")
+	let process_error = run_git_process(command, "process failure")
 		.err()
 		.unwrap_or_else(|| panic!("expected process error"));
 	assert!(process_error.to_string().contains("process failure"));
@@ -7086,7 +7102,7 @@ fn run_git_capture_and_process_report_io_failures_for_missing_worktrees() {
 #[test]
 fn parse_boolean_step_input_rejects_invalid_values() {
 	let inputs = BTreeMap::from([("force".to_string(), vec!["maybe".to_string()])]);
-	let error = crate::parse_boolean_step_input(&inputs, "force")
+	let error = parse_boolean_step_input(&inputs, "force")
 		.err()
 		.unwrap_or_else(|| panic!("expected invalid boolean error"));
 	assert!(
@@ -7198,9 +7214,8 @@ fn inferred_retarget_source_configuration_prefers_configured_source() {
 		distance: 0,
 		record: sample_release_record_for_retarget(),
 	};
-	let inferred =
-		crate::inferred_retarget_source_configuration(Some(&configured), &discovery, true)
-			.unwrap_or_else(|| panic!("expected configured source"));
+	let inferred = inferred_retarget_source_configuration(Some(&configured), &discovery, true)
+		.unwrap_or_else(|| panic!("expected configured source"));
 	assert_eq!(inferred, configured);
 }
 
@@ -7213,7 +7228,7 @@ fn inferred_retarget_source_configuration_infers_from_release_record_provider() 
 		distance: 0,
 		record: sample_release_record_for_retarget(),
 	};
-	let inferred = crate::inferred_retarget_source_configuration(None, &discovery, true)
+	let inferred = inferred_retarget_source_configuration(None, &discovery, true)
 		.unwrap_or_else(|| panic!("expected inferred source"));
 	assert_eq!(inferred.provider, monochange_core::SourceProvider::GitHub);
 	assert_eq!(inferred.owner, "ifiokjr");
@@ -7229,7 +7244,7 @@ fn inferred_retarget_source_configuration_returns_none_when_sync_is_disabled() {
 		distance: 0,
 		record: sample_release_record_for_retarget(),
 	};
-	assert!(crate::inferred_retarget_source_configuration(None, &discovery, false).is_none());
+	assert!(inferred_retarget_source_configuration(None, &discovery, false).is_none());
 }
 
 #[test]
@@ -7263,7 +7278,7 @@ fn build_retarget_release_report_marks_completed_status() {
 		sync_provider: true,
 		dry_run: false,
 	};
-	let report = crate::build_retarget_release_report("v1.2.3", "HEAD", &discovery, false, &result);
+	let report = build_retarget_release_report("v1.2.3", "HEAD", &discovery, false, &result);
 	assert_eq!(report.status, "completed");
 	assert!(!report.is_descendant);
 }
@@ -7280,7 +7295,7 @@ fn render_retarget_release_report_handles_provider_sync_variants() {
 		url: None,
 		message: None,
 	}];
-	let rendered = crate::render_retarget_release_report(&report);
+	let rendered = render_retarget_release_report(&report);
 	assert!(rendered.contains("provider sync: github"));
 	assert!(rendered.contains("[planned]"));
 
@@ -7288,30 +7303,30 @@ fn render_retarget_release_report_handles_provider_sync_variants() {
 	no_provider_report.sync_provider = true;
 	no_provider_report.provider_results = Vec::new();
 	no_provider_report.git_tag_results = Vec::new();
-	let rendered = crate::render_retarget_release_report(&no_provider_report);
+	let rendered = render_retarget_release_report(&no_provider_report);
 	assert!(rendered.contains("provider sync: none"));
 }
 
 #[test]
 fn retarget_operation_label_covers_all_variants() {
 	assert_eq!(
-		crate::retarget_operation_label(monochange_core::RetargetOperation::Planned),
+		retarget_operation_label(monochange_core::RetargetOperation::Planned),
 		"planned"
 	);
 	assert_eq!(
-		crate::retarget_operation_label(monochange_core::RetargetOperation::Moved),
+		retarget_operation_label(monochange_core::RetargetOperation::Moved),
 		"moved"
 	);
 	assert_eq!(
-		crate::retarget_operation_label(monochange_core::RetargetOperation::AlreadyUpToDate),
+		retarget_operation_label(monochange_core::RetargetOperation::AlreadyUpToDate),
 		"already_up_to_date"
 	);
 	assert_eq!(
-		crate::retarget_operation_label(monochange_core::RetargetOperation::Skipped),
+		retarget_operation_label(monochange_core::RetargetOperation::Skipped),
 		"skipped"
 	);
 	assert_eq!(
-		crate::retarget_operation_label(monochange_core::RetargetOperation::Failed),
+		retarget_operation_label(monochange_core::RetargetOperation::Failed),
 		"failed"
 	);
 }
@@ -8139,7 +8154,7 @@ fn git_head_commit_and_read_commit_message_roundtrip() {
 	git_in_temp_repo(root, &["commit", "-m", "subject line", "-m", "body line"]);
 
 	let head = crate::git_head_commit(root).unwrap_or_else(|error| panic!("head commit: {error}"));
-	let message = crate::read_git_commit_message(root, &head)
+	let message = read_git_commit_message(root, &head)
 		.unwrap_or_else(|error| panic!("read commit message: {error}"));
 	assert!(message.contains("subject line"));
 	assert!(message.contains("body line"));
@@ -8149,7 +8164,7 @@ fn git_head_commit_and_read_commit_message_roundtrip() {
 fn run_git_status_reports_nonzero_exit_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	init_git_repo(tempdir.path());
-	let error = crate::run_git_status(
+	let error = run_git_status(
 		tempdir.path(),
 		&["definitely-not-a-real-git-command"],
 		"git status failure",
@@ -10511,7 +10526,7 @@ fn filter_group_release_note_change_respects_member_allowlists() {
 		.is_none()
 	);
 
-	let message = crate::render_group_filtered_update_message("sdk");
+	let message = render_group_filtered_update_message("sdk");
 	assert!(message.contains("No group-facing notes were recorded for this release."));
 	assert!(message.contains("synchronized group `sdk`"));
 }
@@ -10616,7 +10631,7 @@ fn build_command_and_configured_change_type_choices_include_runtime_metadata() {
 		go: monochange_core::EcosystemSettings::default(),
 	};
 	assert_eq!(
-		crate::configured_change_type_choices(&configuration),
+		configured_change_type_choices(&configuration),
 		vec![
 			"breaking".to_string(),
 			"change".to_string(),
@@ -10665,7 +10680,7 @@ fn apply_runtime_prepare_release_markdown_defaults_promotes_release_format_defau
 	release.inputs[0].default = Some("text".to_string());
 	release.inputs[0].choices = vec!["text".to_string(), "json".to_string()];
 
-	crate::apply_runtime_prepare_release_markdown_defaults(&mut cli);
+	apply_runtime_prepare_release_markdown_defaults(&mut cli);
 
 	let release = cli
 		.iter()
@@ -10749,7 +10764,7 @@ fn apply_runtime_change_type_choices_updates_only_unconfigured_change_inputs() {
 		},
 	];
 
-	crate::apply_runtime_change_type_choices(&mut cli, &configuration);
+	apply_runtime_change_type_choices(&mut cli, &configuration);
 
 	assert_eq!(cli[0].inputs[0].kind, CliInputKind::Choice);
 	assert_eq!(
@@ -10796,14 +10811,14 @@ fn apply_runtime_change_type_choices_preserves_existing_choice_inputs_and_empty_
 		steps: Vec::new(),
 		dry_run: false,
 	}];
-	crate::apply_runtime_change_type_choices(&mut cli, &configuration);
+	apply_runtime_change_type_choices(&mut cli, &configuration);
 	assert_eq!(cli[0].inputs[0].choices, vec!["existing"]);
 	assert_eq!(cli[0].inputs[0].kind, CliInputKind::Choice);
 }
 
 #[test]
 fn cli_commands_for_root_uses_workspace_cli_when_configuration_load_succeeds() {
-	let cli = crate::cli_commands_for_root(&fixture_path("config/package-group-and-cli"));
+	let cli = cli_commands_for_root(&fixture_path("config/package-group-and-cli"));
 	let command_names = cli
 		.iter()
 		.map(|command| command.name.as_str())
@@ -10821,7 +10836,7 @@ fn cli_commands_for_root_uses_workspace_cli_when_configuration_load_succeeds() {
 
 #[test]
 fn build_skill_subcommand_forwards_native_add_flags() {
-	let command = Command::new("mc").subcommand(crate::build_skill_subcommand());
+	let command = Command::new("mc").subcommand(build_skill_subcommand());
 	let matches = command
 		.clone()
 		.try_get_matches_from([
@@ -11062,7 +11077,7 @@ fn skill_command_reports_nonzero_exit_status_from_runner() {
 
 #[test]
 fn build_subagents_subcommand_parses_valid_inputs_and_rejects_invalid_targets() {
-	let command = Command::new("mc").subcommand(crate::build_subagents_subcommand());
+	let command = Command::new("mc").subcommand(build_subagents_subcommand());
 	let matches = command
 		.clone()
 		.try_get_matches_from([
@@ -11227,7 +11242,7 @@ fn subagents_command_supports_all_targets_in_default_text_output() {
 
 #[test]
 fn build_release_record_subcommand_requires_from_and_supports_json_output() {
-	let command = Command::new("mc").subcommand(crate::build_release_record_subcommand());
+	let command = Command::new("mc").subcommand(build_release_record_subcommand());
 	let matches = command
 		.clone()
 		.try_get_matches_from([
@@ -11266,7 +11281,7 @@ fn build_release_record_subcommand_requires_from_and_supports_json_output() {
 
 #[test]
 fn build_release_record_subcommand_accepts_sha_flag() {
-	let command = Command::new("mc").subcommand(crate::build_release_record_subcommand());
+	let command = Command::new("mc").subcommand(build_release_record_subcommand());
 	let matches = command
 		.clone()
 		.try_get_matches_from([
@@ -11324,7 +11339,7 @@ fn cli_command_after_help_covers_supported_commands_and_custom_commands() {
 		),
 	];
 	for (name, expected) in cases {
-		let after_help = crate::cli_command_after_help(&CliCommandDefinition {
+		let after_help = cli_command_after_help(&CliCommandDefinition {
 			name: name.to_string(),
 			help_text: None,
 			inputs: Vec::new(),
@@ -11335,7 +11350,7 @@ fn cli_command_after_help_covers_supported_commands_and_custom_commands() {
 		assert!(after_help.contains(expected));
 	}
 	assert!(
-		crate::cli_command_after_help(&CliCommandDefinition {
+		cli_command_after_help(&CliCommandDefinition {
 			name: "custom".to_string(),
 			help_text: None,
 			inputs: Vec::new(),
@@ -11411,7 +11426,7 @@ fn build_cli_command_subcommand_parses_supported_input_kinds() {
 		dry_run: false,
 	};
 
-	let command = Command::new("mc").subcommand(crate::build_cli_command_subcommand(&cli_command));
+	let command = Command::new("mc").subcommand(build_cli_command_subcommand(&cli_command));
 	let matches = command
 		.try_get_matches_from([
 			OsString::from("mc"),
@@ -11894,7 +11909,7 @@ fn maybe_render_markdown_for_terminal_returns_original_when_not_tty() {
 #[test]
 fn render_markdown_if_terminal_returns_styled_when_terminal() {
 	let markdown = "# Hello\n\n**bold** text";
-	let result = crate::render_markdown_if_terminal(markdown, true);
+	let result = render_markdown_if_terminal(markdown, true);
 	// termimad produces ANSI-styled output when terminal is true
 	assert!(result.contains("Hello"));
 	assert_ne!(result, markdown);
@@ -11903,7 +11918,7 @@ fn render_markdown_if_terminal_returns_styled_when_terminal() {
 #[test]
 fn render_markdown_if_terminal_returns_original_when_not_terminal() {
 	let markdown = "# Hello\n\n**bold** text";
-	let result = crate::render_markdown_if_terminal(markdown, false);
+	let result = render_markdown_if_terminal(markdown, false);
 	assert_eq!(result, markdown);
 }
 

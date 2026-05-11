@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use std::env;
 use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
 
 use monochange_cargo::cargo_publish_readiness_blockers;
 use monochange_cargo::publish_blocked_message;
@@ -11,7 +12,6 @@ use monochange_core::Ecosystem;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PackagePublicationTarget;
-pub(crate) use monochange_core::PublishMode;
 use monochange_core::PublishRegistry;
 use monochange_core::RegistryKind;
 use monochange_core::SourceConfiguration;
@@ -24,17 +24,15 @@ use monochange_github::trust_list_contains_context;
 use monochange_github::verify_github_trust_context;
 use monochange_go::write_go_placeholder_manifest;
 use monochange_npm::build_npm_trust_command;
-use monochange_npm::build_npm_trust_list_command;
 use monochange_npm::render_npm_trust_command;
 use monochange_npm::write_npm_placeholder_manifest;
 use monochange_publish::CommandExecutor;
-pub(crate) use monochange_publish::PLACEHOLDER_VERSION;
+use monochange_publish::CommandSpec;
 pub(crate) use monochange_publish::PackagePublishOutcome;
 pub(crate) use monochange_publish::PackagePublishReport;
 pub(crate) use monochange_publish::PackagePublishRunMode;
 pub(crate) use monochange_publish::PackagePublishStatus;
 use monochange_publish::PlaceholderManifestWriterRegistry;
-pub(crate) use monochange_publish::ProcessCommandExecutor;
 use monochange_publish::PublishReadinessRegistry;
 pub(crate) use monochange_publish::PublishRequest;
 use monochange_publish::PublishTrustHandler;
@@ -44,26 +42,20 @@ pub(crate) use monochange_publish::TrustedPublishingOutcome;
 pub(crate) use monochange_publish::TrustedPublishingStatus;
 use monochange_publish::build_placeholder_directory as build_placeholder_directory_with_writers;
 pub(crate) use monochange_publish::build_placeholder_requests;
-pub(crate) use monochange_publish::build_publish_command;
 use monochange_publish::build_publish_command_builder;
 pub(crate) use monochange_publish::build_release_requests;
-pub(crate) use monochange_publish::default_registry_kind_for_ecosystem;
 use monochange_publish::detect_trusted_publishing_identity;
 use monochange_publish::disabled_trust_outcome;
 use monochange_publish::enforce_release_attestation_prerequisites as enforce_release_attestation_prerequisites_impl;
 use monochange_publish::execute_publish_requests as execute_publish_requests_impl;
 use monochange_publish::execute_publish_requests_with_process;
-pub(crate) use monochange_publish::forbidden_npm_token_env_keys;
 use monochange_publish::manual_setup_url;
 use monochange_publish::merge_publish_resume_report;
 use monochange_publish::provider_registry_trust_capability;
 use monochange_publish::read_publish_report_artifact;
-pub(crate) use monochange_publish::registry_version_exists;
 use monochange_publish::reject_npm_token_environment;
 use monochange_publish::render_command;
 use monochange_publish::render_command_error;
-pub(crate) use monochange_publish::resolve_placeholder_readme;
-pub(crate) use monochange_publish::resolve_registry_kind;
 use monochange_publish::resume_publish_requests;
 use monochange_publish::select_release_publication_targets;
 use monochange_publish::trusted_publishing_capability_message;
@@ -255,21 +247,6 @@ impl PublishTrustHandler for CliPublishTrustHandler {
 	) -> MonochangeResult<()> {
 		enforce_release_trust_prerequisites(request, source, root, env_map)
 	}
-
-	fn configure_successful_publish_trust(
-		&self,
-		request: &PublishRequest,
-		source: Option<&SourceConfiguration>,
-		root: &Path,
-		env_map: &BTreeMap<String, String>,
-		executor: &mut dyn CommandExecutor,
-	) -> MonochangeResult<TrustedPublishingOutcome> {
-		if request.registry == RegistryKind::Npm {
-			configure_npm_trusted_publishing(request, source, root, env_map, executor)
-		} else {
-			Ok(manual_trust_outcome(request, source, root, env_map))
-		}
-	}
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -426,6 +403,18 @@ fn planned_trust_outcome(
 		}
 	} else {
 		manual_trust_outcome(request, source, root, env_map)
+	}
+}
+
+fn build_npm_trust_list_command(request: &PublishRequest) -> CommandSpec {
+	CommandSpec {
+		program: "npm".to_string(),
+		args: vec![
+			"trust".to_string(),
+			"ls".to_string(),
+			request.package_name.clone(),
+		],
+		cwd: PathBuf::new(),
 	}
 }
 

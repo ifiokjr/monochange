@@ -1,6 +1,7 @@
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
+use monochange_core::ChangelogSettings;
 use monochange_core::ChangesetContext;
 use monochange_core::ChangesetRevision;
 use monochange_core::HostedActorRef;
