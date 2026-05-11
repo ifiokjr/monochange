@@ -612,31 +612,34 @@ pub fn execute_publish_requests(
 		);
 
 		if dry_run {
+			if mode == PackagePublishRunMode::Placeholder {
+				outcomes.push(PackagePublishOutcome {
+					package: request.package_id.clone(),
+					ecosystem: request.ecosystem,
+					registry: request.registry.to_string(),
+					version: request.version.clone(),
+					status: PackagePublishStatus::Planned,
+					message: planned_publish_message(mode, request),
+					placeholder: true,
+					trusted_publishing: trust_handler
+						.planned_trust_outcome(request, source, root, env_map),
+					command: None,
+					stdout: None,
+					stderr: None,
+				});
+				continue;
+			}
+
 			info!(
 				package_name = request.package_name,
 				version = %request.version,
 				registry = %request.registry,
 				mode = ?mode,
-				"would publish package (dry run)"
+				"validating package publish command (dry run)"
 			);
-			outcomes.push(PackagePublishOutcome {
-				package: request.package_id.clone(),
-				ecosystem: request.ecosystem,
-				registry: request.registry.to_string(),
-				version: request.version.clone(),
-				status: PackagePublishStatus::Planned,
-				message: planned_publish_message(mode, request),
-				placeholder: mode == PackagePublishRunMode::Placeholder,
-				trusted_publishing: trust_handler
-					.planned_trust_outcome(request, source, root, env_map),
-				command: None,
-				stdout: None,
-				stderr: None,
-			});
-			continue;
 		}
 
-		if mode == PackagePublishRunMode::Release {
+		if !dry_run && mode == PackagePublishRunMode::Release {
 			trust_handler.enforce_release_trust_prerequisites(request, source, root, env_map)?;
 			enforce_release_attestation_prerequisites(request, env_map, command_builder)?;
 		}
@@ -662,6 +665,24 @@ pub fn execute_publish_requests(
 				registry = %request.registry,
 				"publish command returned non-zero exit"
 			);
+			if dry_run {
+				outcomes.push(PackagePublishOutcome {
+					package: request.package_id.clone(),
+					ecosystem: request.ecosystem,
+					registry: request.registry.to_string(),
+					version: request.version.clone(),
+					status: PackagePublishStatus::Planned,
+					message: planned_publish_message(mode, request),
+					placeholder: mode == PackagePublishRunMode::Placeholder,
+					trusted_publishing: trust_handler
+						.planned_trust_outcome(request, source, root, env_map),
+					command: Some(render_command(&publish_command)),
+					stdout: non_empty_output(output.stdout),
+					stderr: non_empty_output(output.stderr),
+				});
+				continue;
+			}
+
 			let mut outcome = failed_publish_outcome(
 				mode,
 				request,
@@ -678,28 +699,42 @@ pub fn execute_publish_requests(
 			break;
 		}
 
-		let trusted_publishing = if request.trusted_publishing.enabled {
+		let trusted_publishing = if dry_run {
+			trust_handler.planned_trust_outcome(request, source, root, env_map)
+		} else if request.trusted_publishing.enabled {
 			trust_handler.trust_outcome_for_skip(request, source, root, env_map)
 		} else {
 			disabled_trust_outcome()
 		};
 
+		let (status, message) = if dry_run {
+			(
+				PackagePublishStatus::Planned,
+				planned_publish_message(mode, request),
+			)
+		} else {
+			(
+				PackagePublishStatus::Published,
+				format!(
+					"published {} {} to {}",
+					request.package_name, request.version, request.registry
+				),
+			)
+		};
 		info!(
 			package_name = request.package_name,
 			version = %request.version,
 			registry = %request.registry,
-			"published package"
+			dry_run,
+			"package publish command completed"
 		);
 		outcomes.push(PackagePublishOutcome {
 			package: request.package_id.clone(),
 			ecosystem: request.ecosystem,
 			registry: request.registry.to_string(),
 			version: request.version.clone(),
-			status: PackagePublishStatus::Published,
-			message: format!(
-				"published {} {} to {}",
-				request.package_name, request.version, request.registry
-			),
+			status,
+			message,
 			placeholder: mode == PackagePublishRunMode::Placeholder,
 			trusted_publishing,
 			command: Some(render_command(&publish_command)),

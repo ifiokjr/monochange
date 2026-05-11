@@ -13,6 +13,7 @@ expression: redacted
       "rules": {
         "cargo/dependency-field-order": "warning",
         "cargo/internal-dependency-workspace": "error",
+        "cargo/publishable-dependencies": "error",
         "cargo/required-package-fields": "error",
         "cargo/sorted-dependencies": "warning",
         "cargo/unlisted-package-private": "warning"
