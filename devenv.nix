@@ -461,17 +461,5 @@ in
       description = "Update insta snapshots and delete unreferenced snapshot files.";
       binary = "bash";
     };
-    "strip:env" = {
-      exec = ''
-        set -euo pipefail
-
-        env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT \
-        	-u NIX_LD -u NIX_LD_LIBRARY_PATH \
-        	-u NIX_CFLAGS_COMPILE -u NIX_LDFLAGS
-      '';
-      description = "Strip environment variables";
-      binary = "bash";
-    };
-
   };
 }
