@@ -4,7 +4,7 @@ monochange: minor
 monochange_npm: minor
 ---
 
-# Remove automated npm trust configuration during publish and prefer npm over pnpm for trusted publishing
+# Remove automated npm trust configuration during publish
 
 Removed the `npm trust` command execution from the publish loop. Trust configuration for npm packages must now be done manually or via separate tooling — `mc publish` no longer runs `npm trust github` or `npm trust list` automatically.
 
