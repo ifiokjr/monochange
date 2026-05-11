@@ -1,63 +1,30 @@
 # @monochange/skill
 
-Installable agent skill for monochange.
+Agent guidance for using monochange as a CLI-driven release-planning harness.
 
-This package bundles:
+The package is intentionally task-oriented: start with the short [SKILL.md](./SKILL.md) at runtime, then open the focused files under [skills/](./skills/readme.md) only when a task needs more context. The [examples](./examples/readme.md) are small enough to copy into a new repository and then tailor to its package graph.
 
-- `SKILL.md` — concise entrypoint for agents
-- `skills/readme.md` — index of focused deep dives
-- `skills/adoption.md` — setup-depth questions, migration guidance, and recommendation patterns
-- `skills/changesets.md` — changeset authoring and lifecycle guidance
-- `skills/commands.md` — built-in command catalog and usage patterns
-- `skills/configuration.md` — `monochange.toml` setup and editing guidance
-- `skills/linting.md` — `mc check`, `[lints]`, presets, and manifest-focused rule explanations with examples
-- `examples/readme.md` — condensed scenario examples for quick recommendations
-- `skills/reference.md` — high-context reference with broader examples
-- `skills/trusted-publishing.md` — GitHub/OIDC setup guidance for `npm`, `crates.io`, `jsr`, `pub.dev`, PyPI, and Go module tags
-- `skills/multi-package-publishing.md` — monorepo-oriented publishing patterns for multiple public packages
-- `monochange-skill` — helper executable for printing or copying the bundled skill
+monochange discovers packages in a monorepo, reads release intent from `.changeset/*.md`, computes package and group versions, updates versioned files, creates release records, and can drive provider/package publishing workflows configured in `monochange.toml`.
 
-## Install
+## Start here
 
-For project-local installation through the upstream `skills add` flow, prefer:
+- [SKILL.md](./SKILL.md) — short runtime instructions for agents.
+- [skills/readme.md](./skills/readme.md) — index of focused modules and when to open each one.
+- [skills/commands.md](./skills/commands.md) — verified built-in commands, step commands, and step types.
+- [skills/configuration.md](./skills/configuration.md) — authoring `monochange.toml` with copyable examples.
+- [skills/changesets.md](./skills/changesets.md) — creating and maintaining `.changeset/*.md` files.
+- [skills/reference.md](./skills/reference.md) — complete reference for day-to-day operation.
+- [skills/linting.md](./skills/linting.md) — `mc check`, lint presets, rule severity, and manifest policy.
+- [skills/multi-package-publishing.md](./skills/multi-package-publishing.md) — readiness, bootstrap, and package publishing flows.
+- [skills/trusted-publishing.md](./skills/trusted-publishing.md) — OIDC/trusted-publishing notes for package registries.
+- [examples/readme.md](./examples/readme.md) — scenario examples.
 
-```bash
-mc help skill
-mc skill
-mc skill -a pi -y
-```
+## Important distinction
 
-If you need the lower-level package helper directly, install it with:
+The CLI has three command classes:
 
-```bash
-npm install -g @monochange/skill
-```
+1. **Built-in commands** hardcoded by the binary, such as `mc init`, `mc validate`, `mc check`, `mc mcp`, and `mc publish-readiness`.
+2. **Step commands** generated from built-in step variants, such as `mc step:discover` and `mc step:prepare-release`.
+3. **User-defined workflow commands** created by `[cli.<name>]` in `monochange.toml`, such as `mc release` or `mc publish` in repositories that define them.
 
-## Helper usage
-
-```bash
-monochange-skill --print-install
-monochange-skill --print-skill
-monochange-skill --copy ~/.pi/agent/skills/monochange
-```
-
-`monochange-skill --copy` copies the full skill bundle, including `SKILL.md`, `skills/reference.md`, `skills/trusted-publishing.md`, `skills/multi-package-publishing.md`, the `skills/` deep-dive folder, and the bundled `examples/` folder.
-
-## What the skill teaches
-
-The bundled skill explains how to:
-
-- plan adoption in `quickstart`, `standard`, `full`, or `migration` mode
-- create or refine `monochange.toml` with `mc init`, generated `[cli.*]` workflow commands, `mc step:*`, and `mc validate`
-- inspect the normalized model with `mc discover --format json`
-- create, update, and audit explicit change files with `mc change` and `mc diagnostics`, including dependency-follow-up notes with `caused_by`
-- preview release effects with `mc release --dry-run --format json` and `mc release --dry-run --diff`
-- inspect durable release history with `mc release-record`
-- understand groups, package ids, changelogs, linting policy, package publishing, and source-provider release flows
-- set up trusted publishing / OIDC-backed package publishing for the registries that monochange supports
-- choose sane multi-package publish patterns when one repository ships multiple public packages
-- point users at condensed bundled examples and fuller repository-level example indexes
-
-Open [SKILL.md](./SKILL.md) first, then use [skills/readme.md](./skills/readme.md), [examples/readme.md](./examples/readme.md), [skills/reference.md](./skills/reference.md), [skills/trusted-publishing.md](./skills/trusted-publishing.md), and [skills/multi-package-publishing.md](./skills/multi-package-publishing.md) for the deeper sections.
-
-For fuller repo-shaped examples in the monochange repository, see <https://github.com/monochange/monochange/tree/main/examples>.
+Always inspect `mc help` or `monochange.toml` before assuming a user-defined workflow command exists. A repository can expose friendly commands such as `mc release`, `mc change`, or `mc publish`, but those names are configuration, not CLI guarantees. The step commands remain the portable fallback.

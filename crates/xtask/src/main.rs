@@ -14,12 +14,40 @@ struct Cli {
 enum Commands {
 	/// Regenerate committed JSON Schema assets
 	Schema(SchemaArgs),
+	/// Check or update skill documentation inventories
+	Skill(SkillArgs),
 }
 
 #[derive(Parser)]
 struct SchemaArgs {
 	#[command(subcommand)]
 	command: SchemaCommands,
+}
+
+#[derive(Parser)]
+struct SkillArgs {
+	#[command(subcommand)]
+	command: SkillCommands,
+}
+
+#[derive(Subcommand)]
+enum SkillCommands {
+	/// Check or update packages/monochange__skill/skills/commands.md
+	Commands(SkillCommandsArgs),
+}
+
+#[derive(Parser)]
+struct SkillCommandsArgs {
+	#[command(subcommand)]
+	command: SkillCommandActions,
+}
+
+#[derive(Subcommand)]
+enum SkillCommandActions {
+	/// Update the committed command inventory
+	Update,
+	/// Check the committed command inventory
+	Check,
 }
 
 #[derive(Subcommand)]
@@ -38,6 +66,16 @@ fn main() {
 			match args.command {
 				SchemaCommands::Update => xtask::run(true),
 				SchemaCommands::Check => xtask::run(false),
+			}
+		}
+		Commands::Skill(args) => {
+			match args.command {
+				SkillCommands::Commands(commands_args) => {
+					match commands_args.command {
+						SkillCommandActions::Update => xtask::run_skill_commands(true),
+						SkillCommandActions::Check => xtask::run_skill_commands(false),
+					}
+				}
 			}
 		}
 	};

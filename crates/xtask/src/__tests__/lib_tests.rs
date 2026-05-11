@@ -2,10 +2,52 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::check_schemas;
+use crate::command_literals_from_cli_source;
 use crate::post_process;
 use crate::post_process_config;
 use crate::post_process_release;
+use crate::render_commands_inventory;
+use crate::replace_commands_inventory;
 use crate::run_with_paths;
+
+#[test]
+fn command_literals_from_cli_source_collects_clap_commands() {
+	let source = r#"
+		.subcommand(Command::new("init"))
+		.subcommand(Command::new("lint").subcommand(Command::new("list")))
+	"#;
+	let commands = command_literals_from_cli_source(source);
+
+	assert!(commands.contains("init"));
+	assert!(commands.contains("lint"));
+	assert!(commands.contains("list"));
+}
+
+#[test]
+fn replace_commands_inventory_replaces_marker_block() {
+	let mut built_in = std::collections::BTreeSet::new();
+	built_in.insert("init".to_string());
+	let configured = std::collections::BTreeSet::new();
+	let mut step_commands = std::collections::BTreeSet::new();
+	step_commands.insert("step:validate".to_string());
+	let expected = render_commands_inventory(&built_in, &configured, &step_commands);
+	let current =
+		"before\n<!-- xtask:commands:start -->\nstale\n<!-- xtask:commands:end -->\nafter";
+	let updated = replace_commands_inventory(current, &expected).unwrap();
+
+	assert!(updated.contains("before"));
+	assert!(updated.contains("- `init`"));
+	assert!(updated.contains("- `step:validate`"));
+	assert!(updated.contains("after"));
+	assert!(!updated.contains("stale"));
+}
+
+#[test]
+fn replace_commands_inventory_requires_markers() {
+	let error = replace_commands_inventory("missing", "expected").unwrap_err();
+
+	assert!(error.contains("Missing command inventory start marker"));
+}
 
 #[test]
 fn post_process_sets_id_title_description() {

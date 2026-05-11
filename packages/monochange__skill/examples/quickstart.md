@@ -1,22 +1,31 @@
-# Quickstart example
+# Quickstart: npm packages
 
-## Recommend this when
+```bash
+mc init
+mc validate
+mc step:discover --format json
+```
 
-- the repository is greenfield or nearly greenfield
-- the user wants a safe first success before full automation
-- package discovery and config quality matter more than publish setup right now
+```toml
+[defaults]
+package_type = "npm"
+parent_bump = "patch"
 
-## Default recommendation
+[package."@acme/api"]
+path = "packages/api"
 
-- ask for setup depth first: `quickstart` or `standard`
-- inspect the repository before asking ecosystem-specific questions
-- start with `mc init`, `mc validate`, `mc discover --format json`, and `mc release --dry-run --diff`
-- stop before real publishing unless the user explicitly wants a deeper setup
+[package."@acme/ui"]
+path = "packages/ui"
 
-## Good default output
+[ecosystems.npm]
+enabled = true
+lockfile_commands = ["pnpm install --lockfile-only"]
+```
 
-- detected provider and ecosystems
-- recommended lint profile
-- whether grouping is needed yet
-- next commands to run
-- what to defer until `full` mode
+Create release intent, then preview:
+
+```bash
+mc step:create-change-file --package @acme/api --bump minor --reason "Add webhook filters"
+mc validate
+mc step:prepare-release --dry-run --format json
+```

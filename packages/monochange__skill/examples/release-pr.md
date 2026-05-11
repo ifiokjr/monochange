@@ -1,20 +1,20 @@
-# Release PR example
+# Release pull request workflow
 
-## Recommend this when
+A release PR command is user-defined. Example:
 
-- the team wants a reviewable release branch
-- release files should be inspected before they land on the default branch
-- tags and publishes should happen only after merge
+```toml
+[cli.release-pr]
+help_text = "Prepare a release pull request"
+inputs = [
+	{ name = "format", type = "choice", choices = ["markdown", "json"], default = "markdown" },
+	{ name = "no_verify", type = "boolean", default = false },
+]
+steps = [
+	{ name = "plan release", type = "PrepareRelease", allow_empty_changesets = true },
+	{ name = "refresh lockfile", type = "Command", command = "pnpm install --lockfile-only", when = "{{ number_of_changesets > 0 }}" },
+	{ name = "create release commit", type = "CommitRelease", when = "{{ number_of_changesets > 0 }}" },
+	{ name = "open release request", type = "OpenReleaseRequest", when = "{{ number_of_changesets > 0 }}" },
+]
+```
 
-## Default recommendation
-
-- use `mc release-pr` for branch refresh
-- do not create tags on the release branch
-- after merge, detect the durable release commit with `mc release-record --from HEAD --format json`
-- run `mc tag-release --from HEAD` before package publishing
-
-## Good default output
-
-- release PR refresh strategy
-- post-merge tagging and publish steps
-- approval and human-review checkpoints
+Preview with `--dry-run` when supported before allowing the workflow to mutate branches.

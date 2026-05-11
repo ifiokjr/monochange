@@ -944,18 +944,6 @@ This layout keeps the top-level skill small while still making the richer guidan
 
 <!-- {/mcpConfigSnippet} -->
 
-<!-- {@recommendedCommandFlow} -->
-
-1. **Validate** — `mc validate` checks config and changeset targets.
-2. **Discover** — `mc discover --format json` inspects the workspace model.
-3. **Create changesets** — `mc change --package <id> --bump <severity> --reason "..."` writes explicit release intent.
-4. **Preview release** — `mc release --dry-run --format json` shows planned bumps, changelog output, and changed files.
-5. **Inspect changeset context** — `mc diagnostics --format json` shows git provenance and linked review metadata for all pending changesets.
-6. **Inspect cached manifest** — `mc release --dry-run --format json` refreshes the cached manifest and shows the downstream automation payload.
-7. **Publish** — `mc publish-release --format json` creates provider releases after human review.
-
-<!-- {/recommendedCommandFlow} -->
-
 <!-- {@assistantRepoGuidance} -->
 
 - Read `monochange.toml` before proposing release workflow changes.
@@ -967,53 +955,6 @@ This layout keeps the top-level skill small while still making the richer guidan
 - Use `mc release --dry-run --format json` before mutating release state.
 
 <!-- {/assistantRepoGuidance} -->
-
-<!-- {@cliStepTypes} -->
-
-**Standalone steps** (no prerequisites):
-
-- `Validate` — validate config and changeset targets
-- `Discover` — discover packages across ecosystems
-- `CreateChangeFile` — write a `.changeset/*.md` file
-- `AffectedPackages` — evaluate changeset policy from CI-supplied paths and labels
-- `DiagnoseChangesets` — show changeset context and review metadata
-- `RetargetRelease` — repair a recent release by moving its tags
-
-**Release-state consumer steps** (require `PrepareRelease`):
-
-- `PrepareRelease` — compute release plan, update versions, changelogs, and versioned files
-- `CommitRelease` — create a local release commit
-- `PublishRelease` — create provider releases
-- `OpenReleaseRequest` — open or update a release pull request
-- `CommentReleasedIssues` — comment on issues referenced in changesets
-
-**Generic step:**
-
-- `Command` — run an arbitrary shell command with template interpolation
-
-<!-- {/cliStepTypes} -->
-
-<!-- {@releaseTitleConfig} -->
-
-Two template fields control how release names and changelog version headings render:
-
-- **`release_title`** — plain text title for provider releases (GitHub, GitLab, Gitea)
-- **`changelog_version_title`** — markdown-capable title for changelog version headings
-
-Both are configurable at `[defaults]`, `[package.*]`, and `[group.*]` levels.
-
-Available template variables: `{{ version }}`, `{{ id }}`, `{{ date }}`, `{{ time }}`, `{{ datetime }}`, `{{ changes_count }}`, `{{ tag_url }}`, `{{ compare_url }}`.
-
-```toml
-[defaults]
-release_title = "{{ version }} ({{ date }})"
-changelog_version_title = "[{{ version }}]({{ tag_url }}) ({{ date }})"
-
-[group.main]
-release_title = "v{{ version }} — released {{ date }}"
-```
-
-<!-- {/releaseTitleConfig} -->
 
 <!-- {@lintingPolicyReference} -->
 

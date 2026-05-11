@@ -1,332 +1,142 @@
-# Changesets skill
+# Changesets
 
-Use this guide when the task is to create, review, update, replace, or remove `.changeset/*.md` files.
+Changesets are explicit release intent. They tell monochange which package or group should be considered for a version bump and what human-facing release note to render.
 
-## When to use this skill
+A good changeset answers three questions: what public behavior changed, who is affected, and how monochange should version the affected release target. It should not be a raw commit log or a list of touched files.
 
-Reach for it when you need to:
+## CLI creation
 
-- create a new changeset from a code change
-- decide whether to update an existing changeset instead of creating another one
-- explain dependency propagation with `caused_by`
-- choose between package ids and group ids
-- describe a CLI, library, application, or protocol change in user-facing language
-
-## Start with the workspace model
-
-Before writing anything:
-
-1. Read `monochange.toml`
-2. Run `mc validate`
-3. Run `mc discover --format json`
-4. Review existing `.changeset/*.md` files
-5. Use `mc diagnostics --format json` when you need git and PR context
-
-## The default creation flow
-
-Create a new changeset for one package:
+Prefer the repository's configured workflow if present:
 
 ```bash
-mc change --package monochange --bump minor --reason "add release-record discovery"
+mc change --package @acme/api --bump minor --type feat --reason "Add webhook delivery filters"
 ```
 
-Create a dependency-follow-up changeset:
+If `mc change` is not configured, use the step command directly:
 
 ```bash
-mc change \
-  --package monochange_config \
-  --bump patch \
-  --caused-by monochange_core \
-  --reason "update dependency on monochange_core"
+mc step:create-change-file --package @acme/api --bump minor --reason "Add webhook delivery filters"
 ```
 
-Create a no-version-bump acknowledgement for an affected package:
+Always run `mc validate` after creating or editing changesets.
 
-```bash
-mc change \
-  --package monochange_config \
-  --bump none \
-  --caused-by monochange_core \
-  --reason "dependency-only follow-up"
+The configured command may expose more inputs than the portable step command, such as `--type`, `--caused-by`, or repository-specific defaults. Check `mc help change` or the `[cli.change]` table before relying on a flag name.
+
+## File shape
+
+The frontmatter keys must be configured package ids or group ids. Quote ids that contain `@`, `/`, dots, or other punctuation so the YAML/TOML-like frontmatter is unambiguous.
+
+Simple package-to-bump syntax:
+
+```md
+---
+"@acme/api": minor
+---
+
+# Add webhook delivery filters
+
+Users can now filter webhook deliveries by event type and delivery status.
 ```
 
-## Package id vs. group id
+When using configured changelog types, the type can be the target value when it maps to the desired default bump:
 
-Prefer a package id when one package changed directly:
+```md
+---
+"@acme/api": feat
+---
 
-```markdown
----
-monochange_core: minor
----
+# Add webhook delivery filters
+
+Users can now filter webhook deliveries by event type and delivery status.
 ```
 
-Use a group id only when the outward release boundary is the whole group:
+The shorthand above is compact, but only use it when the configured changelog type already implies the intended bump. If you need to override the bump, pin a version, or attach dependency context, switch to object syntax.
 
-```markdown
+Use object syntax when you need `bump`, `type`, `version`, or `caused_by` together:
+
+```md
 ---
-sdk: minor
+"@acme/api":
+  bump: minor
+  type: feat
 ---
+
+# Add webhook delivery filters
+
+Users can now filter webhook deliveries by event type and delivery status.
 ```
 
-A good rule:
+Multiple targets are allowed when one user-facing change spans packages:
 
-- **package id** — a leaf package changed and monochange can propagate the rest
-- **group id** — the release note should read as one coordinated release owned by the group
-
-## Scalar vs. object frontmatter
-
-Scalar syntax is the shortest form:
-
-```markdown
+```md
 ---
-monochange: patch
----
-```
-
-Object syntax is for richer intent:
-
-```markdown
----
-monochange:
-  bump: major
-  version: "2.0.0"
-  type: security
----
-```
-
-Use object syntax when you need:
-
-- `version` for an explicit version target
-- `type` for a custom changelog section
-- `caused_by` for dependency propagation context
-
-`caused_by` always uses the object form and can point at package ids or group ids.
-
-## `caused_by` and dependency propagation
-
-Without `caused_by`, a dependent package gets an automatic dependency-bump record with little context.
-
-**Without authored context:**
-
-```markdown
-# automatic propagation, no authored explanation
-
-monochange_config -> patch
-```
-
-**With authored context:**
-
-```markdown
----
-monochange_config:
+"@acme/api":
   bump: patch
-  caused_by: ["monochange_core"]
+  type: fix
+"@acme/ui":
+  bump: patch
+  type: fix
 ---
 
-#### update dependency on monochange_core
+# Preserve dashboard filters after retrying requests
 
-Bumps `monochange_core` after the `ChangelogFormat` API change.
+Both the API response and the UI retry flow now keep the same filter state.
 ```
 
-Use `bump: none` when the package is affected but users do not need a version bump.
+Use explicit versions only when you need a specific version rather than semver bump calculation:
 
-`caused_by` suppresses only the matching automatic propagation. Other unrelated upstream changes can still propagate normally.
-
-CLI authoring accepts repeated `--caused-by <id>` flags when more than one upstream package or group explains the follow-up change.
-
-## Create vs. update vs. replace vs. remove
-
-### Create a new changeset
-
-Use a new file when the outward change is genuinely new.
-
-```markdown
+```md
 ---
-monochange: minor
+"@acme/api":
+  bump: minor
+  type: feat
+  version: "2.5.0"
 ---
 
-#### add `mc diagnostics`
-
-Introduce a command for changeset provenance.
+# Stabilize webhook filter endpoints
 ```
 
-### Update an existing changeset
+## `caused_by`
 
-Update in place when the same feature grew before release.
+Use `caused_by` when a package is affected because another package changed.
 
-**Before:**
-
-```markdown
+```md
 ---
-monochange: minor
----
-
-#### add `mc diagnostics`
-
-Introduce a command for changeset provenance.
-```
-
-**After:**
-
-```markdown
----
-monochange: minor
+"@acme/ui":
+  bump: none
+  type: none
+  caused_by: ["@acme/api"]
 ---
 
-#### add `mc diagnostics` for provenance and review context
+# Rebuild UI package for API dependency metadata
 
-Introduce a command for changeset provenance, linked review requests, and related issues.
+No user-facing UI behavior changed.
 ```
 
-### Replace a changeset
+`caused_by` can reference package ids or group ids. In CLI form, pass repeated `--caused-by <id>` flags when the configured workflow exposes that input.
 
-Replace the file when the implementation changed so much that the old note is misleading.
+Use `caused_by` to explain propagation instead of pretending a dependent package has its own feature or fix. This keeps changelogs honest while still preserving enough metadata for release planning and policy checks.
 
-### Remove a changeset
+## Bump rules
 
-Delete the file when the feature was reverted before release.
+- `major` — breaking API, CLI, protocol, data, or user workflow changes.
+- `minor` — new user-facing functionality or behavior.
+- `patch` — fixes and compatible improvements.
+- `none` — documentation, tests, rebuilds, or dependency/context notes with no version impact.
 
-## Write user-facing summaries
+Breaking changes should have their own changeset with migration guidance.
 
-Changeset bodies should describe what users notice.
+When in doubt, choose the bump based on the user's or integrator's experience, not on implementation size. A one-line removal from a public API is usually `major`; a large internal refactor can be `none` if no published behavior changes.
 
-### Weak
+## Lifecycle rules
 
-```markdown
-#### refactor release logic
-```
+Before adding a new changeset:
 
-### Better
+1. Read existing `.changeset/*.md` files.
+2. Decide whether to create, update, merge, or delete.
+3. Target package ids unless a configured group is the real release owner.
+4. Keep unrelated changes in separate files.
+5. Combine packages only when the release note would be the same.
+6. Validate with `mc validate`, `mc diagnostics --format json`, or `mc step:diagnose-changesets --format json`.
 
-```markdown
-#### add `--diff` previews to dry-run release output
-
-`mc release --dry-run --diff` now shows unified file diffs for version and changelog updates without mutating the workspace.
-```
-
-## Artifact-specific framing
-
-Different package types need different release-note framing:
-
-- **Libraries** — public APIs, types, traits, exports, behavior
-- **Applications** — routes, screens, workflows, UX changes
-- **CLI tools** — commands, flags, output, exit codes, config shape
-- **LSP/MCP** — tool names, schemas, protocol methods, response shapes
-
-See [artifact-types.md](./artifact-types.md) for detailed templates.
-
-## Validation loop
-
-After writing or editing changesets:
-
-```bash
-mc validate
-mc diagnostics --format json
-mc release --dry-run --format json
-```
-
-Use `mc step:affected-packages --verify --changed-paths ...` in CI or review workflows when you need to prove all changed packages are covered without depending on a config-defined wrapper.
-
-## Changeset cleanup job
-
-Before release, audit all pending changesets and resolve duplicates, stale entries, and incomplete descriptions.
-
-### Step 1: Export diagnostics data
-
-```bash
-mc diagnostics --format json > /tmp/changesets.json
-```
-
-This produces a JSON document with `requestedChangesets` and `changesets` arrays containing paths, summaries, targets, and git context.
-
-### Step 2: Filter for common issues
-
-**Find short summaries (likely incomplete):**
-
-```bash
-cat /tmp/changesets.json | jq '.changesets[] | select((.summary | length) < 20)'
-```
-
-**Find changesets touching a specific package:**
-
-```bash
-cat /tmp/changesets.json | jq '.changesets[] | select(.targets[].id == "monochange_core")'
-```
-
-**Find changesets without git context:**
-
-```bash
-cat /tmp/changesets.json | jq '.changesets[] | select(.context.introduced == null)'
-```
-
-**Find changesets with duplicate summaries:**
-
-```bash
-cat /tmp/changesets.json | jq -r '.changesets[].summary' | sort | uniq -d
-```
-
-### Step 3: Decision matrix
-
-| Situation                                | Action                                 |
-| ---------------------------------------- | -------------------------------------- |
-| **Same feature in multiple changesets**  | Merge into one multi-package changeset |
-| **Feature reverted / PR closed**         | Remove the changeset file              |
-| **Description too vague**                | Update body with user-facing details   |
-| **Wrong target packages**                | Edit frontmatter to correct targets    |
-| **Same change, same PR, multiple files** | Consolidate into single changeset      |
-
-### Step 4: Merge duplicate changesets
-
-When two changesets describe the same feature:
-
-```bash
-# Read both source changesets
-cat .changeset/feature-cli.md
-cat .changeset/feature-core.md
-
-# Create merged version
-cat > .changeset/unified-feature.md << 'EOF'
----
-monochange_cli: minor
-monochange_core: minor
----
-
-#### add unified feature across CLI and core
-
-Description covering both packages.
-EOF
-
-# Remove obsolete changesets
-git rm .changeset/feature-cli.md .changeset/feature-core.md
-git add .changeset/unified-feature.md
-```
-
-### Step 5: Remove stale changesets
-
-```bash
-# Verify the changeset is truly stale
-mc diagnostics --changeset .changeset/stale-feature.md
-
-# Confirm the feature was reverted or abandoned
-git log --oneline -- .changeset/stale-feature.md
-
-# Remove
-git rm .changeset/stale-feature.md
-```
-
-### Step 6: Validation checklist
-
-Before finalizing cleanup:
-
-- [ ] `mc validate` passes
-- [ ] `mc diagnostics --format json` loads all remaining changesets without error
-- [ ] `mc step:affected-packages --verify --changed-paths <files>` confirms coverage for recent changes
-- [ ] No duplicate summaries across changesets
-- [ ] No changesets reference reverted features
-- [ ] All changesets have user-facing descriptions per [changeset-guide.md](./changeset-guide.md)
-
-## Keep these references nearby
-
-- [changeset-guide.md](./changeset-guide.md) — lifecycle details
-- [artifact-types.md](./artifact-types.md) — package-type-specific guidance
-- [reference.md](./reference.md) — longer examples and config cross-references
+Delete or rewrite stale changesets when the code they describe is reverted before release. Merge near-duplicate changesets when several packages changed for the same outward behavior, but keep unrelated features separate even if they touched the same package.
