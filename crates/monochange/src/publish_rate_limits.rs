@@ -60,10 +60,32 @@ pub(crate) fn plan_publish_rate_limits(
 	mode: PublishRateLimitMode,
 	dry_run: bool,
 ) -> MonochangeResult<PublishRateLimitReport> {
+	plan_publish_rate_limits_with_selection(
+		root,
+		configuration,
+		prepared_release,
+		selected_packages,
+		mode,
+		dry_run,
+		false,
+	)
+}
+
+pub(crate) fn plan_publish_rate_limits_with_selection(
+	root: &Path,
+	configuration: &WorkspaceConfiguration,
+	prepared_release: Option<&PreparedRelease>,
+	selected_packages: &BTreeSet<String>,
+	mode: PublishRateLimitMode,
+	dry_run: bool,
+	publish_all: bool,
+) -> MonochangeResult<PublishRateLimitReport> {
 	let discovery = discover_workspace(root)?;
 	let packages = &discovery.packages;
 	let requests = if mode == PublishRateLimitMode::Placeholder {
 		build_placeholder_plan_requests(root, configuration, packages, selected_packages)?
+	} else if publish_all {
+		build_configured_package_plan_requests(configuration, packages, selected_packages)?
 	} else {
 		build_release_plan_requests(
 			root,
@@ -91,6 +113,22 @@ fn build_placeholder_plan_requests(
 		root,
 		configuration,
 		packages,
+		selected_packages,
+	)?;
+	filter_pending_publish_requests(&requests)
+}
+
+fn build_configured_package_plan_requests(
+	configuration: &WorkspaceConfiguration,
+	packages: &[monochange_core::PackageRecord],
+	selected_packages: &BTreeSet<String>,
+) -> MonochangeResult<Vec<package_publish::PublishRequest>> {
+	let publications =
+		package_publish::configured_package_publication_targets(configuration, packages);
+	let requests = package_publish::build_release_requests(
+		configuration,
+		packages,
+		&publications,
 		selected_packages,
 	)?;
 	filter_pending_publish_requests(&requests)

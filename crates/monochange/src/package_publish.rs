@@ -13,6 +13,7 @@ use monochange_core::Ecosystem;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PackagePublicationTarget;
+use monochange_core::PackageRecord;
 #[cfg(test)]
 pub(crate) use monochange_core::PublishMode;
 use monochange_core::PublishRegistry;
@@ -141,8 +142,37 @@ pub(crate) fn run_publish_packages_with_resume(
 	dry_run: bool,
 	resume_path: Option<&Path>,
 ) -> MonochangeResult<PackagePublishReport> {
-	let publication_targets =
-		release_record_package_publications_from_prepared_or_head(root, prepared_release)?;
+	run_publish_packages_with_resume_and_selection(
+		root,
+		configuration,
+		prepared_release,
+		selected_packages,
+		selected_groups,
+		selected_ecosystems,
+		dry_run,
+		resume_path,
+		false,
+	)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn run_publish_packages_with_resume_and_selection(
+	root: &Path,
+	configuration: &WorkspaceConfiguration,
+	prepared_release: Option<&PreparedRelease>,
+	selected_packages: &BTreeSet<String>,
+	selected_groups: &BTreeSet<String>,
+	selected_ecosystems: &BTreeSet<Ecosystem>,
+	dry_run: bool,
+	resume_path: Option<&Path>,
+	publish_all: bool,
+) -> MonochangeResult<PackagePublishReport> {
+	let discovery = discover_workspace(root)?;
+	let publication_targets = if publish_all {
+		configured_package_publication_targets(configuration, &discovery.packages)
+	} else {
+		release_record_package_publications_from_prepared_or_head(root, prepared_release)?
+	};
 	let selected_targets = select_release_publication_targets(
 		&configuration.groups,
 		&publication_targets,
@@ -154,6 +184,7 @@ pub(crate) fn run_publish_packages_with_resume(
 	run_publish_packages_with_publications_and_resume(
 		root,
 		configuration,
+		&discovery.packages,
 		&selected_targets.publication_targets,
 		&selected_targets.selected_packages,
 		dry_run,
@@ -168,9 +199,11 @@ pub(crate) fn run_publish_packages_with_publications(
 	selected_packages: &BTreeSet<String>,
 	dry_run: bool,
 ) -> MonochangeResult<PackagePublishReport> {
+	let discovery = discover_workspace(root)?;
 	run_publish_packages_with_publications_and_resume(
 		root,
 		configuration,
+		&discovery.packages,
 		publication_targets,
 		selected_packages,
 		dry_run,
@@ -181,15 +214,15 @@ pub(crate) fn run_publish_packages_with_publications(
 fn run_publish_packages_with_publications_and_resume(
 	root: &Path,
 	configuration: &WorkspaceConfiguration,
+	packages: &[PackageRecord],
 	publication_targets: &[PackagePublicationTarget],
 	selected_packages: &BTreeSet<String>,
 	dry_run: bool,
 	resume_path: Option<&Path>,
 ) -> MonochangeResult<PackagePublishReport> {
-	let discovery = discover_workspace(root)?;
 	let requests = build_release_requests(
 		configuration,
-		&discovery.packages,
+		packages,
 		publication_targets,
 		selected_packages,
 	)?;
@@ -234,6 +267,31 @@ pub(crate) fn release_record_package_publications_from_prepared_or_head(
 	Ok(discover_release_record(root, "HEAD")?
 		.record
 		.package_publications)
+}
+
+pub(crate) fn configured_package_publication_targets(
+	configuration: &WorkspaceConfiguration,
+	packages: &[PackageRecord],
+) -> Vec<PackagePublicationTarget> {
+	configuration
+		.packages
+		.iter()
+		.filter_map(|package_definition| {
+			let package = packages.iter().find(|package| {
+				package.metadata.get("config_id") == Some(&package_definition.id)
+			})?;
+			let version = package.current_version.as_ref()?.to_string();
+			Some(PackagePublicationTarget {
+				package: package_definition.id.clone(),
+				ecosystem: package.ecosystem,
+				registry: package_definition.publish.registry.clone(),
+				version,
+				mode: package_definition.publish.mode,
+				trusted_publishing: package_definition.publish.trusted_publishing.clone(),
+				attestations: package_definition.publish.attestations.clone(),
+			})
+		})
+		.collect()
 }
 
 struct CliPublishTrustHandler;

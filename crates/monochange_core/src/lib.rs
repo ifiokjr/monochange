@@ -2326,6 +2326,7 @@ impl CliStepDefinition {
 					"group",
 					"ecosystem",
 					"resume",
+					"all",
 				])
 			}
 			Self::PlanPublishRateLimits { .. } => {
@@ -2453,6 +2454,7 @@ impl CliStepDefinition {
 					"format" => Some(CliInputKind::Choice),
 					"package" => Some(CliInputKind::StringList),
 					"output" | "resume" => Some(CliInputKind::Path),
+					"all" => Some(CliInputKind::Boolean),
 					_ => None,
 				}
 			}
