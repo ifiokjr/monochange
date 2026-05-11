@@ -100,6 +100,7 @@ jobs:
           alias npm="pnpm npm"
 
           "$RUNNER_TEMP/bin/mc" publish \
+            --log-level info \
             --output "$RUNNER_TEMP/publish-result.json" \
             --format json
         shell: devenv shell -- bash -e {0}

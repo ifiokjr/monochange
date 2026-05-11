@@ -25,6 +25,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 use tempfile::TempDir;
+use tracing::debug;
 use tracing::info;
 use urlencoding::encode;
 
@@ -476,6 +477,12 @@ pub fn execute_publish_requests_with_process(
 	readiness: &PublishReadinessRegistry,
 	trust_handler: &dyn PublishTrustHandler,
 ) -> MonochangeResult<PackagePublishReport> {
+	debug!(
+		request_count = requests.len(),
+		dry_run,
+		mode = ?mode,
+		"executing publish requests with process"
+	);
 	let env_map = current_env_map();
 	let endpoints = RegistryEndpoints::from_env();
 	let client = registry_client()?;
@@ -514,6 +521,13 @@ pub fn execute_publish_requests(
 	trust_handler: &dyn PublishTrustHandler,
 ) -> MonochangeResult<PackagePublishReport> {
 	let mut outcomes = Vec::new();
+
+	debug!(
+		request_count = requests.len(),
+		dry_run,
+		mode = ?mode,
+		"executing publish requests"
+	);
 
 	for request in requests {
 		if request.mode == PublishMode::External {
@@ -731,6 +745,10 @@ pub fn build_placeholder_requests(
 	packages: &[PackageRecord],
 	selected_packages: &BTreeSet<String>,
 ) -> MonochangeResult<Vec<PublishRequest>> {
+	debug!(
+		selected_package_count = selected_packages.len(),
+		"building placeholder publish requests"
+	);
 	let packages_by_config_id = packages_by_config_id(packages);
 	let mut requests = Vec::new();
 
@@ -790,6 +808,11 @@ pub fn build_release_requests(
 	publications: &[PackagePublicationTarget],
 	selected_packages: &BTreeSet<String>,
 ) -> MonochangeResult<Vec<PublishRequest>> {
+	debug!(
+		publication_count = publications.len(),
+		selected_package_count = selected_packages.len(),
+		"building release publish requests"
+	);
 	let packages_by_config_id = packages_by_config_id(packages);
 	let mut requests = Vec::new();
 
@@ -2245,6 +2268,12 @@ pub fn registry_version_exists(
 	endpoints: &RegistryEndpoints,
 	request: &PublishRequest,
 ) -> MonochangeResult<bool> {
+	debug!(
+		package_name = request.package_name,
+		version = %request.version,
+		registry = %request.registry,
+		"checking if version exists on registry"
+	);
 	if request.registry == RegistryKind::Npm {
 		let url = format!(
 			"{}/{}",
