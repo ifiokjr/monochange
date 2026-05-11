@@ -23,6 +23,7 @@ use monochange_core::HostedIssueRef;
 use monochange_core::HostedIssueRelationshipKind;
 use monochange_core::HostedReviewRequestKind;
 use monochange_core::HostedReviewRequestRef;
+use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
 use monochange_core::PackageDefinition;
 use monochange_core::PackageRecord;
@@ -37,6 +38,44 @@ use monochange_core::WorkspaceConfiguration;
 use monochange_core::WorkspaceDefaults;
 use semver::Version;
 use tempfile::tempdir;
+
+struct ResolvedSectionDefinition {
+	types: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum ResolvedReleaseSectionTarget {
+	Section(usize),
+	Uncategorized,
+}
+
+fn section_matches_resolved_type(section: &ResolvedSectionDefinition, change_type: &str) -> bool {
+	section
+		.types
+		.iter()
+		.any(|candidate| candidate.trim() == change_type)
+}
+
+fn classify_release_note_change(
+	change: &ReleaseNoteChange,
+	sections: &[ResolvedSectionDefinition],
+) -> ResolvedReleaseSectionTarget {
+	if let Some(change_type) = change.change_type.as_deref()
+		&& let Some(index) = sections
+			.iter()
+			.position(|section| section_matches_resolved_type(section, change_type))
+	{
+		return ResolvedReleaseSectionTarget::Section(index);
+	}
+	let bump_selector = change.bump.to_string();
+	if let Some(index) = sections
+		.iter()
+		.position(|section| section_matches_resolved_type(section, &bump_selector))
+	{
+		return ResolvedReleaseSectionTarget::Section(index);
+	}
+	ResolvedReleaseSectionTarget::Uncategorized
+}
 
 use super::*;
 

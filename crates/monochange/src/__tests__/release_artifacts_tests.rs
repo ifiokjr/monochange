@@ -1,5 +1,6 @@
 use std::fs;
 
+use monochange_core::ChangelogSettings;
 use monochange_core::GroupChangelogInclude;
 use monochange_core::PackageDefinition;
 use monochange_core::PackageType;
@@ -19,6 +20,7 @@ use monochange_core::ReleaseManifestPlan;
 use monochange_core::ReleaseManifestPlanDecision;
 use monochange_core::ReleaseManifestPlanGroup;
 use monochange_core::ReleaseManifestTarget;
+use monochange_core::ReleaseNotesSection;
 use monochange_core::SourceChangeRequest;
 use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;

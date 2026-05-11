@@ -156,6 +156,8 @@ fn setup_scenario_workspace(relative: &str) -> tempfile::TempDir {
 fn git(root: &Path, args: &[&str]) {
 	let output = Command::new("git")
 		.current_dir(root)
+		.arg("-c")
+		.arg("commit.gpgsign=false")
 		.args(args)
 		.output()
 		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
@@ -172,6 +174,7 @@ fn seed_release_pr_git_repository(root: &Path) {
 	git(root, &["init", "-b", "main"]);
 	git(root, &["config", "user.name", "monochange Bench"]);
 	git(root, &["config", "user.email", "monochange@example.com"]);
+	git(root, &["config", "commit.gpgsign", "false"]);
 	git(root, &["add", "."]);
 	git(root, &["commit", "-m", "initial"]);
 	git(root, &["init", "--bare", bare.to_string_lossy().as_ref()]);
@@ -368,6 +371,8 @@ fn generate_fixture_with_git_history(
 		let output = monochange_core::git::git_command(root)
 			.arg("-c")
 			.arg("gc.auto=0")
+			.arg("-c")
+			.arg("commit.gpgsign=false")
 			.args(args)
 			.env("GIT_AUTHOR_NAME", "bench")
 			.env("GIT_AUTHOR_EMAIL", "bench@test")

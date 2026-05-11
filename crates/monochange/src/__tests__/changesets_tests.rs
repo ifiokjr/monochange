@@ -1,3 +1,5 @@
+mod diagnostics_tests;
+
 use std::path::Path;
 use std::path::PathBuf;
 

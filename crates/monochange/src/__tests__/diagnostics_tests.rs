@@ -1,12 +1,15 @@
 use std::fs;
 
+use monochange_core::ChangesetTargetKind;
 use monochange_core::HostedCommitRef;
 use monochange_core::HostedIssueRef;
 use monochange_core::HostedIssueRelationshipKind;
 use monochange_core::HostedReviewRequestKind;
 use monochange_core::HostedReviewRequestRef;
 
-use super::*;
+use super::super::discover_changeset_paths;
+use super::super::resolve_changeset_path;
+use super::super::*;
 
 #[test]
 fn resolve_changeset_path_and_discovery_cover_missing_and_empty_directories() {

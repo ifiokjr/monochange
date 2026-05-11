@@ -634,11 +634,6 @@ fn join_existing_merge_request_lookup(
 	})?
 }
 
-#[cfg(test)]
-fn gitlab_client() -> MonochangeResult<Client> {
-	build_http_client("GitLab")
-}
-
 fn gitlab_token() -> MonochangeResult<String> {
 	env::var("GITLAB_TOKEN")
 		.or_else(|_| env::var("GL_TOKEN"))

@@ -17,8 +17,6 @@ use monochange_core::HostedActorRef;
 use monochange_core::HostedIssueRef;
 use monochange_core::HostedIssueRelationshipKind;
 use monochange_core::HostedReviewRequestRef;
-#[cfg(test)]
-use monochange_core::HostingCapabilities;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PackageRecord;
@@ -1347,48 +1345,6 @@ fn push_unique_release_note_entry(entries: &mut Vec<String>, entry: String) {
 	if !entries.iter().any(|existing| existing == &entry) {
 		entries.push(entry);
 	}
-}
-
-#[cfg(test)]
-struct ResolvedSectionDefinition {
-	types: Vec<String>,
-}
-
-#[cfg(test)]
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-enum ResolvedReleaseSectionTarget {
-	Section(usize),
-	Uncategorized,
-}
-
-#[cfg(test)]
-fn section_matches_resolved_type(section: &ResolvedSectionDefinition, change_type: &str) -> bool {
-	section
-		.types
-		.iter()
-		.any(|candidate| candidate.trim() == change_type)
-}
-
-#[cfg(test)]
-fn classify_release_note_change(
-	change: &ReleaseNoteChange,
-	sections: &[ResolvedSectionDefinition],
-) -> ResolvedReleaseSectionTarget {
-	if let Some(change_type) = change.change_type.as_deref()
-		&& let Some(index) = sections
-			.iter()
-			.position(|section| section_matches_resolved_type(section, change_type))
-	{
-		return ResolvedReleaseSectionTarget::Section(index);
-	}
-	let bump_selector = change.bump.to_string();
-	if let Some(index) = sections
-		.iter()
-		.position(|section| section_matches_resolved_type(section, &bump_selector))
-	{
-		return ResolvedReleaseSectionTarget::Section(index);
-	}
-	ResolvedReleaseSectionTarget::Uncategorized
 }
 
 #[cfg(test)]

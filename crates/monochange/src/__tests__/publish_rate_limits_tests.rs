@@ -1,3 +1,75 @@
+pub(crate) fn plan_unbatched_publish_order_for_dependency_ordered_requests(
+	requests: &[package_publish::PublishRequest],
+	packages: &[monochange_core::PackageRecord],
+	operation: RateLimitOperation,
+	dry_run: bool,
+) -> PublishRateLimitReport {
+	let mut requests = requests.to_vec();
+	sort_requests_by_dependencies(&mut requests, packages);
+	plan_unbatched_publish_order_for_requests(&requests, operation, dry_run)
+}
+
+fn plan_unbatched_publish_order_for_requests(
+	requests: &[package_publish::PublishRequest],
+	operation: RateLimitOperation,
+	dry_run: bool,
+) -> PublishRateLimitReport {
+	let policies = policies_for_operation(operation)
+		.into_iter()
+		.map(|policy| (policy.registry, policy))
+		.collect::<BTreeMap<_, _>>();
+	let mut requests_by_registry =
+		BTreeMap::<RegistryKind, Vec<&package_publish::PublishRequest>>::new();
+	for request in requests {
+		if request.mode == PublishMode::External {
+			continue;
+		}
+		requests_by_registry
+			.entry(request.registry)
+			.or_default()
+			.push(request);
+	}
+
+	let mut batches = Vec::new();
+	let mut windows = Vec::new();
+	for (registry, requests) in requests_by_registry {
+		let policy = policies
+			.get(&registry)
+			.unwrap_or_else(|| panic!("missing rate-limit policy for {registry}"));
+		let pending = requests.len();
+		windows.push(RegistryRateLimitWindowPlan {
+			registry,
+			operation,
+			limit: None,
+			window_seconds: None,
+			pending,
+			batches_required: 1,
+			fits_single_window: true,
+			confidence: policy.confidence,
+			notes: "rate-limit batching disabled for this publish order".to_string(),
+			evidence: policy.evidence.clone(),
+		});
+		batches.push(PublishRateLimitBatch {
+			registry,
+			operation,
+			batch_index: 1,
+			total_batches: 1,
+			packages: requests
+				.iter()
+				.map(|request| request.package_id.clone())
+				.collect(),
+			recommended_wait_seconds: None,
+		});
+	}
+
+	PublishRateLimitReport {
+		dry_run,
+		windows,
+		batches,
+		warnings: Vec::new(),
+	}
+}
+
 use monochange_publish::RegistryEndpoints;
 use monochange_publish::filter_pending_publish_requests_with_transport;
 

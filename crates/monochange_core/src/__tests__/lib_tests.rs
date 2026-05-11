@@ -1,3 +1,5 @@
+mod proptest_bump_severity_tests;
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;

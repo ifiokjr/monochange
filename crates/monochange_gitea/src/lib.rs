@@ -667,11 +667,6 @@ fn join_existing_pull_request_lookup(
 	})?
 }
 
-#[cfg(test)]
-fn gitea_client() -> MonochangeResult<Client> {
-	build_http_client("Gitea")
-}
-
 fn gitea_token() -> MonochangeResult<String> {
 	env::var("GITEA_TOKEN").map_err(|_| {
 		MonochangeError::Config("set `GITEA_TOKEN` before running Gitea automation".to_string())

@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use monochange_config::load_workspace_configuration;
 use monochange_core::BumpSeverity;
+use monochange_core::ChangelogSettings;
 use monochange_core::ChangesetPolicyEvaluation;
 use monochange_core::ChangesetPolicyStatus;
 use monochange_core::CliCommandDefinition;
@@ -22,7 +23,7 @@ use serde::Serialize;
 use tempfile::tempdir;
 
 use super::*;
-use crate::TEST_ENV_LOCK;
+use crate::tests::TEST_ENV_LOCK;
 
 fn cli_context() -> CliContext {
 	CliContext {
@@ -331,6 +332,7 @@ fn sample_rate_limit_report() -> monochange_core::PublishRateLimitReport {
 fn git_in_dir(root: &Path, args: &[&str]) {
 	let status = std::process::Command::new("git")
 		.current_dir(root)
+		.args(["-c", "commit.gpgsign=false"])
 		.args(args)
 		.status()
 		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));

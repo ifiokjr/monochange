@@ -1,6 +1,68 @@
+fn collect_workspace_file_updates(
+	root: &Path,
+	temp_root: &Path,
+	base_updates: &[FileUpdate],
+	lockfile_commands: &[LockfileCommandExecution],
+) -> MonochangeResult<Vec<FileUpdate>> {
+	let normalized_root = monochange_core::normalize_path(root);
+	let mut dirs_to_scan = BTreeSet::new();
+
+	for update in base_updates {
+		if let Some(parent) = update.path.parent() {
+			let normalized = monochange_core::normalize_path(parent);
+			if let Ok(relative) = normalized.strip_prefix(&normalized_root) {
+				dirs_to_scan.insert(relative.to_path_buf());
+			}
+		}
+	}
+
+	for command in lockfile_commands {
+		let normalized = monochange_core::normalize_path(&command.cwd);
+		if let Ok(relative) = normalized.strip_prefix(&normalized_root) {
+			dirs_to_scan.insert(relative.to_path_buf());
+		} else {
+			dirs_to_scan.insert(command.cwd.clone());
+		}
+	}
+
+	// Always scan the changeset directory (files are deleted during release).
+	dirs_to_scan.insert(PathBuf::from(".changeset"));
+
+	let mut relative_paths = BTreeSet::new();
+
+	for dir in &dirs_to_scan {
+		let original_dir = root.join(dir);
+		let temp_dir = temp_root.join(dir);
+		if original_dir.is_dir() {
+			collect_workspace_files(root, &original_dir, &mut relative_paths)?;
+		}
+		if temp_dir.is_dir() {
+			collect_workspace_files(temp_root, &temp_dir, &mut relative_paths)?;
+		}
+	}
+
+	let mut updates = Vec::new();
+
+	for relative in relative_paths {
+		let before = read_optional_file(&root.join(&relative))?;
+		let after = read_optional_file(&temp_root.join(&relative))?;
+		if let Some(content) = after.filter(|content| before.as_ref() != Some(content)) {
+			updates.push(FileUpdate {
+				path: root.join(relative),
+				content,
+			});
+		}
+	}
+
+	updates.sort_by(|left, right| left.path.cmp(&right.path));
+
+	Ok(updates)
+}
+
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
+use monochange_core::ChangelogSettings;
 use monochange_core::ChangesetContext;
 use monochange_core::ChangesetRevision;
 use monochange_core::HostedActorRef;
@@ -17,6 +79,14 @@ use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
 use monochange_core::VersionFormat;
 use monochange_core::WorkspaceConfiguration;
+use monochange_test_helpers::workspace_ops::collect_workspace_files;
+use monochange_test_helpers::workspace_ops::copy_workspace_file;
+use monochange_test_helpers::workspace_ops::copy_workspace_tree;
+use monochange_test_helpers::workspace_ops::ensure_parent_directory;
+use monochange_test_helpers::workspace_ops::read_optional_file;
+use monochange_test_helpers::workspace_ops::remap_workspace_path;
+use monochange_test_helpers::workspace_ops::run_lockfile_command;
+use monochange_test_helpers::workspace_ops::strip_workspace_prefix;
 
 use super::*;
 

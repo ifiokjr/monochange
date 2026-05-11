@@ -2126,49 +2126,6 @@ fn validate_configured_change_type_with_context(
 	)))
 }
 
-#[cfg(test)]
-fn infer_package_bump_from_explicit_version(
-	package_id: &str,
-	packages: &[PackageRecord],
-	explicit_version: Option<&Version>,
-) -> Option<BumpSeverity> {
-	let explicit_version = explicit_version?;
-	packages
-		.iter()
-		.find(|package| package.id == package_id)
-		.and_then(|package| package.current_version.as_ref())
-		.map(|current_version| infer_bump_from_versions(current_version, explicit_version))
-}
-
-#[cfg(test)]
-fn infer_group_bump_from_explicit_version(
-	group: &GroupDefinition,
-	workspace_root: &Path,
-	packages: &[PackageRecord],
-	explicit_version: Option<&Version>,
-) -> MonochangeResult<Option<BumpSeverity>> {
-	let Some(explicit_version) = explicit_version else {
-		return Ok(None);
-	};
-	let mut max_version: Option<&Version> = None;
-	for member_id in &group.packages {
-		let package_id = resolve_package_reference(member_id, workspace_root, packages)?;
-		if let Some(current_version) = packages
-			.iter()
-			.find(|package| package.id == package_id)
-			.and_then(|package| package.current_version.as_ref())
-		{
-			max_version = Some(match max_version {
-				Some(current_max) if current_version > current_max => current_version,
-				Some(current_max) => current_max,
-				None => current_version,
-			});
-		}
-	}
-	Ok(max_version
-		.map(|current_version| infer_bump_from_versions(current_version, explicit_version)))
-}
-
 fn infer_bump_from_versions(current_version: &Version, explicit_version: &Version) -> BumpSeverity {
 	if explicit_version.major > current_version.major {
 		BumpSeverity::Major
@@ -5288,11 +5245,6 @@ pub mod schema {
 		schemars::schema_for!(super::RawWorkspaceConfiguration)
 	}
 }
-
-#[cfg(test)]
-#[cfg(test)]
-#[path = "__tests__/mutant_killers_tests.rs"]
-mod mutant_killers;
 
 #[cfg(test)]
 #[path = "__tests__/lib_tests.rs"]

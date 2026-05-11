@@ -1,3 +1,8 @@
+use std::sync::LazyLock;
+use std::sync::Mutex;
+
+static TEST_ENV_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+
 use std::io;
 use std::path::Path;
 

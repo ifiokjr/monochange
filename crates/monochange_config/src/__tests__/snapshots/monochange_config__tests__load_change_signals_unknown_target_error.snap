@@ -1,5 +1,6 @@
 ---
 source: crates/monochange_config/src/__tests__/lib_tests.rs
+assertion_line: 5747
 expression: unknown_target_error.to_string()
 ---
 error: changeset `[ROOT]/unknown-target.md` references unknown package or group `unknown`

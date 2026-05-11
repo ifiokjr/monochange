@@ -47,6 +47,7 @@ fn git(root: &Path, args: &[&str]) {
 		command.env_remove(variable);
 	}
 	let output = command
+		.args(["-c", "commit.gpgsign=false"])
 		.args(args)
 		.output()
 		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
