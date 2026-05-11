@@ -76,15 +76,15 @@ fn publish_plan_integration_preserves_dependency_order_across_grouped_batches() 
 		.unwrap_or_else(|error| panic!("parse publish plan json: {error}"));
 	let publish_rate_limits = &value["publishRateLimits"];
 	let expected = [
-		"ledger_types",
-		"yaml_config",
 		"zeta_transport",
+		"yaml_config",
+		"ledger_types",
 		"catalog_index",
 		"auth_policy",
 		"telemetry_core",
 		"billing_engine",
-		"notification_worker",
 		"checkout_api",
+		"notification_worker",
 		"fulfillment_service",
 		"public_gateway",
 		"storefront_app",
@@ -132,15 +132,15 @@ fn publish_plan_all_integration_includes_every_configured_package() {
 		})
 		.collect::<Vec<_>>();
 	let mut expected = [
-		"ledger_types",
-		"yaml_config",
 		"zeta_transport",
+		"yaml_config",
+		"ledger_types",
 		"catalog_index",
 		"auth_policy",
 		"telemetry_core",
 		"billing_engine",
-		"notification_worker",
 		"checkout_api",
+		"notification_worker",
 		"fulfillment_service",
 		"public_gateway",
 		"storefront_app",
@@ -184,15 +184,15 @@ fn publish_all_integration_plans_every_configured_package() {
 		})
 		.collect::<Vec<_>>();
 	let mut expected = [
-		"ledger_types",
-		"yaml_config",
 		"zeta_transport",
+		"yaml_config",
+		"ledger_types",
 		"catalog_index",
 		"auth_policy",
 		"telemetry_core",
 		"billing_engine",
-		"notification_worker",
 		"checkout_api",
+		"notification_worker",
 		"fulfillment_service",
 		"public_gateway",
 		"storefront_app",

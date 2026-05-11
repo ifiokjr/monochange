@@ -2,3 +2,6 @@
 name = "yaml_config"
 version = "0.1.0"
 edition = "2021"
+
+[build-dependencies]
+zeta_transport = { path = "../zeta_transport", version = "0.1.0" }

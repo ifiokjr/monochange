@@ -1896,7 +1896,6 @@ fn circle_project_slug(env_map: &BTreeMap<String, String>) -> Option<String> {
 		.or_else(|| env_map.get("CIRCLE_PROJECT_REPONAME").cloned())
 }
 
-use monochange_core::DependencyKind;
 use monochange_core::materialize_dependency_edges;
 
 pub fn read_publish_report_artifact(path: &Path) -> MonochangeResult<PackagePublishReport> {
@@ -2085,9 +2084,6 @@ pub fn order_release_requests_by_publish_dependencies(
 	let mut dependents_by_package = BTreeMap::<String, BTreeSet<String>>::new();
 
 	for edge in materialize_dependency_edges(packages) {
-		if !publish_dependency_kind_is_ordering_relevant(edge.dependency_kind) {
-			continue;
-		}
 		let Some(from_package_id) = config_ids_by_record_id.get(&edge.from_package_id) else {
 			continue;
 		};
@@ -2152,10 +2148,6 @@ pub fn order_release_requests_by_publish_dependencies(
 	}
 
 	Ok(ordered_requests)
-}
-
-pub fn publish_dependency_kind_is_ordering_relevant(kind: DependencyKind) -> bool {
-	!matches!(kind, DependencyKind::Development)
 }
 
 pub fn config_ids_by_package_record_id(packages: &[PackageRecord]) -> BTreeMap<String, String> {

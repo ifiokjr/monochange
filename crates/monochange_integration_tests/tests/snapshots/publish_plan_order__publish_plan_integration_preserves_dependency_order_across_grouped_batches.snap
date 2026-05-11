@@ -8,15 +8,15 @@ expression: publish_rate_limits
       "batchIndex": 1,
       "operation": "publish",
       "packages": [
-        "ledger_types",
-        "yaml_config",
         "zeta_transport",
+        "yaml_config",
+        "ledger_types",
         "catalog_index",
         "auth_policy",
         "telemetry_core",
         "billing_engine",
-        "notification_worker",
         "checkout_api",
+        "notification_worker",
         "fulfillment_service"
       ],
       "recommendedWaitSeconds": null,

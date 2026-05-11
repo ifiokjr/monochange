@@ -1,4 +1,6 @@
+use monochange_core::DependencyKind;
 use monochange_core::GroupChangelogInclude;
+use monochange_core::PackageDependency;
 use monochange_core::VersionFormat;
 
 use super::*;
@@ -442,4 +444,130 @@ fn placeholder_tempdir_error_includes_io_error() {
 			.to_string()
 			.contains("failed to create placeholder tempdir: no tempdir")
 	);
+}
+
+#[test]
+fn publish_dependency_order_handles_realistic_cargo_dependency_graph() {
+	let schema = publish_order_package("schema");
+
+	let mut codegen = publish_order_package("codegen");
+	codegen
+		.declared_dependencies
+		.push(publish_order_dependency("schema", DependencyKind::Runtime));
+
+	let mut test_helpers = publish_order_package("test_helpers");
+	test_helpers
+		.declared_dependencies
+		.push(publish_order_dependency("schema", DependencyKind::Runtime));
+
+	let mut core = publish_order_package("core");
+	core.declared_dependencies
+		.push(publish_order_dependency("schema", DependencyKind::Build));
+	core.declared_dependencies.push(publish_order_dependency(
+		"test_helpers",
+		DependencyKind::Development,
+	));
+
+	let mut cli = publish_order_package("cli");
+	cli.declared_dependencies
+		.push(publish_order_dependency("core", DependencyKind::Runtime));
+	cli.declared_dependencies
+		.push(publish_order_dependency("codegen", DependencyKind::Build));
+	cli.declared_dependencies.push(publish_order_dependency(
+		"test_helpers",
+		DependencyKind::Development,
+	));
+
+	let ordered = order_release_requests_by_publish_dependencies(
+		&[cli, core, test_helpers, codegen, schema],
+		vec![
+			publish_order_request("cli"),
+			publish_order_request("core"),
+			publish_order_request("test_helpers"),
+			publish_order_request("codegen"),
+			publish_order_request("schema"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("publish requests should be ordered: {error}"));
+	let ordered_package_ids = ordered
+		.iter()
+		.map(|request| request.package_id.as_str())
+		.collect::<Vec<_>>();
+
+	assert_eq!(
+		ordered_package_ids,
+		vec!["schema", "codegen", "test_helpers", "core", "cli"]
+	);
+}
+
+#[test]
+fn publish_dependency_order_reports_development_dependency_cycles() {
+	let mut app = publish_order_package("app");
+	app.declared_dependencies.push(publish_order_dependency(
+		"helper",
+		DependencyKind::Development,
+	));
+	let mut helper = publish_order_package("helper");
+	helper
+		.declared_dependencies
+		.push(publish_order_dependency("app", DependencyKind::Development));
+
+	let error = order_release_requests_by_publish_dependencies(
+		&[app, helper],
+		vec![
+			publish_order_request("app"),
+			publish_order_request("helper"),
+		],
+	)
+	.expect_err("development dependency cycle should be rejected");
+
+	assert!(
+		error
+			.to_string()
+			.contains("cyclic publish dependencies detected")
+	);
+}
+
+fn publish_order_package(name: &str) -> PackageRecord {
+	let root = PathBuf::from("/workspace");
+	let mut package = PackageRecord::new(
+		Ecosystem::Cargo,
+		name,
+		root.join(name).join("Cargo.toml"),
+		root,
+		None,
+		PublishState::Public,
+	);
+	package
+		.metadata
+		.insert("config_id".to_string(), name.to_string());
+	package
+}
+
+fn publish_order_dependency(name: &str, kind: DependencyKind) -> PackageDependency {
+	PackageDependency {
+		name: name.to_string(),
+		kind,
+		version_constraint: Some("1.0.0".to_string()),
+		optional: false,
+	}
+}
+
+fn publish_order_request(package: &str) -> PublishRequest {
+	PublishRequest {
+		package_id: package.to_string(),
+		package_name: package.to_string(),
+		ecosystem: Ecosystem::Cargo,
+		manifest_path: PathBuf::from(format!("/workspace/{package}/Cargo.toml")),
+		package_root: PathBuf::from(format!("/workspace/{package}")),
+		registry: RegistryKind::CratesIo,
+		package_manager: None,
+		package_metadata: BTreeMap::new(),
+		mode: PublishMode::Builtin,
+		version: "1.0.0".to_string(),
+		placeholder: false,
+		trusted_publishing: TrustedPublishingSettings::default(),
+		attestations: PublishAttestationSettings::default(),
+		placeholder_readme: String::new(),
+	}
 }

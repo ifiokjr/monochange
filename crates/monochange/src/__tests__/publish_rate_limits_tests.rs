@@ -1534,14 +1534,14 @@ fn test_sort_requests_by_dependencies_keeps_original_order_on_cycle() {
 	a.declared_dependencies
 		.push(monochange_core::PackageDependency {
 			name: "crate-b".into(),
-			kind: monochange_core::DependencyKind::Development,
+			kind: DependencyKind::Development,
 			version_constraint: None,
 			optional: false,
 		});
 	b.declared_dependencies
 		.push(monochange_core::PackageDependency {
 			name: "crate-a".into(),
-			kind: monochange_core::DependencyKind::Development,
+			kind: DependencyKind::Development,
 			version_constraint: None,
 			optional: false,
 		});

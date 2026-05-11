@@ -2124,7 +2124,7 @@ fn build_release_requests_detects_publish_relevant_dependency_cycles() {
 }
 
 #[test]
-fn build_release_requests_ignores_development_dependency_cycles() {
+fn build_release_requests_reports_development_dependency_cycles() {
 	let configuration = sample_configuration(&[
 		("core", monochange_core::PackageType::Npm, true),
 		("utils", monochange_core::PackageType::Npm, true),
@@ -2146,15 +2146,13 @@ fn build_release_requests_ignores_development_dependency_cycles() {
 		sample_npm_publication("core"),
 	];
 
-	let requests =
-		build_release_requests(&configuration, &packages, &publications, &BTreeSet::new())
-			.expect("development-only dependency cycles should not fail");
-	let ordered_package_ids = requests
-		.iter()
-		.map(|request| request.package_id.as_str())
-		.collect::<Vec<_>>();
+	let error = build_release_requests(&configuration, &packages, &publications, &BTreeSet::new())
+		.expect_err("development dependency cycles should fail");
+	let message = error.to_string();
 
-	assert_eq!(ordered_package_ids, vec!["core", "utils"]);
+	assert!(message.contains("cyclic publish dependencies detected"));
+	assert!(message.contains("core -> utils"));
+	assert!(message.contains("utils -> core"));
 }
 
 #[test]
@@ -3815,6 +3813,135 @@ fn execute_publish_requests_publishes_release_with_trust_outcome() {
 	);
 	// No trust commands are executed — trust configuration is manual
 	assert_eq!(executor.commands.len(), 1);
+}
+
+#[test]
+fn release_dry_run_orders_cargo_dev_and_build_dependencies_before_dependents() {
+	let expected_order = vec![
+		"zephyr-build",
+		"lima-dev",
+		"quartz-build",
+		"ember-dev",
+		"nyx-build",
+		"cedar-dev",
+		"violet-build",
+		"osprey-build",
+		"delta-dev",
+		"amber-dev",
+		"mango-build",
+		"sable-dev",
+		"orbit-build",
+		"binary-build",
+		"atlas-dev",
+		"config",
+	];
+	let packages = [
+		("config", Some(("build-dependencies", "atlas-dev"))),
+		("atlas-dev", Some(("build-dependencies", "binary-build"))),
+		("binary-build", Some(("dev-dependencies", "orbit-build"))),
+		("orbit-build", Some(("build-dependencies", "sable-dev"))),
+		("sable-dev", Some(("dev-dependencies", "mango-build"))),
+		("mango-build", Some(("build-dependencies", "amber-dev"))),
+		("amber-dev", Some(("dev-dependencies", "delta-dev"))),
+		("delta-dev", Some(("build-dependencies", "osprey-build"))),
+		("osprey-build", Some(("dev-dependencies", "violet-build"))),
+		("violet-build", Some(("build-dependencies", "cedar-dev"))),
+		("cedar-dev", Some(("dev-dependencies", "nyx-build"))),
+		("nyx-build", Some(("build-dependencies", "ember-dev"))),
+		("ember-dev", Some(("dev-dependencies", "quartz-build"))),
+		("quartz-build", Some(("build-dependencies", "lima-dev"))),
+		("lima-dev", Some(("dev-dependencies", "zephyr-build"))),
+		("zephyr-build", None),
+	];
+	let server = MockServer::start();
+	for (package, _) in packages {
+		server.mock(|when, then| {
+			when.method(GET).path(format!("/crates/{package}"));
+			then.status(404);
+		});
+	}
+
+	let root = tempfile::tempdir().expect("tempdir:");
+	let members = packages
+		.iter()
+		.map(|(package, _)| format!("\"{package}\""))
+		.collect::<Vec<_>>()
+		.join(", ");
+	fs::write(
+		root.path().join("Cargo.toml"),
+		format!("[workspace]\nmembers = [{members}]\nresolver = \"2\"\n"),
+	)
+	.expect("write workspace manifest:");
+
+	for (package, dependency) in packages {
+		let package_dir = root.path().join(package);
+		fs::create_dir_all(package_dir.join("src")).expect("mkdir package:");
+		fs::write(package_dir.join("src/lib.rs"), "").expect("write package lib:");
+
+		let dependency_section = dependency.map_or_else(String::new, |(kind, dependency)| {
+			format!(
+				"\n[{kind}]\n{dependency} = {{ path = \"../{dependency}\", version = \"1.0.0\" }}\n"
+			)
+		});
+		fs::write(
+			package_dir.join("Cargo.toml"),
+			format!(
+				concat!(
+					"[package]\n",
+					"name = \"{package}\"\n",
+					"version = \"1.0.0\"\n",
+					"edition = \"2021\"\n",
+					"license = \"MIT\"\n",
+					"description = \"test package\"\n",
+					"{dependency_section}"
+				),
+				package = package,
+				dependency_section = dependency_section,
+			),
+		)
+		.expect("write package manifest:");
+	}
+
+	let configuration_packages = packages
+		.iter()
+		.map(|(package, _)| (*package, monochange_core::PackageType::Cargo, true))
+		.collect::<Vec<_>>();
+	let configuration = sample_configuration(&configuration_packages);
+	let publications = packages
+		.into_iter()
+		.map(|(package, _)| {
+			PackagePublicationTarget {
+				package: package.to_string(),
+				ecosystem: Ecosystem::Cargo,
+				registry: Some(PublishRegistry::Builtin(RegistryKind::CratesIo)),
+				version: "1.0.0".to_string(),
+				mode: PublishMode::Builtin,
+				trusted_publishing: TrustedPublishingSettings::default(),
+				attestations: PublishAttestationSettings::default(),
+			}
+		})
+		.collect::<Vec<_>>();
+
+	with_vars(
+		[("MONOCHANGE_CRATES_IO_API_URL", Some(server.base_url()))],
+		|| {
+			let report = run_publish_packages_with_publications(
+				root.path(),
+				&configuration,
+				&publications,
+				&BTreeSet::new(),
+				true,
+			)
+			.expect("publish report:");
+			let order = report
+				.packages
+				.iter()
+				.map(|package| package.package.as_str())
+				.collect::<Vec<_>>();
+
+			assert_eq!(order, expected_order);
+		},
+	);
 }
 
 #[test]

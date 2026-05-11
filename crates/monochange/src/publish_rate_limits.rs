@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use monochange_core::DependencyKind;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PublishRateLimitBatch;
@@ -182,10 +181,7 @@ pub(super) fn sort_requests_by_dependencies(
 	// Build dependents for all edges where the target is in the request list,
 	// so we can discover unselected dependents later.
 	for edge in &edges {
-		if (edge.dependency_kind == DependencyKind::Runtime
-			|| edge.dependency_kind == DependencyKind::Development)
-			&& request_ids.contains(&edge.to_package_id)
-		{
+		if request_ids.contains(&edge.to_package_id) {
 			dependents
 				.entry(edge.to_package_id.clone())
 				.or_default()
@@ -195,10 +191,7 @@ pub(super) fn sort_requests_by_dependencies(
 
 	// Build in-degree only for edges between selected packages.
 	for edge in &edges {
-		if (edge.dependency_kind == DependencyKind::Runtime
-			|| edge.dependency_kind == DependencyKind::Development)
-			&& request_ids.contains(&edge.from_package_id)
-			&& request_ids.contains(&edge.to_package_id)
+		if request_ids.contains(&edge.from_package_id) && request_ids.contains(&edge.to_package_id)
 		{
 			*in_degree.get_mut(&edge.from_package_id).unwrap() += 1;
 		}

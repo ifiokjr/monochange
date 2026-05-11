@@ -6,3 +6,6 @@ edition = "2021"
 [dependencies]
 telemetry_core = { path = "../telemetry_core", version = "0.1.0" }
 yaml_config = { path = "../yaml_config", version = "0.1.0" }
+
+[dev-dependencies]
+billing_engine = { path = "../billing_engine", version = "0.1.0" }

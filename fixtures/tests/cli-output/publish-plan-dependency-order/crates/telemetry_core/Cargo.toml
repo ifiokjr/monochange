@@ -5,3 +5,6 @@ edition = "2021"
 
 [dependencies]
 yaml_config = { path = "../yaml_config", version = "0.1.0" }
+
+[dev-dependencies]
+auth_policy = { path = "../auth_policy", version = "0.1.0" }
