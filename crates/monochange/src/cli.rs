@@ -821,9 +821,11 @@ pub(crate) fn build_cli_command_subcommand(cli_command: &CliCommandDefinition) -
 		.help_text
 		.clone()
 		.unwrap_or_else(|| format!("Run the `{}` command", cli_command.name));
+	let usage = cli_command_usage(cli_command);
 
 	let mut command = Command::new(leak_string(cli_command.name.clone()))
 		.about(help_text)
+		.override_usage(usage)
 		.arg(
 			Arg::new("dry-run")
 				.long("dry-run")
@@ -1019,6 +1021,42 @@ Tagging notes:
 			)
 		}
 		_ => None,
+	}
+}
+
+pub(crate) fn cli_command_usage(cli_command: &CliCommandDefinition) -> String {
+	let mut parts = vec![
+		"mc".to_string(),
+		cli_command.name.clone(),
+		"[--dry-run]".to_string(),
+	];
+
+	if command_supports_release_diff_preview(cli_command) {
+		parts.push("[--diff]".to_string());
+		parts.push("[--prepared-release <PATH>]".to_string());
+	}
+
+	parts.extend(cli_command.inputs.iter().map(cli_input_usage));
+	parts.join(" ")
+}
+
+pub(crate) fn cli_input_usage(input: &CliInputDefinition) -> String {
+	let long_name = input.name.replace('_', "-");
+	let value_name = match input.kind {
+		CliInputKind::Boolean => None,
+		CliInputKind::Path => Some("PATH".to_string()),
+		CliInputKind::String | CliInputKind::StringList | CliInputKind::Choice => {
+			Some(input.name.to_uppercase())
+		}
+	};
+	let option = value_name.map_or_else(
+		|| format!("--{long_name}"),
+		|name| format!("--{long_name} <{name}>"),
+	);
+	if input.required {
+		option
+	} else {
+		format!("[{option}]")
 	}
 }
 
