@@ -429,6 +429,7 @@ packages = [
 	"monochange_npm",
 	"monochange_publish",
 	"monochange_python",
+	"monochange_schema",
 	"monochange_semver",
 	"monochange_telemetry",
 	"monochange_test_helpers",
