@@ -104,6 +104,11 @@ jobs:
         with:
           node-version: 24
 
+      - name: install pnpm for publish
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
       - name: publish packages
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
