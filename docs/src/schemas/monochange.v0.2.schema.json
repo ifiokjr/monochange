@@ -1139,6 +1139,22 @@
 			],
 			"type": "string"
 		},
+		"PublishOrderSettings": {
+			"additionalProperties": false,
+			"properties": {
+				"dependency_fields": {
+					"default": null,
+					"items": {
+						"type": "string"
+					},
+					"type": [
+						"array",
+						"null"
+					]
+				}
+			},
+			"type": "object"
+		},
 		"PublishRegistry": {
 			"anyOf": [
 				{
@@ -1494,6 +1510,12 @@
 				},
 				"publish": {
 					"$ref": "#/$defs/publishSettings"
+				},
+				"publish_order": {
+					"$ref": "#/$defs/PublishOrderSettings",
+					"default": {
+						"dependency_fields": null
+					}
 				},
 				"roots": {
 					"default": [],
