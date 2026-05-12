@@ -2337,13 +2337,14 @@ fn parse_release_record_block_rejects_unsupported_schema_version() {
 	let start = RELEASE_RECORD_START_MARKER;
 	let end = RELEASE_RECORD_END_MARKER;
 	let kind = RELEASE_RECORD_KIND;
+	let schema_version = unsupported_release_record_schema_version();
 	let unsupported_schema = format!(
 		r#"{heading}
 
 {start}
 ```json
 {{
-  "schemaVersion": "0.2",
+  "schemaVersion": "{schema_version}",
   "kind": "{kind}",
   "createdAt": "2026-04-06T12:00:00Z",
   "command": "release-pr",
@@ -2359,7 +2360,7 @@ fn parse_release_record_block_rejects_unsupported_schema_version() {
 		.unwrap_or_else(|| panic!("expected unsupported schema error"));
 	assert!(matches!(
 		error,
-		ReleaseRecordError::UnsupportedSchemaVersionValue(version) if version == "0.2"
+		ReleaseRecordError::UnsupportedSchemaVersionValue(version) if version == schema_version
 	));
 }
 
@@ -2440,6 +2441,15 @@ fn parse_release_record_json_normalizes_legacy_v_field() {
 	assert_eq!(parsed.schema_version, RELEASE_RECORD_SCHEMA_VERSION);
 }
 
+// Keep unsupported-schema tests ahead of the current durable version. Hard-coded
+// schema versions become valid during release bumps, which can mask compatibility
+// regressions and break release-PR CI when `monochange_schema` advances.
+fn unsupported_release_record_schema_version() -> String {
+	let current = monochange_schema::current_schema_version()
+		.unwrap_or_else(|error| panic!("parse current schema version: {error}"));
+	monochange_schema::SchemaVersion::new(current.major(), current.minor() + 1).to_string()
+}
+
 fn sample_release_record() -> ReleaseRecord {
 	ReleaseRecord {
 		schema_version: RELEASE_RECORD_SCHEMA_VERSION.to_string(),
@@ -2502,14 +2512,15 @@ fn render_release_record_block_rejects_unsupported_kind() {
 #[test]
 fn render_release_record_block_rejects_unsupported_schema_version() {
 	let mut record = sample_release_record();
-	record.schema_version = "0.2".to_string();
+	let schema_version = unsupported_release_record_schema_version();
+	record.schema_version.clone_from(&schema_version);
 
 	let error = crate::render_release_record_block(&record)
 		.err()
 		.unwrap_or_else(|| panic!("expected unsupported schema render error"));
 	assert!(matches!(
 		error,
-		ReleaseRecordError::UnsupportedSchemaVersionValue(version) if version == "0.2"
+		ReleaseRecordError::UnsupportedSchemaVersionValue(version) if version == schema_version
 	));
 }
 
@@ -2596,15 +2607,17 @@ fn release_record_schema_errors_map_to_core_errors() {
 		ReleaseRecordError::MissingSchemaVersion
 	));
 
+	let schema_version = unsupported_release_record_schema_version();
 	let unsupported_version = crate::release_record_schema_error_to_error(
 		monochange_schema::SchemaError::UnsupportedVersion {
-			actual: "0.2".to_string(),
-			current: monochange_schema::SchemaVersion::new(0, 1),
+			actual: schema_version.clone(),
+			current: monochange_schema::current_schema_version()
+				.unwrap_or_else(|error| panic!("parse current schema version: {error}")),
 		},
 	);
 	assert!(matches!(
 		unsupported_version,
-		ReleaseRecordError::UnsupportedSchemaVersionValue(version) if version == "0.2"
+		ReleaseRecordError::UnsupportedSchemaVersionValue(version) if version == schema_version
 	));
 
 	let invalid_version = crate::release_record_schema_error_to_error(

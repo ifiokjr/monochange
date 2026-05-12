@@ -49,7 +49,7 @@ expression: redacted_outcomes
     "status": "ok"
   },
   {
-    "error": "artifact uses unsupported schema version `0.2`; current supported version is `[schema version]`",
+    "error": "artifact uses unsupported schema version `[schema version]`; current supported version is `[schema version]`",
     "scenario": "future_version",
     "status": "error"
   }

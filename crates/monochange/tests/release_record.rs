@@ -188,22 +188,41 @@ fn release_record_command_reports_unsupported_schema_version() {
 
 	let tempdir = setup_release_repo();
 	let repo = tempdir.path();
-	let json_text = r#"{
-  "v": "0.2",
+	let schema_version = unsupported_release_record_schema_version();
+	let json_text = format!(
+		r#"{{
+  "v": "{schema_version}",
   "kind": "monochange.releaseRecord",
   "createdAt": "2026-04-07T08:00:00Z",
   "command": "release-pr",
   "releaseTargets": [],
   "releasedPackages": [],
   "changedFiles": []
-}"#;
-	commit_file_based_record_raw(repo, json_text, "release-record/commit-body");
+}}"#
+	);
+	commit_file_based_record_raw(repo, &json_text, "release-record/commit-body");
 
 	let output = release_record_output(repo, &["--from", "HEAD"]);
 	assert!(!output.status.success());
 	assert_snapshot!(
 		String::from_utf8(output.stderr).unwrap_or_else(|error| panic!("stderr utf8: {error}"))
 	);
+}
+
+// Keep this test ahead of the current durable schema version. Release PRs bump
+// `monochange_schema`, so a hard-coded "future" version eventually becomes
+// current and turns this error-path test into a release-CI failure.
+fn unsupported_release_record_schema_version() -> String {
+	let (major, minor) = monochange_core::RELEASE_RECORD_SCHEMA_VERSION
+		.split_once('.')
+		.unwrap_or_else(|| panic!("schema version should be major.minor"));
+	let major = major
+		.parse::<u64>()
+		.unwrap_or_else(|error| panic!("parse schema major: {error}"));
+	let minor = minor
+		.parse::<u64>()
+		.unwrap_or_else(|error| panic!("parse schema minor: {error}"));
+	format!("{major}.{}", minor + 1)
 }
 
 #[etest::etest]

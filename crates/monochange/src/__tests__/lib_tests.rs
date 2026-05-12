@@ -14087,6 +14087,10 @@ fn write_release_record_file_snapshot_matches_expected_content() {
 		serde_json::from_str(&content).unwrap_or_else(|error| panic!("parse record: {error}"));
 	let mut value = value;
 	value["createdAt"] = serde_json::Value::String("[timestamp]".to_string());
+	// The on-disk schemaVersion follows the release package version. Redacting it
+	// keeps this snapshot focused on record shape instead of failing every schema
+	// crate bump in release PRs.
+	value["schemaVersion"] = serde_json::Value::String("[schema version]".to_string());
 	insta::assert_json_snapshot!("release_record_file_snapshot", value);
 }
 
