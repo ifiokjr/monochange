@@ -843,7 +843,7 @@
 			"type": "array"
 		},
 		"schemaVersion": {
-			"default": "0.2",
+			"default": "0.1",
 			"type": "string"
 		},
 		"updatedChangelogs": {
