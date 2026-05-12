@@ -300,6 +300,29 @@ steps = [{ type = "Command", name = "install", command = "pnpm install --lockfil
 }
 
 #[test]
+fn read_cli_command_accepts_typed_input_defaults() {
+	let config = r#"
+[cli.release]
+inputs = [
+	{ name = "channel", type = "string", default = "stable" },
+	{ name = "interactive", type = "boolean", default = false },
+	{ name = "attempts", type = "string", default = 3 },
+	{ name = "threshold", type = "string", default = 2.5 },
+]
+steps = [{ type = "Command", command = "mc version" }]
+"#;
+
+	let command = read_cli_command(config, "release")
+		.unwrap_or_else(|error| panic!("command should parse typed defaults: {error}"))
+		.unwrap_or_else(|| panic!("command should exist"));
+
+	assert_eq!(command.inputs[0].default.as_deref(), Some("stable"));
+	assert_eq!(command.inputs[1].default.as_deref(), Some("false"));
+	assert_eq!(command.inputs[2].default.as_deref(), Some("3"));
+	assert_eq!(command.inputs[3].default.as_deref(), Some("2.5"));
+}
+
+#[test]
 fn step_choices_and_labels_include_described_ranked_shell_command_and_save_action() {
 	let choices = step_choices();
 	let labels = choices

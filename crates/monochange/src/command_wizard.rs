@@ -59,12 +59,36 @@ pub(crate) struct CommandInputDraft {
 	pub(crate) help_text: Option<String>,
 	#[serde(default)]
 	pub(crate) required: bool,
-	#[serde(default)]
+	#[serde(default, deserialize_with = "deserialize_command_input_default")]
 	pub(crate) default: Option<String>,
 	#[serde(default)]
 	pub(crate) choices: Vec<String>,
 	#[serde(default)]
 	pub(crate) short: Option<char>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum CommandInputDefault {
+	String(String),
+	Boolean(bool),
+	Integer(i64),
+	Number(f64),
+}
+
+fn deserialize_command_input_default<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+	D: serde::Deserializer<'de>,
+{
+	let value = Option::<CommandInputDefault>::deserialize(deserializer)?;
+	Ok(value.map(|value| {
+		match value {
+			CommandInputDefault::String(value) => value,
+			CommandInputDefault::Boolean(value) => value.to_string(),
+			CommandInputDefault::Integer(value) => value.to_string(),
+			CommandInputDefault::Number(value) => value.to_string(),
+		}
+	}))
 }
 
 impl CommandStepDraft {
