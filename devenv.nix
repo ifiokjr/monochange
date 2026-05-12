@@ -241,6 +241,7 @@ in
         fix:monochange
         fix:format
         fix:js
+        fix:workflows
       '';
       description = "Fix all autofixable problems, including shared-doc synchronization via `mdt update`.";
       binary = "bash";
@@ -287,6 +288,18 @@ in
       description = "Fix clippy lints for rust.";
       binary = "bash";
     };
+    "lint:workflows" = {
+      exec = ''
+        set -euo pipefail
+        if ! command -v zizmor >/dev/null 2>&1; then
+          echo "Installing zizmor via cargo-binstall..."
+          cargo binstall zizmor --no-confirm
+        fi
+        zizmor .github/workflows/ .github/actions/
+      '';
+      description = "Scan GitHub Actions workflows for security vulnerabilities with zizmor.";
+      binary = "bash";
+    };
     "deny:check" = {
       exec = ''
         set -euo pipefail
@@ -315,6 +328,7 @@ in
         lint:architecture
         lint:root-git-config
         lint:js
+        lint:workflows
         lint:js:types
         deny:check
         docs:check
@@ -401,6 +415,18 @@ in
         pnpm tsgo -config tsconfig.json
       '';
       description = "Type-check all JS/TS files with tsgo.";
+      binary = "bash";
+    };
+    "fix:workflows" = {
+      exec = ''
+        set -euo pipefail
+        if ! command -v zizmor >/dev/null 2>&1; then
+          echo "Installing zizmor via cargo-binstall..."
+          cargo binstall zizmor --no-confirm
+        fi
+        zizmor --fix .github/workflows/ .github/actions/
+      '';
+      description = "Auto-fix zizmor findings in GitHub Actions workflows where possible.";
       binary = "bash";
     };
     "fix:js" = {
