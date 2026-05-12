@@ -20,12 +20,22 @@ pub fn snapshot_settings() -> insta::Settings {
 	settings.add_filter(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", "[DATETIME]");
 	settings.add_filter(r"\d{4}-\d{2}-\d{2}", "[DATE]");
 
-	// Release-record schema version filter — redact the wire-format `schemaVersion` field so
-	// snapshots survive release bumps that change `monochange_schema` version.
+	// Release-record schema version filters — redact wire-format fields and diagnostic
+	// text so snapshots assert behavior instead of the schema crate version produced by
+	// the current release PR. This keeps schema-version bumps upgrade-compatible.
 	settings.add_filter(
 		r#""schemaVersion": "\d+\.\d+""#,
 		r#""schemaVersion": "[SCHEMA_VERSION]""#,
 	);
+	settings.add_filter(
+		r"schema version `\d+\.\d+(?:\.\d+)?`",
+		"schema version `[SCHEMA_VERSION]`",
+	);
+	settings.add_filter(
+		r"supported version is `\d+\.\d+`",
+		"supported version is `[SCHEMA_VERSION]`",
+	);
+	settings.add_filter(r"schemaVersion \d+\.\d+", "schemaVersion [SCHEMA_VERSION]");
 
 	settings
 }

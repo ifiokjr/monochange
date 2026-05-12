@@ -305,6 +305,9 @@ fn release_record_migration_outcomes_match_snapshot() {
 		object.insert("schemaVersion".to_string(), json!(1));
 	}
 
+	let current_version = monochange_schema::CURRENT_SCHEMA_VERSION_TEXT;
+	let invalid_version_text = format!("{current_version}.0");
+	let future_version = unsupported_schema_version();
 	let scenarios = vec![
 		("current", sample_release_record()),
 		("not_object", json!(["not", "an", "object"])),
@@ -324,15 +327,18 @@ fn release_record_migration_outcomes_match_snapshot() {
 		),
 		(
 			"invalid_version_text",
-			sample_release_record_with("0.1.0", monochange_schema::release_record::KIND),
+			sample_release_record_with(
+				&invalid_version_text,
+				monochange_schema::release_record::KIND,
+			),
 		),
 		(
 			"old_version_without_migration_edge",
-			sample_release_record_with("0.1", monochange_schema::release_record::KIND),
+			sample_release_record(),
 		),
 		(
 			"future_version",
-			sample_release_record_with("0.2", monochange_schema::release_record::KIND),
+			sample_release_record_with(&future_version, monochange_schema::release_record::KIND),
 		),
 	];
 	let outcomes = scenarios
@@ -357,7 +363,6 @@ fn release_record_migration_outcomes_match_snapshot() {
 		})
 		.collect::<Vec<_>>();
 
-	let current_version = monochange_schema::CURRENT_SCHEMA_VERSION_TEXT;
 	let redacted_outcomes: Vec<Value> = outcomes
 		.into_iter()
 		.map(|mut outcome| {
@@ -375,7 +380,10 @@ fn release_record_migration_outcomes_match_snapshot() {
 				if let Some(v) = map.get_mut("error")
 					&& let Value::String(s) = v
 				{
-					*v = Value::String(s.replace(current_version, "[schema version]"));
+					*v = Value::String(redact_schema_versions(
+						s,
+						&[current_version, &future_version],
+					));
 				}
 			}
 			outcome
@@ -383,6 +391,21 @@ fn release_record_migration_outcomes_match_snapshot() {
 		.collect();
 
 	assert_json_snapshot!(redacted_outcomes);
+}
+
+// Snapshot redaction is intentional: schema versions are derived from release
+// package versions, so release PRs must prove behavior without baking the next
+// version number into expected output.
+fn redact_schema_versions(text: &str, versions: &[&str]) -> String {
+	versions.iter().fold(text.to_string(), |redacted, version| {
+		redacted.replace(version, "[schema version]")
+	})
+}
+
+fn unsupported_schema_version() -> String {
+	let current = monochange_schema::current_schema_version()
+		.unwrap_or_else(|error| panic!("parse current schema version: {error}"));
+	monochange_schema::SchemaVersion::new(current.major(), current.minor() + 1).to_string()
 }
 
 struct SchemaAssetPaths {
