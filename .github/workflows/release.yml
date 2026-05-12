@@ -10,10 +10,6 @@ on:
         description: "Release tag (e.g. v0.1.0). Must start with `v`."
         required: true
         type: string
-      checkout_ref:
-        description: "When true, will release the assets from the provided ref rather than the tag. Use with care."
-        default: false
-        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ inputs.tag || github.ref_name }}
@@ -65,7 +61,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          release_ref='${{ inputs.checkout_ref && github.ref_name || env.RELEASE_TAG }}'
+          release_ref='${{ env.RELEASE_TAG }}'
           git fetch --force origin "+refs/heads/*:refs/remotes/origin/*"
           git fetch --tags --force origin "+refs/tags/*:refs/tags/*"
 
