@@ -139,7 +139,7 @@ impl CliProgressReporter {
 			ProgressFormat::Auto => {
 				if quiet || no_progress {
 					(false, ProgressRenderMode::Human, UNICODE_SYMBOLS)
-				} else if stderr_is_terminal || ci {
+				} else if stderr_is_terminal || (ci && !no_color) {
 					(true, ProgressRenderMode::Human, UNICODE_SYMBOLS)
 				} else {
 					(false, ProgressRenderMode::Human, UNICODE_SYMBOLS)
