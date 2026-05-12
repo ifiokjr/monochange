@@ -119,7 +119,7 @@ fn validate_accepts_scalar_type_shorthand_changesets() {
 
 	let output = cli()
 		.current_dir(tempdir.path())
-		.arg("validate")
+		.arg("step:validate")
 		.output()
 		.unwrap_or_else(|error| panic!("validate output: {error}"));
 	assert!(

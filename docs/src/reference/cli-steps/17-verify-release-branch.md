@@ -51,7 +51,7 @@ from = "{{ inputs.from }}"
 
 You usually do not need to add this step manually for protected release operations:
 
-- `mc tag-release` enforces `[source.releases]` when `enforce_for_tags = true`.
+- `mc step:tag-release` enforces `[source.releases]` when `enforce_for_tags = true`.
 - `PublishRelease` and `PublishPackages` enforce `[source.releases]` during real publish runs when `enforce_for_publish = true`.
 - `CommitRelease` enforces `[source.releases]` only when `enforce_for_commit = true`.
 

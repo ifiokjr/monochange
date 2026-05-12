@@ -514,7 +514,7 @@ fn release_record_command_detects_file_based_record_in_merge_commit() {
 		"expected HEAD to be a merge commit with 2 parents"
 	);
 
-	// mc release-record --from HEAD should find the record via the merge commit
+	// mc step:release-record --from HEAD should find the record via the merge commit
 	let output = release_record_output(repo, &["--from", "HEAD", "--format", "json"]);
 	assert!(
 		output.status.success(),
@@ -759,7 +759,7 @@ fn setup_release_repo() -> TempDir {
 fn release_record_output(root: &Path, args: &[&str]) -> std::process::Output {
 	monochange_command(None)
 		.current_dir(root)
-		.arg("release-record")
+		.arg("step:release-record")
 		.args(args)
 		.output()
 		.unwrap_or_else(|error| panic!("release-record output: {error}"))
@@ -768,7 +768,7 @@ fn release_record_output(root: &Path, args: &[&str]) -> std::process::Output {
 fn tag_release_output(root: &Path, args: &[&str]) -> std::process::Output {
 	monochange_command(None)
 		.current_dir(root)
-		.arg("tag-release")
+		.arg("step:tag-release")
 		.args(args)
 		.output()
 		.unwrap_or_else(|error| panic!("tag-release output: {error}"))

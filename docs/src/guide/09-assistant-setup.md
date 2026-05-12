@@ -106,9 +106,9 @@ Keep instructions like these close to your project guidance:
 <!-- {=assistantRepoGuidance} -->
 
 - Read `monochange.toml` before proposing release workflow changes.
-- Run `mc validate` before and after release-affecting edits.
+- Run `mc step:validate` before and after release-affecting edits.
 - Use `mc discover --format json` to inspect package ids, group ownership, and dependency edges.
-- Use `mc diagnostics --format json` or `monochange_diagnostics` for a structured view of all pending changesets with git and review context.
+- Use `mc step:diagnose-changesets --format json` or `monochange_diagnostics` for a structured view of all pending changesets with git and review context.
 - Use `monochange_lint_catalog` and `monochange_lint_explain` when you need lint metadata without shelling out.
 - Prefer `mc change` plus `.changeset/*.md` files over ad hoc release notes.
 - Use `mc release --dry-run --format json` before mutating release state.
@@ -139,4 +139,4 @@ These tools are designed to help assistants inspect the workspace, write explici
 
 `monochange_analyze_changes` and `monochange_validate_changeset` now provide semantic analysis across **Cargo, npm, Deno, and Dart/Flutter** packages. They surface ecosystem-specific evidence such as Rust public API diffs, JS/TS export changes, `package.json` and `deno.json` export metadata, and `pubspec.yaml` dependency or plugin-platform changes, then validate authored changesets against that semantic model.
 
-When you need full changeset context — introduced commit, linked PR, related issues — use `mc diagnostics --format json` directly. It returns stable workspace-relative paths and structured records that agents can parse without reading raw markdown files.
+When you need full changeset context — introduced commit, linked PR, related issues — use `mc step:diagnose-changesets --format json` directly. It returns stable workspace-relative paths and structured records that agents can parse without reading raw markdown files.

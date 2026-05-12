@@ -12,7 +12,7 @@ This is a repo-shaped example for teams that want discovery, changelogs, changes
 ## Recommended validation flow
 
 ```bash
-mc validate
+mc step:validate
 mc check
 mc release --dry-run --diff
 ```

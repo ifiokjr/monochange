@@ -160,10 +160,10 @@ inputs = ["format", "package", "group", "ecosystem", "resume", "output"]
 
 ### Preview readiness before publishing
 
-Use `mc publish-readiness` when you want a reviewable preflight report, then publish directly from the same release state:
+Use `mc step:publish-readiness` when you want a reviewable preflight report, then publish directly from the same release state:
 
 ```bash
-mc publish-readiness --from HEAD --output .monochange/readiness.json
+mc step:publish-readiness --from HEAD --output .monochange/readiness.json
 mc publish --output .monochange/publish-result.json
 ```
 
@@ -217,7 +217,7 @@ Because `PublishPackages` understands:
 ## Common mistakes
 
 - confusing `PublishPackages` with `PublishRelease`: the former publishes to package registries, the latter creates hosted provider releases (such as GitHub releases)
-- assuming `mc publish` consumes the JSON file from `mc publish-readiness`; use readiness for preflight review or `mc publish-plan --readiness`, not as a `PublishPackages` input
+- assuming `mc publish` consumes the JSON file from `mc step:publish-readiness`; use readiness for preflight review or `mc publish-plan --readiness`, not as a `PublishPackages` input
 - omitting `output` in CI, which makes partial registry failures harder to resume safely
 - expecting development-only dependency cycles to block publishing; only publish-relevant dependency kinds participate in cycle validation
 - running `PublishPackages` without rate-limit planning: use `PlanPublishRateLimits` first when you are unsure about registry windows

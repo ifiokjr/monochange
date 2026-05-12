@@ -274,8 +274,8 @@ done
 cat >"$export_markdown" <<'EOF'
 | Command | Mean [ms] | Min [ms] | Max [ms] |
 |:---|---:|---:|---:|
-| main · mc validate | 10.0 | 9.0 | 11.0 |
-| pr · mc validate | 11.0 | 10.0 | 12.0 |
+| main · mc step:validate | 10.0 | 9.0 | 11.0 |
+| pr · mc step:validate | 11.0 | 10.0 | 12.0 |
 | main · mc discover --format json | 12.0 | 11.0 | 13.0 |
 | pr · mc discover --format json | 13.0 | 12.0 | 14.0 |
 | main · mc release --dry-run | 50.0 | 49.0 | 51.0 |

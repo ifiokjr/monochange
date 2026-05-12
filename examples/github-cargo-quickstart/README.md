@@ -13,7 +13,7 @@ This is a repo-shaped example for a greenfield Cargo workspace that wants GitHub
 ## Recommended validation flow
 
 ```bash
-mc validate
+mc step:validate
 mc check
 mc release --dry-run --diff
 ```

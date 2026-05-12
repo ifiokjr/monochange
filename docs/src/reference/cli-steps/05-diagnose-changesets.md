@@ -150,5 +150,5 @@ Because the raw file is only part of the picture.
 
 - expecting `DiagnoseChangesets` to modify anything
 - assuming it prepares release state for later publication steps
-- using it when a simpler `mc validate` failure would already answer the question
+- using it when a simpler `mc step:validate` failure would already answer the question
 - forgetting to switch to `json` output when another tool should consume the results

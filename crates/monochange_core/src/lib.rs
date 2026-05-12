@@ -2294,6 +2294,54 @@ pub enum CliStepDefinition {
 		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
 		inputs: BTreeMap<String, CliStepInputValue>,
 	},
+	/// Inspect the monochange release record associated with a tag or commit.
+	ReleaseRecord {
+		#[serde(default)]
+		name: Option<String>,
+		#[serde(default)]
+		when: Option<String>,
+		#[serde(default)]
+		always_run: bool,
+		#[serde(
+			default,
+			deserialize_with = "deserialize_cli_step_inputs",
+			serialize_with = "serialize_cli_step_inputs"
+		)]
+		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
+		inputs: BTreeMap<String, CliStepInputValue>,
+	},
+	/// Check package registry publishing readiness without publishing packages.
+	PublishReadiness {
+		#[serde(default)]
+		name: Option<String>,
+		#[serde(default)]
+		when: Option<String>,
+		#[serde(default)]
+		always_run: bool,
+		#[serde(
+			default,
+			deserialize_with = "deserialize_cli_step_inputs",
+			serialize_with = "serialize_cli_step_inputs"
+		)]
+		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
+		inputs: BTreeMap<String, CliStepInputValue>,
+	},
+	/// Create and push release tags from the monochange release record on a commit.
+	TagRelease {
+		#[serde(default)]
+		name: Option<String>,
+		#[serde(default)]
+		when: Option<String>,
+		#[serde(default)]
+		always_run: bool,
+		#[serde(
+			default,
+			deserialize_with = "deserialize_cli_step_inputs",
+			serialize_with = "serialize_cli_step_inputs"
+		)]
+		#[cfg_attr(feature = "schema", schemars(with = "CliStepInputsSchema"))]
+		inputs: BTreeMap<String, CliStepInputValue>,
+	},
 	/// Repair a recent release by retargeting its stored release tag set.
 	///
 	/// This step is independent from `PrepareRelease` and exposes structured
@@ -2365,6 +2413,9 @@ impl CliStepDefinition {
 			| Self::CommentReleasedIssues { inputs, .. }
 			| Self::AffectedPackages { inputs, .. }
 			| Self::DiagnoseChangesets { inputs, .. }
+			| Self::ReleaseRecord { inputs, .. }
+			| Self::PublishReadiness { inputs, .. }
+			| Self::TagRelease { inputs, .. }
 			| Self::RetargetRelease { inputs, .. }
 			| Self::Command { inputs, .. } => inputs,
 		}
@@ -2396,6 +2447,9 @@ impl CliStepDefinition {
 			| Self::CommentReleasedIssues { inputs, .. }
 			| Self::AffectedPackages { inputs, .. }
 			| Self::DiagnoseChangesets { inputs, .. }
+			| Self::ReleaseRecord { inputs, .. }
+			| Self::PublishReadiness { inputs, .. }
+			| Self::TagRelease { inputs, .. }
 			| Self::RetargetRelease { inputs, .. }
 			| Self::Command { inputs, .. } => *inputs = inherited,
 		}
@@ -2422,6 +2476,9 @@ impl CliStepDefinition {
 			| Self::CommentReleasedIssues { name, .. }
 			| Self::AffectedPackages { name, .. }
 			| Self::DiagnoseChangesets { name, .. }
+			| Self::ReleaseRecord { name, .. }
+			| Self::PublishReadiness { name, .. }
+			| Self::TagRelease { name, .. }
 			| Self::RetargetRelease { name, .. }
 			| Self::Command { name, .. } => name.as_deref(),
 		}
@@ -2453,6 +2510,9 @@ impl CliStepDefinition {
 			| Self::CommentReleasedIssues { when, .. }
 			| Self::AffectedPackages { when, .. }
 			| Self::DiagnoseChangesets { when, .. }
+			| Self::ReleaseRecord { when, .. }
+			| Self::PublishReadiness { when, .. }
+			| Self::TagRelease { when, .. }
 			| Self::RetargetRelease { when, .. }
 			| Self::Command { when, .. } => when.as_deref(),
 		}
@@ -2479,6 +2539,9 @@ impl CliStepDefinition {
 			| Self::CommentReleasedIssues { always_run, .. }
 			| Self::AffectedPackages { always_run, .. }
 			| Self::DiagnoseChangesets { always_run, .. }
+			| Self::ReleaseRecord { always_run, .. }
+			| Self::PublishReadiness { always_run, .. }
+			| Self::TagRelease { always_run, .. }
 			| Self::RetargetRelease { always_run, .. }
 			| Self::Command { always_run, .. } => *always_run,
 		}
@@ -2515,6 +2578,9 @@ impl CliStepDefinition {
 			Self::CommentReleasedIssues { .. } => "CommentReleasedIssues",
 			Self::AffectedPackages { .. } => "AffectedPackages",
 			Self::DiagnoseChangesets { .. } => "DiagnoseChangesets",
+			Self::ReleaseRecord { .. } => "ReleaseRecord",
+			Self::PublishReadiness { .. } => "PublishReadiness",
+			Self::TagRelease { .. } => "TagRelease",
 			Self::RetargetRelease { .. } => "RetargetRelease",
 			Self::Command { .. } => "Command",
 		}
@@ -2571,6 +2637,9 @@ impl CliStepDefinition {
 				Some(&["format", "changed_paths", "from", "verify", "label"])
 			}
 			Self::DiagnoseChangesets { .. } => Some(&["format", "changeset"]),
+			Self::ReleaseRecord { .. } => Some(&["from", "format", "sha"]),
+			Self::PublishReadiness { .. } => Some(&["from", "format", "package", "output"]),
+			Self::TagRelease { .. } => Some(&["from", "format", "push"]),
 			Self::RetargetRelease { .. } => Some(&["from", "target", "force", "sync_provider"]),
 			Self::Command { .. } => None,
 		}
@@ -2588,6 +2657,9 @@ impl CliStepDefinition {
 			| Self::OpenReleaseRequest { .. }
 			| Self::AffectedPackages { .. }
 			| Self::DiagnoseChangesets { .. }
+			| Self::ReleaseRecord { .. }
+			| Self::PublishReadiness { .. }
+			| Self::TagRelease { .. }
 			| Self::PlaceholderPublish { .. }
 			| Self::PublishPackages { .. } => {
 				match name {
@@ -2716,6 +2788,31 @@ impl CliStepDefinition {
 					_ => None,
 				}
 			}
+			Self::ReleaseRecord { .. } => {
+				match name {
+					"format" => Some(CliInputKind::Choice),
+					"from" => Some(CliInputKind::String),
+					"sha" => Some(CliInputKind::Boolean),
+					_ => None,
+				}
+			}
+			Self::PublishReadiness { .. } => {
+				match name {
+					"format" => Some(CliInputKind::Choice),
+					"from" => Some(CliInputKind::String),
+					"package" => Some(CliInputKind::StringList),
+					"output" => Some(CliInputKind::Path),
+					_ => None,
+				}
+			}
+			Self::TagRelease { .. } => {
+				match name {
+					"format" => Some(CliInputKind::Choice),
+					"from" => Some(CliInputKind::String),
+					"push" => Some(CliInputKind::Boolean),
+					_ => None,
+				}
+			}
 			Self::RetargetRelease { .. } => {
 				match name {
 					"from" | "target" => Some(CliInputKind::String),
@@ -2764,7 +2861,7 @@ impl CliStepDefinition {
 						c.iter().map(|s| s.to_string()).collect::<Vec<_>>()
 					})
 					.unwrap_or_default();
-				let default = if *name == "sync_provider" {
+				let default = if *name == "sync_provider" || *name == "push" {
 					Some("true".to_string())
 				} else {
 					None
@@ -4435,6 +4532,24 @@ pub fn all_step_variants() -> Vec<CliStepDefinition> {
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::DiagnoseChangesets {
+			name: None,
+			when: None,
+			always_run: false,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::ReleaseRecord {
+			name: None,
+			when: None,
+			always_run: false,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::PublishReadiness {
+			name: None,
+			when: None,
+			always_run: false,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::TagRelease {
 			name: None,
 			when: None,
 			always_run: false,

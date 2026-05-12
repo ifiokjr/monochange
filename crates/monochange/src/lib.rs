@@ -36,7 +36,7 @@
 //! - aggregate all supported ecosystem adapters
 //! - load `monochange.toml`
 //! - load config-defined `[cli.*]` workflow commands from `monochange.toml`
-//! - expose hardcoded binary commands such as `init`, `validate`, `check`, `analyze`, `mcp`, `help`, and `version`
+//! - expose binary commands such as `init`, `check`, `analyze`, `mcp`, `help`, and `version`
 //! - generate immutable `mc step:*` commands from the built-in step schemas
 //! - resolve change input files
 //! - render discovery and release command output in text or JSON
@@ -253,7 +253,6 @@ mod mcp;
 mod migration_audit;
 mod package_publish;
 mod prepared_release_cache;
-mod publish_bootstrap;
 mod publish_progress;
 mod publish_rate_limits;
 mod publish_readiness;
@@ -839,99 +838,6 @@ where
 		}
 		Some(("migrate", migrate_matches)) => run_migration_command(root, quiet, migrate_matches),
 		Some(("mcp", _)) => run_mcp_command_with(quiet, mcp::run_server),
-		Some(("release-record", release_record_matches)) => {
-			let from = release_record_matches
-				.get_one::<String>("from")
-				.map(String::as_str)
-				.ok_or_else(|| MonochangeError::Config("missing release-record ref".to_string()))?;
-			if release_record_matches.get_flag("sha") {
-				let discovery = discover_release_record(root, from)?;
-				Ok(discovery.record_commit)
-			} else {
-				let format = release_record_matches
-					.get_one::<String>("format")
-					.map_or(Ok(OutputFormat::Markdown), |value| {
-						parse_output_format(value)
-					})?;
-				render_release_record_discovery(root, from, format)
-			}
-		}
-		Some(("publish-readiness", publish_readiness_matches)) => {
-			let configuration = configuration?;
-			let from = publish_readiness_matches
-				.get_one::<String>("from")
-				.cloned()
-				.ok_or(MonochangeError::Config(
-					"missing publish-readiness ref".to_string(),
-				))?;
-			let selected_packages = publish_readiness_matches
-				.get_many::<String>("package")
-				.map(|values| values.cloned().collect::<BTreeSet<_>>())
-				.unwrap_or_default();
-			let format = publish_readiness_matches
-				.get_one::<String>("format")
-				.map_or(Ok(OutputFormat::Markdown), |value| {
-					parse_output_format(value)
-				})?;
-			let output = publish_readiness_matches
-				.get_one::<String>("output")
-				.map(PathBuf::from);
-			let options = publish_readiness::PublishReadinessOptions {
-				from,
-				selected_packages,
-				format,
-				output,
-			};
-			publish_readiness::run_publish_readiness(root, &configuration, &options)
-		}
-		Some(("publish-bootstrap", publish_bootstrap_matches)) => {
-			let configuration = configuration?;
-			let from = publish_bootstrap_matches
-				.get_one::<String>("from")
-				.cloned()
-				.ok_or(MonochangeError::Config(
-					"missing publish-bootstrap ref".to_string(),
-				))?;
-			let selected_packages = publish_bootstrap_matches
-				.get_many::<String>("package")
-				.map(|values| values.cloned().collect::<BTreeSet<_>>())
-				.unwrap_or_default();
-			let format = publish_bootstrap_matches
-				.get_one::<String>("format")
-				.map_or(Ok(OutputFormat::Markdown), |value| {
-					parse_output_format(value)
-				})?;
-			let output = publish_bootstrap_matches
-				.get_one::<String>("output")
-				.map(PathBuf::from);
-			let options = publish_bootstrap::PublishBootstrapOptions {
-				from,
-				selected_packages,
-				format,
-				output,
-				dry_run: quiet || publish_bootstrap_matches.get_flag("dry-run"),
-			};
-			publish_bootstrap::run_publish_bootstrap(root, &configuration, &options)
-		}
-		Some(("tag-release", tag_release_matches)) => {
-			let configuration = configuration?;
-			let from = tag_release_matches
-				.get_one::<String>("from")
-				.map(String::as_str)
-				.ok_or_else(|| MonochangeError::Config("missing tag-release ref".to_string()))?;
-			let format = tag_release_matches
-				.get_one::<String>("format")
-				.map_or(Ok(OutputFormat::Markdown), |value| {
-					parse_output_format(value)
-				})?;
-			let push = tag_release_matches
-				.get_one::<String>("push")
-				.is_none_or(|value| value == "true");
-			let dry_run = quiet || tag_release_matches.get_flag("dry-run");
-			#[rustfmt::skip]
-			release_branch_policy::verify_release_ref_for_tags(root, configuration.source.as_ref(), from)?;
-			render_release_tag_report(root, from, format, push, dry_run)
-		}
 		Some(("check", check_matches)) => {
 			if quiet {
 				return Ok(String::new());
@@ -957,23 +863,6 @@ where
 				return Ok(String::new());
 			}
 			lint::handle_lint_subcommand(root, lint_matches)
-		}
-		Some(("validate", validate_matches)) => {
-			let dry_run = quiet || validate_matches.get_flag("dry-run");
-			let synthetic = CliCommandDefinition {
-				name: "validate".to_string(),
-				help_text: None,
-				inputs: vec![],
-				steps: vec![CliStepDefinition::Validate {
-					name: None,
-					when: None,
-					always_run: false,
-					inputs: BTreeMap::new(),
-				}],
-				dry_run: false,
-			};
-			let inputs = collect_cli_command_inputs(&synthetic, validate_matches);
-			execute_cli_command(root, &configuration?, &synthetic, dry_run, inputs)
 		}
 		Some((cli_command_name, cli_command_matches)) if cli_command_name.starts_with("step:") => {
 			let configuration = configuration?;

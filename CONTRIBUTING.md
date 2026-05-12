@@ -11,18 +11,18 @@ This repository uses `devenv` for a reproducible shell.
 ```bash
 devenv shell
 install:all
-mc validate
+mc step:validate
 mc discover --format json
 mc change --package monochange --bump minor --reason "add release planning"
-mc diagnostics --format json
+mc step:diagnose-changesets --format json
 mc release --dry-run --format json
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
-mc release-record --from v1.2.3
-mc tag-release --from HEAD --dry-run --format json
-mc publish-readiness --from HEAD --output .monochange/readiness.json
-mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json
-mc publish-readiness --from HEAD --output .monochange/readiness.json
+mc step:release-record --from v1.2.3
+mc step:tag-release --from HEAD --dry-run --format json
+mc step:publish-readiness --from HEAD --output .monochange/readiness.json
+mc step:placeholder-publish --from HEAD --output .monochange/bootstrap-result.json
+mc step:publish-readiness --from HEAD --output .monochange/readiness.json
 mc publish-plan --readiness .monochange/readiness.json --format json
 mc publish --output .monochange/publish-result.json
 mc repair-release --from v1.2.3 --target HEAD --dry-run
@@ -56,7 +56,7 @@ monochange --help
 mc --help
 docs:check
 docs:update
-mc validate
+mc step:validate
 mc change --package monochange --bump patch --reason "describe the change"
 lint:all
 test:all
@@ -82,7 +82,7 @@ build:book
 - Every non-trivial behavior change starts with a failing test.
 - Release-planning logic needs realistic fixture coverage.
 - Cross-ecosystem behavior should remain consistent across Cargo, npm-family, Deno, Dart, and Flutter.
-- `mc validate` should stay green alongside the rest of the validation suite.
+- `mc step:validate` should stay green alongside the rest of the validation suite.
 
 ## Safety and linting constraints
 

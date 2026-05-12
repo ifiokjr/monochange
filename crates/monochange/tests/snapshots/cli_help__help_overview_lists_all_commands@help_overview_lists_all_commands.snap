@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/tests/cli_help.rs
+assertion_line: 20
 info:
   program: mc
   args:
@@ -28,20 +29,20 @@ Run `mc help <command>` or `mc <command> -h` for detailed examples and usage tip
 
 ▸ Built-in Commands
 
-  init               Generate monochange.toml with detected packages
-  populate           Add missing built-in CLI commands to monochange.toml
-  command            Add or edit config-defined CLI commands interactively
-  skill              Install the monochange skill bundle for AI agents
-  subagents          Generate repo-local monochange subagents and agent guidance
-  analyze            Analyze semantic changes for a package
-  tag-release        Create and push release tags from an embedded release record
-  release-record     Inspect the monochange release record for a tag or commit
-  check              Validate configuration, changesets, and run manifest lint rules
-  lint               Inspect and scaffold manifest lint rules
-  mcp                Start the monochange MCP server over stdin/stdout
-  validate           Validate monochange configuration and changesets
-  publish-readiness  Check package registry publishing readiness without publishing packages
-  publish-bootstrap  Publish first-time placeholder package versions for a release record
+  init                      Generate monochange.toml with detected packages
+  populate                  Add missing built-in CLI commands to monochange.toml
+  command                   Add or edit config-defined CLI commands interactively
+  skill                     Install the monochange skill bundle for AI agents
+  subagents                 Generate repo-local monochange subagents and agent guidance
+  analyze                   Analyze semantic changes for a package
+  step:tag-release          Create and push release tags from an embedded release record
+  step:release-record       Inspect the monochange release record for a tag or commit
+  check                     Validate configuration, changesets, and run manifest lint rules
+  lint                      Inspect and scaffold manifest lint rules
+  mcp                       Start the monochange MCP server over stdin/stdout
+  step:validate             Validate monochange configuration and changesets
+  step:publish-readiness    Check package registry publishing readiness without publishing packages
+  step:placeholder-publish  Publish first-time placeholder package versions for a release record
 
 ▸ Step Commands
 
@@ -61,6 +62,9 @@ Run `mc help <command>` or `mc <command> -h` for detailed examples and usage tip
   step:comment-released-issues   Comment on issues referenced by released changesets
   step:affected-packages         Evaluate affected packages and changeset coverage
   step:diagnose-changesets       Inspect changeset provenance and metadata
+  step:release-record            Inspect the monochange release record for a tag or commit
+  step:publish-readiness         Check package registry publishing readiness without publishing packages
+  step:tag-release               Create and push release tags from an embedded release record
   step:retarget-release          Repair release tags by retargeting a release
 
 

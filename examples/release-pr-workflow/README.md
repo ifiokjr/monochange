@@ -12,7 +12,7 @@ This is a repo-shaped example for a long-running release PR branch flow where re
 ## Recommended validation flow
 
 ```bash
-mc validate
+mc step:validate
 mc check
 mc release --dry-run --diff
 ```

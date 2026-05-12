@@ -59,12 +59,14 @@ jobs:
         if: steps.release_record.outputs.is_release_commit != 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: mc release-pr
+        run: |
+          mc step:prepare-release --format markdown
+          mc step:open-release-request --format markdown
 
       - name: create release tags
         if: steps.release_record.outputs.is_release_commit == 'true'
-        run: mc tag-release --from HEAD
+        run: mc step:tag-release --from HEAD
 
       - name: publish packages
         if: steps.release_record.outputs.is_release_commit == 'true'
-        run: mc publish
+        run: mc step:publish-packages

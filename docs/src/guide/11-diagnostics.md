@@ -1,6 +1,6 @@
 # Diagnostics
 
-`mc diagnostics` gives you a quick snapshot of every pending changeset together with its git and review context.
+`mc step:diagnose-changesets` gives you a quick snapshot of every pending changeset together with its git and review context.
 
 It is useful for human developers reviewing a PR, for AI agents auditing what has changed, and for CI steps that need to understand the full context of pending work before triggering a release.
 
@@ -9,19 +9,19 @@ It is useful for human developers reviewing a PR, for AI agents auditing what ha
 Inspect all pending changesets:
 
 ```bash
-mc diagnostics
+mc step:diagnose-changesets
 ```
 
 Inspect a specific changeset:
 
 ```bash
-mc diagnostics --changeset .changeset/feature.md
+mc step:diagnose-changesets --changeset .changeset/feature.md
 ```
 
 You can pass `--changeset` multiple times. Duplicate paths are deduplicated automatically:
 
 ```bash
-mc diagnostics \
+mc step:diagnose-changesets \
   --changeset .changeset/api-change.md \
   --changeset .changeset/api-change.md \
   --changeset .changeset/bug-fix.md
@@ -30,13 +30,13 @@ mc diagnostics \
 A short name without the directory prefix also works:
 
 ```bash
-mc diagnostics --changeset feature.md
+mc step:diagnose-changesets --changeset feature.md
 ```
 
 And absolute paths resolve correctly too:
 
 ```bash
-mc diagnostics --changeset /home/user/project/.changeset/feature.md
+mc step:diagnose-changesets --changeset /home/user/project/.changeset/feature.md
 ```
 
 ## JSON output
@@ -44,7 +44,7 @@ mc diagnostics --changeset /home/user/project/.changeset/feature.md
 Machine-readable diagnostics for scripting, CI, or AI consumption:
 
 ```bash
-mc diagnostics --format json
+mc step:diagnose-changesets --format json
 ```
 
 The JSON envelope includes:
@@ -71,52 +71,39 @@ Each revision record includes:
 - `commit.shortSha` — short SHA for display
 - `reviewRequest` — PR/MR number and URL when the commit is associated with a pull request
 
-## Config entry
+## Command
 
-Add it manually or run `mc init` to get it included automatically:
+Use the generated immutable step command directly:
 
-```toml
-[cli.diagnostics]
-help_text = "Show changeset diagnostics and context"
-
-[[cli.diagnostics.inputs]]
-name = "format"
-type = "choice"
-choices = ["text", "json"]
-default = "text"
-
-[[cli.diagnostics.inputs]]
-name = "changeset"
-type = "string_list"
-help_text = "changeset path(s), e.g. .changeset/feature.md (omit for all changesets)"
-
-[[cli.diagnostics.steps]]
-type = "DiagnoseChangesets"
+```bash
+mc step:diagnose-changesets --format json
 ```
+
+You only need a `[cli.*]` entry if you want a repository-specific alias that wraps diagnostics with additional steps or inputs.
 
 ## AI agent and MCP usage
 
-`mc diagnostics --format json` and the MCP tool `monochange_diagnostics` are designed to give AI agents a structured overview of all pending changes before planning a release, reviewing a PR, or proposing follow-up work.
+`mc step:diagnose-changesets --format json` and the MCP tool `monochange_diagnostics` are designed to give AI agents a structured overview of all pending changes before planning a release, reviewing a PR, or proposing follow-up work.
 
 A typical agent workflow looks like this:
 
 1. `mc discover --format json` — understand the workspace package graph
-2. `mc diagnostics --format json` — see all pending changesets, linked PRs, and introduced commits
+2. `mc step:diagnose-changesets --format json` — see all pending changesets, linked PRs, and introduced commits
 3. `mc release --dry-run --format json` — preview the computed release plan
 4. `mc change ...` — add, update, or remove changesets as needed
 5. `mc release` — execute the release when everything looks correct
 
-Because `mc diagnostics` and `monochange_diagnostics` return stable, workspace-relative paths and structured JSON, agents can parse the output without needing to read raw markdown files directly. Each changeset record includes enough context — who introduced it, which PR it belongs to, which issues it closes — for an agent to make targeted decisions about whether to proceed with a release or request changes.
+Because `mc step:diagnose-changesets` and `monochange_diagnostics` return stable, workspace-relative paths and structured JSON, agents can parse the output without needing to read raw markdown files directly. Each changeset record includes enough context — who introduced it, which PR it belongs to, which issues it closes — for an agent to make targeted decisions about whether to proceed with a release or request changes.
 
 ### Example: check for undocumented packages before a release
 
 ```bash
-mc diagnostics --format json | jq '[.changesets[] | select(.targets | length == 0)]'
+mc step:diagnose-changesets --format json | jq '[.changesets[] | select(.targets | length == 0)]'
 ```
 
 ### Example: list all open review requests linked to pending changesets
 
 ```bash
-mc diagnostics --format json \
+mc step:diagnose-changesets --format json \
   | jq '[.changesets[].context?.introduced?.reviewRequest? | select(. != null) | .id] | unique'
 ```

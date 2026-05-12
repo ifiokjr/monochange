@@ -36,6 +36,10 @@ fn source_provider_diagnostics_match_snapshot(#[case] scenario_relative: &str) {
 	let _guard = settings.bind_to_scope();
 
 	let tempdir = setup_scenario_workspace(scenario_relative);
-	let json = run_json_command(tempdir.path(), "diagnostics", Some("2026-04-06"));
+	let json = run_json_command(
+		tempdir.path(),
+		"step:diagnose-changesets",
+		Some("2026-04-06"),
+	);
 	assert_readable_json_snapshot!(json);
 }

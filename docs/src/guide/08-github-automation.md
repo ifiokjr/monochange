@@ -58,8 +58,8 @@ GitHub automation now has a repair-oriented history flow in addition to the exis
 Use these commands when you need to inspect, tag, or repair a just-created release:
 
 ```bash
-mc release-record --from v1.2.3
-mc tag-release --from HEAD --dry-run --format json
+mc step:release-record --from v1.2.3
+mc step:tag-release --from HEAD --dry-run --format json
 mc repair-release --from v1.2.3 --target HEAD --dry-run
 mc repair-release --from v1.2.3 --target HEAD
 ```
@@ -68,7 +68,7 @@ The important distinction is:
 
 - the cached release manifest still describes the execution-time release plan for automation
 - `ReleaseRecord` describes the durable release declaration stored in the release commit body
-- `mc tag-release` consumes that durable record after merge and creates the declared tag set on the default branch
+- `mc step:tag-release` consumes that durable record after merge and creates the declared tag set on the default branch
 
 Use `--dry-run` first for `repair-release`. It is a destructive workflow because it retargets release tags.
 
@@ -78,7 +78,7 @@ If immutable registry artifacts have already been published, prefer cutting a ne
 
 <!-- {=projectTagReleaseJsonTagsMap} -->
 
-When a post-merge workflow needs to trigger follow-up release work, prefer `mc tag-release --from HEAD --format json` and read the release tag by package or group id from the top-level `tags` object:
+When a post-merge workflow needs to trigger follow-up release work, prefer `mc step:tag-release --from HEAD --format json` and read the release tag by package or group id from the top-level `tags` object:
 
 ```json
 {
@@ -98,7 +98,7 @@ A package or group might not be released in a particular release commit. Handle 
 For example, a repository with `[group.main]` can trigger a downstream GitHub release workflow from the main group tag with:
 
 ```bash
-mc tag-release --from HEAD --format json >/tmp/tag-report.json
+mc step:tag-release --from HEAD --format json >/tmp/tag-report.json
 tag="$(jq -r '.tags.main // empty' /tmp/tag-report.json)"
 
 if [ -z "$tag" ]; then
@@ -117,7 +117,7 @@ Avoid indexing `tagResults[0]` for workflow control. `tagResults` remains the au
 
 Package publishing is separate from provider release publishing:
 
-- `mc publish-readiness --from HEAD --output <path>` checks package registries before mutation
+- `mc step:publish-readiness --from HEAD --output <path>` checks package registries before mutation
 - `mc publish` handles package registries such as `crates.io`, `npm`, `jsr`, and `pub.dev`
 - `mc publish-release` handles hosted source-provider releases such as GitHub releases
 
@@ -296,7 +296,7 @@ type = "AffectedPackages"
 monochange now includes a release workflow modeled around long-running release PR refresh plus post-merge tagging:
 
 - `.github/workflows/release.yml` refreshes the dedicated release PR branch on normal `main` pushes
-- the same workflow detects when `HEAD` is already a merged monochange release commit, runs `mc tag-release --from HEAD`, runs `mc publish-readiness --from HEAD --output <path>`, and then runs `mc publish`
+- the same workflow detects when `HEAD` is already a merged monochange release commit, runs `mc step:tag-release --from HEAD`, runs `mc step:publish-readiness --from HEAD --output <path>`, and then runs `mc publish`
 - tag-triggered or downstream workflows can then build archives, create hosted releases, publish additional assets from the pushed tags, or run a separate `mc publish-release` job when you still want manifest-driven hosted-release publication
 
 That split keeps tag creation on the default branch side of the merge and lets downstream automation consume the exact durable release metadata that monochange stored in git history.

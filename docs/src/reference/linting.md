@@ -14,7 +14,7 @@ They are separate from Rust compiler or Clippy lints used to develop monochange 
 
 `mc check` runs two phases:
 
-1. normal workspace validation, similar to `mc validate`
+1. normal workspace validation, similar to `mc step:validate`
 2. manifest lint rules for supported package ecosystems
 
 Common commands:
@@ -521,7 +521,7 @@ mc check --format json
 For repository work:
 
 ```bash
-mc validate
+mc step:validate
 mc check
 mc release --dry-run --diff
 ```

@@ -13,7 +13,7 @@ monochange is a CLI/tool harness for producing versioned packages from a monorep
 
 ```bash
 mc help
-mc validate
+mc step:validate
 mc check
 mc step:config --format json
 mc step:discover --format json
@@ -24,7 +24,7 @@ If a repository defines user workflows, `mc help` will show them under user-defi
 ## Version planning flow
 
 ```bash
-mc validate
+mc step:validate
 mc step:discover --format json
 mc step:diagnose-changesets --format json
 mc step:prepare-release --dry-run --format json
@@ -34,7 +34,7 @@ If configured aliases exist, users may prefer:
 
 ```bash
 mc discover --format json
-mc diagnostics --format json
+mc step:diagnose-changesets --format json
 mc release --dry-run --format json
 mc release --dry-run --diff
 ```
@@ -43,7 +43,7 @@ mc release --dry-run --diff
 
 A safe release workflow usually does this:
 
-1. Validate and lint (`mc validate`, `mc check`).
+1. Validate and lint (`mc step:validate`, `mc check`).
 2. Preview versioned files (`PrepareRelease` dry-run).
 3. Apply `PrepareRelease` for real.
 4. Run configured lockfile/schema/format commands.
@@ -57,13 +57,13 @@ Do not skip review before commit, tag, provider-release, or package-publish step
 Current built-in package publishing is release-record oriented:
 
 ```bash
-mc publish-readiness --from HEAD --output readiness.json
-mc publish-bootstrap --from HEAD --output bootstrap.json
+mc step:publish-readiness --from HEAD --output readiness.json
+mc step:placeholder-publish --from HEAD --output bootstrap.json
 mc publish-plan --readiness readiness.json --format json   # only if configured in this repo
 mc publish --output publish-result.json                    # only if configured in this repo
 ```
 
-`mc publish-readiness` and `mc publish-bootstrap` are built in. `mc publish-plan` and `mc publish` are user-defined workflows when present.
+`mc step:publish-readiness` and `mc step:placeholder-publish` are built in. `mc publish-plan` and `mc publish` are user-defined workflows when present.
 
 Use `mode = "external"` for private/custom registries or when existing CI handles package publication.
 

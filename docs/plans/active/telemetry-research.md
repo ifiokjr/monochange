@@ -256,7 +256,7 @@ Properties:
 
 - `cargo test --workspace`
 - `lint:all`
-- `mc validate`
+- `mc step:validate`
 - Manual checks:
   - fresh install reports telemetry disabled or asks for opt-in without sending anything
   - `MC_TELEMETRY=0` suppresses all network sends

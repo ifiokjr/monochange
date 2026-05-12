@@ -12,7 +12,7 @@ validate_monochange:
   before_script:
     - npm install -g @monochange/cli
   script:
-    - mc validate
+    - mc step:validate
     - mc check
 
 release_preview:
@@ -34,8 +34,8 @@ release_or_publish:
     - git fetch --force --tags origin
     - |
       set -euo pipefail
-      if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
-        mc tag-release --from HEAD
+      if mc step:release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
+        mc step:tag-release --from HEAD
         ./scripts/legacy-release.sh
       else
         mc release-pr

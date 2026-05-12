@@ -73,13 +73,13 @@ fn forgejo_cli_validate_accepts_fixture_configuration() {
 		.env("NO_COLOR", "1")
 		.env_remove("RUST_LOG")
 		.current_dir(fixture_path("source/forgejo"))
-		.arg("validate")
+		.arg("step:validate")
 		.output()
-		.unwrap_or_else(|error| panic!("run mc validate: {error}"));
+		.unwrap_or_else(|error| panic!("run mc step:validate: {error}"));
 
 	assert!(
 		output.status.success(),
-		"mc validate failed\nstdout:\n{}\nstderr:\n{}",
+		"mc step:validate failed\nstdout:\n{}\nstderr:\n{}",
 		String::from_utf8_lossy(&output.stdout),
 		String::from_utf8_lossy(&output.stderr)
 	);

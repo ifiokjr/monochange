@@ -45,7 +45,7 @@ Validation completed for PR #264. The key targeted coverage lives in `crates/mon
 - `devenv shell fix:all`
 - `devenv shell test:all`
 - `devenv shell coverage:patch`
-- `devenv shell mc validate`
+- `devenv shell mc step:validate`
 
 ## Notes
 

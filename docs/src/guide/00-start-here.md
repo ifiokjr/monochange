@@ -46,7 +46,7 @@ Start with the generated file instead of hand-authoring your first config.
 ## 3. Validate the workspace
 
 ```bash
-mc validate
+mc step:validate
 ```
 
 This checks `monochange.toml` and your `.changeset/*.md` files together.
@@ -108,7 +108,7 @@ mc release --dry-run --diff
 When you want to inspect changeset provenance before releasing, add a diagnostics pass:
 
 ```bash
-mc diagnostics --format json
+mc step:diagnose-changesets --format json
 ```
 
 Stop here on your first run. This previews the release plan without publishing anything.
@@ -128,8 +128,8 @@ If you need a silent safety check, run `mc release --quiet`. Quiet mode suppress
 
 ## If you hit a problem
 
-- `mc init` says a config already exists: keep the existing `monochange.toml` and continue with `mc validate`, or pass `--force` to regenerate.
-- `mc validate` reports problems: fix the reported config or changeset issue, then rerun `mc validate`.
+- `mc init` says a config already exists: keep the existing `monochange.toml` and continue with `mc step:validate`, or pass `--force` to regenerate.
+- `mc step:validate` reports problems: fix the reported config or changeset issue, then rerun `mc step:validate`.
 - `mc change` rejects your target: rerun `mc discover --format json` and copy a valid package id.
 - You are not sure what to do next: continue with [Your first release plan](./02-setup.md).
 

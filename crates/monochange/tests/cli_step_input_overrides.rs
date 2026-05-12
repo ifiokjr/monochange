@@ -19,7 +19,7 @@ fn validate_step_runs_without_input_overrides() {
 	let _guard = settings.bind_to_scope();
 
 	let tempdir = setup_scenario_workspace("cli-step-input-overrides/workspace");
-	let output = run_command(tempdir.path(), "validate");
+	let output = run_command(tempdir.path(), "step:validate");
 	assert!(
 		output.status.success(),
 		"{}",

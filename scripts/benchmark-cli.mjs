@@ -9,17 +9,15 @@ const WARMUP_RUNS = 1;
 const BENCHMARK_RUNS = 6;
 const PHASE_COMMAND_LABELS = ["mc release --dry-run", "mc release"];
 const PHASE_COMMAND_ARGS = [["release", "--dry-run"], ["release"]];
-const COMMAND_LABELS = [
-	"mc validate",
-	"mc discover --format json",
-	"mc release --dry-run",
-	"mc release",
-];
-const COMMAND_ARGS = [
-	["validate"],
-	["discover", "--format", "json"],
-	["release", "--dry-run"],
-	["release"],
+const COMMANDS = [
+	{
+		label: "mc step:validate",
+		legacyArgs: ["validate"],
+		currentArgs: ["step:validate"],
+	},
+	{ label: "mc discover --format json", args: ["discover", "--format", "json"] },
+	{ label: "mc release --dry-run", args: ["release", "--dry-run"] },
+	{ label: "mc release", args: ["release"] },
 ];
 const SCENARIOS = [
 	{ id: "baseline", name: "Baseline fixture", packages: 20, changesets: 50, commits: 50 },
@@ -140,7 +138,7 @@ function summarizeScenarioStatus(tablePath, phaseTablePath) {
 	const regressed = "🔴";
 	const flat = "⚪";
 	const shortNames = new Map([
-		["mc validate", "validate"],
+		["mc step:validate", "validate"],
 		["mc discover --format json", "discover"],
 		["mc release --dry-run", "dry-run"],
 		["mc release", "release"],
@@ -175,7 +173,7 @@ function renderComment(outputPath, scenarios) {
 		"",
 		"Commands:",
 	];
-	for (const label of COMMAND_LABELS) lines.push(`- \`${label}\``);
+	for (const command of COMMANDS) lines.push(`- \`${command.label}\``);
 	for (const scenario of scenarios) {
 		const status = summarizeScenarioStatus(scenario.tablePath, scenario.phaseTablePath);
 		lines.push("", "<details>");
@@ -190,6 +188,16 @@ function renderComment(outputPath, scenarios) {
 		lines.push("", "</details>");
 	}
 	writeFileSync(outputPath, `${lines.join("\n")}\n`);
+}
+
+function supportsArgs(bin, args) {
+	const result = spawnSync(bin, [...args, "--help"], { encoding: "utf8" });
+	return result.status === 0;
+}
+
+function commandArgsFor(bin, command) {
+	if (command.currentArgs && supportsArgs(bin, command.currentArgs)) return command.currentArgs;
+	return command.args ?? command.legacyArgs;
 }
 
 function supportsJsonProgress(bin) {
@@ -435,16 +443,16 @@ function runScenario(mainBin, prBin, fixtureDir, tablePath) {
 		"--export-markdown",
 		tablePath,
 	];
-	for (let i = 0; i < COMMAND_LABELS.length; i += 1) {
+	for (const command of COMMANDS) {
 		args.push(
 			"--command-name",
-			`main · ${COMMAND_LABELS[i]}`,
-			`${mainBin} ${COMMAND_ARGS[i].join(" ")}`,
+			`main · ${command.label}`,
+			`${mainBin} ${commandArgsFor(mainBin, command).join(" ")}`,
 		);
 		args.push(
 			"--command-name",
-			`pr · ${COMMAND_LABELS[i]}`,
-			`${prBin} ${COMMAND_ARGS[i].join(" ")}`,
+			`pr · ${command.label}`,
+			`${prBin} ${commandArgsFor(prBin, command).join(" ")}`,
 		);
 	}
 	run(hyperfineBin, args, { cwd: fixtureDir, stdio: "inherit" });

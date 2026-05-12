@@ -74,7 +74,6 @@ use crate::cli::apply_runtime_change_type_choices;
 use crate::cli::apply_runtime_prepare_release_markdown_defaults;
 use crate::cli::build_cli_command_subcommand;
 use crate::cli::build_command_for_root;
-use crate::cli::build_release_record_subcommand;
 use crate::cli::build_skill_subcommand;
 use crate::cli::build_subagents_subcommand;
 use crate::cli::cli_command_after_help;
@@ -511,6 +510,9 @@ fn expected_builtin_step_command_names() -> Vec<&'static str> {
 		"step:comment-released-issues",
 		"step:affected-packages",
 		"step:diagnose-changesets",
+		"step:release-record",
+		"step:publish-readiness",
+		"step:tag-release",
 		"step:retarget-release",
 	]
 }
@@ -595,11 +597,11 @@ fn cli_help_returns_success_output() {
 	assert!(output.contains("step:publish-release"));
 	assert!(output.contains("step:plan-publish-rate-limits"));
 	assert!(output.contains("step:retarget-release"));
-	assert!(output.contains("release-record"));
-	assert!(output.contains("publish-bootstrap"));
+	assert!(output.contains("step:release-record"));
+	assert!(output.contains("step:placeholder-publish"));
 	assert!(output.contains("publish-release"));
 	assert!(output.contains("comment-released-issues"));
-	assert!(output.contains("tag-release"));
+	assert!(output.contains("step:tag-release"));
 }
 
 #[test]
@@ -840,19 +842,14 @@ fn release_record_help_describes_first_parent_discovery() {
 		"mc",
 		[
 			OsString::from("mc"),
-			OsString::from("release-record"),
+			OsString::from("step:release-record"),
 			OsString::from("--help"),
 		],
 	)
 	.unwrap_or_else(|error| panic!("release-record help: {error}"));
 
-	assert!(
-		output.contains("Inspect the monochange release record associated with a tag or commit")
-	);
-	assert!(output.contains("mc release-record --from v1.2.3"));
-	assert!(
-		output.contains("Walks first-parent ancestry until it finds a monochange release record")
-	);
+	assert!(output.contains("Inspect the release record associated with a tag or commit"));
+	assert!(output.contains("--from <FROM>"));
 }
 
 #[test]
@@ -861,18 +858,14 @@ fn tag_release_help_describes_post_merge_tagging_workflow() {
 		"mc",
 		[
 			OsString::from("mc"),
-			OsString::from("tag-release"),
+			OsString::from("step:tag-release"),
 			OsString::from("--help"),
 		],
 	)
 	.unwrap_or_else(|error| panic!("tag-release help: {error}"));
 
-	assert!(
-		output.contains(
-			"Create and push release tags from the monochange release record on a commit"
-		)
-	);
-	assert!(output.contains("mc tag-release --from HEAD --dry-run --format json"));
+	assert!(output.contains("Create and push release tags from a release record"));
+	assert!(output.contains("mc step:tag-release --from HEAD --dry-run --format json"));
 	assert!(output.contains("reruns on the same commit as already up to date"));
 }
 
@@ -1191,7 +1184,7 @@ fn release_record_supports_json_output() {
 		root,
 		[
 			OsString::from("mc"),
-			OsString::from("release-record"),
+			OsString::from("step:release-record"),
 			OsString::from("--from"),
 			OsString::from("HEAD"),
 			OsString::from("--format"),
@@ -1226,7 +1219,7 @@ fn release_record_jq_filters_json_output_for_ci() {
 		root,
 		[
 			OsString::from("mc"),
-			OsString::from("release-record"),
+			OsString::from("step:release-record"),
 			OsString::from("--from"),
 			OsString::from("HEAD"),
 			OsString::from("--format"),
@@ -1244,7 +1237,7 @@ fn release_record_jq_filters_json_output_for_ci() {
 		root,
 		[
 			OsString::from("mc"),
-			OsString::from("release-record"),
+			OsString::from("step:release-record"),
 			OsString::from("--from"),
 			OsString::from("HEAD"),
 			OsString::from("--format"),
@@ -1267,7 +1260,7 @@ fn publish_readiness_dispatches_from_release_record_and_writes_artifact() {
 		root,
 		[
 			OsString::from("mc"),
-			OsString::from("publish-readiness"),
+			OsString::from("step:publish-readiness"),
 			OsString::from("--from"),
 			OsString::from("HEAD"),
 			OsString::from("--package"),
@@ -1292,109 +1285,6 @@ fn publish_readiness_dispatches_from_release_record_and_writes_artifact() {
 }
 
 #[test]
-fn publish_bootstrap_dispatches_from_release_record_and_writes_artifact() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let root = tempdir.path();
-	create_release_record_commit(root);
-	let output_path = root.join(".monochange/local/bootstrap-result.json");
-	let output = run_cli(
-		root,
-		[
-			OsString::from("mc"),
-			OsString::from("publish-bootstrap"),
-			OsString::from("--from"),
-			OsString::from("HEAD"),
-			OsString::from("--package"),
-			OsString::from("missing"),
-			OsString::from("--dry-run"),
-			OsString::from("--format"),
-			OsString::from("text"),
-			OsString::from("--output"),
-			output_path.clone().into_os_string(),
-		],
-	)
-	.unwrap_or_else(|error| panic!("publish-bootstrap output: {error}"));
-
-	assert!(output.contains("publish bootstrap: planned"));
-	assert!(output.contains("release ref: HEAD"));
-	assert!(output.contains("dry-run: yes"));
-	assert!(output.contains("packages: none"));
-
-	let artifact = fs::read_to_string(&output_path)
-		.unwrap_or_else(|error| panic!("read bootstrap artifact: {error}"));
-	assert!(artifact.contains("\"kind\": \"monochange.publishBootstrap\""));
-	assert!(artifact.contains("\"status\": \"planned\""));
-	assert!(artifact.contains("\"from\": \"HEAD\""));
-	assert!(artifact.contains("\"selectedPackages\": []"));
-}
-
-#[test]
-fn publish_bootstrap_dispatches_with_release_record_package_publications() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let root = tempdir.path();
-	create_release_record_commit_with_package_publication(root, "missing");
-	let output = run_cli(
-		root,
-		[
-			OsString::from("mc"),
-			OsString::from("publish-bootstrap"),
-			OsString::from("--from"),
-			OsString::from("HEAD"),
-			OsString::from("--package"),
-			OsString::from("missing"),
-			OsString::from("--dry-run"),
-			OsString::from("--format"),
-			OsString::from("json"),
-		],
-	)
-	.unwrap_or_else(|error| panic!("publish-bootstrap output: {error}"));
-
-	assert!(output.contains("\"selectedPackages\": [\n    \"missing\"\n  ]"));
-	assert!(output.contains("\"packages\": []"));
-}
-
-#[test]
-fn publish_bootstrap_propagates_placeholder_publish_errors() {
-	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-	let root = tempdir.path();
-	create_release_record_commit_with_package_publication(root, "missing");
-	fs::create_dir_all(root.join("crates/missing/src"))
-		.unwrap_or_else(|error| panic!("create package source: {error}"));
-	fs::write(
-		root.join("crates/missing/Cargo.toml"),
-		"[package]\nname = \"missing\"\nversion = \"1.2.3\"\nedition = \"2021\"\n",
-	)
-	.unwrap_or_else(|error| panic!("write package manifest: {error}"));
-	fs::write(
-		root.join("crates/missing/src/lib.rs"),
-		"pub fn value() -> u8 { 1 }\n",
-	)
-	.unwrap_or_else(|error| panic!("write package source: {error}"));
-	fs::write(
-		root.join("monochange.toml"),
-		"[package.missing]\npath = \"crates/missing\"\ntype = \"cargo\"\n\n[package.missing.publish.placeholder]\nreadme_file = \"missing-placeholder.md\"\n",
-	)
-	.unwrap_or_else(|error| panic!("write monochange config: {error}"));
-
-	let error = run_cli(
-		root,
-		[
-			OsString::from("mc"),
-			OsString::from("publish-bootstrap"),
-			OsString::from("--from"),
-			OsString::from("HEAD"),
-			OsString::from("--package"),
-			OsString::from("missing"),
-			OsString::from("--dry-run"),
-		],
-	)
-	.unwrap_err()
-	.to_string();
-
-	assert!(error.contains("failed to read placeholder README"));
-}
-
-#[test]
 fn publish_readiness_reports_release_ref_and_output_errors() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
@@ -1404,7 +1294,7 @@ fn publish_readiness_reports_release_ref_and_output_errors() {
 		root,
 		[
 			OsString::from("mc"),
-			OsString::from("publish-readiness"),
+			OsString::from("step:publish-readiness"),
 			OsString::from("--from"),
 			OsString::from("missing-ref"),
 		],
@@ -1416,7 +1306,7 @@ fn publish_readiness_reports_release_ref_and_output_errors() {
 		root,
 		[
 			OsString::from("mc"),
-			OsString::from("publish-readiness"),
+			OsString::from("step:publish-readiness"),
 			OsString::from("--from"),
 			OsString::from("HEAD"),
 			OsString::from("--output"),
@@ -1432,7 +1322,7 @@ fn publish_readiness_reports_release_ref_and_output_errors() {
 }
 
 #[test]
-fn init_writes_detected_packages_groups_and_default_cli_commands() {
+fn init_writes_detected_packages_groups_without_default_cli_commands() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_fixture("monochange/init-scan", tempdir.path());
 
@@ -1448,18 +1338,13 @@ fn init_writes_detected_packages_groups_and_default_cli_commands() {
 	assert!(config.contains("[package.core]"));
 	assert!(config.contains("[package.web]"));
 	assert!(config.contains("[group.main]"));
-	assert!(!config.contains("[cli.validate]"));
-	assert!(config.contains("[cli.discover]"));
-	assert!(config.contains("[cli.change]"));
-	assert!(config.contains("[cli.release]"));
-	assert!(config.contains("[cli.versions]"));
-	assert!(config.contains("[cli.placeholder-publish]"));
-	assert!(config.contains("[cli.publish]"));
-	assert!(config.contains("[cli.publish-plan]"));
-	assert!(config.contains("type = \"Discover\""));
-	assert!(config.contains("type = \"CreateChangeFile\""));
-	assert!(config.contains("type = \"PlaceholderPublish\""));
-	assert!(config.contains("type = \"PublishPackages\""));
+	assert!(
+		!config
+			.lines()
+			.any(|line| line.trim_start().starts_with("[cli."))
+	);
+	assert!(config.contains("without [cli.*] command"));
+	assert!(config.contains("mc step:*"));
 
 	load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("generated config should parse: {error}"));
@@ -1480,7 +1365,7 @@ fn init_writes_configuration_that_validates_in_empty_workspace() {
 	assert!(!config.contains("[cli.validate]"));
 	run_cli(
 		tempdir.path(),
-		[OsString::from("mc"), OsString::from("validate")],
+		[OsString::from("mc"), OsString::from("step:validate")],
 	)
 	.unwrap_or_else(|error| panic!("generated config should validate: {error}"));
 }
@@ -1823,7 +1708,7 @@ fn validate_command_validates_workspace_configuration_and_changesets() {
 	copy_fixture("monochange/validate-workspace", tempdir.path());
 	let output = run_cli(
 		tempdir.path(),
-		[OsString::from("mc"), OsString::from("validate")],
+		[OsString::from("mc"), OsString::from("step:validate")],
 	)
 	.unwrap_or_else(|error| panic!("validate output: {error}"));
 	assert!(output.contains("workspace validation passed"));
@@ -1835,7 +1720,7 @@ fn validate_command_reports_invalid_changeset_targets() {
 	copy_fixture("monochange/validate-invalid-changeset", tempdir.path());
 	let error = run_cli(
 		tempdir.path(),
-		[OsString::from("mc"), OsString::from("validate")],
+		[OsString::from("mc"), OsString::from("step:validate")],
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected validation failure"));
@@ -3960,7 +3845,7 @@ fn repairable_releases_guide_distinguishes_manifest_and_release_record() {
 		"manifest = \"what monochange is preparing right now\"",
 		"release record = \"what this release commit historically declared\"",
 		"`ReleaseRecord` does **not** replace the cached release manifest",
-		"mc release-record --from v1.2.3",
+		"mc step:release-record --from v1.2.3",
 		"mc repair-release --from v1.2.3 --target HEAD --dry-run",
 		"Prefer publishing a new patch release",
 	] {
@@ -3979,7 +3864,7 @@ fn github_automation_guide_mentions_release_repair_and_dry_run() {
 		.unwrap_or_else(|error| panic!("github automation guide: {error}"));
 
 	for expected in [
-		"mc release-record --from v1.2.3",
+		"mc step:release-record --from v1.2.3",
 		"mc repair-release --from v1.2.3 --target HEAD --dry-run",
 		"Use `--dry-run` first for `repair-release`",
 	] {
@@ -4011,7 +3896,7 @@ fn release_planning_guide_describes_release_cli_command_requirements() {
 		fs::read_to_string(release_guide).unwrap_or_else(|error| panic!("release guide: {error}"));
 
 	for expected in [
-		"`mc release` is a config-driven workflow command.",
+		"`mc release` is a config-driven workflow command only when your repository defines a `[cli.release]` table.",
 		"`.changeset/*.md`",
 		"`--dry-run`",
 	] {
@@ -4156,7 +4041,7 @@ fn validate_rejects_workspace_versioned_packages_in_different_groups() {
 
 	let error = run_cli(
 		tempdir.path(),
-		[OsString::from("mc"), OsString::from("validate")],
+		[OsString::from("mc"), OsString::from("step:validate")],
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected validation failure"));
@@ -4175,7 +4060,7 @@ fn validate_rejects_workspace_versioned_packages_not_in_any_group() {
 
 	let error = run_cli(
 		tempdir.path(),
-		[OsString::from("mc"), OsString::from("validate")],
+		[OsString::from("mc"), OsString::from("step:validate")],
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected validation failure"));
@@ -4195,7 +4080,7 @@ fn validate_accepts_workspace_versioned_packages_in_same_group() {
 
 	let output = run_cli(
 		tempdir.path(),
-		[OsString::from("mc"), OsString::from("validate")],
+		[OsString::from("mc"), OsString::from("step:validate")],
 	)
 	.unwrap_or_else(|error| panic!("validate output: {error}"));
 	assert!(output.contains("workspace validation passed"));
@@ -4210,7 +4095,7 @@ fn validate_accepts_single_workspace_versioned_package_without_group() {
 
 	let output = run_cli(
 		tempdir.path(),
-		[OsString::from("mc"), OsString::from("validate")],
+		[OsString::from("mc"), OsString::from("step:validate")],
 	)
 	.unwrap_or_else(|error| panic!("validate output: {error}"));
 	assert!(output.contains("workspace validation passed"));
@@ -6448,6 +6333,137 @@ fn execute_cli_command_retarget_release_requires_from_input() {
 }
 
 #[test]
+fn execute_cli_command_builtin_release_steps_require_from_input() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	write_blank_monochange_config(tempdir.path());
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+
+	let cases = [
+		(
+			"release-record",
+			monochange_core::CliStepDefinition::ReleaseRecord {
+				name: None,
+				when: None,
+				always_run: false,
+				inputs: BTreeMap::new(),
+			},
+			"missing release-record ref",
+		),
+		(
+			"publish-readiness",
+			monochange_core::CliStepDefinition::PublishReadiness {
+				name: None,
+				when: None,
+				always_run: false,
+				inputs: BTreeMap::new(),
+			},
+			"missing publish-readiness ref",
+		),
+		(
+			"tag-release",
+			monochange_core::CliStepDefinition::TagRelease {
+				name: None,
+				when: None,
+				always_run: false,
+				inputs: BTreeMap::new(),
+			},
+			"missing tag-release ref",
+		),
+	];
+
+	for (name, step, expected) in cases {
+		let cli_command = CliCommandDefinition {
+			name: name.to_string(),
+			help_text: None,
+			inputs: Vec::new(),
+			steps: vec![step],
+			dry_run: false,
+		};
+		let error = crate::execute_cli_command(
+			tempdir.path(),
+			&configuration,
+			&cli_command,
+			true,
+			BTreeMap::new(),
+		)
+		.err()
+		.unwrap_or_else(|| panic!("expected missing from input error for {name}"));
+		assert!(
+			error.to_string().contains(expected),
+			"{name} error missing `{expected}`: {error}"
+		);
+	}
+}
+
+#[test]
+fn execute_cli_command_tag_release_verification_errors_before_rendering() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"[source]
+provider = "github"
+owner = "monochange"
+repo = "monochange"
+
+[source.releases]
+branches = ["release/*"]
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+	git_in_temp_repo(tempdir.path(), &["init", "-b", "main"]);
+	git_in_temp_repo(
+		tempdir.path(),
+		&["config", "user.email", "test@example.com"],
+	);
+	git_in_temp_repo(tempdir.path(), &["config", "user.name", "Test User"]);
+	git_in_temp_repo(tempdir.path(), &["config", "commit.gpgsign", "false"]);
+	fs::write(tempdir.path().join("README.md"), "release branch\n")
+		.unwrap_or_else(|error| panic!("write readme: {error}"));
+	git_in_temp_repo(tempdir.path(), &["add", "."]);
+	git_in_temp_repo(tempdir.path(), &["commit", "-m", "initial"]);
+	let configuration = load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let mut step_inputs = BTreeMap::new();
+	step_inputs.insert(
+		"from".to_string(),
+		monochange_core::CliStepInputValue::String("HEAD".to_string()),
+	);
+	step_inputs.insert(
+		"push".to_string(),
+		monochange_core::CliStepInputValue::Boolean(false),
+	);
+	let cli_command = CliCommandDefinition {
+		name: "tag-release".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![monochange_core::CliStepDefinition::TagRelease {
+			name: None,
+			when: None,
+			always_run: false,
+			inputs: step_inputs,
+		}],
+		dry_run: false,
+	};
+	let error = crate::execute_cli_command(
+		tempdir.path(),
+		&configuration,
+		&cli_command,
+		true,
+		BTreeMap::new(),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected tag verification error"));
+	assert!(!error.to_string().contains("missing tag-release ref"));
+	assert!(
+		error
+			.to_string()
+			.contains("is not reachable from any configured release branch pattern [release/*]"),
+		"unexpected tag verification error: {error}"
+	);
+}
+
+#[test]
 fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	write_blank_monochange_config(tempdir.path());
@@ -6505,7 +6521,7 @@ fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 				no_verify: false,
 				inputs: BTreeMap::new(),
 			},
-			"`OpenReleaseRequest` requires a previous `PrepareRelease` step",
+			"`OpenReleaseRequest` requires a previous `PrepareRelease` step or a reusable prepared release artifact",
 		),
 		(
 			"release-comments",
@@ -10548,22 +10564,6 @@ fn create_release_record_commit(root: &Path) -> String {
 	create_release_record_commit_from_record(root, &record)
 }
 
-fn create_release_record_commit_with_package_publication(root: &Path, package: &str) -> String {
-	let mut record = sample_release_record_for_retarget();
-	record.package_publications = vec![monochange_core::PackagePublicationTarget {
-		package: package.to_string(),
-		ecosystem: Ecosystem::Cargo,
-		registry: Some(monochange_core::PublishRegistry::Builtin(
-			monochange_core::RegistryKind::CratesIo,
-		)),
-		version: "1.2.3".to_string(),
-		mode: monochange_core::PublishMode::Builtin,
-		trusted_publishing: monochange_core::TrustedPublishingSettings::default(),
-		attestations: monochange_core::PublishAttestationSettings::default(),
-	}];
-	create_release_record_commit_from_record(root, &record)
-}
-
 fn create_release_record_commit_from_record(
 	root: &Path,
 	record: &monochange_core::ReleaseRecord,
@@ -10840,7 +10840,12 @@ fn build_command_and_configured_change_type_choices_include_runtime_metadata() {
 	assert_eq!(command.get_name(), "monochange");
 	assert!(command.clone().find_subcommand("skill").is_some());
 	assert!(command.clone().find_subcommand("subagents").is_some());
-	assert!(command.clone().find_subcommand("release-record").is_some());
+	assert!(
+		command
+			.clone()
+			.find_subcommand("step:release-record")
+			.is_some()
+	);
 
 	let configuration = monochange_core::WorkspaceConfiguration {
 		root_path: PathBuf::from("."),
@@ -11500,67 +11505,6 @@ fn subagents_command_supports_all_targets_in_default_text_output() {
 }
 
 #[test]
-fn build_release_record_subcommand_requires_from_and_supports_json_output() {
-	let command = Command::new("mc").subcommand(build_release_record_subcommand());
-	let matches = command
-		.clone()
-		.try_get_matches_from([
-			OsString::from("mc"),
-			OsString::from("release-record"),
-			OsString::from("--from"),
-			OsString::from("HEAD"),
-			OsString::from("--format"),
-			OsString::from("json"),
-		])
-		.unwrap_or_else(|error| panic!("release-record matches: {error}"));
-	let (_, subcommand_matches) = matches
-		.subcommand()
-		.unwrap_or_else(|| panic!("expected release-record subcommand"));
-	assert_eq!(
-		subcommand_matches
-			.get_one::<String>("from")
-			.map(String::as_str),
-		Some("HEAD")
-	);
-	assert_eq!(
-		subcommand_matches
-			.get_one::<String>("format")
-			.map(String::as_str),
-		Some("json")
-	);
-	let error = command
-		.try_get_matches_from([OsString::from("mc"), OsString::from("release-record")])
-		.err()
-		.unwrap_or_else(|| panic!("expected missing from error"));
-	assert_eq!(
-		error.kind(),
-		clap::error::ErrorKind::MissingRequiredArgument
-	);
-}
-
-#[test]
-fn build_release_record_subcommand_accepts_sha_flag() {
-	let command = Command::new("mc").subcommand(build_release_record_subcommand());
-	let matches = command
-		.clone()
-		.try_get_matches_from([
-			OsString::from("mc"),
-			OsString::from("release-record"),
-			OsString::from("--from"),
-			OsString::from("HEAD"),
-			OsString::from("--sha"),
-		])
-		.unwrap_or_else(|error| panic!("release-record --sha matches: {error}"));
-	let (_, subcommand_matches) = matches
-		.subcommand()
-		.unwrap_or_else(|| panic!("expected release-record subcommand"));
-	assert!(
-		subcommand_matches.get_flag("sha"),
-		"expected --sha to be parsed as a flag"
-	);
-}
-
-#[test]
 fn build_command_with_cli_registers_custom_subcommands_and_default_help_text() {
 	let cli = vec![CliCommandDefinition {
 		name: "custom".to_string(),
@@ -11593,7 +11537,7 @@ fn cli_command_after_help_covers_supported_commands_and_custom_commands() {
 		("diagnostics", "linked review request"),
 		("repair-release", "Defaults to descendant-only retargets"),
 		(
-			"tag-release",
+			"step:tag-release",
 			"Treats reruns on the same commit as already up to date",
 		),
 	];
@@ -13176,10 +13120,10 @@ fn cli_help_subcommand_renders_detailed_command_help() {
 		[
 			OsString::from("mc"),
 			OsString::from("help"),
-			OsString::from("validate"),
+			OsString::from("step:validate"),
 		],
 	)
-	.unwrap_or_else(|error| panic!("help validate output: {error}"));
+	.unwrap_or_else(|error| panic!("help step:validate output: {error}"));
 
 	assert!(output.contains("validate"));
 	assert!(output.contains("Description"));
@@ -13321,24 +13265,14 @@ fn init_with_provider_writes_source_section_and_commit_release_command() {
 		"expected [source.pull_requests]"
 	);
 	assert!(
-		config.contains("[cli.commit-release]"),
-		"expected [cli.commit-release] command"
+		!config
+			.lines()
+			.any(|line| line.trim_start().starts_with("[cli.")),
+		"expected no generated CLI commands"
 	);
 	assert!(
-		config.contains("[cli.release-pr]"),
-		"expected [cli.release-pr] command"
-	);
-	assert!(
-		config.contains("type = \"PrepareRelease\""),
-		"expected PrepareRelease step"
-	);
-	assert!(
-		config.contains("type = \"CommitRelease\""),
-		"expected CommitRelease step"
-	);
-	assert!(
-		config.contains("type = \"OpenReleaseRequest\""),
-		"expected OpenReleaseRequest step"
+		config.contains("mc step:*"),
+		"expected starter config to document direct step commands"
 	);
 	load_workspace_configuration(tempdir.path())
 		.unwrap_or_else(|error| panic!("generated provider config should parse: {error}"));
@@ -13387,16 +13321,20 @@ fn init_with_github_provider_creates_workflow_files() {
 	let release = fs::read_to_string(tempdir.path().join(".github/workflows/release.yml"))
 		.unwrap_or_else(|error| panic!("release.yml: {error}"));
 	assert!(
-		release.contains("mc release-pr"),
-		"expected mc release-pr command"
+		release.contains("mc step:prepare-release --format markdown"),
+		"expected mc step:prepare-release command"
 	);
 	assert!(
-		release.contains("mc tag-release --from HEAD"),
-		"expected mc tag-release command"
+		release.contains("mc step:open-release-request --format markdown"),
+		"expected mc step:open-release-request command"
 	);
 	assert!(
-		release.contains("mc publish"),
-		"expected mc publish command"
+		release.contains("mc step:tag-release --from HEAD"),
+		"expected mc step:tag-release command"
+	);
+	assert!(
+		release.contains("mc step:publish-packages"),
+		"expected mc step:publish-packages command"
 	);
 	assert!(
 		release.contains("github-actions[bot]"),
@@ -13544,7 +13482,11 @@ fn init_with_gitlab_provider_writes_source_but_no_workflows() {
 		.unwrap_or_else(|error| panic!("config: {error}"));
 
 	assert!(config.contains("provider = \"gitlab\""));
-	assert!(config.contains("[cli.commit-release]"));
+	assert!(
+		!config
+			.lines()
+			.any(|line| line.trim_start().starts_with("[cli."))
+	);
 	assert!(
 		!output.contains("changeset-policy.yml"),
 		"gitlab should not generate GitHub workflows"

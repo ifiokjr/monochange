@@ -29,7 +29,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if mc release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
+          if mc step:release-record --from HEAD --format json >/tmp/release-record.json 2>/dev/null; then
             echo "is_release_commit=true" >> "$GITHUB_OUTPUT"
           else
             echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
@@ -43,7 +43,7 @@ jobs:
 
       - name: create release tags
         if: steps.release_record.outputs.is_release_commit == 'true'
-        run: mc tag-release --from HEAD
+        run: mc step:tag-release --from HEAD
 
       - name: downstream publish jobs would run here
         if: steps.release_record.outputs.is_release_commit == 'true'

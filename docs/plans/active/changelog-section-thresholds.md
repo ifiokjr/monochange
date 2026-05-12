@@ -41,4 +41,4 @@
 
 - `devenv shell cargo test -q -p monochange_core -p monochange_config -p monochange changelog`
 - `devenv shell cargo test -q -p monochange_core -p monochange_config`
-- `devenv shell mc validate`
+- `devenv shell mc step:validate`

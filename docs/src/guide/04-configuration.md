@@ -483,11 +483,11 @@ lockfile_commands = [
 
 CLI workflow commands are user-defined top-level commands. Each `[cli.<command>]` table in `monochange.toml` becomes `mc <command>`, with its own help text, inputs, and ordered step list.
 
-`mc init` writes starter workflow tables for common commands such as `discover`, `change`, `release`, `versions`, `publish`, `publish-plan`, `affected`, `diagnostics`, and `repair-release`. After initialization those names are ordinary config-driven commands: edit the tables to customize behavior, or delete commands you do not want to expose.
+`mc init` writes a minimal starter config and does not seed default `[cli.*]` workflow aliases. Add `[cli.<command>]` tables only for repository-specific workflows that need to chain multiple steps, expose custom names, or run shell `Command` steps.
 
 Built-in steps are also available directly as immutable `mc step:*` commands. The binary generates those commands from the step schemas, so `mc step:discover`, `mc step:prepare-release`, `mc step:affected-packages`, and the other step commands do not require config entries. Use `step:*` in CI when you want a stable built-in operation without depending on a repository-defined wrapper.
 
-Some top-level names are reserved for hardcoded binary commands, including `init`, `mcp`, `help`, `version`, `analyze`, `check`, and `validate`. The `step:` prefix is also reserved. Do not define `[cli.validate]` or `[cli.step:*]` tables.
+Some top-level names are reserved for binary commands, including `init`, `mcp`, `help`, `version`, `analyze`, and `check`. The `step:` prefix is reserved for immutable built-in step commands. Do not define `[cli.step:*]` tables.
 
 <!-- {=cliStepExplicitInputInheritance} -->
 
@@ -862,10 +862,10 @@ Current implementation notes:
 Run:
 
 ```bash
-mc validate
+mc step:validate
 ```
 
-`mc validate` validates:
+`mc step:validate` validates:
 
 - package and group declarations
 - manifest presence for each package type

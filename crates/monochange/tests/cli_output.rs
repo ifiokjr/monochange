@@ -111,7 +111,7 @@ fn validate_cli_succeeds_for_valid_workspace() {
 	assert_cmd_snapshot!(
 		monochange_command(None)
 			.current_dir(tempdir.path())
-			.arg("validate")
+			.arg("step:validate")
 	);
 }
 
@@ -616,7 +616,7 @@ fn validate_cli_rejects_packages_in_multiple_groups() {
 	assert_cmd_snapshot!(
 		monochange_command(None)
 			.current_dir(tempdir.path())
-			.arg("validate")
+			.arg("step:validate")
 	);
 }
 
@@ -638,7 +638,7 @@ fn validate_cli_reports_frontmatter_location_and_fix_hint() {
 
 	let output = monochange_command(None)
 		.current_dir(tempdir.path())
-		.arg("validate")
+		.arg("step:validate")
 		.output()
 		.unwrap_or_else(|error| panic!("validate output: {error}"));
 	assert!(!output.status.success());

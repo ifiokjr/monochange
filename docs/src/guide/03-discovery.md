@@ -20,7 +20,7 @@ Run discovery:
 <!-- {=projectDiscoverCommand} -->
 
 ```bash
-mc validate
+mc step:validate
 mc discover --format json
 ```
 

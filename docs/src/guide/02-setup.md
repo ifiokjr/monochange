@@ -14,9 +14,9 @@ mc init
 
 `mc init` detects packages, writes an annotated `monochange.toml`, and gives you a better starting point than hand-authoring a first config from scratch.
 
-The generated file becomes the source of truth for named workflow commands like `mc discover`, `mc change`, and `mc release`. Those commands come from generated `[cli.*]` tables, so you can edit or delete them like any other config.
+The generated file is intentionally minimal and does not create default `[cli.*]` workflow aliases. Every built-in step is available directly as an immutable `mc step:*` command, for example `mc step:discover`, `mc step:create-change-file`, and `mc step:prepare-release`.
 
-`mc validate` is different: it is a hardcoded binary command that always runs the validation preflight. Every built-in step is also available directly as an immutable `mc step:*` command, for example `mc step:discover`, `mc step:create-change-file`, and `mc step:prepare-release`, even when no matching `[cli.*]` workflow exists.
+Add `[cli.*]` tables only when you want repository-specific named workflows that chain steps, expose custom inputs, or run shell `Command` steps.
 
 ### Automated CI setup with `--provider`
 
@@ -98,19 +98,19 @@ For GitLab and Gitea, the `[source]` section is configured but workflows are not
 ## 2. Validate the generated workspace
 
 ```bash
-mc validate
+mc step:validate
 ```
 
 This confirms that the generated config and any existing `.changeset/*.md` files agree with the workspace.
 
-If validation fails, fix the reported problem first, then rerun `mc validate`.
+If validation fails, fix the reported problem first, then rerun `mc step:validate`.
 
 ## 3. Discover the package ids you will actually use
 
 <!-- {=projectDiscoverCommand} -->
 
 ```bash
-mc validate
+mc step:validate
 mc discover --format json
 ```
 
@@ -148,7 +148,7 @@ When you are ready to move beyond planning:
 
 - use `mc placeholder-publish --dry-run --format json` if some packages still need a bootstrap `0.0.0` release so they exist in their registries first
 - use `mc publish --dry-run --format json` to preview built-in package publication to `crates.io`, `npm`, `jsr`, or `pub.dev`
-- before real package publication, optionally write a readiness artifact with `mc publish-readiness --from HEAD --output .monochange/readiness.json` for preflight review, then run `mc publish`
+- before real package publication, optionally write a readiness artifact with `mc step:publish-readiness --from HEAD --output .monochange/readiness.json` for preflight review, then run `mc publish`
 - use `mc publish-release --dry-run --format json` only for hosted/provider releases such as GitHub releases
 
 ## Package ids vs. group ids
@@ -164,15 +164,15 @@ That keeps your first changes simple while still letting monochange synchronize 
 
 ### `mc init` says a config already exists
 
-Keep the existing `monochange.toml`, inspect it, and continue with `mc validate`. If you want to regenerate the config from scratch, pass the `--force` flag:
+Keep the existing `monochange.toml`, inspect it, and continue with `mc step:validate`. If you want to regenerate the config from scratch, pass the `--force` flag:
 
 ```sh
 mc init --force
 ```
 
-### `mc validate` reports config or changeset errors
+### `mc step:validate` reports config or changeset errors
 
-Fix the reported issue first. `mc validate` is the fastest way to get back to a known-good workspace.
+Fix the reported issue first. `mc step:validate` is the fastest way to get back to a known-good workspace.
 
 ### `mc change` says the package id is unknown
 

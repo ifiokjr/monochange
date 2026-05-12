@@ -2,7 +2,7 @@
 
 `mc repair-release` is for the stressful moment right after a release when you discover that a few follow-up commits still need to be part of that release.
 
-If you have **not created the tags yet** and only need the initial post-merge tag creation step, use `mc tag-release --from HEAD` instead. `repair-release` is the follow-up tool for moving an already-created release tag set.
+If you have **not created the tags yet** and only need the initial post-merge tag creation step, use `mc step:tag-release --from HEAD` instead. `repair-release` is the follow-up tool for moving an already-created release tag set.
 
 Examples:
 
@@ -50,12 +50,12 @@ The `ReleaseRecord` JSON schema is published with the book at <https://monochang
 
 ## How monochange finds a release later
 
-Use `mc release-record` when you want to inspect the durable release declaration for a tag or a newer commit built on top of that release.
+Use `mc step:release-record` when you want to inspect the durable release declaration for a tag or a newer commit built on top of that release.
 
 ```bash
-mc release-record --from v1.2.3
-mc release-record --from HEAD --format json
-mc tag-release --from HEAD --dry-run --format json
+mc step:release-record --from v1.2.3
+mc step:release-record --from HEAD --format json
+mc step:tag-release --from HEAD --dry-run --format json
 ```
 
 monochange will:
@@ -111,7 +111,7 @@ A typical repair flow looks like this:
 4. You inspect the durable history record:
 
 ```bash
-mc release-record --from v1.2.3
+mc step:release-record --from v1.2.3
 ```
 
 5. You preview the repair:

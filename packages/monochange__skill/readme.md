@@ -23,7 +23,7 @@ monochange discovers packages in a monorepo, reads release intent from `.changes
 
 The CLI has three command classes:
 
-1. **Built-in commands** hardcoded by the binary, such as `mc init`, `mc validate`, `mc check`, `mc mcp`, and `mc publish-readiness`.
+1. **Binary commands** wired by the binary, such as `mc init`, `mc check`, and `mc mcp`; typed operations such as validation and publish readiness are exposed as `mc step:*` commands.
 2. **Step commands** generated from built-in step variants, such as `mc step:discover` and `mc step:prepare-release`.
 3. **User-defined workflow commands** created by `[cli.<name>]` in `monochange.toml`, such as `mc release` or `mc publish` in repositories that define them.
 

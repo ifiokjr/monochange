@@ -15,7 +15,7 @@ Use this when adding monochange to an existing monorepo.
 
 ```bash
 mc init
-mc validate
+mc step:validate
 mc step:discover --format json
 mc check
 ```

@@ -28,7 +28,7 @@ fn validate_readiness_artifact_status(report: &PublishReadinessReport) -> Monoch
 		return Ok(());
 	}
 	Err(MonochangeError::Config(
-		"publish readiness artifact is blocked; rerun `mc publish-readiness` and resolve blockers before `mc publish`".to_string(),
+		"publish readiness artifact is blocked; rerun `mc step:publish-readiness` and resolve blockers before `mc publish`".to_string(),
 	))
 }
 
@@ -37,7 +37,7 @@ fn validate_readiness_current_status(report: &PublishReadinessReport) -> Monocha
 		return Ok(());
 	}
 	Err(MonochangeError::Config(
-		"current publish readiness is blocked; rerun `mc publish-readiness` and resolve blockers before `mc publish`".to_string(),
+		"current publish readiness is blocked; rerun `mc step:publish-readiness` and resolve blockers before `mc publish`".to_string(),
 	))
 }
 

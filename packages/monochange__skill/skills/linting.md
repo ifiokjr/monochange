@@ -2,7 +2,7 @@
 
 `mc check` validates monochange configuration, changesets, and package manifests using configured lint rules.
 
-Use `mc validate` when you only need to know whether monochange can load the workspace and changesets. Use `mc check` when package metadata consistency matters: publishability fields, workspace dependency protocols, duplicate changesets, package ownership, and other ecosystem-specific policy.
+Use `mc step:validate` when you only need to know whether monochange can load the workspace and changesets. Use `mc check` when package metadata consistency matters: publishability fields, workspace dependency protocols, duplicate changesets, package ownership, and other ecosystem-specific policy.
 
 ## Commands
 

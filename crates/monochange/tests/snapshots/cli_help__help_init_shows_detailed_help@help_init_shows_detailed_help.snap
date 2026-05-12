@@ -58,7 +58,7 @@ exit_code: 0
 
 ▸ See Also
 
-  mc help populate  mc help validate  mc help discover
+  mc help populate  mc help step:validate  mc help discover
 
 
 ----- stderr -----

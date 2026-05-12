@@ -7,7 +7,7 @@ expression: rendered
 Measured with `hyperfine --warmup 1 --runs 6`.
 
 Commands:
-- `mc validate`
+- `mc step:validate`
 - `mc discover --format json`
 - `mc release --dry-run`
 - `mc release`
@@ -17,8 +17,8 @@ Commands:
 
 | Command                            |    Mean [ms] | Min [ms] | Max [ms] |    Relative |
 | :--------------------------------- | -----------: | -------: | -------: | ----------: |
-| `main · mc validate`               |  120.0 ± 6.0 |    113.0 |    129.0 |        1.00 |
-| `pr · mc validate`                 |  126.0 ± 4.0 |    121.0 |    131.0 | 1.05 ± 0.06 |
+| `main · mc step:validate`               |  120.0 ± 6.0 |    113.0 |    129.0 |        1.00 |
+| `pr · mc step:validate`                 |  126.0 ± 4.0 |    121.0 |    131.0 | 1.05 ± 0.06 |
 | `main · mc discover --format json` |   88.0 ± 3.0 |     84.0 |     92.0 |        1.00 |
 | `pr · mc discover --format json`   |   85.0 ± 2.0 |     82.0 |     88.0 | 0.97 ± 0.04 |
 | `main · mc release --dry-run`      |  240.0 ± 8.0 |    229.0 |    251.0 |        1.00 |
@@ -55,8 +55,8 @@ Commands:
 
 | Command                            |     Mean [ms] | Min [ms] | Max [ms] |    Relative |
 | :--------------------------------- | ------------: | -------: | -------: | ----------: |
-| `main · mc validate`               |  480.0 ± 12.0 |    462.0 |    495.0 |        1.00 |
-| `pr · mc validate`                 |  502.0 ± 15.0 |    481.0 |    522.0 | 1.05 ± 0.05 |
+| `main · mc step:validate`               |  480.0 ± 12.0 |    462.0 |    495.0 |        1.00 |
+| `pr · mc step:validate`                 |  502.0 ± 15.0 |    481.0 |    522.0 | 1.05 ± 0.05 |
 | `main · mc discover --format json` |  390.0 ± 14.0 |    371.0 |    409.0 |        1.00 |
 | `pr · mc discover --format json`   |  372.0 ± 11.0 |    358.0 |    388.0 | 0.95 ± 0.04 |
 | `main · mc release --dry-run`      |  980.0 ± 28.0 |    942.0 |   1018.0 |        1.00 |

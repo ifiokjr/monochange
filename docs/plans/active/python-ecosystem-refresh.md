@@ -40,7 +40,7 @@ PR #152 added Python ecosystem support, but it was created against an older mono
 - [x] run formatter (`cargo fmt --all`)
 - [x] run targeted Python adapter tests
 - [x] run repository lint/test validation through the pre-push hook
-- [x] run workspace config validation (`mc validate`)
+- [x] run workspace config validation (`mc step:validate`)
 - [x] update PR #152 branch
 - [x] monitor GitHub checks
 - [x] fix changeset coverage for packages reported by CI check
@@ -57,7 +57,7 @@ PR #152 added Python ecosystem support, but it was created against an older mono
 - [x] `cargo fmt --all`
 - [x] `devenv shell lint:all` completed; publish dry-run reported expected unpublished internal dependency warnings plus the Python crate readme warning without lint failures
 - [x] pre-push `lint and test` hook completed successfully before force-push
-- [x] `mc validate`
+- [x] `mc step:validate`
 - [x] `cargo fmt --all --check`
 - [x] `cargo test -p monochange_config load_workspace_configuration_inherits_python_ecosystem_defaults`
 - [x] `cargo test -p monochange_config load_workspace_configuration_rejects_python_versioned_file_glob_unsupported_files`
