@@ -136,6 +136,7 @@ fn example_block(description: &str, command: &str) -> String {
 const BUILTIN_COMMAND_NAMES: &[&str] = &[
 	"init",
 	"populate",
+	"command",
 	"skill",
 	"subagents",
 	"analyze",
@@ -268,6 +269,19 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 				"This is a safe, additive-only operation.",
 			],
 			see_also: &["init", "validate"],
+		},
+		CommandHelp {
+			name: "command",
+			summary: "Add or edit config-defined CLI commands interactively",
+			description: "Opens an interactive dashboard for creating and revising [cli.<name>] command entries in monochange.toml. The wizard can add a new command, edit or rename an existing command, keep existing steps unchanged, or replace steps with built-in workflow steps and shell Command steps.",
+			usage: "mc command",
+			options: &[],
+			examples: &[("Open the command dashboard:", "mc command")],
+			tips: &[
+				"Choose edit to revise an existing [cli.<name>] command without rewriting its steps.",
+				"Use the editor action when you need advanced TOML fields that the wizard does not prompt for yet.",
+			],
+			see_also: &["populate", "validate"],
 		},
 		CommandHelp {
 			name: "skill",

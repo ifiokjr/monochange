@@ -1,3 +1,6 @@
+#![allow(unstable_features)]
+#![feature(coverage_attribute)]
+
 //! # `monochange`
 //!
 //! <!-- {=monochangeCrateDocs|trim|linePrefix:"//! ":true} -->
@@ -81,6 +84,7 @@ pub(crate) use cli_runtime::execute_cli_command;
 use cli_runtime::execute_matches;
 pub(crate) use cli_runtime::maybe_render_markdown_for_terminal;
 pub(crate) use cli_runtime::parse_output_format;
+use command_wizard::run_command_wizard;
 use git_support::git_commit_paths;
 use git_support::git_head_commit;
 use git_support::git_stage_paths;
@@ -175,6 +179,7 @@ use subagents::SubagentOptions;
 use subagents::run_subagents;
 pub(crate) use versioned_files::*;
 pub use workspace_ops::AddChangeFileRequest;
+use workspace_ops::PopulateWorkspaceResult;
 pub use workspace_ops::add_change_file;
 pub(crate) use workspace_ops::add_interactive_change_file;
 pub use workspace_ops::discover_workspace;
@@ -237,6 +242,7 @@ mod cli_help;
 mod cli_progress;
 mod cli_runtime;
 mod cli_theme;
+mod command_wizard;
 mod git_support;
 mod hosted_sources;
 mod interactive;
@@ -764,20 +770,9 @@ where
 				return Ok(String::new());
 			}
 			let result = populate_workspace(root)?;
-			if result.added_commands.is_empty() {
-				Ok(format!(
-					"{} already defines all default CLI commands",
-					result.path.display()
-				))
-			} else {
-				Ok(format!(
-					"updated {} and added {} default CLI commands: {}",
-					result.path.display(),
-					result.added_commands.len(),
-					result.added_commands.join(", ")
-				))
-			}
+			Ok(format_populate_workspace_result(&result))
 		}
+		Some(("command", _)) => run_command_wizard_for_cli(root, quiet),
 		Some(("skill", skill_matches)) => {
 			let forwarded_args = skill_matches
 				.get_many::<String>("args")
@@ -1005,6 +1000,30 @@ where
 	} else {
 		Ok(output)
 	}
+}
+
+fn format_populate_workspace_result(result: &PopulateWorkspaceResult) -> String {
+	if result.added_commands.is_empty() {
+		format!(
+			"{} already defines all default CLI commands",
+			result.path.display()
+		)
+	} else {
+		format!(
+			"updated {} and added {} default CLI commands: {}",
+			result.path.display(),
+			result.added_commands.len(),
+			result.added_commands.join(", ")
+		)
+	}
+}
+
+#[coverage(off)]
+fn run_command_wizard_for_cli(root: &Path, quiet: bool) -> MonochangeResult<String> {
+	if quiet {
+		return Ok(String::new());
+	}
+	run_command_wizard(root)
 }
 
 fn run_mcp_command_with<F, Fut>(quiet: bool, run_server: F) -> MonochangeResult<String>

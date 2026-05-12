@@ -1055,9 +1055,33 @@ fn mcp_and_root_command_support_quiet_and_missing_subcommands() {
 	.unwrap_or_else(|error| panic!("quiet mcp output: {error}"));
 	assert!(quiet_output.is_empty());
 
+	let quiet_command_output = run_cli(
+		tempdir.path(),
+		[
+			OsString::from("mc"),
+			OsString::from("command"),
+			OsString::from("--quiet"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("quiet command output: {error}"));
+	assert!(quiet_command_output.is_empty());
+
 	let no_subcommand = run_cli(tempdir.path(), [OsString::from("mc")])
 		.expect_err("missing subcommand should fail");
 	assert!(no_subcommand.to_string().contains("Usage: mc"));
+}
+
+#[test]
+fn populate_workspace_result_message_lists_added_commands() {
+	let result = crate::workspace_ops::PopulateWorkspaceResult {
+		path: PathBuf::from("monochange.toml"),
+		added_commands: vec!["release".to_string(), "publish".to_string()],
+	};
+
+	assert_eq!(
+		crate::format_populate_workspace_result(&result),
+		"updated monochange.toml and added 2 default CLI commands: release, publish"
+	);
 }
 
 #[test]

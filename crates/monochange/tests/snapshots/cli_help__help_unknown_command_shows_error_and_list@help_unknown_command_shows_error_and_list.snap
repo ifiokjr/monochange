@@ -17,6 +17,7 @@ error: Unknown command `nonexistent`
   Run mc help to see available commands.
   init                           Generate monochange.toml with detected packages
   populate                       Add missing built-in CLI commands to monochange.toml
+  command                        Add or edit config-defined CLI commands interactively
   skill                          Install the monochange skill bundle for AI agents
   subagents                      Generate repo-local monochange subagents and agent guidance
   analyze                        Analyze semantic changes for a package
