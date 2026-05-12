@@ -603,6 +603,30 @@ fn cli_help_returns_success_output() {
 }
 
 #[test]
+fn cli_configured_command_help_groups_generated_configured_and_global_options() {
+	let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+	let output = run_with_args_in_dir(
+		"mc",
+		[
+			OsString::from("mc"),
+			OsString::from("release"),
+			OsString::from("--help"),
+		],
+		&root,
+	)
+	.unwrap_or_else(|error| panic!("release help: {error}"));
+
+	assert!(output.contains("Release Options:"));
+	assert!(output.contains("Global Options:"));
+	assert!(output.contains("Release Options:\n      --dry-run"));
+	assert!(output.contains("      --prepared-release <PATH>"));
+	assert!(output.contains("Options:\n      --format <FORMAT>"));
+	assert!(output.contains("Global Options:\n  -q, --quiet"));
+	assert!(output.contains("      --progress-format <FORMAT>"));
+	assert!(output.contains("      --jq <EXPRESSION>"));
+}
+
+#[test]
 fn publish_release_help_documents_draft_release_options() {
 	let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
 	let output = run_with_args_in_dir(

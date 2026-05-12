@@ -135,6 +135,9 @@ fn monochange_styles() -> clap::builder::Styles {
 		.invalid(crate::cli_theme::error())
 }
 
+const GLOBAL_OPTIONS_HELP_HEADING: &str = "Global Options";
+const RELEASE_OPTIONS_HELP_HEADING: &str = "Release Options";
+
 #[allow(clippy::redundant_closure_for_method_calls)]
 pub(crate) fn build_command_with_cli(
 	bin_name: &'static str,
@@ -149,10 +152,12 @@ pub(crate) fn build_command_with_cli(
 			.subcommand_required(true)
 			.arg_required_else_help(true)
 			.subcommand_help_heading("Built-in Commands")
+			.next_help_heading(GLOBAL_OPTIONS_HELP_HEADING)
 			.arg(
 				Arg::new("log-level")
 					.long("log-level")
 					.global(true)
+					.help_heading(GLOBAL_OPTIONS_HELP_HEADING)
 					.help("Set tracing filter (e.g. debug, monochange=trace)")
 					.value_name("FILTER")
 					.hide(true),
@@ -162,6 +167,7 @@ pub(crate) fn build_command_with_cli(
 					.long("quiet")
 					.short('q')
 					.global(true)
+					.help_heading(GLOBAL_OPTIONS_HELP_HEADING)
 					.help("Suppress stdout/stderr output and run in dry-run mode when supported")
 					.action(ArgAction::SetTrue),
 			)
@@ -169,6 +175,7 @@ pub(crate) fn build_command_with_cli(
 				Arg::new("progress-format")
 					.long("progress-format")
 					.global(true)
+					.help_heading(GLOBAL_OPTIONS_HELP_HEADING)
 					.help("Control progress output on stderr")
 					.value_name("FORMAT")
 					.value_parser(["auto", "unicode", "ascii", "json"]),
@@ -177,6 +184,7 @@ pub(crate) fn build_command_with_cli(
 				Arg::new("jq")
 					.long("jq")
 					.global(true)
+					.help_heading(GLOBAL_OPTIONS_HELP_HEADING)
 					.help("Filter JSON output with a jq-style expression, such as `.assets[].name`")
 					.value_name("EXPRESSION"),
 			)
@@ -827,9 +835,11 @@ pub(crate) fn build_cli_command_subcommand(cli_command: &CliCommandDefinition) -
 	let mut command = Command::new(leak_string(cli_command.name.clone()))
 		.about(help_text)
 		.override_usage(usage)
+		.next_help_heading(RELEASE_OPTIONS_HELP_HEADING)
 		.arg(
 			Arg::new("dry-run")
 				.long("dry-run")
+				.help_heading(RELEASE_OPTIONS_HELP_HEADING)
 				.help("Run the command in dry-run mode when supported")
 				.action(ArgAction::SetTrue),
 		);
@@ -839,12 +849,14 @@ pub(crate) fn build_cli_command_subcommand(cli_command: &CliCommandDefinition) -
 			.arg(
 				Arg::new("diff")
 					.long("diff")
+					.help_heading(RELEASE_OPTIONS_HELP_HEADING)
 					.help("Show unified file diffs for prepared release changes")
 					.action(ArgAction::SetTrue),
 			)
 			.arg(
 				Arg::new("prepared-release")
 					.long("prepared-release")
+					.help_heading(RELEASE_OPTIONS_HELP_HEADING)
 					.help("Read or write the prepared release artifact at a specific path")
 					.value_name("PATH"),
 			);
@@ -854,6 +866,7 @@ pub(crate) fn build_cli_command_subcommand(cli_command: &CliCommandDefinition) -
 		command = command.after_help(after_help);
 	}
 
+	command = command.next_help_heading("Options");
 	for input in &cli_command.inputs {
 		command = command.arg(build_cli_command_input_arg(input));
 	}
