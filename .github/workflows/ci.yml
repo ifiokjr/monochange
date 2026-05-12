@@ -136,11 +136,21 @@ jobs:
         run: |
           set -euo pipefail
 
-          if is_release_commit="$(mc step:release-record --from HEAD --format json --jq '.resolvedCommit == .recordCommit' 2>/dev/null)"; then
+          release_record_error="$(mktemp)"
+          if is_release_commit="$(mc step:release-record --from HEAD --format json --jq '.resolvedCommit == .recordCommit' 2>"$release_record_error")"; then
             echo "is_release_commit=${is_release_commit}" >> "$GITHUB_OUTPUT"
-          else
-            echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+
+          subject="$(git log -1 --pretty=%s)"
+          body="$(git log -1 --pretty=%B)"
+          if [[ "$subject" == chore\(release\):* ]] || grep -q '<!-- monochange:release-record:start -->' <<<"$body"; then
+            echo "::error::Release-looking commit could not be read as a release record; failing instead of silently skipping release automation."
+            cat "$release_record_error" >&2
+            exit 1
+          fi
+
+          echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
         shell: devenv shell -- bash -e {0}
 
       - name: check publish builds
@@ -402,6 +412,53 @@ jobs:
         if: steps.release_commit.outputs.created == 'false'
         run: echo "No pull-request release commit was created; skipping release test preflight."
 
+  release-records:
+    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'monochange/release')
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: create release commit
+        id: release_commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          before="$(git rev-parse HEAD)"
+          mc release --commit
+          after="$(git rev-parse HEAD)"
+          if [ "$before" != "$after" ]; then
+            echo "created=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "created=false" >> "$GITHUB_OUTPUT"
+          fi
+        shell: devenv shell -- bash -e {0}
+
+      - name: validate release record discovery
+        if: steps.release_commit.outputs.created == 'true'
+        run: |
+          schema:check
+          cargo test -p monochange_integration_tests release_record_artifact_fixtures_load_through_parser
+          is_release_commit="$(cargo run --quiet --package monochange --bin monochange -- step:release-record --from HEAD --format json --jq '.resolvedCommit == .recordCommit')"
+          if [ "$is_release_commit" != "true" ]; then
+            echo "Generated release commit was not recognized as the resolved release record commit."
+            exit 1
+          fi
+          cargo run --quiet --package monochange --bin monochange -- step:release-record --from HEAD --format json | jq .
+        shell: devenv shell -- bash -e {0}
+
+      - name: skip release record validation when no release commit is created
+        if: steps.release_commit.outputs.created == 'false'
+        run: echo "No pull-request release commit was created; skipping release record preflight."
+
   release-lint:
     if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'monochange/release')
     timeout-minutes: 60
@@ -523,11 +580,21 @@ jobs:
         run: |
           set -euo pipefail
 
-          if is_release_commit="$(mc step:release-record --from HEAD --format json --jq '.resolvedCommit == .recordCommit' 2>/dev/null)"; then
+          release_record_error="$(mktemp)"
+          if is_release_commit="$(mc step:release-record --from HEAD --format json --jq '.resolvedCommit == .recordCommit' 2>"$release_record_error")"; then
             echo "is_release_commit=${is_release_commit}" >> "$GITHUB_OUTPUT"
-          else
-            echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+
+          subject="$(git log -1 --pretty=%s)"
+          body="$(git log -1 --pretty=%B)"
+          if [[ "$subject" == chore\(release\):* ]] || grep -q '<!-- monochange:release-record:start -->' <<<"$body"; then
+            echo "::error::Release-looking commit could not be read as a release record; failing instead of silently skipping release automation."
+            cat "$release_record_error" >&2
+            exit 1
+          fi
+
+          echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
         shell: devenv shell -- bash -e {0}
 
       - name: refresh release pull request
@@ -571,12 +638,18 @@ jobs:
         run: |
           set -euo pipefail
 
-          if is_release_commit="$(mc step:release-record --from HEAD --format json --jq '.resolvedCommit == .recordCommit' 2>/dev/null)"; then
+          if is_release_commit="$(mc step:release-record --from HEAD --format json --jq '.resolvedCommit == .recordCommit')"; then
             echo "is_release_commit=${is_release_commit}" >> "$GITHUB_OUTPUT"
             if [ "${is_release_commit}" = "true" ]; then
               mc step:tag-release --from HEAD --push=true --format json | tee /tmp/tag-report.json
             fi
           else
+            subject="$(git log -1 --pretty=%s)"
+            if [[ "$subject" == chore\(release\):\ prepare\ release* ]]; then
+              echo "Release-looking commit could not be read as a release record; failing instead of silently skipping release automation."
+              mc step:release-record --from HEAD --format json
+              exit 1
+            fi
             echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
           fi
 

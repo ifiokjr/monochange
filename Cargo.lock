@@ -5389,6 +5389,7 @@ dependencies = [
  "monochange_core",
  "monochange_schema",
  "schemars",
+ "semver",
  "serde_json",
 ]
 

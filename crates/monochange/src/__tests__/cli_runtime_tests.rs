@@ -21,6 +21,7 @@ use monochange_core::ShellConfig;
 use monochange_core::SourceProvider;
 use monochange_core::VersionFormat;
 use serde::Serialize;
+use tempfile::TempDir;
 use tempfile::tempdir;
 
 use super::*;
@@ -136,6 +137,19 @@ fn sample_configuration(root: &Path) -> monochange_core::WorkspaceConfiguration 
 		python: monochange_core::EcosystemSettings::default(),
 		go: monochange_core::EcosystemSettings::default(),
 	}
+}
+
+fn initialized_workspace_dir() -> TempDir {
+	let workspace_dir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = workspace_dir.path();
+	fs::write(root.join("Cargo.toml"), "[workspace]\n")
+		.unwrap_or_else(|error| panic!("write workspace manifest: {error}"));
+	git_in_dir(root, &["init", "-b", "main"]);
+	git_in_dir(root, &["config", "user.name", "monochange Tests"]);
+	git_in_dir(root, &["config", "user.email", "monochange@example.com"]);
+	git_in_dir(root, &["add", "Cargo.toml"]);
+	git_in_dir(root, &["commit", "-m", "initial"]);
+	workspace_dir
 }
 
 fn sample_prepared_release() -> PreparedRelease {
@@ -1812,9 +1826,9 @@ fn execute_cli_command_with_options_plans_publish_rate_limits_from_prepared_rele
 	let _guard = TEST_ENV_LOCK
 		.lock()
 		.unwrap_or_else(|error| panic!("test env lock: {error}"));
-	let root = fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
-		.unwrap_or_else(|error| panic!("workspace root: {error}"));
-	let configuration = sample_configuration(&root);
+	let workspace_dir = initialized_workspace_dir();
+	let root = workspace_dir.path();
+	let configuration = sample_configuration(root);
 	let artifact_dir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let artifact_path = artifact_dir.path().join("prepared-release.json");
 	let cli_command = CliCommandDefinition {
@@ -1839,7 +1853,7 @@ fn execute_cli_command_with_options_plans_publish_rate_limits_from_prepared_rele
 		dry_run: false,
 	};
 	save_prepared_release_execution(
-		&root,
+		root,
 		&configuration,
 		&sample_prepared_release(),
 		&[],
@@ -1848,7 +1862,7 @@ fn execute_cli_command_with_options_plans_publish_rate_limits_from_prepared_rele
 	.unwrap_or_else(|error| panic!("save prepared release artifact: {error}"));
 
 	let output = execute_cli_command_with_options(
-		&root,
+		root,
 		&configuration,
 		&cli_command,
 		ExecuteCliCommandOptions {
@@ -1914,16 +1928,8 @@ fn execute_cli_command_with_options_reuses_prepared_release_artifact_for_version
 	let _guard = TEST_ENV_LOCK
 		.lock()
 		.unwrap_or_else(|error| panic!("test env lock: {error}"));
-	let workspace_dir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let workspace_dir = initialized_workspace_dir();
 	let root = workspace_dir.path();
-	fs::write(root.join("Cargo.toml"), "[workspace]\n")
-		.unwrap_or_else(|error| panic!("write workspace manifest: {error}"));
-	git_in_dir(root, &["init", "-b", "main"]);
-	git_in_dir(root, &["config", "user.name", "monochange Tests"]);
-	git_in_dir(root, &["config", "user.email", "monochange@example.com"]);
-	git_in_dir(root, &["add", "Cargo.toml"]);
-	git_in_dir(root, &["commit", "-m", "initial"]);
-
 	let configuration = sample_configuration(root);
 	let artifact_dir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let artifact_path = artifact_dir.path().join("prepared-release.json");
@@ -1960,16 +1966,16 @@ fn execute_cli_command_with_options_reuses_prepared_release_artifact_for_version
 
 #[test]
 fn execute_cli_command_with_options_reports_invalid_versions_artifacts() {
-	let root = fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
-		.unwrap_or_else(|error| panic!("workspace root: {error}"));
-	let configuration = sample_configuration(&root);
+	let workspace_dir = initialized_workspace_dir();
+	let root = workspace_dir.path();
+	let configuration = sample_configuration(root);
 	let artifact_dir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let invalid_artifact_path = artifact_dir.path().join("prepared-release.json");
 	fs::write(&invalid_artifact_path, "not json")
 		.unwrap_or_else(|error| panic!("write invalid artifact: {error}"));
 
 	let error = execute_cli_command_with_options(
-		&root,
+		root,
 		&configuration,
 		&default_cli_command("display-versions"),
 		ExecuteCliCommandOptions {
@@ -1995,13 +2001,13 @@ fn execute_cli_command_with_options_reports_invalid_versions_output_formats() {
 	let _guard = TEST_ENV_LOCK
 		.lock()
 		.unwrap_or_else(|error| panic!("test env lock: {error}"));
-	let root = fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
-		.unwrap_or_else(|error| panic!("workspace root: {error}"));
-	let configuration = sample_configuration(&root);
+	let workspace_dir = initialized_workspace_dir();
+	let root = workspace_dir.path();
+	let configuration = sample_configuration(root);
 	let artifact_dir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let artifact_path = artifact_dir.path().join("prepared-release.json");
 	save_prepared_release_execution(
-		&root,
+		root,
 		&configuration,
 		&sample_prepared_release_with_versions(),
 		&[],
@@ -2010,7 +2016,7 @@ fn execute_cli_command_with_options_reports_invalid_versions_output_formats() {
 	.unwrap_or_else(|error| panic!("save prepared release artifact: {error}"));
 
 	let error = execute_cli_command_with_options(
-		&root,
+		root,
 		&configuration,
 		&default_cli_command("display-versions"),
 		ExecuteCliCommandOptions {

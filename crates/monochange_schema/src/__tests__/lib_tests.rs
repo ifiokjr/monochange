@@ -6,7 +6,6 @@ use crate::SchemaError;
 use crate::SchemaVersion;
 use crate::SchemaVersionParseError;
 use crate::current_schema_version;
-use crate::extract_major_minor;
 use crate::migration_changelog;
 use crate::release_record;
 
@@ -56,27 +55,48 @@ fn package_version_parser_reports_component_errors() {
 }
 
 #[test]
-fn extract_major_minor_strips_patch_at_runtime() {
-	assert_eq!(extract_major_minor("1.42.3"), "1.42");
-	assert_eq!(extract_major_minor("1.42"), "1.42");
+fn current_schema_version_is_not_behind_package_version() {
+	let package_version = env!("CARGO_PKG_VERSION");
+	let current = current_schema_version()
+		.unwrap_or_else(|error| panic!("parse current schema version: {error}"));
+	let package = SchemaVersion::from_package_version(package_version)
+		.unwrap_or_else(|error| panic!("parse package version: {error}"));
+	assert!(
+		current >= package,
+		"current durable schema {current} must not lag package-derived schema {package}"
+	);
+	let serialized = serde_json::to_value(current)
+		.unwrap_or_else(|error| panic!("serialize schema version: {error}"));
+	assert_eq!(serialized, json!(CURRENT_SCHEMA_VERSION_TEXT));
+	assert_eq!(
+		serde_json::to_value(package).unwrap(),
+		json!(package.to_string())
+	);
 }
 
 #[test]
-fn current_schema_version_strips_patch_from_package_version() {
-	let package_version = env!("CARGO_PKG_VERSION");
-	let expected_text = extract_major_minor(package_version);
-	assert_eq!(CURRENT_SCHEMA_VERSION_TEXT, expected_text);
-	let current = current_schema_version()
-		.unwrap_or_else(|error| panic!("parse current schema version: {error}"));
-	let expected = SchemaVersion::from_package_version(package_version)
-		.unwrap_or_else(|error| panic!("parse package version: {error}"));
-	assert_eq!(current, expected);
-	let from_package = SchemaVersion::from_package_version(package_version)
-		.unwrap_or_else(|error| panic!("parse package version: {error}"));
-	assert_eq!(from_package, expected);
-	let serialized = serde_json::to_value(current)
-		.unwrap_or_else(|error| panic!("serialize schema version: {error}"));
-	assert_eq!(serialized, json!(expected_text));
+fn populated_release_record_artifact_uses_current_schema_version() {
+	let version = CURRENT_SCHEMA_VERSION_TEXT;
+	let json = release_record::current_populated_artifact_json();
+	let value: Value = serde_json::from_str(&json)
+		.unwrap_or_else(|error| panic!("parse populated release record artifact: {error}"));
+
+	assert_eq!(value["schemaVersion"], version);
+	assert_eq!(value["kind"], release_record::KIND);
+	assert_eq!(value["releaseTargets"].as_array().unwrap().len(), 2);
+	assert_eq!(value["changesets"].as_array().unwrap().len(), 1);
+	assert!(
+		value["changedFiles"]
+			.as_array()
+			.unwrap()
+			.iter()
+			.any(|entry| {
+				entry
+					== &json!(format!(
+						"crates/monochange_schema/schemas/artifacts/release-record.v{version}.json"
+					))
+			})
+	);
 }
 
 #[test]
@@ -96,6 +116,46 @@ fn release_record_accepts_current_schema_version() {
 		migrated.get("schemaVersion"),
 		Some(&json!(CURRENT_SCHEMA_VERSION_TEXT))
 	);
+}
+
+#[test]
+fn release_record_migrates_older_schema_versions() {
+	let migrated = release_record::migrate_value(json!({
+		"schemaVersion": "0.1",
+		"kind": release_record::KIND,
+		"createdAt": "2026-04-06T12:00:00Z",
+		"command": "release-pr",
+		"releaseTargets": [],
+		"releasedPackages": [],
+		"changedFiles": []
+	}))
+	.unwrap_or_else(|error| panic!("migrate old release record: {error}"));
+
+	assert_eq!(
+		migrated.get("schemaVersion"),
+		Some(&json!(CURRENT_SCHEMA_VERSION_TEXT))
+	);
+}
+
+#[test]
+fn release_record_rejects_older_schema_without_explicit_migration_edge() {
+	let error = release_record::migrate_value(json!({
+		"schemaVersion": "0.0",
+		"kind": release_record::KIND,
+		"createdAt": "2026-04-06T12:00:00Z",
+		"command": "release-pr",
+		"releaseTargets": [],
+		"releasedPackages": [],
+		"changedFiles": []
+	}))
+	.err()
+	.unwrap_or_else(|| panic!("expected missing migration path error"));
+
+	assert!(matches!(
+		error,
+		SchemaError::MissingMigrationPath { from, to, .. }
+			if from == SchemaVersion::new(0, 0) && to == release_record::current_version().unwrap()
+	));
 }
 
 #[test]
@@ -192,25 +252,6 @@ fn release_record_rejects_invalid_version_text() {
 }
 
 #[test]
-fn release_record_rejects_old_version_without_migration_edge() {
-	let error = release_record::migrate_value(json!({
-		"schemaVersion": "9.0",
-		"kind": release_record::KIND,
-		"createdAt": "2026-04-06T12:00:00Z",
-		"command": "release-pr",
-		"releaseTargets": [],
-		"releasedPackages": [],
-		"changedFiles": []
-	}))
-	.err()
-	.unwrap_or_else(|| panic!("expected unsupported version error"));
-	assert!(matches!(
-		error,
-		SchemaError::UnsupportedVersion { actual, .. } if actual == "9.0"
-	));
-}
-
-#[test]
 fn release_record_rejects_unsupported_kind() {
 	let error = release_record::migrate_value(json!({
 		"schemaVersion": "0.1",
@@ -253,8 +294,19 @@ fn release_record_rejects_future_version() {
 fn migration_changelog_is_machine_readable_json() {
 	let json = migration_changelog::to_json_pretty()
 		.unwrap_or_else(|error| panic!("migration changelog json: {error}"));
-	assert_eq!(json, "[]");
-	assert!(migration_changelog::entries_for_artifact(release_record::KIND).is_empty());
+	let value = serde_json::from_str::<Value>(&json)
+		.unwrap_or_else(|error| panic!("migration changelog json should parse: {error}"));
+	let entries = migration_changelog::entries_for_artifact(release_record::KIND);
+	assert_eq!(entries.len(), 1);
+	assert_eq!(entries[0].to, SchemaVersion::new(0, 2));
+	assert_eq!(
+		value.pointer("/0/artifact"),
+		Some(&json!(release_record::KIND))
+	);
+	assert_eq!(value.pointer("/0/from/schemaVersion"), Some(&json!("0.1")));
+	assert_eq!(value.pointer("/0/to"), Some(&json!("0.2")));
+	assert_eq!(value.pointer("/0/operation"), Some(&json!("noop")));
+	assert_eq!(value.pointer("/0/noop"), Some(&json!(true)));
 }
 
 #[test]
@@ -306,5 +358,9 @@ fn committed_migration_changelog_is_current() {
 		"read committed migration changelog"
 	);
 	let committed = committed_result.unwrap_or_default();
-	assert_eq!(committed, format!("{generated}\n"));
+	let committed_value = serde_json::from_str::<Value>(&committed)
+		.unwrap_or_else(|error| panic!("committed migration changelog json: {error}"));
+	let generated_value = serde_json::from_str::<Value>(&generated)
+		.unwrap_or_else(|error| panic!("generated migration changelog json: {error}"));
+	assert_eq!(committed_value, generated_value);
 }

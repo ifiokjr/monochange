@@ -1,1 +1,14 @@
-[]
+[
+	{
+		"artifact": "monochange.releaseRecord",
+		"from": {
+			"type": "version",
+			"schemaVersion": "0.1"
+		},
+		"to": "0.2",
+		"operation": "noop",
+		"changes": [],
+		"noop": true,
+		"reason": "Release-record schema 0.2 preserves the 0.1 wire shape; the explicit edge keeps older artifact readability covered by CI."
+	}
+]

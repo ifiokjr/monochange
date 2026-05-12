@@ -3,6 +3,8 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
+use monochange_core::BumpSeverity;
+
 /// Post-process a generated JSON schema by adding `$id`, `title`, and `description`.
 pub fn post_process(schema: &mut serde_json::Value, id: &str, title: &str, description: &str) {
 	let Some(obj) = schema.as_object_mut() else {
@@ -20,12 +22,17 @@ pub fn post_process(schema: &mut serde_json::Value, id: &str, title: &str, descr
 }
 
 /// Post-process a release-record schema.
-pub fn post_process_release(schema: &mut serde_json::Value, id: &str, title: &str) {
+pub fn post_process_release(
+	schema: &mut serde_json::Value,
+	id: &str,
+	title: &str,
+	schema_version: &str,
+) {
 	post_process(
 		schema,
 		id,
 		title,
-		"Durable commit-embedded release record schema for monochange artifact version 0.1.",
+		"Durable commit-embedded release record schema for monochange release records.",
 	);
 	let Some(obj) = schema.as_object_mut() else {
 		return;
@@ -34,19 +41,26 @@ pub fn post_process_release(schema: &mut serde_json::Value, id: &str, title: &st
 		"additionalProperties".to_string(),
 		serde_json::Value::Bool(false),
 	);
-	// Override kind to use const (single allowed value) — schemaVersion keeps default since it evolves
 	let Some(props) = schema
 		.pointer_mut("/properties")
-		.and_then(|v| v.as_object_mut())
+		.and_then(|value| value.as_object_mut())
 	else {
 		return;
 	};
-	// Override kind to use const — schemaVersion keeps default since it evolves
+	if let Some(schema_version_obj) = props
+		.get_mut("schemaVersion")
+		.and_then(|schema_version| schema_version.as_object_mut())
+	{
+		schema_version_obj.insert(
+			"default".to_string(),
+			serde_json::Value::String(schema_version.to_string()),
+		);
+	}
 	if let Some(kind_obj) = props.get_mut("kind").and_then(|kind| kind.as_object_mut()) {
 		kind_obj.remove("default");
 		kind_obj.insert(
 			"const".to_string(),
-			serde_json::Value::String("monochange.releaseRecord".to_string()),
+			serde_json::Value::String(monochange_schema::release_record::KIND.to_string()),
 		);
 	}
 }
@@ -87,7 +101,15 @@ pub fn run(update_mode: bool) -> Result<(), String> {
 	let workspace_dir = crate_dir.parent().unwrap().parent().unwrap();
 	let schemas_dir = workspace_dir.join("crates/monochange_schema/schemas");
 	let docs_schemas_dir = workspace_dir.join("docs/src/schemas");
-	run_with_paths(update_mode, &schemas_dir, &docs_schemas_dir)
+	let schema_version_path = workspace_dir.join("crates/monochange_schema/SCHEMA_VERSION");
+	let version = expected_schema_version(workspace_dir)?;
+	run_with_paths(
+		update_mode,
+		&schemas_dir,
+		&docs_schemas_dir,
+		&schema_version_path,
+		&version,
+	)
 }
 
 /// Core schema generation logic with configurable output directories.
@@ -95,9 +117,9 @@ pub fn run_with_paths(
 	update_mode: bool,
 	schemas_dir: &PathBuf,
 	docs_schemas_dir: &PathBuf,
+	schema_version_path: &PathBuf,
+	version: &str,
 ) -> Result<(), String> {
-	let version = monochange_schema::CURRENT_SCHEMA_VERSION_TEXT;
-
 	// Release record schema
 	let release_schema = monochange_core::schema::release_record();
 	let mut release_value = release_schema.to_value();
@@ -105,6 +127,7 @@ pub fn run_with_paths(
 		&mut release_value,
 		"https://monochange.github.io/monochange/schemas/release-record.schema.json",
 		"monochange release record",
+		version,
 	);
 
 	// Config schema from raw TOML types
@@ -118,6 +141,12 @@ pub fn run_with_paths(
 
 	let release_json = serde_json::to_string_pretty(&release_value).unwrap();
 	let config_json = serde_json::to_string_pretty(&config_value).unwrap();
+	let release_record_artifact_json =
+		monochange_schema::release_record::populated_artifact_json(version);
+	let migration_changelog_json = format!(
+		"{}\n",
+		monochange_schema::migration_changelog::to_json_pretty().unwrap()
+	);
 
 	// Versioned schemas (identical content, different $id)
 	let mut release_versioned_value = release_value.clone();
@@ -128,6 +157,7 @@ pub fn run_with_paths(
 			"https://monochange.github.io/monochange/schemas/release-record.v{version}.schema.json"
 		),
 		"monochange release record",
+		version,
 	);
 	post_process_config(
 		&mut config_versioned_value,
@@ -141,47 +171,252 @@ pub fn run_with_paths(
 
 	let release_path = schemas_dir.join("release-record.schema.json");
 	let config_path = schemas_dir.join("monochange.schema.json");
+	let migration_changelog_path = schemas_dir.join("migration-changelog.json");
+	let release_record_artifacts_dir = schemas_dir.join("artifacts");
+	let release_record_artifact_current_path =
+		release_record_artifacts_dir.join("release-record.current.json");
+	let release_record_artifact_versioned_path =
+		release_record_artifacts_dir.join(format!("release-record.v{version}.json"));
+	let docs_release_path = docs_schemas_dir.join("release-record.schema.json");
+	let docs_config_path = docs_schemas_dir.join("monochange.schema.json");
+	let docs_release_versioned_path =
+		docs_schemas_dir.join(format!("release-record.v{version}.schema.json"));
+	let docs_config_versioned_path =
+		docs_schemas_dir.join(format!("monochange.v{version}.schema.json"));
 
 	if update_mode {
 		fs::create_dir_all(schemas_dir).unwrap();
 		fs::create_dir_all(docs_schemas_dir).unwrap();
+		fs::create_dir_all(&release_record_artifacts_dir).unwrap();
+		if let Some(parent) = schema_version_path.parent() {
+			fs::create_dir_all(parent).unwrap();
+		}
 
+		fs::write(schema_version_path, schema_version_file_contents(version)).unwrap();
 		fs::write(&release_path, &release_json).unwrap();
 		fs::write(&config_path, &config_json).unwrap();
+		fs::write(&migration_changelog_path, &migration_changelog_json).unwrap();
+		fs::write(
+			&release_record_artifact_current_path,
+			&release_record_artifact_json,
+		)
+		.unwrap();
+		fs::write(
+			&release_record_artifact_versioned_path,
+			&release_record_artifact_json,
+		)
+		.unwrap();
 
 		// Also write to docs directory (unversioned aliases)
-		fs::write(
-			docs_schemas_dir.join("release-record.schema.json"),
-			&release_json,
-		)
-		.unwrap();
-		fs::write(
-			docs_schemas_dir.join("monochange.schema.json"),
-			&config_json,
-		)
-		.unwrap();
+		fs::write(&docs_release_path, &release_json).unwrap();
+		fs::write(&docs_config_path, &config_json).unwrap();
 
 		// Write versioned schemas
-		fs::write(
-			docs_schemas_dir.join(format!("release-record.v{version}.schema.json")),
-			&release_versioned_json,
-		)
-		.unwrap();
-		fs::write(
-			docs_schemas_dir.join(format!("monochange.v{version}.schema.json")),
-			&config_versioned_json,
-		)
-		.unwrap();
+		fs::write(&docs_release_versioned_path, &release_versioned_json).unwrap();
+		fs::write(&docs_config_versioned_path, &config_versioned_json).unwrap();
 
 		println!("Schemas updated successfully.");
 		return Ok(());
 	}
 
 	// Check mode: compare existing files
-	check_schemas(&[
+	let mut errors = Vec::new();
+	if let Err(error) = check_text_files(&[(
+		schema_version_path,
+		schema_version_file_contents(version).as_str(),
+	)]) {
+		errors.push(error);
+	}
+	if let Err(error) = check_schemas(&[
 		(&release_path, release_json.as_str()),
 		(&config_path, config_json.as_str()),
-	])
+		(&migration_changelog_path, migration_changelog_json.as_str()),
+		(
+			&release_record_artifact_current_path,
+			release_record_artifact_json.as_str(),
+		),
+		(
+			&release_record_artifact_versioned_path,
+			release_record_artifact_json.as_str(),
+		),
+		(&docs_release_path, release_json.as_str()),
+		(&docs_config_path, config_json.as_str()),
+		(
+			&docs_release_versioned_path,
+			release_versioned_json.as_str(),
+		),
+		(&docs_config_versioned_path, config_versioned_json.as_str()),
+	]) {
+		errors.push(error);
+	}
+	if errors.is_empty() {
+		println!("Schemas are up to date.");
+		Ok(())
+	} else {
+		Err(errors.join("\n"))
+	}
+}
+
+fn schema_version_file_contents(version: &str) -> String {
+	format!("{version}\n")
+}
+
+/// Derive the expected public schema version from the next `monochange_schema` release.
+pub fn expected_schema_version(workspace_dir: &Path) -> Result<String, String> {
+	let package_version = schema_package_manifest_version(workspace_dir)?;
+	let current_version = semver::Version::parse(&package_version).map_err(|error| {
+		format!("Could not parse monochange_schema package version `{package_version}`: {error}")
+	})?;
+	let next_version = planned_schema_bump(workspace_dir)?.apply_to_version(&current_version);
+	monochange_schema::SchemaVersion::from_package_version(&next_version.to_string())
+		.map(|schema_version| schema_version.to_string())
+		.map_err(|error| format!("Could not derive schema version from `{next_version}`: {error}"))
+}
+
+fn schema_package_manifest_version(workspace_dir: &Path) -> Result<String, String> {
+	let manifest_path = workspace_dir.join("crates/monochange_schema/Cargo.toml");
+	let manifest = fs::read_to_string(&manifest_path)
+		.map_err(|error| format!("Could not read {}: {error}", manifest_path.display()))?;
+	package_version_from_manifest(&manifest).ok_or_else(|| {
+		format!(
+			"Could not find [package] version in {}",
+			manifest_path.display()
+		)
+	})
+}
+
+fn package_version_from_manifest(manifest: &str) -> Option<String> {
+	let mut in_package = false;
+	for line in manifest.lines() {
+		let trimmed = line.trim();
+		if trimmed == "[package]" {
+			in_package = true;
+			continue;
+		}
+		if trimmed.starts_with('[') {
+			in_package = false;
+			continue;
+		}
+		if !in_package {
+			continue;
+		}
+		let Some((key, value)) = trimmed.split_once('=') else {
+			continue;
+		};
+		if key.trim() == "version" {
+			return Some(clean_changeset_scalar(value).to_string());
+		}
+	}
+	None
+}
+
+fn planned_schema_bump(workspace_dir: &Path) -> Result<BumpSeverity, String> {
+	let changeset_dir = workspace_dir.join(".changeset");
+	let Ok(entries) = fs::read_dir(&changeset_dir) else {
+		return Ok(BumpSeverity::None);
+	};
+	let mut bump = BumpSeverity::None;
+	for entry in entries {
+		let entry = entry.map_err(|error| {
+			format!(
+				"Could not read entry in {}: {error}",
+				changeset_dir.display()
+			)
+		})?;
+		let path = entry.path();
+		if path.extension().and_then(|value| value.to_str()) != Some("md") {
+			continue;
+		}
+		let contents = fs::read_to_string(&path)
+			.map_err(|error| format!("Could not read {}: {error}", path.display()))?;
+		bump = bump.max(changeset_bump_for_package(&contents, "monochange_schema"));
+	}
+	Ok(bump)
+}
+
+fn changeset_bump_for_package(contents: &str, package: &str) -> BumpSeverity {
+	let normalized = contents.replace("\r\n", "\n").replace('\r', "\n");
+	let Some(without_opening) = normalized.strip_prefix("---") else {
+		return BumpSeverity::None;
+	};
+	let Some((frontmatter, _body)) = without_opening.split_once("\n---") else {
+		return BumpSeverity::None;
+	};
+
+	let mut bump = BumpSeverity::None;
+	let mut active_package = false;
+	for line in frontmatter.lines() {
+		let trimmed = line.trim();
+		if trimmed.is_empty() || trimmed.starts_with('#') {
+			continue;
+		}
+
+		if line.starts_with(' ') || line.starts_with('\t') {
+			if active_package {
+				bump = bump.max(nested_bump(trimmed));
+			}
+			continue;
+		}
+
+		active_package = false;
+		let Some((raw_key, raw_value)) = trimmed.split_once(':') else {
+			continue;
+		};
+		let key = clean_changeset_scalar(raw_key);
+		if key != package {
+			continue;
+		}
+
+		active_package = true;
+		bump = bump.max(inline_bump(raw_value));
+	}
+	bump
+}
+
+fn nested_bump(line: &str) -> BumpSeverity {
+	let Some((key, value)) = line.split_once(':') else {
+		return BumpSeverity::None;
+	};
+	if clean_changeset_scalar(key) != "bump" {
+		return BumpSeverity::None;
+	}
+	bump_from_text(clean_changeset_scalar(value))
+}
+
+fn inline_bump(value: &str) -> BumpSeverity {
+	let value = value.trim();
+	if value.is_empty() {
+		return BumpSeverity::None;
+	}
+	let direct = bump_from_text(clean_changeset_scalar(value));
+	if direct != BumpSeverity::None {
+		return direct;
+	}
+
+	let inline_table = value.trim_start_matches('{').trim_end_matches('}');
+	inline_table
+		.split(',')
+		.map(nested_bump)
+		.max()
+		.unwrap_or(BumpSeverity::None)
+}
+
+fn bump_from_text(value: &str) -> BumpSeverity {
+	match clean_changeset_scalar(value) {
+		"major" => BumpSeverity::Major,
+		"minor" => BumpSeverity::Minor,
+		"patch" => BumpSeverity::Patch,
+		_ => BumpSeverity::None,
+	}
+}
+
+fn clean_changeset_scalar(value: &str) -> &str {
+	value
+		.trim()
+		.trim_matches(',')
+		.trim_matches('"')
+		.trim_matches('\'')
+		.trim()
 }
 
 const COMMANDS_INVENTORY_START: &str = "<!-- xtask:commands:start -->";
@@ -330,6 +565,26 @@ fn replace_commands_inventory(current: &str, expected: &str) -> Result<String, S
 	Ok(updated)
 }
 
+/// Compare expected text strings against files on disk.
+fn check_text_files(paths: &[(&PathBuf, &str)]) -> Result<(), String> {
+	let mut errors = Vec::new();
+	for (path, expected) in paths {
+		if path.exists() {
+			let existing = fs::read_to_string(path).unwrap();
+			if existing != *expected {
+				errors.push(format!("Generated file mismatch: {}", path.display()));
+			}
+		} else {
+			errors.push(format!("Generated file missing: {}", path.display()));
+		}
+	}
+	if errors.is_empty() {
+		Ok(())
+	} else {
+		Err(errors.join("\n"))
+	}
+}
+
 /// Compare expected schema JSON strings against files on disk.
 fn check_schemas(paths: &[(&PathBuf, &str)]) -> Result<(), String> {
 	let mut errors = Vec::new();
@@ -364,7 +619,6 @@ fn check_schemas(paths: &[(&PathBuf, &str)]) -> Result<(), String> {
 		}
 	}
 	if errors.is_empty() {
-		println!("Schemas are up to date.");
 		Ok(())
 	} else {
 		Err(errors.join("\n"))

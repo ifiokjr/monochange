@@ -1,0 +1,80 @@
+{
+	"changedFiles": [
+		"Cargo.toml",
+		"crates/monochange_schema/Cargo.toml",
+		"crates/monochange_schema/schemas/artifacts/release-record.current.json"
+	],
+	"changesets": [
+		{
+			"details": "Generated release-record artifact fixtures are parsed through the same migration path as commit-embedded records.",
+			"path": ".changeset/release-record-schema-compat.md",
+			"summary": "Keep release record schema compatibility checks stable",
+			"targets": [
+				{
+					"bump": "patch",
+					"causedBy": [
+						"release-record-schema-compat"
+					],
+					"changeType": "fix",
+					"evidenceRefs": [
+						"crates/monochange_schema/src/lib.rs"
+					],
+					"id": "monochange_schema",
+					"kind": "package",
+					"origin": "frontmatter"
+				}
+			]
+		}
+	],
+	"command": "mc release --commit",
+	"createdAt": "2026-01-01T00:00:00Z",
+	"deletedChangesets": [
+		".changeset/release-record-schema-compat.md"
+	],
+	"kind": "monochange.releaseRecord",
+	"provider": {
+		"host": "github.com",
+		"kind": "github",
+		"owner": "monochange",
+		"repo": "monochange"
+	},
+	"releaseTargets": [
+		{
+			"id": "main",
+			"kind": "group",
+			"members": [
+				"monochange",
+				"monochange_core"
+			],
+			"release": true,
+			"tag": true,
+			"tagName": "v0.1.0",
+			"version": "0.1.0",
+			"versionFormat": "primary"
+		},
+		{
+			"id": "monochange_schema",
+			"kind": "package",
+			"members": [],
+			"release": false,
+			"tag": false,
+			"tagName": "monochange_schema/v0.1.0",
+			"version": "0.1.0",
+			"versionFormat": "namespaced"
+		}
+	],
+	"releasedPackages": [
+		"monochange",
+		"monochange_core",
+		"monochange_schema"
+	],
+	"schemaVersion": "0.1",
+	"updatedChangelogs": [
+		"changelog.md"
+	],
+	"version": "0.1.0",
+	"versions": {
+		"main": "0.1.0",
+		"monochange_schema": "0.1.0"
+	}
+}
