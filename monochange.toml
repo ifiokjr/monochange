@@ -743,8 +743,8 @@ steps = [
 	{ type = "Command", name = "format changed files", when = "{{ number_of_changesets > 0 }}", command = "dprint fmt --allow-no-files" },
 	{ type = "Command", name = "stage json schemas", when = "{{ number_of_changesets > 0 }}", command = "git add crates/monochange_schema/schemas/*.json docs/src/schemas/*.json" },
 	{ type = "Command", name = "refresh shared markdown", when = "{{ number_of_changesets > 0 }}", command = "mdt update" },
-	{ type = "CommitRelease", name = "create release commit", when = "{{ number_of_changesets > 0 && commit }}", inputs = { no_verify = "{{ inputs.no_verify }}" } },
-	{ type = "OpenReleaseRequest", name = "create the pr", when = "{{ number_of_changesets > 0 && commit && create_pr }}", inputs = { no_verify = "{{ inputs.no_verify }}" } },
+	{ type = "CommitRelease", name = "create release commit", when = "{{ number_of_changesets > 0 && inputs.commit }}", inputs = { no_verify = "{{ inputs.no_verify }}" } },
+	{ type = "OpenReleaseRequest", name = "create the pr", when = "{{ number_of_changesets > 0 && inputs.commit && inputs.create_pr }}", inputs = { no_verify = "{{ inputs.no_verify }}" } },
 ]
 
 [cli.publish-check]
