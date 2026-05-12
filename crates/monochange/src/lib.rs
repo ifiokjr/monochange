@@ -760,7 +760,7 @@ fn render_custom_command_argument_error(
 	)
 }
 
-fn format_populate_workspace_result(result: &workspace_ops::PopulateWorkspaceResult) -> String {
+fn format_populate_workspace_result(result: &PopulateWorkspaceResult) -> String {
 	if result.added_commands.is_empty() {
 		format!(
 			"{} already defines all default CLI commands",
@@ -979,22 +979,6 @@ where
 		jq_filter::apply_jq_filter(&output, &expression)
 	} else {
 		Ok(output)
-	}
-}
-
-fn format_populate_workspace_result(result: &PopulateWorkspaceResult) -> String {
-	if result.added_commands.is_empty() {
-		format!(
-			"{} already defines all default CLI commands",
-			result.path.display()
-		)
-	} else {
-		format!(
-			"updated {} and added {} default CLI commands: {}",
-			result.path.display(),
-			result.added_commands.len(),
-			result.added_commands.join(", ")
-		)
 	}
 }
 

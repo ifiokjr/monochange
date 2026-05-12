@@ -15,20 +15,20 @@ use super::*;
 fn empty_configuration(root: &Path) -> WorkspaceConfiguration {
 	WorkspaceConfiguration {
 		root_path: root.to_path_buf(),
-		defaults: monochange_core::WorkspaceDefaults::default(),
-		changelog: monochange_core::ChangelogSettings::default(),
+		defaults: WorkspaceDefaults::default(),
+		changelog: ChangelogSettings::default(),
 		packages: Vec::new(),
 		groups: Vec::new(),
 		cli: Vec::new(),
-		changesets: monochange_core::ChangesetSettings::default(),
+		changesets: ChangesetSettings::default(),
 		source: None,
-		lints: monochange_core::lint::WorkspaceLintSettings::default(),
-		cargo: monochange_core::EcosystemSettings::default(),
-		npm: monochange_core::EcosystemSettings::default(),
-		deno: monochange_core::EcosystemSettings::default(),
-		dart: monochange_core::EcosystemSettings::default(),
-		python: monochange_core::EcosystemSettings::default(),
-		go: monochange_core::EcosystemSettings::default(),
+		lints: WorkspaceLintSettings::default(),
+		cargo: EcosystemSettings::default(),
+		npm: EcosystemSettings::default(),
+		deno: EcosystemSettings::default(),
+		dart: EcosystemSettings::default(),
+		python: EcosystemSettings::default(),
+		go: EcosystemSettings::default(),
 	}
 }
 
