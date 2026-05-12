@@ -1,3 +1,5 @@
+#![allow(clippy::disallowed_methods)]
+
 use monochange_core::ChangelogSettings;
 use monochange_core::ChangesetSettings;
 use monochange_core::DependencyKind;
@@ -10,11 +12,42 @@ use monochange_core::lint::WorkspaceLintSettings;
 
 use super::*;
 
+fn empty_configuration(root: &Path) -> WorkspaceConfiguration {
+	WorkspaceConfiguration {
+		root_path: root.to_path_buf(),
+		defaults: monochange_core::WorkspaceDefaults::default(),
+		changelog: monochange_core::ChangelogSettings::default(),
+		packages: Vec::new(),
+		groups: Vec::new(),
+		cli: Vec::new(),
+		changesets: monochange_core::ChangesetSettings::default(),
+		source: None,
+		lints: monochange_core::lint::WorkspaceLintSettings::default(),
+		cargo: monochange_core::EcosystemSettings::default(),
+		npm: monochange_core::EcosystemSettings::default(),
+		deno: monochange_core::EcosystemSettings::default(),
+		dart: monochange_core::EcosystemSettings::default(),
+		python: monochange_core::EcosystemSettings::default(),
+		go: monochange_core::EcosystemSettings::default(),
+	}
+}
+
 fn builtin_provider_registry_trust_capability(
 	registry: RegistryKind,
 	provider: CiProviderKind,
 ) -> ProviderRegistryTrustCapability {
 	provider_registry_trust_capability(&PublishRegistry::Builtin(registry), provider)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn build_pending_configured_package_release_requests_handles_empty_configuration() {
+	let configuration = empty_configuration(Path::new("."));
+	let requests =
+		build_pending_configured_package_release_requests(&configuration, &[], &BTreeSet::new())
+			.await
+			.unwrap_or_else(|error| panic!("build pending configured release requests: {error}"));
+
+	assert!(requests.is_empty());
 }
 
 #[test]

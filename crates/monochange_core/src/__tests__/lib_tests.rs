@@ -182,6 +182,39 @@ impl HostedSourceAdapter for DefaultHostedSourceAdapter {
 	}
 }
 
+struct PanicDiscoveryAdapter;
+
+impl crate::EcosystemAdapter for PanicDiscoveryAdapter {
+	fn ecosystem(&self) -> Ecosystem {
+		Ecosystem::Cargo
+	}
+
+	fn discover(&self, _root: &Path) -> crate::MonochangeResult<crate::AdapterDiscovery> {
+		panic!("discovery panic for coverage");
+	}
+
+	fn load_configured(
+		&self,
+		_root: &Path,
+		_package_path: &Path,
+	) -> crate::MonochangeResult<Option<PackageRecord>> {
+		Ok(None)
+	}
+
+	fn supported_versioned_file_kind(&self, _path: &Path) -> bool {
+		false
+	}
+
+	fn validate_versioned_file(
+		&self,
+		_full_path: &Path,
+		_display_path: &str,
+		_custom_fields: Option<&[String]>,
+	) -> crate::MonochangeResult<()> {
+		Ok(())
+	}
+}
+
 fn test_source_configuration(provider: SourceProvider) -> SourceConfiguration {
 	SourceConfiguration {
 		provider,
@@ -813,6 +846,75 @@ fn package_record_ids_are_stable_for_relative_and_absolute_roots() {
 
 	assert_eq!(relative.id, absolute.id);
 	assert_eq!(relative.id, "cargo:crates/core/Cargo.toml");
+}
+
+#[test]
+fn discovery_path_filter_applies_gitignore_to_relative_paths() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	fs::write(root.join(".gitignore"), "ignored/\n*.log\n")
+		.unwrap_or_else(|error| panic!("write gitignore: {error}"));
+	fs::create_dir_all(root.join("ignored"))
+		.unwrap_or_else(|error| panic!("create ignored dir: {error}"));
+	fs::create_dir_all(root.join("kept"))
+		.unwrap_or_else(|error| panic!("create kept dir: {error}"));
+	fs::write(root.join("kept/app.log"), "log\n")
+		.unwrap_or_else(|error| panic!("write log: {error}"));
+
+	let filter = crate::DiscoveryPathFilter::new(root);
+
+	assert!(!filter.should_descend(Path::new("ignored")));
+	assert!(!filter.allows(&root.join("kept/app.log")));
+	assert!(filter.allows(Path::new("kept/app.txt")));
+}
+
+#[test]
+fn discovery_path_filter_handles_paths_prefixed_by_relative_input_root() {
+	let tempdir = tempfile::Builder::new()
+		.prefix("relative-filter-")
+		.tempdir_in(".")
+		.unwrap_or_else(|error| panic!("tempdir in current directory: {error}"));
+	let relative_root = PathBuf::from(
+		tempdir
+			.path()
+			.file_name()
+			.unwrap_or_else(|| panic!("expected tempdir file name"))
+			.to_os_string(),
+	);
+	let filter = crate::DiscoveryPathFilter::new(&relative_root);
+
+	assert!(filter.should_descend(&relative_root.join("src")));
+}
+
+#[test]
+fn discovery_path_filter_skips_nested_git_worktrees() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let nested = root.join("vendor/repo");
+	fs::create_dir_all(nested.join("src"))
+		.unwrap_or_else(|error| panic!("create nested worktree: {error}"));
+	fs::write(nested.join(".git"), "gitdir: ../.git/worktrees/repo\n")
+		.unwrap_or_else(|error| panic!("write nested git marker: {error}"));
+
+	let filter = crate::DiscoveryPathFilter::new(root);
+
+	assert!(!filter.should_descend(&nested));
+	assert!(!filter.allows(&nested.join("src/lib.rs")));
+}
+
+#[test]
+fn ecosystem_registry_reports_panicked_discovery_worker() {
+	let registry = crate::EcosystemRegistry::new().with_adapter(Box::new(PanicDiscoveryAdapter));
+	let error = registry
+		.discover_all(Path::new("."))
+		.err()
+		.unwrap_or_else(|| panic!("expected panicked discovery worker error"));
+
+	assert!(
+		error
+			.to_string()
+			.contains("ecosystem discovery worker panicked")
+	);
 }
 
 #[test]

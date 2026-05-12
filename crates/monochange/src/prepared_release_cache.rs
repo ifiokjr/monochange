@@ -367,24 +367,23 @@ async fn tracked_path_snapshots(
 		if absolute_path.exists() {
 			let relative_path = root_relative(root, &absolute_path);
 			let relative = relative_path.to_string_lossy().into_owned();
-			let hash_index = file_paths.len();
 			file_paths.push(relative);
-			snapshot_inputs.push(TrackedPathSnapshotInput::File { path, hash_index });
+			snapshot_inputs.push(TrackedPathSnapshotInput::File { path });
 		} else {
 			snapshot_inputs.push(TrackedPathSnapshotInput::Deleted { path });
 		}
 	}
 
-	let hashes = hash_files_at_paths(root, &file_paths).await?;
+	let mut hashes = hash_files_at_paths(root, &file_paths).await?.into_iter();
 	let snapshots = snapshot_inputs
 		.into_iter()
 		.map(|input| {
 			match input {
-				TrackedPathSnapshotInput::File { path, hash_index } => {
+				TrackedPathSnapshotInput::File { path } => {
 					PreparedReleaseTrackedPath {
 						path,
 						state: PreparedReleaseTrackedPathState::File,
-						hash: Some(hashes[hash_index].clone()),
+						hash: hashes.next(),
 					}
 				}
 				TrackedPathSnapshotInput::Deleted { path } => {
@@ -403,7 +402,7 @@ async fn tracked_path_snapshots(
 
 #[derive(Debug)]
 enum TrackedPathSnapshotInput {
-	File { path: PathBuf, hash_index: usize },
+	File { path: PathBuf },
 	Deleted { path: PathBuf },
 }
 
@@ -445,16 +444,19 @@ async fn hash_files_at_paths(root: &Path, paths: &[String]) -> MonochangeResult<
 		)));
 	}
 
-	let hashes = String::from_utf8_lossy(&output.stdout)
+	parse_hash_object_output(&output.stdout, paths.len())
+}
+
+fn parse_hash_object_output(stdout: &[u8], expected_count: usize) -> MonochangeResult<Vec<String>> {
+	let hashes = String::from_utf8_lossy(stdout)
 		.lines()
 		.map(str::trim)
 		.filter(|hash| !hash.is_empty())
 		.map(str::to_string)
 		.collect::<Vec<_>>();
-	if hashes.len() != paths.len() {
+	if hashes.len() != expected_count {
 		return Err(MonochangeError::Config(format!(
-			"failed to hash files: expected {} hashes, got {}",
-			paths.len(),
+			"failed to hash files: expected {expected_count} hashes, got {}",
 			hashes.len()
 		)));
 	}

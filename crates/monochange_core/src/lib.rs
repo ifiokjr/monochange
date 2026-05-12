@@ -510,9 +510,7 @@ impl DiscoveryPathFilter {
 	}
 
 	fn has_nested_git_worktree_ancestor(&self, path: &Path, is_dir: bool) -> bool {
-		let Some(mut current) = self.absolute_path(path) else {
-			return false;
-		};
+		let mut current = self.absolute_path(path);
 		if !is_dir {
 			current = current.parent().unwrap_or(&current).to_path_buf();
 		}
@@ -544,15 +542,14 @@ impl DiscoveryPathFilter {
 		)
 	}
 
-	fn absolute_path(&self, path: &Path) -> Option<PathBuf> {
+	fn absolute_path(&self, path: &Path) -> PathBuf {
 		if path.is_absolute() {
-			return path.strip_prefix(&self.input_root).map_or_else(
-				|_| Some(path.to_path_buf()),
-				|relative| Some(self.root.join(relative)),
-			);
+			return path
+				.strip_prefix(&self.input_root)
+				.map_or_else(|_| path.to_path_buf(), |relative| self.root.join(relative));
 		}
-		self.relative_path(path)
-			.map(|relative| self.root.join(relative))
+		let relative = path.strip_prefix(&self.input_root).unwrap_or(path);
+		self.root.join(relative)
 	}
 }
 

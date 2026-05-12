@@ -343,14 +343,14 @@ fn validate_and_discover_release_workspace_cover_fallback_and_errors() {
 	let undetected = WorkspaceConfiguration {
 		root_path: undetected_root.path().to_path_buf(),
 		defaults: monochange_core::WorkspaceDefaults {
-			package_type: Some(PackageType::Cargo),
+			package_type: Some(PackageType::Go),
 			..monochange_core::WorkspaceDefaults::default()
 		},
 		changelog: ChangelogSettings::default(),
 		packages: vec![PackageDefinition {
 			id: "empty".to_string(),
 			path: PathBuf::from("empty-package"),
-			package_type: PackageType::Cargo,
+			package_type: PackageType::Go,
 			changelog: None,
 			excluded_changelog_types: Vec::new(),
 			empty_update_message: None,
@@ -383,8 +383,7 @@ fn validate_and_discover_release_workspace_cover_fallback_and_errors() {
 	assert!(
 		undetected_error
 			.to_string()
-			.contains("could not be discovered")
-			|| undetected_error.to_string().contains("failed to read")
+			.contains("configured package `empty` at empty-package could not be discovered")
 	);
 
 	let missing_manifest_root =

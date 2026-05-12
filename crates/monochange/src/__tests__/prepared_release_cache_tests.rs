@@ -104,6 +104,28 @@ fn read_prepared_release_artifact_reports_invalid_json() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn hash_file_helpers_return_single_hash_and_reject_mismatched_output() {
+	let tempdir = setup_prepared_release_repo();
+	let root = tempdir.path();
+	let path = root.join("hash-me.txt");
+	fs::write(&path, "hash me\n").unwrap_or_else(|error| panic!("write hash fixture: {error}"));
+
+	let hash = hash_file_at_path(root, &path)
+		.await
+		.unwrap_or_else(|error| panic!("hash file: {error}"));
+	assert_eq!(hash.len(), 40);
+
+	let error = parse_hash_object_output(b"abc123\n", 2)
+		.err()
+		.unwrap_or_else(|| panic!("expected mismatched hash count error"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to hash files: expected 2 hashes, got 1")
+	);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn git_status_snapshot_sorts_results_and_excludes_artifact_path() {
 	let tempdir = setup_prepared_release_repo();
 	let root = tempdir.path();
