@@ -57,7 +57,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: checkout current workflow ref
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
 
@@ -71,24 +71,42 @@ jobs:
 
           if git rev-parse --verify --quiet "refs/tags/$release_ref" >/dev/null; then
             git checkout --detach "refs/tags/$release_ref"
-          elif git rev-parse --verify --quiet "refs/remotes/origin/$release_ref" >/dev/null; then
-            git checkout --detach "refs/remotes/origin/$release_ref"
           else
-            git fetch --force origin "$release_ref"
-            git checkout --detach FETCH_HEAD
+            echo "::error::Release ref '$release_ref' is not a valid tag. Releases must be created from tags." >&2
+            exit 1
           fi
 
+      - name: verify checkout matches release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_tag="${{ env.RELEASE_TAG }}"
+          actual_commit=$(git rev-parse HEAD)
+          tag_commit=$(git rev-list -n1 "$expected_tag")
+          if [ "$actual_commit" != "$tag_commit" ]; then
+            echo "::error::Checked-out commit $actual_commit does not match tag $expected_tag ($tag_commit)" >&2
+            exit 1
+          fi
+
+          # Ensure the tag has been merged into main (prevents orphaned/release-branch tags)
+          if ! git merge-base --is-ancestor "$actual_commit" refs/remotes/origin/main 2>/dev/null; then
+            echo "::error::Tag $expected_tag ($actual_commit) is not on the main branch" >&2
+            exit 1
+          fi
+
+          echo "Verified: checked-out commit matches tag $expected_tag and is on main"
+
       - name: install rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
 
       - name: setup cross toolchain
-        uses: taiki-e/setup-cross-toolchain-action@v1
+        uses: taiki-e/setup-cross-toolchain-action@129361238c06ff2cc1c4ca5c5d2217af441ffdf6 # v1.40.1
         with:
           target: ${{ matrix.target }}
         if: startsWith(matrix.os, 'ubuntu') && !contains(matrix.target, '-musl')
 
       - name: install cross
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@c070f87102a1c75b3183910f391c1cb887fe13c8 # v2
         with:
           tool: cross
         if: contains(matrix.target, '-musl')
@@ -99,7 +117,7 @@ jobs:
         if: endsWith(matrix.target, 'windows-msvc')
 
       - name: upload binaries
-        uses: taiki-e/upload-rust-binary-action@v1
+        uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1.30.2
         with:
           bin: monochange
           manifest-path: crates/monochange/Cargo.toml
@@ -156,7 +174,7 @@ jobs:
           done
 
       - name: attest all release archives
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
         with:
           subject-path: ${{ runner.temp }}/release-asset-attestations/*
 
