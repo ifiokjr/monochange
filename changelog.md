@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.5.0](https://github.com/monochange/monochange/releases/tag/v0.5.0) (2026-05-12)
+
+Grouped release for `main`.
+
+### Added
+
+> [!NOTE]
+> _main_
+
+#### Publish all configured packages
+
+Add a `--all` flag to the PublishPackages CLI step so migration workflows can publish every configured package, including packages that were not part of the prepared release record.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #461](https://github.com/monochange/monochange/pull/461) _Introduced in:_ [`3d956cd`](https://github.com/monochange/monochange/commit/3d956cd3e34747e088add98fe0358251f388782f)
+
+### Fixed
+
+> [!NOTE]
+> _monochange_
+
+#### Improve custom command argument errors
+
+Unexpected arguments passed to configured CLI commands now show a focused diagnostic with the explicit usage, the `monochange.toml` section to edit, and an example input definition.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #464](https://github.com/monochange/monochange/pull/464) _Introduced in:_ [`b869604`](https://github.com/monochange/monochange/commit/b86960446661884e9732616249232a4aa5e929b3)
+
+### Testing
+
+> [!NOTE]
+> _monochange_
+
+#### Fix flaky `reuses_prepared_release_artifact_for_versions` test
+
+The `execute_cli_command_with_options_reuses_prepared_release_artifact_for_versions` test (and the related `plans_publish_rate_limits_from_prepared_release_artifact` and `reports_invalid_versions_output_formats` tests) operated on the real repository workspace root without holding the `TEST_ENV_LOCK`. When other test threads modified workspace files concurrently, the `git status` snapshot captured at artifact save time could differ from the snapshot taken at validation time, causing an intermittent "workspace status no longer matches the saved prepared release" error.
+
+All three tests now acquire `TEST_ENV_LOCK` before reading the workspace, serialising them against other tests that modify git state.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #458](https://github.com/monochange/monochange/pull/458) _Introduced in:_ [`a78046a`](https://github.com/monochange/monochange/commit/a78046a1803c136426770d4fb2e6a8928e844e19)
+
 ## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)
 
 Grouped release for `main`.

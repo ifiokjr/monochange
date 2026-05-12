@@ -1,0 +1,2009 @@
+{
+	"$defs": {
+		"BumpSeverity": {
+			"enum": [
+				"none",
+				"patch",
+				"minor",
+				"major"
+			],
+			"type": "string"
+		},
+		"ChangelogFormat": {
+			"enum": [
+				"monochange",
+				"keep_a_changelog"
+			],
+			"type": "string"
+		},
+		"ChangelogSectionDef": {
+			"additionalProperties": false,
+			"properties": {
+				"description": {
+					"default": null,
+					"description": "Description of when this section should appear.",
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"heading": {
+					"description": "Display heading for the section in rendered changelogs.",
+					"type": "string"
+				},
+				"priority": {
+					"default": 100,
+					"description": "Ordering priority for changelog rendering. Lower values appear first.",
+					"format": "int8",
+					"maximum": 127,
+					"minimum": -128,
+					"type": "integer"
+				}
+			},
+			"required": [
+				"heading"
+			],
+			"type": "object"
+		},
+		"ChangelogSectionThresholds": {
+			"additionalProperties": false,
+			"properties": {
+				"collapse": {
+					"default": 127,
+					"description": "Collapse sections whose priority is greater than or equal to this value.",
+					"format": "int8",
+					"maximum": 127,
+					"minimum": -128,
+					"type": "integer"
+				},
+				"ignored": {
+					"default": 127,
+					"description": "Omit sections whose priority is strictly greater than this value.",
+					"format": "int8",
+					"maximum": 127,
+					"minimum": -128,
+					"type": "integer"
+				}
+			},
+			"type": "object"
+		},
+		"ChangelogType": {
+			"additionalProperties": false,
+			"properties": {
+				"bump": {
+					"$ref": "#/$defs/BumpSeverity",
+					"default": "none",
+					"description": "Semver bump severity implied by this changeset type."
+				},
+				"description": {
+					"default": null,
+					"description": "Human-readable description of when to use this type.",
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"section": {
+					"description": "Section key this type routes to (references a `[changelog.sections]` key).",
+					"type": "string"
+				}
+			},
+			"required": [
+				"section"
+			],
+			"type": "object"
+		},
+		"ChangesetAffectedSettings": {
+			"additionalProperties": false,
+			"properties": {
+				"changed_paths": {
+					"default": [],
+					"items": {
+						"type": "string"
+					},
+					"type": "array"
+				},
+				"comment_on_failure": {
+					"default": true,
+					"type": "boolean"
+				},
+				"enabled": {
+					"default": true,
+					"type": "boolean"
+				},
+				"ignored_paths": {
+					"default": [],
+					"items": {
+						"type": "string"
+					},
+					"type": "array"
+				},
+				"required": {
+					"default": true,
+					"type": "boolean"
+				},
+				"skip_labels": {
+					"default": [],
+					"items": {
+						"type": "string"
+					},
+					"type": "array"
+				}
+			},
+			"type": "object"
+		},
+		"ChangesetSettings": {
+			"additionalProperties": false,
+			"properties": {
+				"affected": {
+					"$ref": "#/$defs/ChangesetAffectedSettings",
+					"default": {
+						"changed_paths": [],
+						"comment_on_failure": true,
+						"enabled": true,
+						"ignored_paths": [],
+						"required": true,
+						"skip_labels": []
+					}
+				}
+			},
+			"type": "object"
+		},
+		"CliInputDefault": {
+			"anyOf": [
+				{
+					"type": "string"
+				},
+				{
+					"type": "boolean"
+				},
+				{
+					"format": "int64",
+					"type": "integer"
+				},
+				{
+					"format": "double",
+					"type": "number"
+				}
+			]
+		},
+		"CliInputDefinition": {
+			"additionalProperties": false,
+			"properties": {
+				"choices": {
+					"default": [],
+					"items": {
+						"type": "string"
+					},
+					"type": "array"
+				},
+				"default": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/CliInputDefault"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"help_text": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"name": {
+					"type": "string"
+				},
+				"required": {
+					"default": false,
+					"type": "boolean"
+				},
+				"short": {
+					"default": null,
+					"maxLength": 1,
+					"minLength": 1,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"type": {
+					"$ref": "#/$defs/CliInputKind"
+				}
+			},
+			"required": [
+				"name",
+				"type"
+			],
+			"type": "object"
+		},
+		"CliInputKind": {
+			"enum": [
+				"string",
+				"string_list",
+				"path",
+				"choice",
+				"boolean"
+			],
+			"type": "string"
+		},
+		"CliStepDefinition": {
+			"description": "Built-in execution units for `[[cli.<command>.steps]]`.\n\n`monochange` runs steps in order and lets later steps consume state created by\nearlier ones. Use standalone steps such as `Validate`, `Discover`,\n`AffectedPackages`, `DiagnoseChangesets`, and `RetargetRelease` when you want\ninspection or repair. Use `PrepareRelease` when later steps need structured\nrelease state.\n\nSee the CLI step reference in the book for full workflow guidance.",
+			"oneOf": [
+				{
+					"additionalProperties": false,
+					"description": "Expose the resolved `monochange` configuration and workspace root.",
+					"properties": {
+						"always_run": {
+							"default": false,
+							"type": "boolean"
+						},
+						"inputs": {
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
+						},
+						"name": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"type": {
+							"const": "Config",
+							"type": "string"
+						},
+						"when": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						}
+					},
+					"required": [
+						"type"
+					],
+					"type": "object"
+				},
+				{
+					"additionalProperties": false,
+					"description": "Validate `monochange` configuration and changesets, and run lint rules\non package manifests.",
+					"properties": {
+						"always_run": {
+							"default": false,
+							"type": "boolean"
+						},
+						"inputs": {
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
+						},
+						"name": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"type": {
+							"const": "Validate",
+							"type": "string"
+						},
+						"when": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						}
+					},
+					"required": [
+						"type"
+					],
+					"type": "object"
+				},
+				{
+					"additionalProperties": false,
+					"description": "Discover packages across supported ecosystems and render the result.",
+					"properties": {
+						"always_run": {
+							"default": false,
+							"type": "boolean"
+						},
+						"inputs": {
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
+						},
+						"name": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"type": {
+							"const": "Discover",
+							"type": "string"
+						},
+						"when": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						}
+					},
+					"required": [
+						"type"
+					],
+					"type": "object"
+				},
+				{
+					"additionalProperties": false,
+					"description": "Display planned package and group versions without mutating release files.",
+					"properties": {
+						"always_run": {
+							"default": false,
+							"type": "boolean"
+						},
+						"inputs": {
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
+						},
+						"name": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"type": {
+							"const": "DisplayVersions",
+							"type": "string"
+						},
+						"when": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						}
+					},
+					"required": [
+						"type"
+					],
+					"type": "object"
+				},
+				{
+					"additionalProperties": false,
+					"description": "Create a `.changeset/*.md` file from typed CLI inputs or interactive\nprompts.",
+					"properties": {
+						"always_run": {
+							"default": false,
+							"type": "boolean"
+						},
+						"inputs": {
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
+						},
+						"name": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"show_progress": {
+							"default": null,
+							"type": [
+								"boolean",
+								"null"
+							]
+						},
+						"type": {
+							"const": "CreateChangeFile",
+							"type": "string"
+						},
+						"when": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						}
+					},
+					"required": [
+						"type"
+					],
+					"type": "object"
+				},
+				{
+					"additionalProperties": false,
+					"description": "Prepare a release and expose structured `release.*` context to later\nsteps.",
+					"properties": {
+						"allow_empty_changesets": {
+							"default": false,
+							"description": "When true, do not error when there are no pending changesets.\nInstead, succeed with zero changesets, allowing downstream steps\nto check `number_of_changesets` in their `when` conditions.",
+							"type": "boolean"
+						},
+						"always_run": {
+							"default": false,
+							"type": "boolean"
+						},
+						"inputs": {
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
+						},
+						"name": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"type": {
+							"const": "PrepareRelease",
+							"type": "string"
+						},
+						"when": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						}
+					},
+					"required": [
+						"type"
+					],
+					"type": "object"
+				},
+				{
+					"additionalProperties": false,
+					"description": "Create a local release commit with an embedded durable `ReleaseRecord`.\n\nRequires a previous `PrepareRelease` step.",
+					"properties": {
+						"always_run": {
+							"default": false,
+							"type": "boolean"
+						},
+						"inputs": {
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
+						},
+						"name": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"no_verify": {
+							"default": false,
+							"type": "boolean"
+						},
+						"type": {
+							"const": "CommitRelease",
+							"type": "string"
+						},
+						"update_release_json": {
+							"default": false,
+							"type": "boolean"
+						},
+						"when": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						}
+					},
+					"required": [
+						"type"
+					],
+					"type": "object"
+				},
+				{
+					"additionalProperties": false,
+					"description": "Verify a commit is reachable from one of the configured release branches.",
+					"properties": {
+						"always_run": {
+							"default": false,
+							"type": "boolean"
+						},
+						"inputs": {
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
+						},
+						"name": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"type": {
+							"const": "VerifyReleaseBranch",
+							"type": "string"
+						},
+						"when": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						}
+					},
+					"required": [
+						"type"
+					],
+					"type": "object"
+				},
+				{
+					"additionalProperties": false,
+					"description": "Publish hosted releases from a prepared `monochange` release.\n\nRequires a previous `PrepareRelease` step and `[source]`\nconfiguration.",
+					"properties": {
+						"always_run": {
+							"default": false,
+							"type": "boolean"
+						},
+						"inputs": {
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
+						},
+						"name": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"type": {
+							"const": "PublishRelease",
+							"type": "string"
+						},
+						"when": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						}
+					},
+					"required": [
+						"type"
+					],
+					"type": "object"
+				},
+				{
+					"additionalProperties": false,
+					"description": "Publish placeholder package versions for missing registry packages.",
+					"properties": {
+						"always_run": {
+							"default": false,
+							"type": "boolean"
+						},
+						"inputs": {
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
+						},
+						"name": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"type": {
+							"const": "PlaceholderPublish",
+							"type": "string"
+						},
+						"when": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						}
+					},
+					"required": [
+						"type"
+					],
+					"type": "object"
+				},
+				{
+					"additionalProperties": false,
+					"description": "Publish package versions from durable monochange release state.",
+					"properties": {
+						"always_run": {
+							"default": false,
+							"type": "boolean"
+						},
+						"inputs": {
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
+						},
+						"name": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"type": {
+							"const": "PublishPackages",
+							"type": "string"
+						},
+						"when": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						}
+					},
+					"required": [
+						"type"
+					],
+					"type": "object"
+				},
+				{
+					"additionalProperties": false,
+					"description": "Plan package-registry rate-limit windows for publish operations.",
+					"properties": {
+						"always_run": {
+							"default": false,
+							"type": "boolean"
+						},
+						"inputs": {
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
+						},
+						"name": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"type": {
+							"const": "PlanPublishRateLimits",
+							"type": "string"
+						},
+						"when": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						}
+					},
+					"required": [
+						"type"
+					],
+					"type": "object"
+				},
+				{
+					"additionalProperties": false,
+					"description": "Open or update a hosted release request from prepared release state.\n\nRequires a previous `PrepareRelease` step and `[source]`\nconfiguration.",
+					"properties": {
+						"always_run": {
+							"default": false,
+							"type": "boolean"
+						},
+						"inputs": {
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
+						},
+						"name": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"no_verify": {
+							"default": false,
+							"type": "boolean"
+						},
+						"type": {
+							"const": "OpenReleaseRequest",
+							"type": "string"
+						},
+						"when": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						}
+					},
+					"required": [
+						"type"
+					],
+					"type": "object"
+				},
+				{
+					"additionalProperties": false,
+					"description": "Comment on linked released issues after a prepared release.\n\nRequires a previous `PrepareRelease` step and currently expects\n`[source].provider = \"github\"`.",
+					"properties": {
+						"always_run": {
+							"default": false,
+							"type": "boolean"
+						},
+						"inputs": {
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
+						},
+						"name": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"type": {
+							"const": "CommentReleasedIssues",
+							"type": "string"
+						},
+						"when": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						}
+					},
+					"required": [
+						"type"
+					],
+					"type": "object"
+				},
+				{
+					"additionalProperties": false,
+					"description": "Evaluate affected packages and changeset coverage for changed files.\n\nStandalone CI-oriented step.",
+					"properties": {
+						"always_run": {
+							"default": false,
+							"type": "boolean"
+						},
+						"inputs": {
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
+						},
+						"name": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"type": {
+							"const": "AffectedPackages",
+							"type": "string"
+						},
+						"when": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						}
+					},
+					"required": [
+						"type"
+					],
+					"type": "object"
+				},
+				{
+					"additionalProperties": false,
+					"description": "Inspect parsed changeset data, provenance, and linked metadata.",
+					"properties": {
+						"always_run": {
+							"default": false,
+							"type": "boolean"
+						},
+						"inputs": {
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
+						},
+						"name": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"type": {
+							"const": "DiagnoseChangesets",
+							"type": "string"
+						},
+						"when": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						}
+					},
+					"required": [
+						"type"
+					],
+					"type": "object"
+				},
+				{
+					"additionalProperties": false,
+					"description": "Repair a recent release by retargeting its stored release tag set.\n\nThis step is independent from `PrepareRelease` and exposes structured\n`retarget.*` state to later commands.",
+					"properties": {
+						"always_run": {
+							"default": false,
+							"type": "boolean"
+						},
+						"inputs": {
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
+						},
+						"name": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"type": {
+							"const": "RetargetRelease",
+							"type": "string"
+						},
+						"when": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						}
+					},
+					"required": [
+						"type"
+					],
+					"type": "object"
+				},
+				{
+					"additionalProperties": false,
+					"description": "Run an arbitrary command with `monochange` template context.\n\nUse this to bridge built-in `monochange` state into external tooling.",
+					"properties": {
+						"always_run": {
+							"default": false,
+							"type": "boolean"
+						},
+						"command": {
+							"type": "string"
+						},
+						"dry_run_command": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"id": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"inputs": {
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
+						},
+						"name": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"shell": {
+							"$ref": "#/$defs/ShellConfig",
+							"default": false
+						},
+						"show_progress": {
+							"default": null,
+							"type": [
+								"boolean",
+								"null"
+							]
+						},
+						"type": {
+							"const": "Command",
+							"type": "string"
+						},
+						"variables": {
+							"additionalProperties": {
+								"$ref": "#/$defs/CommandVariable"
+							},
+							"default": null,
+							"type": [
+								"object",
+								"null"
+							]
+						},
+						"when": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						}
+					},
+					"required": [
+						"type",
+						"command"
+					],
+					"type": "object"
+				}
+			]
+		},
+		"CliStepInputOverrideValueSchema": {
+			"anyOf": [
+				{
+					"type": "string"
+				},
+				{
+					"type": "boolean"
+				},
+				{
+					"items": {
+						"type": "string"
+					},
+					"type": "array"
+				}
+			]
+		},
+		"CliStepInputsSchema": {
+			"anyOf": [
+				{
+					"additionalProperties": {
+						"$ref": "#/$defs/CliStepInputOverrideValueSchema"
+					},
+					"type": "object"
+				},
+				{
+					"items": {
+						"type": "string"
+					},
+					"type": "array"
+				}
+			]
+		},
+		"CommandVariable": {
+			"enum": [
+				"version",
+				"group_version",
+				"released_packages",
+				"changed_files",
+				"changesets"
+			],
+			"type": "string"
+		},
+		"EcosystemType": {
+			"enum": [
+				"cargo",
+				"npm",
+				"deno",
+				"dart",
+				"python",
+				"go"
+			],
+			"type": "string"
+		},
+		"LockfileCommandDefinition": {
+			"additionalProperties": false,
+			"properties": {
+				"command": {
+					"type": "string"
+				},
+				"cwd": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"shell": {
+					"$ref": "#/$defs/ShellConfig",
+					"default": false
+				}
+			},
+			"required": [
+				"command"
+			],
+			"type": "object"
+		},
+		"PackageType": {
+			"enum": [
+				"cargo",
+				"npm",
+				"deno",
+				"dart",
+				"flutter",
+				"python",
+				"go"
+			],
+			"type": "string"
+		},
+		"ProviderMergeRequestSettings": {
+			"additionalProperties": false,
+			"properties": {
+				"auto_merge": {
+					"default": false,
+					"type": "boolean"
+				},
+				"base": {
+					"default": "main",
+					"type": "string"
+				},
+				"branch_prefix": {
+					"default": "monochange/release",
+					"type": "string"
+				},
+				"enabled": {
+					"default": true,
+					"type": "boolean"
+				},
+				"labels": {
+					"default": [
+						"release",
+						"automated"
+					],
+					"items": {
+						"type": "string"
+					},
+					"type": "array"
+				},
+				"title": {
+					"default": "chore(release): prepare release",
+					"type": "string"
+				},
+				"verified_commits": {
+					"default": false,
+					"type": "boolean"
+				}
+			},
+			"type": "object"
+		},
+		"ProviderReleaseNotesSource": {
+			"enum": [
+				"monochange",
+				"github_generated"
+			],
+			"type": "string"
+		},
+		"ProviderReleaseSettings": {
+			"additionalProperties": false,
+			"properties": {
+				"attestations": {
+					"$ref": "#/$defs/ReleaseAttestationSettings"
+				},
+				"branches": {
+					"default": [
+						"main"
+					],
+					"items": {
+						"type": "string"
+					},
+					"type": "array"
+				},
+				"draft": {
+					"default": false,
+					"type": "boolean"
+				},
+				"enabled": {
+					"default": true,
+					"type": "boolean"
+				},
+				"enforce_for_commit": {
+					"default": false,
+					"type": "boolean"
+				},
+				"enforce_for_publish": {
+					"default": true,
+					"type": "boolean"
+				},
+				"enforce_for_tags": {
+					"default": true,
+					"type": "boolean"
+				},
+				"generate_notes": {
+					"default": false,
+					"type": "boolean"
+				},
+				"prerelease": {
+					"default": false,
+					"type": "boolean"
+				},
+				"source": {
+					"$ref": "#/$defs/ProviderReleaseNotesSource",
+					"default": "monochange"
+				}
+			},
+			"type": "object"
+		},
+		"PublishMode": {
+			"enum": [
+				"builtin",
+				"external"
+			],
+			"type": "string"
+		},
+		"PublishRegistry": {
+			"anyOf": [
+				{
+					"$ref": "#/$defs/RegistryKind"
+				},
+				{
+					"type": "string"
+				}
+			]
+		},
+		"RegistryKind": {
+			"enum": [
+				"crates_io",
+				"npm",
+				"jsr",
+				"pub_dev",
+				"pypi",
+				"go_proxy"
+			],
+			"type": "string"
+		},
+		"ReleaseAttestationSettings": {
+			"additionalProperties": false,
+			"properties": {
+				"require_github_artifact_attestations": {
+					"default": false,
+					"type": "boolean"
+				}
+			},
+			"type": "object"
+		},
+		"ShellConfig": {
+			"description": "Shell configuration for `Command` steps.",
+			"oneOf": [
+				{
+					"enum": [
+						"None",
+						"Default"
+					],
+					"type": "string"
+				},
+				{
+					"additionalProperties": false,
+					"properties": {
+						"Custom": {
+							"type": "string"
+						}
+					},
+					"required": [
+						"Custom"
+					],
+					"type": "object"
+				}
+			]
+		},
+		"SourceProvider": {
+			"enum": [
+				"github",
+				"gitlab",
+				"gitea",
+				"forgejo"
+			],
+			"type": "string"
+		},
+		"VersionFormat": {
+			"enum": [
+				"namespaced",
+				"primary"
+			],
+			"type": "string"
+		},
+		"VersionedFileDefinition": {
+			"additionalProperties": false,
+			"properties": {
+				"fields": {
+					"default": null,
+					"items": {
+						"type": "string"
+					},
+					"type": [
+						"array",
+						"null"
+					]
+				},
+				"name": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"path": {
+					"type": "string"
+				},
+				"prefix": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"regex": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"type": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/EcosystemType"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				}
+			},
+			"required": [
+				"path"
+			],
+			"type": "object"
+		},
+		"changelogConfig": {
+			"anyOf": [
+				{
+					"$ref": "#/$defs/changelogDefinition"
+				},
+				{
+					"$ref": "#/$defs/changelogTable"
+				}
+			]
+		},
+		"changelogDefinition": {
+			"anyOf": [
+				{
+					"type": "boolean"
+				},
+				{
+					"type": "string"
+				}
+			]
+		},
+		"changelogSettings": {
+			"additionalProperties": false,
+			"properties": {
+				"section_thresholds": {
+					"$ref": "#/$defs/ChangelogSectionThresholds",
+					"default": {
+						"collapse": 127,
+						"ignored": 127
+					}
+				},
+				"sections": {
+					"additionalProperties": {
+						"$ref": "#/$defs/ChangelogSectionDef"
+					},
+					"default": {},
+					"type": "object"
+				},
+				"templates": {
+					"default": [],
+					"items": {
+						"type": "string"
+					},
+					"type": "array"
+				},
+				"types": {
+					"additionalProperties": {
+						"$ref": "#/$defs/ChangelogType"
+					},
+					"default": {},
+					"type": "object"
+				}
+			},
+			"type": "object"
+		},
+		"changelogTable": {
+			"additionalProperties": false,
+			"properties": {
+				"enabled": {
+					"default": null,
+					"type": [
+						"boolean",
+						"null"
+					]
+				},
+				"format": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/ChangelogFormat"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"include": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/groupChangelogInclude"
+						},
+						{
+							"type": "null"
+						}
+					]
+				},
+				"initial_header": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"path": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				}
+			},
+			"type": "object"
+		},
+		"cliCommand": {
+			"additionalProperties": false,
+			"properties": {
+				"dry_run": {
+					"default": false,
+					"type": "boolean"
+				},
+				"help_text": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"inputs": {
+					"default": [],
+					"items": {
+						"$ref": "#/$defs/CliInputDefinition"
+					},
+					"type": "array"
+				},
+				"steps": {
+					"default": [],
+					"items": {
+						"$ref": "#/$defs/CliStepDefinition"
+					},
+					"type": "array"
+				}
+			},
+			"type": "object"
+		},
+		"defaults": {
+			"additionalProperties": false,
+			"properties": {
+				"changelog": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/changelogConfig"
+						},
+						{
+							"type": "null"
+						}
+					]
+				},
+				"changelog_version_title": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"empty_update_message": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"include_private": {
+					"default": false,
+					"type": "boolean"
+				},
+				"package_type": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/PackageType"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"parent_bump": {
+					"$ref": "#/$defs/BumpSeverity",
+					"default": "patch"
+				},
+				"release_title": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"strict_version_conflicts": {
+					"default": false,
+					"type": "boolean"
+				},
+				"warn_on_group_mismatch": {
+					"default": true,
+					"type": "boolean"
+				}
+			},
+			"type": "object"
+		},
+		"ecosystemSettings": {
+			"additionalProperties": false,
+			"properties": {
+				"dependency_version_prefix": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"enabled": {
+					"default": null,
+					"type": [
+						"boolean",
+						"null"
+					]
+				},
+				"exclude": {
+					"default": [],
+					"items": {
+						"type": "string"
+					},
+					"type": "array"
+				},
+				"lockfile_commands": {
+					"default": [],
+					"items": {
+						"$ref": "#/$defs/LockfileCommandDefinition"
+					},
+					"type": "array"
+				},
+				"publish": {
+					"$ref": "#/$defs/publishSettings"
+				},
+				"roots": {
+					"default": [],
+					"items": {
+						"type": "string"
+					},
+					"type": "array"
+				},
+				"versioned_files": {
+					"items": {
+						"$ref": "#/$defs/versionedFileDefinition"
+					},
+					"type": "array"
+				}
+			},
+			"type": "object"
+		},
+		"ecosystems": {
+			"additionalProperties": false,
+			"properties": {
+				"cargo": {
+					"$ref": "#/$defs/ecosystemSettings"
+				},
+				"dart": {
+					"$ref": "#/$defs/ecosystemSettings"
+				},
+				"deno": {
+					"$ref": "#/$defs/ecosystemSettings"
+				},
+				"go": {
+					"$ref": "#/$defs/ecosystemSettings"
+				},
+				"npm": {
+					"$ref": "#/$defs/ecosystemSettings"
+				},
+				"python": {
+					"$ref": "#/$defs/ecosystemSettings"
+				}
+			},
+			"type": "object"
+		},
+		"groupChangelogInclude": {
+			"anyOf": [
+				{
+					"type": "string"
+				},
+				{
+					"items": {
+						"type": "string"
+					},
+					"type": "array"
+				}
+			]
+		},
+		"groupDefinition": {
+			"additionalProperties": false,
+			"properties": {
+				"changelog": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/changelogConfig"
+						},
+						{
+							"type": "null"
+						}
+					]
+				},
+				"changelog_version_title": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"empty_update_message": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"excluded_changelog_types": {
+					"default": [],
+					"items": {
+						"type": "string"
+					},
+					"type": "array"
+				},
+				"packages": {
+					"items": {
+						"type": "string"
+					},
+					"type": "array"
+				},
+				"release": {
+					"default": false,
+					"type": "boolean"
+				},
+				"release_title": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"tag": {
+					"default": false,
+					"type": "boolean"
+				},
+				"version_format": {
+					"$ref": "#/$defs/VersionFormat",
+					"default": "namespaced"
+				},
+				"versioned_files": {
+					"items": {
+						"$ref": "#/$defs/versionedFileDefinition"
+					},
+					"type": "array"
+				}
+			},
+			"required": [
+				"packages"
+			],
+			"type": "object"
+		},
+		"packageDefinition": {
+			"additionalProperties": false,
+			"properties": {
+				"additional_paths": {
+					"default": [],
+					"items": {
+						"type": "string"
+					},
+					"type": "array"
+				},
+				"changelog": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/changelogConfig"
+						},
+						{
+							"type": "null"
+						}
+					]
+				},
+				"changelog_version_title": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"empty_update_message": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"excluded_changelog_types": {
+					"default": [],
+					"items": {
+						"type": "string"
+					},
+					"type": "array"
+				},
+				"ignore_ecosystem_versioned_files": {
+					"default": false,
+					"type": "boolean"
+				},
+				"ignored_paths": {
+					"default": [],
+					"items": {
+						"type": "string"
+					},
+					"type": "array"
+				},
+				"path": {
+					"type": "string"
+				},
+				"publish": {
+					"$ref": "#/$defs/publishSettings"
+				},
+				"release": {
+					"default": false,
+					"type": "boolean"
+				},
+				"release_title": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"tag": {
+					"default": false,
+					"type": "boolean"
+				},
+				"type": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/PackageType"
+						},
+						{
+							"type": "null"
+						}
+					]
+				},
+				"version_format": {
+					"$ref": "#/$defs/VersionFormat",
+					"default": "namespaced"
+				},
+				"versioned_files": {
+					"items": {
+						"$ref": "#/$defs/versionedFileDefinition"
+					},
+					"type": "array"
+				}
+			},
+			"required": [
+				"path"
+			],
+			"type": "object"
+		},
+		"placeholderSettings": {
+			"additionalProperties": false,
+			"properties": {
+				"readme": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"readme_file": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				}
+			},
+			"type": "object"
+		},
+		"publishAttestationSettings": {
+			"additionalProperties": false,
+			"properties": {
+				"require_registry_provenance": {
+					"default": null,
+					"type": [
+						"boolean",
+						"null"
+					]
+				}
+			},
+			"type": "object"
+		},
+		"publishRateLimitSettings": {
+			"additionalProperties": false,
+			"properties": {
+				"enforce": {
+					"default": null,
+					"type": [
+						"boolean",
+						"null"
+					]
+				}
+			},
+			"type": "object"
+		},
+		"publishSettings": {
+			"additionalProperties": false,
+			"properties": {
+				"attestations": {
+					"$ref": "#/$defs/publishAttestationSettings"
+				},
+				"enabled": {
+					"default": null,
+					"type": [
+						"boolean",
+						"null"
+					]
+				},
+				"mode": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/PublishMode"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"placeholder": {
+					"$ref": "#/$defs/placeholderSettings"
+				},
+				"rate_limits": {
+					"$ref": "#/$defs/publishRateLimitSettings"
+				},
+				"registry": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/PublishRegistry"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"trusted_publishing": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/trustedPublishingSettings"
+						},
+						{
+							"type": "null"
+						}
+					]
+				}
+			},
+			"type": "object"
+		},
+		"source": {
+			"additionalProperties": false,
+			"properties": {
+				"api_url": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"host": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"owner": {
+					"type": "string"
+				},
+				"provider": {
+					"$ref": "#/$defs/SourceProvider",
+					"default": "github"
+				},
+				"pull_requests": {
+					"$ref": "#/$defs/ProviderMergeRequestSettings",
+					"default": {
+						"auto_merge": false,
+						"base": "main",
+						"branch_prefix": "monochange/release",
+						"enabled": true,
+						"labels": [
+							"release",
+							"automated"
+						],
+						"title": "chore(release): prepare release",
+						"verified_commits": false
+					}
+				},
+				"releases": {
+					"$ref": "#/$defs/ProviderReleaseSettings",
+					"default": {
+						"branches": [
+							"main"
+						],
+						"draft": false,
+						"enabled": true,
+						"enforce_for_commit": false,
+						"enforce_for_publish": true,
+						"enforce_for_tags": true,
+						"generate_notes": false,
+						"prerelease": false,
+						"source": "monochange"
+					}
+				},
+				"repo": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"owner",
+				"repo"
+			],
+			"type": "object"
+		},
+		"trustedPublishingDetails": {
+			"additionalProperties": false,
+			"properties": {
+				"enabled": {
+					"default": null,
+					"type": [
+						"boolean",
+						"null"
+					]
+				},
+				"environment": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"repository": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"workflow": {
+					"default": null,
+					"type": [
+						"string",
+						"null"
+					]
+				}
+			},
+			"type": "object"
+		},
+		"trustedPublishingSettings": {
+			"anyOf": [
+				{
+					"type": "boolean"
+				},
+				{
+					"$ref": "#/$defs/trustedPublishingDetails"
+				}
+			]
+		},
+		"versionedFileDefinition": {
+			"anyOf": [
+				{
+					"type": "string"
+				},
+				{
+					"$ref": "#/$defs/VersionedFileDefinition"
+				}
+			]
+		}
+	},
+	"$id": "https://monochange.github.io/monochange/schemas/monochange.v0.2.schema.json",
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"additionalProperties": false,
+	"description": "JSON Schema for monochange.toml workspace configuration files.",
+	"properties": {
+		"changelog": {
+			"$ref": "#/$defs/changelogSettings"
+		},
+		"changesets": {
+			"$ref": "#/$defs/ChangesetSettings",
+			"default": {
+				"affected": {
+					"changed_paths": [],
+					"comment_on_failure": true,
+					"enabled": true,
+					"ignored_paths": [],
+					"required": true,
+					"skip_labels": []
+				}
+			}
+		},
+		"cli": {
+			"additionalProperties": {
+				"$ref": "#/$defs/cliCommand"
+			},
+			"type": "object"
+		},
+		"defaults": {
+			"$ref": "#/$defs/defaults"
+		},
+		"ecosystems": {
+			"$ref": "#/$defs/ecosystems"
+		},
+		"group": {
+			"additionalProperties": {
+				"$ref": "#/$defs/groupDefinition"
+			},
+			"type": "object"
+		},
+		"lints": {
+			"default": {
+				"disable_gitignore": false,
+				"exclude": [],
+				"include": [],
+				"rules": {},
+				"scopes": [],
+				"use": []
+			}
+		},
+		"package": {
+			"additionalProperties": {
+				"$ref": "#/$defs/packageDefinition"
+			},
+			"type": "object"
+		},
+		"source": {
+			"anyOf": [
+				{
+					"$ref": "#/$defs/source"
+				},
+				{
+					"type": "null"
+				}
+			]
+		}
+	},
+	"title": "monochange configuration",
+	"type": "object"
+}

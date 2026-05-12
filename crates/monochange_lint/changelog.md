@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.5.0](https://github.com/monochange/monochange/releases/tag/v0.5.0) (2026-05-12)
+
+### Added
+
+#### Publish all configured packages
+
+Add a `--all` flag to the PublishPackages CLI step so migration workflows can publish every configured package, including packages that were not part of the prepared release record.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #461](https://github.com/monochange/monochange/pull/461) _Introduced in:_ [`3d956cd`](https://github.com/monochange/monochange/commit/3d956cd3e34747e088add98fe0358251f388782f)
+
+### Fixed
+
+#### Move lint testing helpers into shared test helpers
+
+The private `monochange_lint_testing` crate has been removed. Its stable lint report and autofix formatting helpers now live in `monochange_test_helpers::lint_testing`, so publishable crates no longer depend on an unpublished workspace crate during Cargo package verification.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #468](https://github.com/monochange/monochange/pull/468) _Introduced in:_ [`00847e5`](https://github.com/monochange/monochange/commit/00847e502bfb3805a846e0363f1d6ae176f38e47)
+
 ## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)
 
 ### Added
