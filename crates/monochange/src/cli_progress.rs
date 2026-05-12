@@ -134,12 +134,15 @@ impl CliProgressReporter {
 		let color_enabled = stderr_is_terminal && env::var("TERM").is_ok_and(|term| term != "dumb");
 		let no_color = env::var_os("NO_COLOR").is_some();
 		let no_progress = env::var_os("MONOCHANGE_NO_PROGRESS").is_some();
+		let ci = running_in_ci();
 		let (enabled, render_mode, symbols) = match format {
 			ProgressFormat::Auto => {
-				if quiet || no_progress || !stderr_is_terminal {
+				if quiet || no_progress {
 					(false, ProgressRenderMode::Human, UNICODE_SYMBOLS)
-				} else {
+				} else if stderr_is_terminal || ci {
 					(true, ProgressRenderMode::Human, UNICODE_SYMBOLS)
+				} else {
+					(false, ProgressRenderMode::Human, UNICODE_SYMBOLS)
 				}
 			}
 			ProgressFormat::Unicode => (!quiet, ProgressRenderMode::Human, UNICODE_SYMBOLS),
@@ -148,7 +151,8 @@ impl CliProgressReporter {
 		};
 		let color =
 			enabled && render_mode == ProgressRenderMode::Human && !no_color && color_enabled;
-		let animate = enabled && render_mode == ProgressRenderMode::Human && stderr_is_terminal;
+		let animate =
+			enabled && render_mode == ProgressRenderMode::Human && stderr_is_terminal && !ci;
 		Self {
 			enabled,
 			color,
@@ -648,6 +652,19 @@ fn format_duration(duration: Duration) -> String {
 
 fn duration_millis(duration: Duration) -> u64 {
 	u64::try_from(duration.as_millis()).unwrap_or(u64::MAX)
+}
+
+fn running_in_ci() -> bool {
+	[
+		"CI",
+		"GITHUB_ACTIONS",
+		"GITLAB_CI",
+		"BUILDKITE",
+		"CIRCLECI",
+		"TF_BUILD",
+	]
+	.iter()
+	.any(|name| env::var_os(name).is_some())
 }
 
 fn summarized_phase_timings(phase_timings: &[StepPhaseTiming]) -> Vec<StepPhaseTiming> {
