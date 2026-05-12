@@ -4,6 +4,61 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.5.0](https://github.com/monochange/monochange/releases/tag/v0.5.0) (2026-05-12)
+
+### Breaking Change
+
+#### generate built-in release and validation step commands
+
+> **Breaking change** — several hardcoded top-level commands now live under generated immutable `mc step:*` command names.
+
+The release-record, publish-readiness, tag-release, placeholder-publish, and validation operations now share the generated step-command path used by the rest of the CLI step catalog. This keeps their help, schema metadata, docs, and automation examples consistent with configured workflow steps while preserving the distinction between binary commands, generated step commands, and optional user-defined `[cli.*]` workflow aliases.
+
+**Before:** scripts could call these hardcoded top-level commands directly:
+
+```bash
+mc validate
+mc release-record --from HEAD --format json
+mc publish-readiness --from HEAD --output .monochange/readiness.json
+mc tag-release --from HEAD
+mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json
+```
+
+**After:** call the generated step command names instead:
+
+```bash
+mc step:validate
+mc step:release-record --from HEAD --format json
+mc step:publish-readiness --from HEAD --output .monochange/readiness.json
+mc step:tag-release --from HEAD
+mc step:placeholder-publish --from HEAD --output .monochange/bootstrap-result.json
+```
+
+`mc init` also writes a smaller starter configuration. It no longer seeds redundant generated `[cli.*]` aliases for commands that already exist as immutable step commands.
+
+**Before:** starter configs included workflow aliases for generated behavior:
+
+```toml
+[cli.validate]
+steps = [{ type = "Validate" }]
+```
+
+**After:** starter configs rely on the generated command directly and reserve `[cli.*]` for repository-specific chains, custom inputs, or shell `Command` steps:
+
+```bash
+mc step:validate
+```
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #479](https://github.com/monochange/monochange/pull/479) _Introduced in:_ [`d9adff8`](https://github.com/monochange/monochange/commit/d9adff8fb396df908e335d2a6688aa729abb5f4d) _Closed issues:_ [#476](https://github.com/monochange/monochange/issues/476)
+
+### Added
+
+#### Publish all configured packages
+
+Add a `--all` flag to the PublishPackages CLI step so migration workflows can publish every configured package, including packages that were not part of the prepared release record.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #461](https://github.com/monochange/monochange/pull/461) _Introduced in:_ [`3d956cd`](https://github.com/monochange/monochange/commit/3d956cd3e34747e088add98fe0358251f388782f) _Last updated in:_ [`b7761da`](https://github.com/monochange/monochange/commit/b7761da6d7be9ed253276d059363d5449b1d44d0) _Related issues:_ [#455](https://github.com/monochange/monochange/issues/455)
+
 ## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)
 
 ### Added
