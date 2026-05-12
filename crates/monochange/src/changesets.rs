@@ -358,7 +358,12 @@ fn batch_git_log(
 		.current_dir(root)
 		.arg("log")
 		.arg("--format=%H%x1f%an%x1f%ae%x1f%aI%x1f%cI")
-		.arg("--name-status");
+		.arg("--name-status")
+		// Existing pending changesets only need the commits that added or updated
+		// them. Filtering out deletes, type changes, and other unrelated status
+		// records keeps large history scans smaller without changing introduced or
+		// last-updated attribution for files still present in `.changeset/`.
+		.arg("--diff-filter=AM");
 	command.arg("--").arg(".changeset/");
 
 	let output = match command.output() {

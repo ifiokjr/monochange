@@ -106,53 +106,72 @@ pub(crate) async fn build_release_targets(
 	// only needs a stable view of tags for the current command, so sharing one
 	// loaded list avoids re-running the same git command over and over.
 	let sorted_tags = load_sorted_tags(&configuration.root_path).await;
-
-	let mut release_targets = configuration
+	let configured_package_by_id = configuration
+		.packages
+		.iter()
+		.map(|package| (package.id.as_str(), package))
+		.collect::<std::collections::HashMap<_, _>>();
+	let mut group_by_package_id = std::collections::HashMap::with_capacity(
+		configuration
+			.groups
+			.iter()
+			.map(|group| group.packages.len())
+			.sum(),
+	);
+	for group in &configuration.groups {
+		for package_id in &group.packages {
+			group_by_package_id
+				.entry(package_id.as_str())
+				.or_insert(group);
+		}
+	}
+	let planned_group_by_id = plan
 		.groups
 		.iter()
-		.filter_map(|group| {
-			plan.groups
-				.iter()
-				.find(|pg| pg.group_id == group.id && pg.recommended_bump.is_release())
-				.and_then(|pg| {
-					pg.planned_version.as_ref().map(|version| {
-						let vs = version.to_string();
-						let tag = render_tag_name(&group.id, &vs, group.version_format);
-						let prev = find_previous_tag_in(&tag, &sorted_tags);
-						let ctx = TitleRenderContext::new(
-							&group.id,
-							&vs,
-							changes_count,
-							source,
-							&tag,
-							prev.as_deref(),
-						);
-						let rt = effective_title_template(
-							group.release_title.as_deref(),
-							defaults_release_title,
-							default_release_title_for_format(group.version_format),
-						);
-						let ct = effective_title_template(
-							group.changelog_version_title.as_deref(),
-							defaults_changelog_title,
-							default_changelog_version_title_for_format(group.version_format),
-						);
-						ReleaseTarget {
-							id: group.id.clone(),
-							kind: ReleaseOwnerKind::Group,
-							version: vs,
-							tag: group.tag,
-							release: group.release,
-							version_format: group.version_format,
-							tag_name: tag,
-							members: group.packages.clone(),
-							rendered_title: ctx.render(rt),
-							rendered_changelog_title: ctx.render(ct),
-						}
-					})
-				})
+		.filter(|group| group.recommended_bump.is_release())
+		.map(|group| (group.group_id.as_str(), group))
+		.collect::<std::collections::HashMap<_, _>>();
+
+	let mut release_targets = Vec::with_capacity(configuration.groups.len() + plan.decisions.len());
+	release_targets.extend(configuration.groups.iter().filter_map(|group| {
+		planned_group_by_id.get(group.id.as_str()).and_then(|pg| {
+			pg.planned_version.as_ref().map(|version| {
+				let vs = version.to_string();
+				let tag = render_tag_name(&group.id, &vs, group.version_format);
+				let prev = find_previous_tag_in(&tag, &sorted_tags);
+				let ctx = TitleRenderContext::new(
+					&group.id,
+					&vs,
+					changes_count,
+					source,
+					&tag,
+					prev.as_deref(),
+				);
+				let rt = effective_title_template(
+					group.release_title.as_deref(),
+					defaults_release_title,
+					default_release_title_for_format(group.version_format),
+				);
+				let ct = effective_title_template(
+					group.changelog_version_title.as_deref(),
+					defaults_changelog_title,
+					default_changelog_version_title_for_format(group.version_format),
+				);
+				ReleaseTarget {
+					id: group.id.clone(),
+					kind: ReleaseOwnerKind::Group,
+					version: vs,
+					tag: group.tag,
+					release: group.release,
+					version_format: group.version_format,
+					tag_name: tag,
+					members: group.packages.clone(),
+					rendered_title: ctx.render(rt),
+					rendered_changelog_title: ctx.render(ct),
+				}
+			})
 		})
-		.collect::<Vec<_>>();
+	}));
 	for decision in plan
 		.decisions
 		.iter()
@@ -169,40 +188,54 @@ pub(crate) async fn build_release_targets(
 			.get("config_id")
 			.cloned()
 			.unwrap_or_else(|| package.name.clone());
-		let Some(identity) = configuration.effective_release_identity(&config_id) else {
+		let Some(package_definition) = configured_package_by_id.get(config_id.as_str()).copied()
+		else {
 			continue;
 		};
+		let (owner_id, owner_kind, tag_enabled, release_enabled, version_format, members) =
+			if let Some(group) = group_by_package_id.get(config_id.as_str()).copied() {
+				(
+					&group.id,
+					ReleaseOwnerKind::Group,
+					group.tag,
+					group.release,
+					group.version_format,
+					group.packages.clone(),
+				)
+			} else {
+				(
+					&package_definition.id,
+					ReleaseOwnerKind::Package,
+					package_definition.tag,
+					package_definition.release,
+					package_definition.version_format,
+					vec![package_definition.id.clone()],
+				)
+			};
 		let vs = version.to_string();
-		let tag = render_tag_name(&identity.owner_id, &vs, identity.version_format);
+		let tag = render_tag_name(owner_id, &vs, version_format);
 		let prev = find_previous_tag_in(&tag, &sorted_tags);
-		let pkg_def = configuration.package_by_id(&config_id);
-		let ctx = TitleRenderContext::new(
-			&identity.owner_id,
-			&vs,
-			changes_count,
-			source,
-			&tag,
-			prev.as_deref(),
-		);
+		let ctx =
+			TitleRenderContext::new(owner_id, &vs, changes_count, source, &tag, prev.as_deref());
 		let rt = effective_title_template(
-			pkg_def.and_then(|p| p.release_title.as_deref()),
+			package_definition.release_title.as_deref(),
 			defaults_release_title,
-			default_release_title_for_format(identity.version_format),
+			default_release_title_for_format(version_format),
 		);
 		let ct = effective_title_template(
-			pkg_def.and_then(|p| p.changelog_version_title.as_deref()),
+			package_definition.changelog_version_title.as_deref(),
 			defaults_changelog_title,
-			default_changelog_version_title_for_format(identity.version_format),
+			default_changelog_version_title_for_format(version_format),
 		);
 		release_targets.push(ReleaseTarget {
-			id: identity.owner_id.clone(),
-			kind: identity.owner_kind,
+			id: owner_id.clone(),
+			kind: owner_kind,
 			version: vs,
-			tag: identity.tag,
-			release: identity.release,
-			version_format: identity.version_format,
+			tag: tag_enabled,
+			release: release_enabled,
+			version_format,
 			tag_name: tag,
-			members: identity.members,
+			members,
 			rendered_title: ctx.render(rt),
 			rendered_changelog_title: ctx.render(ct),
 		});
@@ -219,7 +252,12 @@ pub(crate) fn build_package_publication_targets(
 	let package_by_id = packages
 		.iter()
 		.map(|package| (package.id.as_str(), package))
-		.collect::<BTreeMap<_, _>>();
+		.collect::<std::collections::HashMap<_, _>>();
+	let configured_package_by_id = configuration
+		.packages
+		.iter()
+		.map(|package| (package.id.as_str(), package))
+		.collect::<std::collections::HashMap<_, _>>();
 	let mut targets = plan
 		.decisions
 		.iter()
@@ -232,7 +270,7 @@ pub(crate) fn build_package_publication_targets(
 				.get("config_id")
 				.cloned()
 				.unwrap_or_else(|| package.name.clone());
-			let package_definition = configuration.package_by_id(&config_id)?;
+			let package_definition = configured_package_by_id.get(config_id.as_str()).copied()?;
 			if !package_definition.publish.enabled
 				|| matches!(
 					package.publish_state,

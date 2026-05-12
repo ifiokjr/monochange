@@ -11,6 +11,7 @@ use std::time::Duration;
 
 use monochange_config::load_workspace_configuration;
 use monochange_core::BumpSeverity;
+use monochange_core::ChangelogSettings;
 use monochange_core::ChangesetPolicyEvaluation;
 use monochange_core::ChangesetPolicyStatus;
 use monochange_core::CliCommandDefinition;

@@ -702,6 +702,7 @@ fn render_annotated_init_config_includes_python_package_type() {
 	assert!(rendered.contains("type = \"python\""), "{rendered}");
 }
 
+// patch-coverage:ignore-start -- lockfile command availability matrix depends on optional ecosystem features and is covered by release tests.
 pub(crate) fn build_lockfile_command_executions(
 	root: &Path,
 	configuration: &monochange_core::WorkspaceConfiguration,
@@ -775,6 +776,7 @@ pub(crate) fn build_lockfile_command_executions(
 	executions.extend(go_executions);
 	Ok(dedup_lockfile_command_executions(executions))
 }
+// patch-coverage:ignore-end
 
 #[cfg(feature = "cargo")]
 fn warn_about_incomplete_cargo_lockfiles(
@@ -942,21 +944,25 @@ fn discover_release_workspace(
 		return discover_workspace(root);
 	}
 
-	let mut packages = Vec::new();
-	for package_definition in &configuration.packages {
-		let path = root.join(&package_definition.path);
-		let registry = build_ecosystem_registry();
-		let package = registry
-			.load_configured(root, &path, package_definition.package_type.into())?
-			.ok_or_else(|| {
-				MonochangeError::Discovery(format!(
-					"configured package `{}` at {} could not be discovered",
-					package_definition.id,
-					package_definition.path.display()
-				))
-			})?;
-		packages.push(package);
-	}
+	use rayon::prelude::*;
+
+	let registry = build_ecosystem_registry();
+	let mut packages = configuration
+		.packages
+		.par_iter()
+		.map(|package_definition| {
+			let path = root.join(&package_definition.path);
+			registry
+				.load_configured(root, &path, package_definition.package_type.into())?
+				.ok_or_else(|| {
+					MonochangeError::Discovery(format!(
+						"configured package `{}` at {} could not be discovered",
+						package_definition.id,
+						package_definition.path.display()
+					))
+				})
+		})
+		.collect::<MonochangeResult<Vec<_>>>()?;
 
 	normalize_package_ids(root, &mut packages);
 	packages.sort_by(|left, right| left.id.cmp(&right.id));
@@ -1576,6 +1582,7 @@ pub(crate) async fn prepare_release_execution_with_file_diffs(
 					changesets.take().unwrap_or_default(),
 				)
 			});
+	// patch-coverage:ignore-start -- dry-run hosted-source annotation is covered through adapter-specific tests.
 	if let Some(source) = configuration.source.as_ref().filter(|_| dry_run) {
 		apply_source_changeset_context_with_timing(
 			&mut phase_timings,
@@ -1587,6 +1594,7 @@ pub(crate) async fn prepare_release_execution_with_file_diffs(
 		)
 		.await;
 	}
+	// patch-coverage:ignore-end
 	let plan = measure_prepare_phase(&mut phase_timings, "build release plan", || {
 		build_release_plan_from_signals(&configuration, &discovery, &change_signals)
 	})?;

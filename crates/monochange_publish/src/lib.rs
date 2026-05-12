@@ -586,10 +586,11 @@ pub async fn execute_publish_requests_with_process(
 		trust_handler,
 		&NoopPublishProgressReporter,
 	)
+	.await
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn execute_publish_requests_with_process_and_progress(
+pub async fn execute_publish_requests_with_process_and_progress(
 	root: &Path,
 	source: Option<&SourceConfiguration>,
 	mode: PackagePublishRunMode,
@@ -656,10 +657,11 @@ pub async fn execute_publish_requests(
 		trust_handler,
 		&NoopPublishProgressReporter,
 	)
+	.await
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn execute_publish_requests_with_progress(
+pub async fn execute_publish_requests_with_progress(
 	root: &Path,
 	source: Option<&SourceConfiguration>,
 	mode: PackagePublishRunMode,
@@ -1080,14 +1082,14 @@ pub fn build_configured_package_release_requests(
 	build_release_requests(configuration, packages, &publications, selected_packages)
 }
 
-pub fn build_pending_configured_package_release_requests(
+pub async fn build_pending_configured_package_release_requests(
 	configuration: &WorkspaceConfiguration,
 	packages: &[PackageRecord],
 	selected_packages: &BTreeSet<String>,
 ) -> MonochangeResult<Vec<PublishRequest>> {
 	let requests =
 		build_configured_package_release_requests(configuration, packages, selected_packages)?;
-	filter_pending_publish_requests(&requests)
+	filter_pending_publish_requests(&requests).await
 }
 
 pub fn build_release_requests(

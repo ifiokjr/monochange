@@ -37,14 +37,11 @@ use monochange_publish::RegistryEndpoints;
 use monochange_publish::append_publish_dry_run_args;
 use monochange_publish::build_npm_placeholder_publish_command;
 use monochange_publish::build_npm_release_publish_command;
-use monochange_publish::build_placeholder_directory as build_placeholder_directory_with_writers;
 use monochange_publish::build_publish_command;
 use monochange_publish::crates_io_index_entry_path;
 use monochange_publish::crates_io_index_version_exists;
 use monochange_publish::default_registry_kind_for_ecosystem;
-use monochange_publish::enforce_release_attestation_prerequisites as enforce_release_attestation_prerequisites_impl;
 use monochange_publish::ensure_publish_report_succeeded;
-use monochange_publish::execute_publish_requests as execute_publish_requests_impl;
 use monochange_publish::filter_pending_publish_requests_with_transport;
 use monochange_publish::forbidden_npm_token_env_keys;
 use monochange_publish::publish_report_json_error;
@@ -55,7 +52,7 @@ use monochange_publish::resolve_placeholder_readme;
 use monochange_publish::resolve_registry_kind;
 use monochange_publish::write_publish_report_artifact;
 use monochange_test_helpers::git;
-use reqwest::blocking::Client;
+use reqwest::Client;
 use semver::Version;
 use serde_json::Value as JsonValue;
 use temp_env::with_vars;
@@ -260,46 +257,6 @@ fn with_locked_env_vars<T>(action: impl FnOnce() -> T) -> T {
 	action()
 }
 
-#[allow(clippy::too_many_arguments)]
-fn execute_publish_requests(
-	root: &Path,
-	source: Option<&SourceConfiguration>,
-	mode: PackagePublishRunMode,
-	dry_run: bool,
-	requests: &[PublishRequest],
-	client: &Client,
-	endpoints: &RegistryEndpoints,
-	env_map: &BTreeMap<String, String>,
-	executor: &mut dyn CommandExecutor,
-) -> MonochangeResult<PackagePublishReport> {
-	execute_publish_requests_impl(
-		root,
-		source,
-		mode,
-		dry_run,
-		requests,
-		client,
-		endpoints,
-		env_map,
-		executor,
-		&build_publish_command_builder(),
-		&placeholder_manifest_writer_registry(),
-		&publish_readiness_registry(),
-		&CliPublishTrustHandler,
-	)
-}
-
-fn enforce_release_attestation_prerequisites(
-	request: &PublishRequest,
-	env_map: &BTreeMap<String, String>,
-) -> MonochangeResult<()> {
-	enforce_release_attestation_prerequisites_impl(
-		request,
-		env_map,
-		&build_publish_command_builder(),
-	)
-}
-
 fn build_npm_trust_list_command(request: &PublishRequest) -> CommandSpec {
 	CommandSpec {
 		program: "npm".to_string(),
@@ -361,23 +318,6 @@ fn configure_npm_trusted_publishing(
 		setup_url: Some(manual_setup_url(request)),
 		message: "configured npm trusted publishing for the current GitHub workflow".to_string(),
 	})
-}
-
-fn build_placeholder_directory(
-	root: &Path,
-	request: &PublishRequest,
-	source: Option<&SourceConfiguration>,
-) -> MonochangeResult<TempDir> {
-	build_placeholder_directory_with_writers(
-		root,
-		request,
-		source,
-		&placeholder_manifest_writer_registry(),
-	)
-}
-
-fn placeholder_tempdir_error(error: &std::io::Error) -> MonochangeError {
-	MonochangeError::Io(format!("failed to create placeholder tempdir: {error}"))
 }
 
 fn workflow_root() -> TempDir {
@@ -3867,8 +3807,8 @@ async fn execute_publish_requests_publishes_release_with_trust_outcome() {
 	assert_eq!(executor.commands.len(), 1);
 }
 
-#[test]
-fn release_dry_run_orders_cargo_dev_and_build_dependencies_before_dependents() {
+#[tokio::test(flavor = "multi_thread")]
+async fn release_dry_run_orders_cargo_dev_and_build_dependencies_before_dependents() {
 	let expected_order = vec![
 		"zephyr-build",
 		"lima-dev",
@@ -3974,9 +3914,9 @@ fn release_dry_run_orders_cargo_dev_and_build_dependencies_before_dependents() {
 		})
 		.collect::<Vec<_>>();
 
-	with_vars(
+	temp_env::async_with_vars(
 		[("MONOCHANGE_CRATES_IO_API_URL", Some(server.base_url()))],
-		|| {
+		async {
 			let report = run_publish_packages_with_publications(
 				root.path(),
 				&configuration,
@@ -3984,6 +3924,7 @@ fn release_dry_run_orders_cargo_dev_and_build_dependencies_before_dependents() {
 				&BTreeSet::new(),
 				true,
 			)
+			.await
 			.expect("publish report:");
 			let order = report
 				.packages
@@ -3993,7 +3934,8 @@ fn release_dry_run_orders_cargo_dev_and_build_dependencies_before_dependents() {
 
 			assert_eq!(order, expected_order);
 		},
-	);
+	)
+	.await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -4691,6 +4633,7 @@ async fn run_publish_packages_with_resume_filters_by_group_and_ecosystem() {
 						&BTreeSet::new(),
 						&selected_groups,
 						&selected_ecosystems,
+						false,
 						true,
 						None,
 					))

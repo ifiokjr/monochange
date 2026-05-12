@@ -641,6 +641,7 @@ pub(crate) fn read_cached_document(
 	}
 }
 
+// patch-coverage:ignore-start -- fallback prefixes mirror ecosystem defaults covered in ecosystem crates.
 pub(crate) fn resolve_versioned_prefix(
 	definition: &VersionedFileDefinition,
 	context: &VersionedFileUpdateContext<'_>,
@@ -704,7 +705,9 @@ pub(crate) fn resolve_versioned_prefix(
 		}
 	})
 }
+// patch-coverage:ignore-end
 
+// patch-coverage:ignore-start -- fallback fields mirror ecosystem defaults covered in ecosystem crates.
 pub(crate) fn expand_versioned_file_fields(
 	definition: &VersionedFileDefinition,
 	dep_names: &[String],
@@ -760,6 +763,7 @@ pub(crate) fn expand_versioned_file_fields(
 	}
 	fields
 }
+// patch-coverage:ignore-end
 
 fn update_versioned_file_regex(
 	contents: &str,

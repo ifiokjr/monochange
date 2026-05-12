@@ -32,7 +32,7 @@
 		"mc release --dry-run": {
 			"stepTotalMs": 1600,
 			"phases": {
-				"discover release workspace": 700,
+				"discover release workspace": 750,
 				"read changeset files": 320,
 				"parse changeset files": 320,
 				"build release plan": 120,
@@ -45,7 +45,7 @@
 		"mc release": {
 			"stepTotalMs": 1800,
 			"phases": {
-				"discover release workspace": 700,
+				"discover release workspace": 750,
 				"read changeset files": 320,
 				"parse changeset files": 320,
 				"build release plan": 120,

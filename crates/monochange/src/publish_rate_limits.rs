@@ -15,6 +15,7 @@ use monochange_core::RegistryRateLimitPolicy;
 use monochange_core::RegistryRateLimitWindowPlan;
 use monochange_core::WorkspaceConfiguration;
 use monochange_core::materialize_dependency_edges;
+use monochange_publish::configured_package_publication_targets;
 use monochange_publish::filter_pending_publish_requests;
 
 use crate::PreparedRelease;
@@ -57,6 +58,7 @@ pub(crate) async fn plan_publish_rate_limits(
 	prepared_release: Option<&PreparedRelease>,
 	selected_packages: &BTreeSet<String>,
 	mode: PublishRateLimitMode,
+	publish_all_configured_packages: bool,
 	dry_run: bool,
 ) -> MonochangeResult<PublishRateLimitReport> {
 	let discovery = discover_workspace(root)?;
@@ -70,6 +72,7 @@ pub(crate) async fn plan_publish_rate_limits(
 			prepared_release,
 			packages,
 			selected_packages,
+			publish_all_configured_packages,
 		)
 		.await?
 	};
@@ -102,12 +105,17 @@ async fn build_release_plan_requests(
 	prepared_release: Option<&PreparedRelease>,
 	packages: &[monochange_core::PackageRecord],
 	selected_packages: &BTreeSet<String>,
+	publish_all_configured_packages: bool,
 ) -> MonochangeResult<Vec<package_publish::PublishRequest>> {
-	let publications = package_publish::release_record_package_publications_from_prepared_or_head(
-		root,
-		prepared_release,
-	)
-	.await?;
+	let publications = if publish_all_configured_packages {
+		configured_package_publication_targets(configuration, packages)
+	} else {
+		package_publish::release_record_package_publications_from_prepared_or_head(
+			root,
+			prepared_release,
+		)
+		.await?
+	};
 	let requests = package_publish::build_release_requests(
 		configuration,
 		packages,

@@ -69,6 +69,7 @@ use tempfile::tempdir;
 
 use crate::CliContext;
 use crate::PreparedFileDiff;
+pub(crate) use crate::TEST_ENV_LOCK;
 use crate::add_change_file;
 use crate::add_interactive_change_file;
 use crate::affected_packages;
@@ -1789,6 +1790,21 @@ fn populate_reports_when_all_default_cli_commands_are_already_present() {
 
 	assert!(output.contains("already defines all default CLI commands"));
 	assert_eq!(after, before);
+}
+
+#[test]
+fn format_populate_workspace_result_lists_added_commands() {
+	let result = crate::workspace_ops::PopulateWorkspaceResult {
+		path: PathBuf::from("monochange.toml"),
+		added_commands: vec!["release".to_string(), "publish".to_string()],
+	};
+
+	let output = crate::format_populate_workspace_result(&result);
+
+	assert_eq!(
+		output,
+		"updated monochange.toml and added 2 default CLI commands: release, publish"
+	);
 }
 
 #[test]
@@ -13440,7 +13456,7 @@ fn batch_changeset_contexts_returns_empty_without_git_repo() {
 
 #[etest::etest(skip=std::env::var_os("PRE_COMMIT").is_some())]
 fn batch_changeset_contexts_resolves_introduced_and_updated_commits() {
-	let _env_lock = crate::TEST_ENV_LOCK
+	let _env_lock = TEST_ENV_LOCK
 		.lock()
 		.unwrap_or_else(std::sync::PoisonError::into_inner);
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
@@ -14816,7 +14832,20 @@ async fn execute_cli_command_retarget_release_applies_git_updates_without_provid
 			name: None,
 			when: None,
 			always_run: false,
-			inputs: BTreeMap::new(),
+			inputs: BTreeMap::from([
+				(
+					"from".to_string(),
+					monochange_core::CliStepInputValue::Inherited,
+				),
+				(
+					"target".to_string(),
+					monochange_core::CliStepInputValue::Inherited,
+				),
+				(
+					"sync_provider".to_string(),
+					monochange_core::CliStepInputValue::Inherited,
+				),
+			]),
 		}],
 		dry_run: false,
 	};

@@ -328,6 +328,16 @@ async fn release_target_and_title_helpers_cover_provider_and_skip_paths() {
 			.all(|target| !target.rendered_changelog_title.is_empty())
 	);
 
+	let mut ungrouped_configuration = configuration.clone();
+	ungrouped_configuration.groups.clear();
+	let ungrouped_targets =
+		build_release_targets(&ungrouped_configuration, &packages, &plan, &changeset_paths).await;
+	assert!(ungrouped_targets.iter().any(|target| {
+		target.id == "pkg-a"
+			&& target.kind == ReleaseOwnerKind::Package
+			&& target.members == ["pkg-a".to_string()]
+	}));
+
 	assert_eq!(
 		effective_title_template(Some("specific"), Some("default"), "builtin"),
 		"specific"
@@ -937,6 +947,30 @@ fn deduplicate_uses_persistent_index_to_skip_scan() {
 	);
 	assert!(result.is_ok());
 	assert!(stale_dir.is_dir());
+}
+
+#[test]
+fn deduplicate_skips_current_record_dir_during_overlap_scan() {
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+	let current_record_dir = root.join(".monochange/releases/current");
+	fs::create_dir_all(&current_record_dir).unwrap();
+
+	let target = ReleaseRecordTarget {
+		id: "pkg-current".to_string(),
+		kind: ReleaseOwnerKind::Package,
+		version: "1.2.3".to_string(),
+		version_format: VersionFormat::Primary,
+		tag: true,
+		release: true,
+		tag_name: "v1.2.3".to_string(),
+		members: vec![],
+	};
+
+	let result = deduplicate_overlapping_release_records(root, &[target], &current_record_dir);
+
+	assert!(result.is_ok());
+	assert!(current_record_dir.is_dir());
 }
 
 #[test]

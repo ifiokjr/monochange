@@ -2,6 +2,7 @@
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
+use monochange_core::ChangelogSettings;
 use monochange_core::ChangesetContext;
 use monochange_core::ChangesetRevision;
 use monochange_core::HostedActorRef;
@@ -1047,6 +1048,22 @@ fn run_lockfile_command_variants_cover_success_and_shell_paths() {
 	)
 	.unwrap_or_else(|error| panic!("run workspace lockfile command through shell: {error}"));
 	assert!(temp_root.path().join("shell-output.txt").exists());
+}
+
+#[test]
+fn collect_workspace_file_updates_ignores_parentless_base_updates() {
+	let root = tempfile::tempdir().unwrap_or_else(|error| panic!("root tempdir: {error}"));
+	let temp_root = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let base_update = FileUpdate {
+		path: PathBuf::new(),
+		content: Vec::new(),
+	};
+
+	let updates =
+		collect_workspace_file_updates(root.path(), temp_root.path(), &[base_update], &[])
+			.unwrap_or_else(|error| panic!("collect updates: {error}"));
+
+	assert!(updates.is_empty());
 }
 
 #[test]

@@ -447,8 +447,8 @@ fn ecosystem_progress_presentation_uses_portable_emojis() {
 	assert_eq!(progress_emoji_for_label("future"), "🌐");
 }
 
-#[test]
-fn execute_publish_requests_uses_noop_progress_reporter_by_default() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_publish_requests_uses_noop_progress_reporter_by_default() {
 	let report = execute_publish_requests_with_process(
 		Path::new("."),
 		None,
@@ -460,13 +460,14 @@ fn execute_publish_requests_uses_noop_progress_reporter_by_default() {
 		&PublishReadinessRegistry::new(),
 		&TestPublishTrustHandler,
 	)
+	.await
 	.unwrap();
 
 	assert!(report.packages.is_empty());
 }
 
-#[test]
-fn publish_progress_reports_external_skip_and_summary_events() {
+#[tokio::test(flavor = "multi_thread")]
+async fn publish_progress_reports_external_skip_and_summary_events() {
 	let mut request = sample_publish_request_for_registry(RegistryKind::Npm);
 	request.mode = PublishMode::External;
 	let requests = vec![request];
@@ -489,6 +490,7 @@ fn publish_progress_reports_external_skip_and_summary_events() {
 		&TestPublishTrustHandler,
 		&progress,
 	)
+	.await
 	.unwrap();
 
 	assert_eq!(
@@ -1240,8 +1242,8 @@ fn cargo_publish_request() -> PublishRequest {
 	}
 }
 
-#[test]
-fn dry_run_publish_executes_registry_dry_run_and_captures_output() {
+#[tokio::test(flavor = "multi_thread")]
+async fn dry_run_publish_executes_registry_dry_run_and_captures_output() {
 	let request = cargo_publish_request();
 	let client = registry_client().unwrap_or_else(|error| panic!("registry client: {error}"));
 	let endpoints = RegistryEndpoints::from_env();
@@ -1266,6 +1268,7 @@ fn dry_run_publish_executes_registry_dry_run_and_captures_output() {
 		&readiness,
 		&trust_handler,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("execute publish dry run: {error}"));
 
 	assert_eq!(executor.commands.len(), 1);

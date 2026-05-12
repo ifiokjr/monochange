@@ -546,6 +546,15 @@ async fn read_status_hash_and_ignore_helpers_report_non_git_cases() {
 		.unwrap_or_else(|error| panic!("non-git artifact ignore should succeed: {error}"));
 }
 
+#[test]
+fn first_hash_for_path_reports_empty_git_output() {
+	let error = first_hash_for_path(Path::new("tracked.txt"), Vec::new())
+		.err()
+		.unwrap_or_else(|| panic!("expected empty hash output error"));
+
+	assert!(error.to_string().contains("git returned no hash"));
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn git_status_snapshot_without_excluded_path_keeps_all_lines() {
 	let tempdir = setup_prepared_release_repo();

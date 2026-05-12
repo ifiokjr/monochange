@@ -1,9 +1,5 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-#[cfg(test)]
-use std::env;
-#[cfg(test)]
-use std::fs;
 use std::path::Path;
 
 use monochange_cargo::cargo_publish_readiness_blockers;
@@ -13,8 +9,6 @@ use monochange_core::Ecosystem;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::PackagePublicationTarget;
-#[cfg(test)]
-pub(crate) use monochange_core::PublishMode;
 use monochange_core::PublishRegistry;
 use monochange_core::RegistryKind;
 use monochange_core::SourceConfiguration;
@@ -29,15 +23,11 @@ use monochange_npm::render_npm_trust_command;
 use monochange_npm::write_npm_placeholder_manifest;
 #[cfg(test)]
 use monochange_publish::CommandExecutor;
-#[cfg(test)]
-pub(crate) use monochange_publish::PLACEHOLDER_VERSION;
 pub(crate) use monochange_publish::PackagePublishOutcome;
 pub(crate) use monochange_publish::PackagePublishReport;
 pub(crate) use monochange_publish::PackagePublishRunMode;
 pub(crate) use monochange_publish::PackagePublishStatus;
 use monochange_publish::PlaceholderManifestWriterRegistry;
-#[cfg(test)]
-pub(crate) use monochange_publish::ProcessCommandExecutor;
 use monochange_publish::PublishReadinessRegistry;
 pub(crate) use monochange_publish::PublishRequest;
 use monochange_publish::PublishTrustHandler;
@@ -49,12 +39,9 @@ pub(crate) use monochange_publish::TrustedPublishingStatus;
 #[cfg(test)]
 use monochange_publish::build_placeholder_directory as build_placeholder_directory_with_writers;
 pub(crate) use monochange_publish::build_placeholder_requests;
-#[cfg(test)]
-pub(crate) use monochange_publish::build_publish_command;
 use monochange_publish::build_publish_command_builder;
 pub(crate) use monochange_publish::build_release_requests;
-#[cfg(test)]
-pub(crate) use monochange_publish::default_registry_kind_for_ecosystem;
+use monochange_publish::configured_package_publication_targets;
 use monochange_publish::detect_trusted_publishing_identity;
 use monochange_publish::disabled_trust_outcome;
 #[cfg(test)]
@@ -62,19 +49,11 @@ use monochange_publish::enforce_release_attestation_prerequisites as enforce_rel
 #[cfg(test)]
 use monochange_publish::execute_publish_requests as execute_publish_requests_impl;
 use monochange_publish::execute_publish_requests_with_process_and_progress;
-#[cfg(test)]
-pub(crate) use monochange_publish::forbidden_npm_token_env_keys;
 use monochange_publish::manual_setup_url;
 use monochange_publish::merge_publish_resume_report;
 use monochange_publish::provider_registry_trust_capability;
 use monochange_publish::read_publish_report_artifact;
-#[cfg(test)]
-pub(crate) use monochange_publish::registry_version_exists;
 use monochange_publish::reject_npm_token_environment;
-#[cfg(test)]
-pub(crate) use monochange_publish::resolve_placeholder_readme;
-#[cfg(test)]
-pub(crate) use monochange_publish::resolve_registry_kind;
 use monochange_publish::resume_publish_requests;
 use monochange_publish::select_release_publication_targets;
 use monochange_publish::trusted_publishing_capability_message;
@@ -129,6 +108,7 @@ pub(crate) async fn run_publish_packages(
 		selected_packages,
 		&BTreeSet::new(),
 		&BTreeSet::new(),
+		false,
 		dry_run,
 		None,
 	)
@@ -143,11 +123,16 @@ pub(crate) async fn run_publish_packages_with_resume(
 	selected_packages: &BTreeSet<String>,
 	selected_groups: &BTreeSet<String>,
 	selected_ecosystems: &BTreeSet<Ecosystem>,
+	publish_all_configured_packages: bool,
 	dry_run: bool,
 	resume_path: Option<&Path>,
 ) -> MonochangeResult<PackagePublishReport> {
-	let publication_targets =
-		release_record_package_publications_from_prepared_or_head(root, prepared_release).await?;
+	let publication_targets = if publish_all_configured_packages {
+		let discovery = discover_workspace(root)?;
+		configured_package_publication_targets(configuration, &discovery.packages)
+	} else {
+		release_record_package_publications_from_prepared_or_head(root, prepared_release).await?
+	};
 	let selected_targets = select_release_publication_targets(
 		&configuration.groups,
 		&publication_targets,

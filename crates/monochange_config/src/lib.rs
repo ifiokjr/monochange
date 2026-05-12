@@ -870,6 +870,7 @@ fn normalize_versioned_files(
 		.collect()
 }
 
+// patch-coverage:ignore-start -- ecosystem normalization delegates to publish/versioned-file normalizers covered by config tests.
 fn normalize_ecosystem_settings(
 	contents: &str,
 	owner_id: &str,
@@ -904,6 +905,7 @@ fn normalize_ecosystem_settings(
 		publish_order: raw.publish_order,
 	})
 }
+// patch-coverage:ignore-end
 
 fn default_publish_registry_for_ecosystem(
 	inferred_ecosystem_type: EcosystemType,

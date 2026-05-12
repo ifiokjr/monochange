@@ -456,6 +456,7 @@ pub fn relative_to_root(root: &Path, path: &Path) -> Option<PathBuf> {
 #[derive(Clone, Debug)]
 pub struct DiscoveryPathFilter {
 	root: PathBuf,
+	input_root: PathBuf,
 	gitignore: Gitignore,
 }
 
@@ -463,6 +464,7 @@ impl DiscoveryPathFilter {
 	/// Build a discovery filter from repository gitignore rules.
 	#[must_use]
 	pub fn new(root: &Path) -> Self {
+		let input_root = root.to_path_buf();
 		let root = normalize_path(root);
 		let mut builder = GitignoreBuilder::new(&root);
 		for path in [root.join(".gitignore"), root.join(".git/info/exclude")] {
@@ -472,7 +474,11 @@ impl DiscoveryPathFilter {
 		}
 		let gitignore = builder.build().unwrap_or_else(|_| Gitignore::empty());
 
-		Self { root, gitignore }
+		Self {
+			root,
+			input_root,
+			gitignore,
+		}
 	}
 
 	/// Return `true` when `path` should be considered during discovery.
@@ -496,27 +502,20 @@ impl DiscoveryPathFilter {
 	}
 
 	fn matches_gitignore(&self, path: &Path, is_dir: bool) -> bool {
-		let normalized_path = normalize_path(path);
-		normalized_path
-			.strip_prefix(&self.root)
-			.ok()
-			.is_some_and(|relative| {
-				self.gitignore
-					.matched_path_or_any_parents(relative, is_dir)
-					.is_ignore()
-			})
+		self.relative_path(path).is_some_and(|relative| {
+			self.gitignore
+				.matched_path_or_any_parents(&relative, is_dir)
+				.is_ignore()
+		})
 	}
 
 	fn has_nested_git_worktree_ancestor(&self, path: &Path, is_dir: bool) -> bool {
-		let normalized_path = normalize_path(path);
-		let mut current = if is_dir {
-			normalized_path.clone()
-		} else {
-			normalized_path
-				.parent()
-				.unwrap_or(&normalized_path)
-				.to_path_buf()
+		let Some(mut current) = self.absolute_path(path) else {
+			return false;
 		};
+		if !is_dir {
+			current = current.parent().unwrap_or(&current).to_path_buf();
+		}
 
 		while current.starts_with(&self.root) && current != self.root {
 			if current.join(".git").exists() {
@@ -529,6 +528,31 @@ impl DiscoveryPathFilter {
 		}
 
 		false
+	}
+
+	fn relative_path(&self, path: &Path) -> Option<PathBuf> {
+		if path.is_absolute() {
+			return path
+				.strip_prefix(&self.root)
+				.or_else(|_| path.strip_prefix(&self.input_root))
+				.ok()
+				.map(Path::to_path_buf);
+		}
+		path.strip_prefix(&self.input_root).map_or_else(
+			|_| Some(path.to_path_buf()),
+			|relative| Some(relative.to_path_buf()),
+		)
+	}
+
+	fn absolute_path(&self, path: &Path) -> Option<PathBuf> {
+		if path.is_absolute() {
+			return path.strip_prefix(&self.input_root).map_or_else(
+				|_| Some(path.to_path_buf()),
+				|relative| Some(self.root.join(relative)),
+			);
+		}
+		self.relative_path(path)
+			.map(|relative| self.root.join(relative))
 	}
 }
 
@@ -4893,7 +4917,7 @@ pub struct AdapterDiscovery {
 	pub warnings: Vec<String>,
 }
 
-pub trait EcosystemAdapter {
+pub trait EcosystemAdapter: Send + Sync {
 	fn ecosystem(&self) -> Ecosystem;
 
 	fn discover(&self, root: &Path) -> MonochangeResult<AdapterDiscovery>;
@@ -4940,10 +4964,27 @@ impl EcosystemRegistry {
 	}
 
 	pub fn discover_all(&self, root: &Path) -> MonochangeResult<AdapterDiscovery> {
-		let mut packages = Vec::new();
-		let mut warnings = Vec::new();
-		for adapter in &self.adapters {
-			let mut result = adapter.discover(root)?;
+		let results = std::thread::scope(|scope| {
+			self.adapters
+				.iter()
+				.map(|adapter| scope.spawn(move || adapter.discover(root)))
+				.collect::<Vec<_>>()
+				.into_iter()
+				.map(|handle| {
+					handle.join().map_err(|_| {
+						MonochangeError::Discovery(
+							"ecosystem discovery worker panicked".to_string(),
+						)
+					})?
+				})
+				.collect::<MonochangeResult<Vec<_>>>()
+		})?;
+
+		let mut packages =
+			Vec::with_capacity(results.iter().map(|result| result.packages.len()).sum());
+		let mut warnings =
+			Vec::with_capacity(results.iter().map(|result| result.warnings.len()).sum());
+		for mut result in results {
 			packages.append(&mut result.packages);
 			warnings.append(&mut result.warnings);
 		}

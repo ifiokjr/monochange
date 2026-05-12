@@ -29,7 +29,7 @@ This is a **breaking change** that migrates the entire CLI and workspace from sy
 
 ### `monochange_github`, `monochange_gitea`, `monochange_gitlab`, `monochange_forgejo`
 
-- **All public sync entry points** that previously used `Runtime::new().block_on()` internally are now either `async fn` or delegate to `block_on_in_context`. Public `async fn` signatures include:
+- **All public sync entry points** that previously used `Runtime::new().block_on()` internally are now `async fn`; the sync bridge helper is kept only for tests. Public `async fn` signatures include:
   - `publish_release`, `find_existing_pull_request`, `find_existing_release`, `default_branch_name`, `create_change_request`, `verify_release_branch`, `retarget_release_tags`, `enrich_changeset_context`, `no_identity`
 - **`reqwest::blocking::Client`** replaced with async `reqwest::Client` throughout.
 - **`github_runtime()` / `gitea_runtime()` / etc.** removed from public API (only available as `#[cfg(test)]` helpers).
@@ -37,16 +37,16 @@ This is a **breaking change** that migrates the entire CLI and workspace from sy
 ### `monochange_publish`
 
 - **`filter_pending_publish_requests`**, **`filter_pending_publish_requests_with_transport`**, **`registry_version_exists`**, **`crates_io_version_exists`**, **`crates_io_index_version_exists`** are now `async fn`. Callers must `.await`.
-- **`execute_publish_requests_with_process`** and **`run_placeholder_publish`** remain sync (they bridge internally via `block_on_in_context`).
+- **`execute_publish_requests`**, **`execute_publish_requests_with_progress`**, **`execute_publish_requests_with_process`**, **`execute_publish_requests_with_process_and_progress`**, and **`run_placeholder_publish`** are now async.
 - **`reqwest::blocking::Client`** replaced with async `reqwest::Client` throughout.
 - **`registry_client()`** is now a sync function returning `MonochangeResult<Client>` (no longer async).
 
 ### `monochange`
 
-- **`cli_runtime::block_on_in_context`** is a new `pub(crate)` helper that safely handles both multi-threaded and current-thread Tokio runtimes, eliminating "Cannot start a runtime from within a runtime" panics.
+- **`cli_runtime::block_on_in_context`** is now a `#[cfg(test)]` `pub(crate)` helper for compatibility tests; production code awaits async APIs directly.
 - **`publish_source_change_request`**, **`publish_readiness::publish_plan_package_filter_from_readiness_artifact`**, **`plan_publish_rate_limits`**, and all async CLI step handlers are now `async fn`.
 - **`run_publish_packages`**, **`run_publish_packages_with_resume`** remain async.
-- **`run_placeholder_publish`** and **`execute_publish_requests_with_process`** remain sync, bridging to async internally.
+- **`run_placeholder_publish`** and **`execute_publish_requests_with_process`** are now async and should be awaited directly.
 - **Test files** converted from `#[test]` to `#[tokio::test(flavor = "multi_thread")]` where they call async code.
 
 ## Migration guide
@@ -56,7 +56,7 @@ This is a **breaking change** that migrates the entire CLI and workspace from sy
 3. Any code calling `monochange_publish::*` async functions must be in an async context.
 4. Tests that call async code must use `#[tokio::test(flavor = "multi_thread")]`.
 5. Replace `reqwest::blocking::Client` with `reqwest::Client` (async) in all custom code.
-6. When bridging from sync to async, use `block_on_in_context` which handles multi-threaded runtimes via `block_in_place` and current-thread runtimes via `handle.block_on()`.
+6. Avoid new sync-to-async bridges in production code; prefer async callers and `.await`. `block_on_in_context` is retained only for test compatibility boundaries.
 
 ```rust
 // Before (sync):

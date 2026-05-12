@@ -360,43 +360,106 @@ async fn tracked_path_snapshots(
 	tracked_paths.sort();
 	tracked_paths.dedup();
 
-	let mut snapshots = Vec::with_capacity(tracked_paths.len());
+	let mut snapshot_inputs = Vec::with_capacity(tracked_paths.len());
+	let mut file_paths = Vec::new();
 	for path in tracked_paths {
 		let absolute_path = resolve_config_path(root, &path);
 		if absolute_path.exists() {
-			let hash = hash_file_at_path(root, &absolute_path).await?;
-			snapshots.push(PreparedReleaseTrackedPath {
-				path,
-				state: PreparedReleaseTrackedPathState::File,
-				hash: Some(hash),
-			});
+			let relative_path = root_relative(root, &absolute_path);
+			let relative = relative_path.to_string_lossy().into_owned();
+			let hash_index = file_paths.len();
+			file_paths.push(relative);
+			snapshot_inputs.push(TrackedPathSnapshotInput::File { path, hash_index });
 		} else {
-			snapshots.push(PreparedReleaseTrackedPath {
-				path,
-				state: PreparedReleaseTrackedPathState::Deleted,
-				hash: None,
-			});
+			snapshot_inputs.push(TrackedPathSnapshotInput::Deleted { path });
 		}
 	}
+
+	let hashes = hash_files_at_paths(root, &file_paths).await?;
+	let snapshots = snapshot_inputs
+		.into_iter()
+		.map(|input| {
+			match input {
+				TrackedPathSnapshotInput::File { path, hash_index } => {
+					PreparedReleaseTrackedPath {
+						path,
+						state: PreparedReleaseTrackedPathState::File,
+						hash: Some(hashes[hash_index].clone()),
+					}
+				}
+				TrackedPathSnapshotInput::Deleted { path } => {
+					PreparedReleaseTrackedPath {
+						path,
+						state: PreparedReleaseTrackedPathState::Deleted,
+						hash: None,
+					}
+				}
+			}
+		})
+		.collect();
+
 	Ok(snapshots)
 }
 
+#[derive(Debug)]
+enum TrackedPathSnapshotInput {
+	File { path: PathBuf, hash_index: usize },
+	Deleted { path: PathBuf },
+}
+
+#[cfg(test)]
+fn first_hash_for_path(path: &Path, hashes: Vec<String>) -> MonochangeResult<String> {
+	hashes.into_iter().next().ok_or_else(|| {
+		MonochangeError::Config(format!(
+			"failed to hash {}: git returned no hash",
+			path.display()
+		))
+	})
+}
+
+#[cfg(test)]
 async fn hash_file_at_path(root: &Path, path: &Path) -> MonochangeResult<String> {
 	let relative_path = root_relative(root, path);
 	let relative = relative_path.to_string_lossy().into_owned();
-	let output = git_command_output(root, &["hash-object", "--", &relative])
+	let hashes = hash_files_at_paths(root, &[relative]).await?;
+	first_hash_for_path(path, hashes)
+}
+
+async fn hash_files_at_paths(root: &Path, paths: &[String]) -> MonochangeResult<Vec<String>> {
+	if paths.is_empty() {
+		return Ok(Vec::new());
+	}
+
+	let mut args = Vec::with_capacity(paths.len() + 2);
+	args.push("hash-object");
+	args.push("--");
+	args.extend(paths.iter().map(String::as_str));
+
+	let output = git_command_output(root, &args)
 		.await
-		.map_err(|error| {
-			MonochangeError::Io(format!("failed to hash {}: {error}", path.display()))
-		})?;
+		.map_err(|error| MonochangeError::Io(format!("failed to hash files: {error}")))?;
 	if !output.status.success() {
 		return Err(MonochangeError::Config(format!(
-			"failed to hash {}: {}",
-			path.display(),
+			"failed to hash files: {}",
 			git_error_detail(&output)
 		)));
 	}
-	Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+
+	let hashes = String::from_utf8_lossy(&output.stdout)
+		.lines()
+		.map(str::trim)
+		.filter(|hash| !hash.is_empty())
+		.map(str::to_string)
+		.collect::<Vec<_>>();
+	if hashes.len() != paths.len() {
+		return Err(MonochangeError::Config(format!(
+			"failed to hash files: expected {} hashes, got {}",
+			paths.len(),
+			hashes.len()
+		)));
+	}
+
+	Ok(hashes)
 }
 
 pub(crate) async fn ensure_monochange_artifact_ignored(

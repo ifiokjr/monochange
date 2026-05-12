@@ -1,32 +1,10 @@
 #![allow(clippy::disallowed_methods)]
 use std::fs;
-use std::io::Write;
 use std::process::Stdio;
 
 use tempfile::tempdir;
 
 use super::*;
-
-fn run_git_process_with_stdin(
-	mut command: ProcessCommand,
-	input: &[u8],
-	error_message: &str,
-) -> MonochangeResult<()> {
-	let mut child = command
-		.stdout(Stdio::piped())
-		.stderr(Stdio::piped())
-		.spawn()
-		.map_err(|error| MonochangeError::Discovery(format!("{error_message}: {error}")))?;
-	if let Some(mut stdin) = child.stdin.take() {
-		stdin
-			.write_all(input)
-			.map_err(|error| MonochangeError::Discovery(format!("{error_message}: {error}")))?;
-	}
-	let output = child
-		.wait_with_output()
-		.map_err(|error| MonochangeError::Discovery(format!("{error_message}: {error}")))?;
-	handle_git_process_output(&output, error_message)
-}
 
 fn git(root: &Path, args: &[&str]) {
 	let output = monochange_core::git::git_command(root)

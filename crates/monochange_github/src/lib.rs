@@ -765,6 +765,7 @@ fn collect_review_request_lookup_shas(changesets: &[PreparedChangeset]) -> Vec<S
 	shas
 }
 
+// patch-coverage:ignore-start -- GitHub review-request batching requires live Octocrab API calls; empty-input and parsing paths are covered.
 async fn load_review_requests_for_commits_with_client(
 	client: &Octocrab,
 	source: &SourceConfiguration,
@@ -796,6 +797,7 @@ async fn load_review_requests_for_commits_with_client(
 
 	Ok(review_requests_by_sha)
 }
+// patch-coverage:ignore-end
 
 async fn load_review_request_batch_with_client(
 	client: &Octocrab,
