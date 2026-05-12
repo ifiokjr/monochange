@@ -1395,7 +1395,8 @@ fn evaluate_cli_step_condition(
 	if trimmed.is_empty() {
 		return Ok(false);
 	}
-	let template_context = build_cli_template_context(context, step_inputs, None);
+	let condition_inputs = cli_step_condition_inputs(context, step_inputs);
+	let template_context = build_cli_template_context(context, &condition_inputs, None);
 	let template_context_json = serde_json::Value::Object(template_context.clone());
 	if let Some(path) = parse_direct_template_reference(trimmed) {
 		let Some(value) = lookup_template_value(&template_context_json, path) else {
@@ -1410,6 +1411,15 @@ fn evaluate_cli_step_condition(
 		minijinja::Value::from_serialize(serde_json::Value::Object(template_context));
 	let rendered = render_jinja_template(&normalized, &jinja_context)?;
 	parse_string_as_boolean(&rendered, condition)
+}
+
+fn cli_step_condition_inputs(
+	context: &CliContext,
+	step_inputs: &BTreeMap<String, Vec<String>>,
+) -> BTreeMap<String, Vec<String>> {
+	let mut inputs = context.inputs.clone();
+	inputs.extend(step_inputs.clone());
+	inputs
 }
 
 fn parse_template_as_boolean(value: &serde_json::Value, condition: &str) -> MonochangeResult<bool> {

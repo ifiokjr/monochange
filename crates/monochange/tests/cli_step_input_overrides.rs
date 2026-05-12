@@ -126,7 +126,7 @@ inputs = ["message"]
 }
 
 #[test]
-fn when_conditions_use_explicit_step_input_context() {
+fn when_conditions_can_use_command_inputs_without_passing_them_to_steps() {
 	let tempdir = setup_scenario_workspace("cli-step-input-overrides/workspace");
 	append_config(
 		tempdir.path(),
@@ -137,7 +137,7 @@ inputs = [{ name = "enabled", type = "boolean" }]
 [[cli.when-explicit-inputs.steps]]
 type = "Command"
 when = "{{ inputs.enabled is defined }}"
-command = "touch implicit-output.txt"
+command = "printf '%s' '{{ inputs.enabled is defined }}' > implicit-output.txt"
 shell = true
 
 [[cli.when-explicit-inputs.steps]]
@@ -156,7 +156,9 @@ inputs = ["enabled"]
 		"{}",
 		String::from_utf8_lossy(&output.stderr)
 	);
-	assert!(!tempdir.path().join("implicit-output.txt").exists());
+	let implicit_contents = fs::read_to_string(tempdir.path().join("implicit-output.txt"))
+		.unwrap_or_else(|error| panic!("implicit command output file: {error}"));
+	assert_eq!(implicit_contents, "false");
 	assert!(tempdir.path().join("selected-output.txt").exists());
 }
 

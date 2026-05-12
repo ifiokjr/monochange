@@ -1914,13 +1914,21 @@ fn execute_cli_command_with_options_reuses_prepared_release_artifact_for_version
 	let _guard = TEST_ENV_LOCK
 		.lock()
 		.unwrap_or_else(|error| panic!("test env lock: {error}"));
-	let root = fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
-		.unwrap_or_else(|error| panic!("workspace root: {error}"));
-	let configuration = sample_configuration(&root);
+	let workspace_dir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = workspace_dir.path();
+	fs::write(root.join("Cargo.toml"), "[workspace]\n")
+		.unwrap_or_else(|error| panic!("write workspace manifest: {error}"));
+	git_in_dir(root, &["init", "-b", "main"]);
+	git_in_dir(root, &["config", "user.name", "monochange Tests"]);
+	git_in_dir(root, &["config", "user.email", "monochange@example.com"]);
+	git_in_dir(root, &["add", "Cargo.toml"]);
+	git_in_dir(root, &["commit", "-m", "initial"]);
+
+	let configuration = sample_configuration(root);
 	let artifact_dir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let artifact_path = artifact_dir.path().join("prepared-release.json");
 	save_prepared_release_execution(
-		&root,
+		root,
 		&configuration,
 		&sample_prepared_release_with_versions(),
 		&[],
@@ -1929,7 +1937,7 @@ fn execute_cli_command_with_options_reuses_prepared_release_artifact_for_version
 	.unwrap_or_else(|error| panic!("save prepared release artifact: {error}"));
 
 	let output = execute_cli_command_with_options(
-		&root,
+		root,
 		&configuration,
 		&default_cli_command("display-versions"),
 		ExecuteCliCommandOptions {
