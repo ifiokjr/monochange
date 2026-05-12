@@ -116,7 +116,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if is_release_commit="$(mc release-record --from HEAD --format json --jq '.resolvedCommit == .recordCommit' 2>/dev/null)"; then
+          if is_release_commit="$(mc step:release-record --from HEAD --format json --jq '.resolvedCommit == .recordCommit' 2>/dev/null)"; then
             echo "is_release_commit=${is_release_commit}" >> "$GITHUB_OUTPUT"
           else
             echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
@@ -499,7 +499,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if is_release_commit="$(mc release-record --from HEAD --format json --jq '.resolvedCommit == .recordCommit' 2>/dev/null)"; then
+          if is_release_commit="$(mc step:release-record --from HEAD --format json --jq '.resolvedCommit == .recordCommit' 2>/dev/null)"; then
             echo "is_release_commit=${is_release_commit}" >> "$GITHUB_OUTPUT"
           else
             echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
@@ -547,10 +547,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          if is_release_commit="$(mc release-record --from HEAD --format json --jq '.resolvedCommit == .recordCommit' 2>/dev/null)"; then
+          if is_release_commit="$(mc step:release-record --from HEAD --format json --jq '.resolvedCommit == .recordCommit' 2>/dev/null)"; then
             echo "is_release_commit=${is_release_commit}" >> "$GITHUB_OUTPUT"
             if [ "${is_release_commit}" = "true" ]; then
-              mc tag-release --from HEAD --push=true --format json | tee /tmp/tag-report.json
+              mc step:tag-release --from HEAD --push=true --format json | tee /tmp/tag-report.json
             fi
           else
             echo "is_release_commit=false" >> "$GITHUB_OUTPUT"

@@ -15,7 +15,7 @@ Agents should optimize for safety and traceability: inspect config first, prefer
 
 - Read `monochange.toml` before recommending commands. Top-level `mc <name>` workflow commands can be user-defined by `[cli.<name>]` and vary per repository.
 - Do not assume `mc discover`, `mc change`, `mc release`, `mc publish`, or similar workflow names exist in every repo. They are user-defined unless they appear in `mc help` for that workspace.
-- Built-in commands are hardcoded by the CLI. Step commands are always exposed as `mc step:<step-name>` for built-in step variants, except the generic `Command` step.
+- Binary commands are wired by the CLI. Step commands are always exposed as `mc step:<step-name>` for built-in step variants, except the generic `Command` step.
 - When authoring `[cli.*]` workflows, command inputs are explicit per step. Add `inputs = ["name"]` on a step to inherit a command input unchanged, or use the map form for overrides and renamed values.
 - Prefer package or group ids from `monochange.toml` over manifest names.
 - Use dry-run or preview commands before mutating versions, committing, tagging, releasing, or publishing.
@@ -23,11 +23,11 @@ Agents should optimize for safety and traceability: inspect config first, prefer
 
 ## Fast workflow
 
-1. Inspect configuration: `mc validate`, `mc step:config --format json`, or `mc help`. Use this to learn package ids, enabled ecosystems, groups, and which top-level workflow commands actually exist.
+1. Inspect configuration: `mc step:validate`, `mc step:config --format json`, or `mc help`. Use this to learn package ids, enabled ecosystems, groups, and which top-level workflow commands actually exist.
 2. Inspect packages: use the configured workflow command (often `mc discover --format json`) or `mc step:discover --format json`. Prefer JSON when another tool or agent will consume the package graph.
 3. Create release intent: use a configured workflow command (often `mc change ...`) or write `.changeset/*.md` manually. Read existing changesets first so you can update or merge related intent instead of creating duplicates.
 4. Preview versioned files: use the configured workflow command (often `mc release --dry-run --format json` or `--diff`) or `mc step:prepare-release --dry-run`. The preview is where you verify versions, changelog entries, generated manifests, and lockfile work before mutating the tree.
-5. Run validation and linting: `mc check` and `mc validate`. `validate` catches monochange configuration and target issues; `check` also runs manifest lint rules.
+5. Run validation and linting: `mc check` and `mc step:validate`. `validate` catches monochange configuration and target issues; `check` also runs manifest lint rules.
 6. Only after review, run configured commit/release/publish workflows. Keep release-record, readiness, bootstrap, plan, and publish artifacts when the workflow emits them.
 
 ## What to open next
@@ -53,14 +53,14 @@ Built-in commands in the current CLI:
 - `mc skill` — install or update the monochange skill bundle.
 - `mc subagents` — generate repository-local agent/subagent guidance for monochange work.
 - `mc analyze` — inspect semantic changes for a package.
-- `mc tag-release` — create release tags from an embedded release record.
-- `mc release-record` — inspect the release record reachable from a tag or commit.
+- `mc step:tag-release` — create release tags from an embedded release record.
+- `mc step:release-record` — inspect the release record reachable from a tag or commit.
 - `mc check` — validate configuration, changesets, and manifest lint rules.
 - `mc lint` — list or explain lint rules and presets.
 - `mc mcp` — run the stdio MCP server.
-- `mc validate` — validate `monochange.toml` and changeset targets.
-- `mc publish-readiness` — verify publishability from a release record without publishing.
-- `mc publish-bootstrap` — publish first-time placeholder versions for packages in a release record.
+- `mc step:validate` — validate `monochange.toml` and changeset targets.
+- `mc step:publish-readiness` — verify publishability from a release record without publishing.
+- `mc step:placeholder-publish` — publish first-time placeholder versions for packages in a release record.
 
 Built-in step commands:
 

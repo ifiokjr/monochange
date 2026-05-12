@@ -358,7 +358,7 @@ fn validate_readiness_input_fingerprint(
 	}
 
 	Err(MonochangeError::Config(
-		"publish readiness artifact inputs are stale; workspace config, manifests, lockfiles, or publish tooling inputs changed, so rerun `mc publish-readiness --from HEAD --output <PATH>`".to_string(),
+		"publish readiness artifact inputs are stale; workspace config, manifests, lockfiles, or publish tooling inputs changed, so rerun `mc step:publish-readiness --from HEAD --output <PATH>`".to_string(),
 	))
 }
 
@@ -458,7 +458,7 @@ fn validate_readiness_release_commit(
 		return Ok(());
 	}
 	Err(MonochangeError::Config(format!(
-		"publish readiness artifact was generated for release record {}, but `mc publish` selected {}; rerun `mc publish-readiness --from HEAD --output <PATH>`",
+		"publish readiness artifact was generated for release record {}, but `mc publish` selected {}; rerun `mc step:publish-readiness --from HEAD --output <PATH>`",
 		artifact.record_commit, current.record_commit
 	)))
 }

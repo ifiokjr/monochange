@@ -836,6 +836,114 @@
 				},
 				{
 					"additionalProperties": false,
+					"description": "Inspect the monochange release record associated with a tag or commit.",
+					"properties": {
+						"always_run": {
+							"default": false,
+							"type": "boolean"
+						},
+						"inputs": {
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
+						},
+						"name": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"type": {
+							"const": "ReleaseRecord",
+							"type": "string"
+						},
+						"when": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						}
+					},
+					"required": [
+						"type"
+					],
+					"type": "object"
+				},
+				{
+					"additionalProperties": false,
+					"description": "Check package registry publishing readiness without publishing packages.",
+					"properties": {
+						"always_run": {
+							"default": false,
+							"type": "boolean"
+						},
+						"inputs": {
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
+						},
+						"name": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"type": {
+							"const": "PublishReadiness",
+							"type": "string"
+						},
+						"when": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						}
+					},
+					"required": [
+						"type"
+					],
+					"type": "object"
+				},
+				{
+					"additionalProperties": false,
+					"description": "Create and push release tags from the monochange release record on a commit.",
+					"properties": {
+						"always_run": {
+							"default": false,
+							"type": "boolean"
+						},
+						"inputs": {
+							"$ref": "#/$defs/CliStepInputsSchema",
+							"default": []
+						},
+						"name": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						},
+						"type": {
+							"const": "TagRelease",
+							"type": "string"
+						},
+						"when": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
+						}
+					},
+					"required": [
+						"type"
+					],
+					"type": "object"
+				},
+				{
+					"additionalProperties": false,
 					"description": "Repair a recent release by retargeting its stored release tag set.\n\nThis step is independent from `PrepareRelease` and exposes structured\n`retarget.*` state to later commands.",
 					"properties": {
 						"always_run": {

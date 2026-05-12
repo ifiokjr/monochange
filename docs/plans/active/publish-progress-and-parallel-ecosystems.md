@@ -49,7 +49,7 @@ This work makes release operations easier to trust by giving users readable prog
   - blocked/failed.
 - [ ] Keep progress on stderr and existing reports on stdout/artifacts.
 - [ ] Add tests for emoji labels, CI/plain output, and publish event sequencing.
-- [ ] Validate with `cargo fmt`, targeted tests, `cargo clippy -q -p monochange --all-targets --all-features -- -D warnings`, and `devenv shell mc validate`.
+- [ ] Validate with `cargo fmt`, targeted tests, `cargo clippy -q -p monochange --all-targets --all-features -- -D warnings`, and `devenv shell mc step:validate`.
 
 ### 2. Progress across CLI steps
 

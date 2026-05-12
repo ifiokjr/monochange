@@ -604,7 +604,7 @@ required = true
 [[cli.change.steps]]
 type = "CreateChangeFile"
 
-# `validate` is hardcoded; run `mc validate` directly instead of defining [cli.validate].
+# `validate` is a built-in step command; run `mc step:validate` directly instead of defining [cli.validate].
 ```
 
 ## Migration checklist
@@ -617,6 +617,6 @@ type = "CreateChangeFile"
 - [ ] Remove `scopes` and `[changes]` sections (no conventional commits)
 - [ ] Update `.changeset/*.md` frontmatter keys to use declared package/group ids
 - [ ] Update CI workflows from `knope <command>` to `mc <command>`
-- [ ] Run `mc validate` to check config and changesets
+- [ ] Run `mc step:validate` to check config and changesets
 - [ ] Run `mc release --dry-run` to verify the release plan
 - [ ] Remove knope from your dependencies and install monochange

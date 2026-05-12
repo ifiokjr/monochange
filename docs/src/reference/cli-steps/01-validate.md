@@ -16,7 +16,7 @@ It is especially useful for:
 - CI jobs that should fail before spending time on planning or publication
 - custom commands that should refuse to continue when config or changesets are invalid
 
-Compared with a shell-only `Command` step that runs `mc validate`, the built-in `Validate` step is preferable when you want the command definition to stay provider-neutral and semantically typed.
+Compared with a shell-only `Command` step that runs `mc step:validate`, the built-in `Validate` step is preferable when you want the command definition to stay provider-neutral and semantically typed.
 
 ## Inputs
 
@@ -88,11 +88,11 @@ Typical pattern:
 <!-- {=cliStepValidateExample} -->
 
 ```bash
-mc validate
+mc step:validate
 mc step:validate
 ```
 
-`validate` is a hardcoded binary command, so do not define `[cli.validate]` in `monochange.toml`. Use `mc validate` for the normal workspace preflight, use `mc step:validate` when you want the immutable step command form, or compose the step under a non-reserved workflow name:
+`validate` is a built-in step command, so do not define `[cli.validate]` in `monochange.toml`. Use `mc step:validate` for the normal workspace preflight, or compose the step under a non-reserved workflow name:
 
 ```toml
 [cli.preflight]

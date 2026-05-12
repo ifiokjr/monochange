@@ -10,7 +10,7 @@ When opening a PR, make the body easy for maintainers and CI reviewers to scan:
 - Start with a concise summary of user-visible changes.
 - Explain why the change is needed and link related issues with `Closes #...` when applicable.
 - Identify the change type and affected areas, especially CLI commands, configuration schema, release planning, package ecosystem adapters, source providers, CI, docs, and agent skill/package docs.
-- Include exact validation commands and relevant output. Prefer repository scripts such as `mc validate`, `lint:all`, `build:all`, `docs:update`, and `docs:check` where they apply.
+- Include exact validation commands and relevant output. Prefer repository scripts such as `mc step:validate`, `lint:all`, `build:all`, `docs:update`, and `docs:check` where they apply.
 - State changeset status explicitly: added, not needed because the change is internal-only, or not needed because the touched paths are ignored by changeset policy.
 - For docs changes, mention whether shared `.templates/` blocks changed and whether `docs:update` and `docs:check` were run.
 - Include risk and rollout notes for compatibility, migrations, release behavior, or operational changes.

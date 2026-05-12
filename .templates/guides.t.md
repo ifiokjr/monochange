@@ -611,11 +611,11 @@ When `version` is provided without `bump`, the bump is inferred from the current
 
 <!-- {@releaseWorkflowBehavior} -->
 
-`mc release` is a config-driven workflow command. `mc init` writes a starter `[cli.release]` table that runs `PrepareRelease`, so initialized repositories can use `mc release` immediately while keeping the workflow editable in `monochange.toml`.
+`mc release` is a config-driven workflow command only when your repository defines a `[cli.release]` table. `mc init` writes a minimal starter config and does not seed default workflow aliases, so use the immutable `mc step:prepare-release` command unless you add your own named workflow.
 
-The binary no longer ships a hidden default workflow set for commands such as `discover`, `change`, `release`, `affected`, `diagnostics`, `repair-release`, `publish`, or `publish-plan`. Those names exist when your config defines them, usually because `mc init` generated the starter tables. If a repository has not opted into a named workflow, use the immutable step command instead, for example `mc step:discover`, `mc step:create-change-file`, `mc step:prepare-release`, `mc step:affected-packages`, or `mc step:retarget-release`.
+The binary no longer ships a hidden default workflow set for commands such as `discover`, `change`, `release`, `affected`, `diagnostics`, `repair-release`, `publish`, or `publish-plan`. Those names exist only when your config defines them. If a repository has not opted into a named workflow, use the immutable step command instead, for example `mc step:discover`, `mc step:create-change-file`, `mc step:prepare-release`, `mc step:affected-packages`, `mc step:diagnose-changesets`, `mc step:retarget-release`, `mc step:publish-readiness`, or `mc step:plan-publish-rate-limits`.
 
-`mc validate` remains a hardcoded binary command for normal preflight checks. The matching immutable step form is also available as `mc step:validate`. Do not define `[cli.validate]` or any `[cli.step:*]` command in `monochange.toml`; those names are reserved for built-in commands.
+`mc step:validate` is the immutable built-in step command for normal preflight checks. Do not define `[cli.validate]` or any `[cli.step:*]` command in `monochange.toml`; those names are reserved for built-in commands.
 
 Commands like `commit-release` combine `PrepareRelease` with later stateful steps such as `CommitRelease`. Provider request workflows such as `release-pr` can add `OpenReleaseRequest`. Keep both as explicit `[cli.*]` workflow commands when you want a durable, named release process.
 
@@ -957,9 +957,9 @@ This layout keeps the top-level skill small while still making the richer guidan
 <!-- {@assistantRepoGuidance} -->
 
 - Read `monochange.toml` before proposing release workflow changes.
-- Run `mc validate` before and after release-affecting edits.
+- Run `mc step:validate` before and after release-affecting edits.
 - Use `mc discover --format json` to inspect package ids, group ownership, and dependency edges.
-- Use `mc diagnostics --format json` or `monochange_diagnostics` for a structured view of all pending changesets with git and review context.
+- Use `mc step:diagnose-changesets --format json` or `monochange_diagnostics` for a structured view of all pending changesets with git and review context.
 - Use `monochange_lint_catalog` and `monochange_lint_explain` when you need lint metadata without shelling out.
 - Prefer `mc change` plus `.changeset/*.md` files over ad hoc release notes.
 - Use `mc release --dry-run --format json` before mutating release state.
@@ -978,7 +978,7 @@ They are separate from Rust compiler or Clippy lints used to develop monochange 
 
 `mc check` runs two phases:
 
-1. normal workspace validation, similar to `mc validate`
+1. normal workspace validation, similar to `mc step:validate`
 2. manifest lint rules for supported package ecosystems
 
 Common commands:
@@ -1485,7 +1485,7 @@ mc check --format json
 For repository work:
 
 ```bash
-mc validate
+mc step:validate
 mc check
 mc release --dry-run --diff
 ```

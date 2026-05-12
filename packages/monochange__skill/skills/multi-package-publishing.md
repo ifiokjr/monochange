@@ -7,8 +7,8 @@ Treat publishing as a separate phase from release preparation. Release preparati
 ## Recommended flow
 
 1. Prepare and commit a release so a release record exists.
-2. Run `mc publish-readiness --from HEAD --output readiness.json`.
-3. Run any first-time bootstrap flow with `mc publish-bootstrap --from HEAD --output bootstrap.json` when packages are missing from registries.
+2. Run `mc step:publish-readiness --from HEAD --output readiness.json`.
+3. Run any first-time bootstrap flow with `mc step:placeholder-publish --from HEAD --output bootstrap.json` when packages are missing from registries.
 4. Run configured publish planning and publish workflows if the repo defines them.
 5. Store output artifacts so failed publishes can be resumed.
 
@@ -46,7 +46,7 @@ Publish ordering uses ecosystem-specific dependency fields. npm defaults to `dep
 ## Safety
 
 - Do not run real publish commands when the user only asked for a preview.
-- Prefer `mc publish-readiness` before package publication.
+- Prefer `mc step:publish-readiness` before package publication.
 - Prefer dry-run workflows such as a configured `mc publish-check` when available.
 - Retain JSON artifacts from readiness, bootstrap, plan, and publish runs.
 - Re-run readiness when manifests, lockfiles, publish config, registry auth mode, or package selection changes after an artifact was created.

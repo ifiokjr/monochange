@@ -281,7 +281,7 @@ in
     "fix:monochange" = {
       exec = ''
         set -euo pipefail
-        mc validate
+        mc step:validate
         mc check --fix
       '';
       description = "Fix clippy lints for rust.";
@@ -334,7 +334,7 @@ in
     "lint:monochange" = {
       exec = ''
         set -euo pipefail
-        mc validate
+        mc step:validate
         mc check
       '';
       description = "Run manifest lint rules across all ecosystems.";

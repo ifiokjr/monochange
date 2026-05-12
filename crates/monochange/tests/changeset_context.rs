@@ -96,7 +96,7 @@ fn diagnostics_command_reports_changeset_introduction_and_last_updated() {
 
 	let output = monochange_command(None)
 		.current_dir(root)
-		.arg("diagnostics")
+		.arg("step:diagnose-changesets")
 		.args(["--changeset", ".changeset/feature.md", "--format", "json"])
 		.output()
 		.unwrap_or_else(|error| panic!("diagnostics: {error}"));
@@ -131,7 +131,7 @@ fn diagnostics_command_reports_all_changesets_and_deduplicates_explicit_inputs()
 
 	let output = monochange_command(None)
 		.current_dir(root)
-		.arg("diagnostics")
+		.arg("step:diagnose-changesets")
 		.arg("--format")
 		.arg("json")
 		.output()
@@ -152,7 +152,7 @@ fn diagnostics_command_reports_all_changesets_and_deduplicates_explicit_inputs()
 
 	let duplicate_output = monochange_command(None)
 		.current_dir(root)
-		.arg("diagnostics")
+		.arg("step:diagnose-changesets")
 		.arg("--changeset")
 		.arg(".changeset/feature.md")
 		.arg("--changeset")

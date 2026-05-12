@@ -35,7 +35,7 @@ Today:
 
 - `github-cargo-quickstart`, `github-npm-quickstart`, `gitlab-migration`, `internal-only-workspace`, `mixed-workspace`, `public-packages-placeholder-publish`, and `release-pr-workflow` are repo-shaped examples with actual workspace and config files
 - `publishing-test-lab` remains an issue-driven planning directory because real publish verification belongs in a separate repository
-- `./validate-examples.sh` runs `mc validate`, `mc check`, and `mc release --dry-run --diff` against every repo-shaped example in this folder
+- `./validate-examples.sh` runs `mc step:validate`, `mc check`, and `mc release --dry-run --diff` against every repo-shaped example in this folder
 
 See also [publishing-test-lab/ISSUE.md](./publishing-test-lab/ISSUE.md) for a draft GitHub issue that scopes the external publishing-verification work.
 

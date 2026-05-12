@@ -3,7 +3,7 @@
 `mc publish-plan` previews package-registry publish work against monochange's built-in ecosystem rate-limit metadata.
 
 ```bash
-mc publish-readiness --from HEAD --output .monochange/readiness.json
+mc step:publish-readiness --from HEAD --output .monochange/readiness.json
 mc publish-plan --readiness .monochange/readiness.json --format json
 mc publish-plan --mode placeholder --format json
 mc publish-plan --ci github-actions
@@ -27,7 +27,7 @@ The report includes:
 - `jsr` — official publish-window metadata
 - `pub.dev` — conservative daily publish planning metadata for CI batching
 
-Use `mc publish-readiness --from HEAD --output <path>`, then `mc publish-plan --readiness <path>`, then `mc publish` when you want CI to fail early instead of discovering registry throttling mid-release. Rerun `mc publish-readiness` if workspace config, package manifests, lockfiles, or registry/tooling files changed since the artifact was written. The `--readiness` input is only valid for normal publish planning; placeholder planning still uses `mc publish-plan --mode placeholder` without a readiness artifact.
+Use `mc step:publish-readiness --from HEAD --output <path>`, then `mc publish-plan --readiness <path>`, then `mc publish` when you want CI to fail early instead of discovering registry throttling mid-release. Rerun `mc step:publish-readiness` if workspace config, package manifests, lockfiles, or registry/tooling files changed since the artifact was written. The `--readiness` input is only valid for normal publish planning; placeholder planning still uses `mc publish-plan --mode placeholder` without a readiness artifact.
 
 ## Filtering and enforcement
 
@@ -48,4 +48,4 @@ That setting is inherited by matching packages and causes monochange to stop bef
 
 `mc publish-plan --ci gitlab-ci` renders a GitLab CI matrix snippet.
 
-Both snippets use explicit `mc publish --package ...` invocations for each planned batch so you can wire the batches into manual, scheduled, or follow-up pipelines without relying on long sleeps inside CI. Pair each planned batch with `mc publish-readiness --from HEAD --package ... --output <path>` when you want a preflight report for that subset; publish the batch with `mc publish --package ...`.
+Both snippets use explicit `mc publish --package ...` invocations for each planned batch so you can wire the batches into manual, scheduled, or follow-up pipelines without relying on long sleeps inside CI. Pair each planned batch with `mc step:publish-readiness --from HEAD --package ... --output <path>` when you want a preflight report for that subset; publish the batch with `mc publish --package ...`.

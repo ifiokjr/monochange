@@ -16,7 +16,7 @@ New crates that do not yet exist on their target registry must be placeholder-pu
 ## 2. Group and package consistency
 
 - [ ] Every package in a release group (`tag = true` / `release = true`) must be publishable on its registry. Packages with `publish = false` in their manifest should have `tag = false`, `release = false`, and `changelog = false` in `monochange.toml`, and should ideally not be members of a release group at all.
-- [ ] Run `mc validate` and confirm no warnings about group members that contradict their package manifests.
+- [ ] Run `mc step:validate` and confirm no warnings about group members that contradict their package manifests.
 - [ ] Check that `defaults.include_private` in `monochange.toml` is set correctly (currently `false`), and that no private package accidentally appears in a release group.
 
 ## 3. Batched publisher readiness
@@ -38,7 +38,7 @@ push to main → ci.yml (release-pr) → merge release PR
 ```
 
 - [ ] Verify each step above is present and triggered by the correct event.
-- [ ] Confirm `mc release-record --from HEAD` correctly detects a release commit after merge (the `release-post-merge` job gates on this).
+- [ ] Confirm `mc step:release-record --from HEAD` correctly detects a release commit after merge (the `release-post-merge` job gates on this).
 - [ ] Confirm tag push triggers `release.yml` automatically (`on: push: tags: "v*"`).
 - [ ] Verify concurrency groups prevent duplicate runs without silently canceling important work.
 
@@ -64,7 +64,7 @@ npm packages are handled differently from cargo crates. Platform-specific npm pa
 
 ## 8. Changeset and version validation
 
-- [ ] Run `mc validate` and fix any errors or warnings.
+- [ ] Run `mc step:validate` and fix any errors or warnings.
 - [ ] Run `lint:monochange` (devenv script) and fix any lint errors.
 - [ ] Check that every changeset targeting a new package uses `major` (not `patch`) for the first release of that package.
 - [ ] Verify the `main` group's `version_format = "primary"` is set — only one package or group may use `"primary"` and it produces the top-level `vX.Y.Z` tag.
@@ -83,6 +83,6 @@ npm packages are handled differently from cargo crates. Platform-specific npm pa
 - [ ] Confirm crate versions are live on crates.io (`cargo search monochange`).
 - [ ] Confirm npm packages are live on npmjs.com (`npm view @monochange/cli version`).
 - [ ] Confirm tags exist in the repo for each release target.
-- [ ] Confirm `mc release-record --from HEAD` shows the release record as resolved.
+- [ ] Confirm `mc step:release-record --from HEAD` shows the release record as resolved.
 - [ ] Confirm issues referenced in changesets received close/comment notifications.
 - [ ] Confirm docs deployed to GitHub Pages (if applicable).

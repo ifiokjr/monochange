@@ -2,7 +2,7 @@
 
 ```bash
 mc init
-mc validate
+mc step:validate
 mc step:discover --format json
 ```
 
@@ -26,6 +26,6 @@ Create release intent, then preview:
 
 ```bash
 mc step:create-change-file --package @acme/api --bump minor --reason "Add webhook filters"
-mc validate
+mc step:validate
 mc step:prepare-release --dry-run --format json
 ```

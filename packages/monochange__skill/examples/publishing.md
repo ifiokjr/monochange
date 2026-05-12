@@ -3,8 +3,8 @@
 Built-in readiness and bootstrap commands:
 
 ```bash
-mc publish-readiness --from HEAD --output readiness.json
-mc publish-bootstrap --from HEAD --output bootstrap.json
+mc step:publish-readiness --from HEAD --output readiness.json
+mc step:placeholder-publish --from HEAD --output bootstrap.json
 ```
 
 Repository-specific workflow commands can wrap publish planning and publishing:

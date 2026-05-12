@@ -50,7 +50,7 @@ Generate a starter config from the packages monochange detects:
 mc init
 ```
 
-`mc init` writes an annotated `monochange.toml`, including starter `[cli.*]` workflow commands such as `discover`, `change`, `release`, `publish`, and `affected`. Those generated tables are the editable source of truth for named workflow commands; the binary also exposes immutable `mc step:*` commands for every built-in step when you need a direct, config-free entry point.
+`mc init` writes an annotated, minimal `monochange.toml` without default `[cli.*]` workflow aliases. The binary exposes immutable `mc step:*` commands for every built-in step when you need a direct, config-free entry point; add `[cli.*]` tables only for repository-specific named workflows.
 
 For automated CI setup, include the `--provider` flag:
 
@@ -63,7 +63,7 @@ This configures the `[source]` section, generates CLI commands for `commit-relea
 Validate the workspace:
 
 ```bash
-mc validate
+mc step:validate
 ```
 
 Discover the package ids you will use in commands and changesets:
@@ -139,12 +139,12 @@ monochange can promote one prepared release into several source-provider automat
 - `mc publish-release --dry-run --format json` previews provider release payloads before publishing
 - `mc release-pr --dry-run --format json` previews the release branch, commit, and release-request body
 - when `[source.pull_requests].verified_commits = true` and `mc release-pr` runs on GitHub Actions for the configured GitHub repository, the GitHub provider pushes a normal release branch commit first, then attempts to replace it with a Git Database API commit that GitHub reports as verified; if verification or the API update fails, the normal pushed commit remains in place
-- `mc release-record --from <tag>` inspects the durable release declaration stored in the release commit body
-- `mc tag-release --from HEAD --dry-run --format json` previews the post-merge release tag set declared by that durable record
+- `mc step:release-record --from <tag>` inspects the durable release declaration stored in the release commit body
+- `mc step:tag-release --from HEAD --dry-run --format json` previews the post-merge release tag set declared by that durable record
 - `mc repair-release --from <tag> --dry-run` previews a release-retarget plan before mutating tags
 - changelog templates can render linked change owners, review requests, commits, and closed issues through `{{ context }}` or fine-grained metadata variables
 - `mc step:affected-packages --format json --verify --changed-paths ...` evaluates pull-request changeset policy from CI-supplied paths and labels without requiring a config-defined wrapper command
-- `mc diagnostics --format json` shows all discovered changeset context or restricts to explicit inputs
+- `mc step:diagnose-changesets --format json` shows all discovered changeset context or restricts to explicit inputs
 
 <!-- {/projectGitHubAutomationOverview} -->
 
@@ -152,7 +152,7 @@ monochange can promote one prepared release into several source-provider automat
 
 <!-- {=projectTagReleaseJsonTagsMap} -->
 
-When a post-merge workflow needs to trigger follow-up release work, prefer `mc tag-release --from HEAD --format json` and read the release tag by package or group id from the top-level `tags` object:
+When a post-merge workflow needs to trigger follow-up release work, prefer `mc step:tag-release --from HEAD --format json` and read the release tag by package or group id from the top-level `tags` object:
 
 ```json
 {
@@ -172,7 +172,7 @@ A package or group might not be released in a particular release commit. Handle 
 For example, a repository with `[group.main]` can trigger a downstream GitHub release workflow from the main group tag with:
 
 ```bash
-mc tag-release --from HEAD --format json >/tmp/tag-report.json
+mc step:tag-release --from HEAD --format json >/tmp/tag-report.json
 tag="$(jq -r '.tags.main // empty' /tmp/tag-report.json)"
 
 if [ -z "$tag" ]; then
@@ -216,10 +216,10 @@ See [Advanced: Assistant setup and MCP](docs/src/guide/09-assistant-setup.md) fo
 - render changelogs through structured release notes and configurable formats
 - emit stable release-manifest JSON for downstream automation
 - preview or publish provider releases and release requests from typed command steps and shared release data
-- inspect durable release records from tags or descendant commits with `mc release-record`
-- create post-merge release tags from a merged release commit with `mc tag-release --from HEAD`
+- inspect durable release records from tags or descendant commits with `mc step:release-record`
+- create post-merge release tags from a merged release commit with `mc step:tag-release --from HEAD`
 - repair a recent source/provider release by retargeting its release tags with `mc repair-release`
-- inspect changeset context and review metadata with `mc diagnostics` for both human and automation workflows
+- inspect changeset context and review metadata with `mc step:diagnose-changesets` for both human and automation workflows
 - apply Rust semver evidence when provided
 - expose a bundled assistant skill plus a stdio MCP server with `mc mcp`
 - publish the CLI as `@monochange/cli` and the bundled agent skill as `@monochange/skill`
@@ -281,18 +281,18 @@ Enter the reproducible development shell and install workspace tooling:
 ```bash
 devenv shell
 install:all
-mc validate
+mc step:validate
 mc discover --format json
 mc change --package monochange --bump minor --reason "add release planning"
-mc diagnostics --format json
+mc step:diagnose-changesets --format json
 mc release --dry-run --format json
 mc publish-release --dry-run --format json
 mc release-pr --dry-run --format json
-mc release-record --from v1.2.3
-mc tag-release --from HEAD --dry-run --format json
-mc publish-readiness --from HEAD --output .monochange/readiness.json
-mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json
-mc publish-readiness --from HEAD --output .monochange/readiness.json
+mc step:release-record --from v1.2.3
+mc step:tag-release --from HEAD --dry-run --format json
+mc step:publish-readiness --from HEAD --output .monochange/readiness.json
+mc step:placeholder-publish --from HEAD --output .monochange/bootstrap-result.json
+mc step:publish-readiness --from HEAD --output .monochange/readiness.json
 mc publish-plan --readiness .monochange/readiness.json --format json
 mc publish --output .monochange/publish-result.json
 mc repair-release --from v1.2.3 --target HEAD --dry-run
@@ -312,7 +312,7 @@ docs:check      # verify mdt shared-doc synchronization
 docs:update     # synchronize shared docs via mdt update
 schema:check    # verify committed JSON schemas are current
 schema:update   # regenerate schema assets from source
-mc validate
+mc step:validate
 lint:all
 test:all
 coverage:all

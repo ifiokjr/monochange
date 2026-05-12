@@ -141,14 +141,14 @@ const BUILTIN_COMMAND_NAMES: &[&str] = &[
 	"subagents",
 	"analyze",
 	"migrate",
-	"release-record",
-	"publish-readiness",
-	"publish-bootstrap",
-	"tag-release",
+	"step:release-record",
+	"step:publish-readiness",
+	"step:placeholder-publish",
+	"step:tag-release",
 	"lint",
 	"mcp",
 	"check",
-	"validate",
+	"step:validate",
 	"help",
 ];
 
@@ -253,7 +253,7 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 				"The generated config is a starting point — customize packages, groups, and CLI commands in monochange.toml.",
 				"Use --provider=github to get GitHub Actions workflow templates included.",
 			],
-			see_also: &["populate", "validate", "discover"],
+			see_also: &["populate", "step:validate", "discover"],
 		},
 		CommandHelp {
 			name: "populate",
@@ -268,7 +268,7 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 				"Run this after upgrading monochange to pick up new commands.",
 				"This is a safe, additive-only operation.",
 			],
-			see_also: &["init", "validate"],
+			see_also: &["init", "step:validate"],
 		},
 		CommandHelp {
 			name: "command",
@@ -568,7 +568,7 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 				"Embeds a durable release record block in the commit body.",
 				"Can run before OpenReleaseRequest in the same workflow.",
 			],
-			see_also: &["release", "tag-release", "release-pr"],
+			see_also: &["release", "step:tag-release", "release-pr"],
 		},
 		CommandHelp {
 			name: "release-pr",
@@ -656,7 +656,7 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 				target packages/groups, requested bumps, the commit SHA that introduced \
 				and last updated each changeset, linked review requests, and related issue \
 				references.",
-			usage: "mc diagnostics [OPTIONS]",
+			usage: "mc step:diagnose-changesets [OPTIONS]",
 			options: &[
 				(
 					"--changeset",
@@ -666,11 +666,11 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 				("--format", "<FORMAT>", "text, json (default: text)"),
 			],
 			examples: &[
-				("Diagnose all changesets:", "mc diagnostics"),
-				("JSON output:", "mc diagnostics --format json"),
+				("Diagnose all changesets:", "mc step:diagnose-changesets"),
+				("JSON output:", "mc step:diagnose-changesets --format json"),
 				(
 					"Specific changeset:",
-					"mc diagnostics --changeset .changeset/feature.md",
+					"mc step:diagnose-changesets --changeset .changeset/feature.md",
 				),
 			],
 			tips: &[
@@ -724,17 +724,17 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 			tips: &[
 				"Defaults to descendant-only retargets unless --force is set.",
 				"Hosted release sync runs by default; disable with --sync-provider=false.",
-				"Use mc tag-release to create tags from a fresh release commit instead.",
+				"Use mc step:tag-release to create tags from a fresh release commit instead.",
 			],
-			see_also: &["tag-release", "release-record", "release"],
+			see_also: &["step:tag-release", "step:release-record", "release"],
 		},
 		CommandHelp {
-			name: "tag-release",
+			name: "step:tag-release",
 			summary: "Create and push release tags from an embedded release record",
 			description: "Reads the monochange release record embedded in a commit's body and creates \
 				the full tag set declared by that record. Pushes tags to origin by default. \
 				Reruns on the same commit are treated as already up to date.",
-			usage: "mc tag-release --from <REF> [OPTIONS]",
+			usage: "mc step:tag-release --from <REF> [OPTIONS]",
 			options: &[
 				("--from", "<REF>", "Release commit ref (required)"),
 				("--push", "=BOOL", "Push tags to origin (default: true)"),
@@ -742,15 +742,18 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 				("--format", "<FORMAT>", "text, json (default: text)"),
 			],
 			examples: &[
-				("Create and push tags:", "mc tag-release --from HEAD"),
-				("Dry-run preview:", "mc tag-release --from HEAD --dry-run"),
+				("Create and push tags:", "mc step:tag-release --from HEAD"),
+				(
+					"Dry-run preview:",
+					"mc step:tag-release --from HEAD --dry-run",
+				),
 				(
 					"Create without pushing:",
-					"mc tag-release --from HEAD --push=false",
+					"mc step:tag-release --from HEAD --push=false",
 				),
 				(
 					"JSON output:",
-					"mc tag-release --from HEAD --dry-run --format json",
+					"mc step:tag-release --from HEAD --dry-run --format json",
 				),
 			],
 			tips: &[
@@ -759,32 +762,32 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 				"Reruns on the same commit are treated as already up to date.",
 				"Use mc repair-release to move existing tags later.",
 			],
-			see_also: &["repair-release", "release-record", "commit-release"],
+			see_also: &["repair-release", "step:release-record", "commit-release"],
 		},
 		CommandHelp {
-			name: "release-record",
+			name: "step:release-record",
 			summary: "Inspect the monochange release record for a tag or commit",
 			description: "Resolves the supplied ref to a commit, then walks first-parent ancestry until \
 				it finds a monochange release record embed. Renders the full release record \
 				including targets, versions, changed files, and changelogs.",
-			usage: "mc release-record --from <REF> [OPTIONS]",
+			usage: "mc step:release-record --from <REF> [OPTIONS]",
 			options: &[
 				("--from", "<REF>", "Tag or commit-ish to locate (required)"),
 				("--format", "<FORMAT>", "text, json (default: text)"),
 			],
 			examples: &[
-				("Inspect by tag:", "mc release-record --from v1.2.3"),
-				("Inspect by commit:", "mc release-record --from HEAD"),
+				("Inspect by tag:", "mc step:release-record --from v1.2.3"),
+				("Inspect by commit:", "mc step:release-record --from HEAD"),
 				(
 					"JSON output:",
-					"mc release-record --from v1.2.3 --format json",
+					"mc step:release-record --from v1.2.3 --format json",
 				),
 			],
 			tips: &[
 				"Fails loudly if it encounters a malformed release record block.",
 				"Walks first-parent ancestry to find the record.",
 			],
-			see_also: &["tag-release", "repair-release"],
+			see_also: &["step:tag-release", "repair-release"],
 		},
 		CommandHelp {
 			name: "check",
@@ -820,7 +823,7 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 				"Lint rules are configured in [lints] of monochange.toml.",
 				"Use mc lint list to see available rules and presets.",
 			],
-			see_also: &["lint", "validate", "affected"],
+			see_also: &["lint", "step:validate", "affected"],
 		},
 		CommandHelp {
 			name: "lint",
@@ -852,7 +855,7 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 				"Rule ids follow the <ecosystem>/<name> pattern.",
 				"Use mc check to run lint rules, mc lint to manage them.",
 			],
-			see_also: &["check", "validate"],
+			see_also: &["check", "step:validate"],
 		},
 		CommandHelp {
 			name: "mcp",
@@ -872,14 +875,14 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 			see_also: &["subagents", "skill"],
 		},
 		CommandHelp {
-			name: "validate",
+			name: "step:validate",
 			summary: "Validate monochange configuration and changesets",
 			description: "Validates the monochange.toml configuration, package manifests, version \
 				groups, changeset files, and workspace consistency. This is the same \
 				validation step that runs at the start of release commands.",
-			usage: "mc validate",
+			usage: "mc step:validate",
 			options: &[],
-			examples: &[("Validate the workspace:", "mc validate")],
+			examples: &[("Validate the workspace:", "mc step:validate")],
 			tips: &[
 				"Runs automatically before release commands.",
 				"Standalone use is for pre-commit hooks or CI gates.",
@@ -901,17 +904,17 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 				"Discovery is read-only and does not modify any files.",
 				"JSON output is useful for scripting and LLM consumption.",
 			],
-			see_also: &["validate", "init"],
+			see_also: &["step:validate", "init"],
 		},
 		CommandHelp {
-			name: "publish-readiness",
+			name: "step:publish-readiness",
 			summary: "Check package registry publishing readiness without publishing packages",
 			description: "Evaluates the package publications recorded on a release commit against the\
 				current workspace configuration and target registries. The command is read-only: it\
 				runs registry existence checks in dry-run mode, reports packages that are ready,\
 				already published, or unsupported by built-in publishing, and can write a JSON\
 				readiness artifact for later publish orchestration.",
-			usage: "mc publish-readiness --from <REF> [OPTIONS]",
+			usage: "mc step:publish-readiness --from <REF> [OPTIONS]",
 			options: &[
 				(
 					"--from",
@@ -933,15 +936,15 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 			examples: &[
 				(
 					"Check the current release commit:",
-					"mc publish-readiness --from HEAD",
+					"mc step:publish-readiness --from HEAD",
 				),
 				(
 					"Write a readiness artifact:",
-					"mc publish-readiness --from HEAD --output .monochange/local/readiness.json",
+					"mc step:publish-readiness --from HEAD --output .monochange/local/readiness.json",
 				),
 				(
 					"JSON for one package:",
-					"mc publish-readiness --from v1.2.3 --package core --format json",
+					"mc step:publish-readiness --from v1.2.3 --package core --format json",
 				),
 			],
 			tips: &[
@@ -951,13 +954,13 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 			see_also: &["publish-plan", "publish", "placeholder-publish"],
 		},
 		CommandHelp {
-			name: "publish-bootstrap",
+			name: "step:placeholder-publish",
 			summary: "Publish first-time placeholder package versions for a release record",
 			description: "Reads the package publications embedded in a release commit, narrows them with\
 				optional package filters, and runs placeholder publishing for that release package set.\
 				The command can write a JSON bootstrap result artifact for CI logs or manual retry\
 				notes. Use --dry-run first to inspect work without mutating registries.",
-			usage: "mc publish-bootstrap --from <REF> [OPTIONS]",
+			usage: "mc step:placeholder-publish --from <REF> [OPTIONS]",
 			options: &[
 				(
 					"--from",
@@ -988,23 +991,23 @@ fn builtin_command_helps() -> Vec<CommandHelp> {
 			examples: &[
 				(
 					"Preview bootstrap work:",
-					"mc publish-bootstrap --from HEAD --dry-run",
+					"mc step:placeholder-publish --from HEAD --dry-run",
 				),
 				(
 					"Write a bootstrap result:",
-					"mc publish-bootstrap --from HEAD --output .monochange/local/bootstrap-result.json",
+					"mc step:placeholder-publish --from HEAD --output .monochange/local/bootstrap-result.json",
 				),
 				(
 					"JSON for one package:",
-					"mc publish-bootstrap --from HEAD --package core --format json",
+					"mc step:placeholder-publish --from HEAD --package core --format json",
 				),
 			],
 			tips: &[
-				"Run mc publish-readiness again after bootstrap before mc publish.",
+				"Run mc step:publish-readiness again after bootstrap before mc publish.",
 				"Existing placeholder versions are skipped and treated as resumable.",
 			],
 			see_also: &[
-				"publish-readiness",
+				"step:publish-readiness",
 				"publish-plan",
 				"publish",
 				"placeholder-publish",
@@ -1456,6 +1459,11 @@ fn step_summary_for_kind(kind_name: &str) -> String {
 		"CreateChangeFile" => "Create a structured changeset file".to_string(),
 		"AffectedPackages" => "Evaluate affected packages and changeset coverage".to_string(),
 		"DiagnoseChangesets" => "Inspect changeset provenance and metadata".to_string(),
+		"ReleaseRecord" => "Inspect the monochange release record for a tag or commit".to_string(),
+		"PublishReadiness" => {
+			"Check package registry publishing readiness without publishing packages".to_string()
+		}
+		"TagRelease" => "Create and push release tags from an embedded release record".to_string(),
 		"RetargetRelease" => "Repair release tags by retargeting a release".to_string(),
 		"PrepareRelease" => "Plan version bumps, changelogs, and release artifacts".to_string(),
 		"CommitRelease" => "Create a release commit with an embedded release record".to_string(),
@@ -1483,7 +1491,7 @@ fn step_details(kebab: &str) -> StepDetails {
 	match kebab {
 		"publish-release" => {
 			StepDetails {
-				description: "PublishRelease converts a prepared release into hosted provider release operations.\n\nFor example, with a configured source provider it can create or update the outward release objects that correspond to monochange's prepared release targets. It does not publish package artifacts to registries; package publishing lives in `mc publish-readiness`, `mc publish --readiness <path>`, and `mc placeholder-publish`.\n\nUse it when you want monochange to handle provider-aware publication rather than stitching together release API calls manually. It needs a previous PrepareRelease step in the same workflow and `[source]` configuration.",
+				description: "PublishRelease converts a prepared release into hosted provider release operations.\n\nFor example, with a configured source provider it can create or update the outward release objects that correspond to monochange's prepared release targets. It does not publish package artifacts to registries; package publishing lives in `mc step:publish-readiness`, `mc publish --readiness <path>`, and `mc placeholder-publish`.\n\nUse it when you want monochange to handle provider-aware publication rather than stitching together release API calls manually. It needs a previous PrepareRelease step in the same workflow and `[source]` configuration.",
 				examples: &[
 					(
 						"Preview provider release payloads:",
@@ -1496,10 +1504,10 @@ fn step_details(kebab: &str) -> StepDetails {
 				],
 				tips: &[
 					"PublishRelease handles hosted/source-provider releases such as GitHub releases, not package registries.",
-					"Use `mc publish-readiness --from HEAD --output <path>` followed by `mc publish --readiness <path>` for crates.io, npm, JSR, or pub.dev packages.",
+					"Use `mc step:publish-readiness --from HEAD --output <path>` followed by `mc publish --readiness <path>` for crates.io, npm, JSR, or pub.dev packages.",
 					"Dry-run output stays aligned with the prepared release state and release target model.",
 				],
-				see_also: &["step:prepare-release", "publish-readiness", "publish"],
+				see_also: &["step:prepare-release", "step:publish-readiness", "publish"],
 			}
 		}
 		"prepare-release" => {

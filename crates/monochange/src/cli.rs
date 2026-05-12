@@ -209,7 +209,7 @@ When provided, the generated config includes:\n\
 \n\
 - [source] section with the provider configured\n\
 - Release and pull request settings for the provider\n\
-- CLI commands for commit-release and release-pr\n\
+- A minimal starter config without generated [cli.*] command aliases\n\
 - GitHub Actions workflows (for --provider=github)\n\
 \nSupported providers: github, gitlab, gitea",
 							)
@@ -224,16 +224,11 @@ When provided, the generated config includes:\n\
 			.subcommand(build_subagents_subcommand())
 			.subcommand(build_analyze_subcommand())
 			.subcommand(build_migrate_subcommand())
-			.subcommand(build_release_record_subcommand())
-			.subcommand(build_publish_readiness_subcommand())
-			.subcommand(build_publish_bootstrap_subcommand())
-			.subcommand(build_tag_release_subcommand())
 			.subcommand(build_lint_subcommand())
 			.subcommand(Command::new("mcp").about(
 				"Start the monochange MCP (Model Context Protocol) server over stdin/stdout",
 			))
 			.subcommand(build_check_subcommand())
-			.subcommand(build_validate_subcommand())
 			.subcommand(build_help_subcommand());
 
 	command = command.next_help_heading("Step Commands");
@@ -469,202 +464,6 @@ Audit notes:
 		)
 }
 
-pub(crate) fn build_release_record_subcommand() -> Command {
-	Command::new("release-record")
-		.about("Inspect the monochange release record associated with a tag or commit")
-		.after_help(
-			r"Examples:
-  mc release-record --from v1.2.3
-  mc release-record --from HEAD --format json
-
-Inspection notes:
-  - Resolves the supplied ref to a commit.
-  - Walks first-parent ancestry until it finds a monochange release record.
-  - Fails loudly if it encounters a malformed release record block on the path.",
-		)
-		.arg(
-			Arg::new("from")
-				.long("from")
-				.required(true)
-				.value_name("REF")
-				.help("Tag or commit-ish used to locate the release record"),
-		)
-		.arg(
-			Arg::new("format")
-				.long("format")
-				.help("Output format")
-				.default_value("markdown")
-				.value_parser(["text", "json", "markdown", "md"]),
-		)
-		.arg(
-			Arg::new("sha")
-				.long("sha")
-				.help("Output only the commit SHA of the discovered release record")
-				.action(ArgAction::SetTrue),
-		)
-}
-
-pub(crate) fn build_publish_readiness_subcommand() -> Command {
-	Command::new("publish-readiness")
-		.about("Check package registry publishing readiness without publishing packages")
-		.after_help(
-			r"Examples:
-  mc publish-readiness --from HEAD
-  mc publish-readiness --from v1.2.3 --package core --format json
-  mc publish-readiness --from HEAD --output .monochange/local/readiness.json
-
-Readiness notes:
-  - Uses the release record at the supplied ref to select package versions.
-  - Checks registry state in dry-run mode and reports already-published packages as resumable.
-  - Treats packages configured for external publishing as blocked for built-in publishing.",
-		)
-		.arg(
-			Arg::new("from")
-				.long("from")
-				.required(true)
-				.value_name("REF")
-				.help("Tag or commit-ish used to locate the release record"),
-		)
-		.arg(
-			Arg::new("package")
-				.long("package")
-				.short('p')
-				.help("Limit readiness to one or more package ids")
-				.value_name("PACKAGE")
-				.action(ArgAction::Append),
-		)
-		.arg(
-			Arg::new("output")
-				.long("output")
-				.help("Write a JSON readiness artifact to this path")
-				.value_name("PATH"),
-		)
-		.arg(
-			Arg::new("format")
-				.long("format")
-				.help("Output format")
-				.default_value("markdown")
-				.value_parser(["text", "json", "markdown", "md"]),
-		)
-		.arg(
-			Arg::new("sha")
-				.long("sha")
-				.help("Output only the commit SHA of the discovered release record")
-				.action(ArgAction::SetTrue),
-		)
-}
-
-pub(crate) fn build_publish_bootstrap_subcommand() -> Command {
-	Command::new("publish-bootstrap")
-		.about("Publish first-time placeholder package versions for a release record")
-		.after_help(
-			r"Examples:
-  mc publish-bootstrap --from HEAD --dry-run
-  mc publish-bootstrap --from HEAD --output .monochange/local/bootstrap-result.json
-  mc publish-bootstrap --from HEAD --package core --format json
-
-Bootstrap notes:
-  - Uses the release record at the supplied ref to select package ids.
-  - Publishes missing placeholder versions only; existing placeholders are skipped as resumable.
-  - Run `mc publish-readiness` again after bootstrap before real package publishing.",
-		)
-		.arg(
-			Arg::new("from")
-				.long("from")
-				.required(true)
-				.value_name("REF")
-				.help("Tag or commit-ish used to locate the release record"),
-		)
-		.arg(
-			Arg::new("package")
-				.long("package")
-				.short('p')
-				.help(
-					"Limit bootstrap publishing to one or more package ids from the release record",
-				)
-				.value_name("PACKAGE")
-				.action(ArgAction::Append),
-		)
-		.arg(
-			Arg::new("output")
-				.long("output")
-				.help("Write a JSON publish bootstrap result artifact to this path")
-				.value_name("PATH"),
-		)
-		.arg(
-			Arg::new("dry-run")
-				.long("dry-run")
-				.help("Plan placeholder publication without publishing packages")
-				.action(ArgAction::SetTrue),
-		)
-		.arg(
-			Arg::new("format")
-				.long("format")
-				.help("Output format")
-				.default_value("markdown")
-				.value_parser(["text", "json", "markdown", "md"]),
-		)
-		.arg(
-			Arg::new("sha")
-				.long("sha")
-				.help("Output only the commit SHA of the discovered release record")
-				.action(ArgAction::SetTrue),
-		)
-}
-
-pub(crate) fn build_tag_release_subcommand() -> Command {
-	Command::new("tag-release")
-		.about("Create and push release tags from the monochange release record on a commit")
-		.after_help(
-			r"Examples:
-  mc tag-release --from HEAD
-  mc tag-release --from HEAD --dry-run --format json
-  mc tag-release --from HEAD --push=false
-
-Tagging notes:
-  - Resolves the supplied ref to a commit and requires that commit itself to be the release commit.
-  - Creates the full tag set declared by the embedded monochange release record.
-  - Pushes tags to `origin` by default and treats reruns on the same commit as already up to date.",
-		)
-		.arg(
-			Arg::new("from")
-				.long("from")
-				.required(true)
-				.value_name("REF")
-				.help("Release commit ref used to create the declared tag set"),
-		)
-		.arg(
-			Arg::new("dry-run")
-				.long("dry-run")
-				.help("Preview release tag creation without mutating local or remote refs")
-				.action(ArgAction::SetTrue),
-		)
-		.arg(
-			Arg::new("push")
-				.long("push")
-				.help("Push created tags to origin")
-				.value_name("PUSH")
-				.num_args(0..=1)
-				.default_value("true")
-				.default_missing_value("true")
-				.require_equals(true)
-				.value_parser(["true", "false"]),
-		)
-		.arg(
-			Arg::new("format")
-				.long("format")
-				.help("Output format")
-				.default_value("markdown")
-				.value_parser(["text", "json", "markdown", "md"]),
-		)
-		.arg(
-			Arg::new("sha")
-				.long("sha")
-				.help("Output only the commit SHA of the discovered release record")
-				.action(ArgAction::SetTrue),
-		)
-}
-
 pub(crate) fn build_check_subcommand() -> Command {
 	Command::new("check")
 		.about("Validate configuration, changesets, and run manifest lint rules")
@@ -695,37 +494,6 @@ pub(crate) fn build_check_subcommand() -> Command {
 				.help("Run only the specified lint rule ids")
 				.value_name("RULES")
 				.value_delimiter(','),
-		)
-		.arg(
-			Arg::new("format")
-				.long("format")
-				.help("Output format")
-				.default_value("markdown")
-				.value_parser(["text", "json", "markdown", "md"]),
-		)
-		.arg(
-			Arg::new("sha")
-				.long("sha")
-				.help("Output only the commit SHA of the discovered release record")
-				.action(ArgAction::SetTrue),
-		)
-}
-
-pub(crate) fn build_validate_subcommand() -> Command {
-	Command::new("validate")
-		.about("Validate monochange configuration and changesets")
-		.hide(true)
-		.after_help(
-			r"Examples:
-  mc validate
-
-Runs the Validate step directly without requiring a configuration entry.",
-		)
-		.arg(
-			Arg::new("dry-run")
-				.long("dry-run")
-				.help("Run without making any changes")
-				.action(ArgAction::SetTrue),
 		)
 		.arg(
 			Arg::new("format")
@@ -827,6 +595,13 @@ fn step_command_summary(step: &CliStepDefinition) -> String {
 		"affected-packages" => "Compute affected packages from a prepared release plan".to_string(),
 		"create-change-file" => "Create a changeset file for one or more packages".to_string(),
 		"prepare-release" => "Plan version bumps, changelogs, and release artifacts".to_string(),
+		"release-record" => {
+			"Inspect the release record associated with a tag or commit".to_string()
+		}
+		"publish-readiness" => {
+			"Check package registry publishing readiness without publishing packages".to_string()
+		}
+		"tag-release" => "Create and push release tags from a release record".to_string(),
 		"publish-release" => {
 			"Publish provider release objects from a prepared release artifact".to_string()
 		}
@@ -1006,8 +781,8 @@ Verification reminders:
 		"diagnostics" => {
 			Some(
 				r"Examples:
-  mc diagnostics --format json
-  mc diagnostics --changeset .changeset/feature.md
+  mc step:diagnose-changesets --format json
+  mc step:diagnose-changesets --changeset .changeset/feature.md
 
 Diagnostics include:
   - Target packages/groups and requested bump
@@ -1029,12 +804,12 @@ Repair notes:
   - Hosted release sync runs by default and can be disabled with --sync-provider=false.",
 			)
 		}
-		"tag-release" => {
+		"step:tag-release" => {
 			Some(
 				r"Examples:
-  mc tag-release --from HEAD
-  mc tag-release --from HEAD --dry-run --format json
-  mc tag-release --from HEAD --push=false
+  mc step:tag-release --from HEAD
+  mc step:tag-release --from HEAD --dry-run --format json
+  mc step:tag-release --from HEAD --push=false
 
 Tagging notes:
   - Requires the resolved ref itself to be the monochange release commit.

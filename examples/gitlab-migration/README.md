@@ -28,7 +28,7 @@ monochange.toml
 From this directory, run:
 
 ```bash
-mc validate
+mc step:validate
 mc check
 mc release --dry-run --diff
 ```

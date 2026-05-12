@@ -34,7 +34,7 @@ Run cargo-mutants across the monochange Rust workspace from the latest `main`, f
 - [x] add failing tests / fixtures / snapshots for each real survivor found so far in `monochange_config`
 - [x] add property tests where invariants are a better fit than examples
 - [ ] run `fix:all`
-- [ ] run targeted tests, then full validation (`lint:all`, `test:all`, `mc validate`)
+- [ ] run targeted tests, then full validation (`lint:all`, `test:all`, `mc step:validate`)
 - [ ] ensure patch coverage for changed executable lines is 100%
 - [ ] add/update changeset if published crate code changed
 - [ ] open PR, monitor checks, and squash merge when green
@@ -45,7 +45,7 @@ Run cargo-mutants across the monochange Rust workspace from the latest `main`, f
 - `devenv shell fix:all`
 - `devenv shell lint:all`
 - `devenv shell test:all`
-- `devenv shell mc validate`
+- `devenv shell mc step:validate`
 - patch coverage command to be determined from current workspace tooling
 
 ## Notes

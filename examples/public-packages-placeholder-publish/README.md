@@ -12,7 +12,7 @@ This is a repo-shaped example for reserving public package names before the real
 ## Recommended validation flow
 
 ```bash
-mc validate
+mc step:validate
 mc check
 mc release --dry-run --diff
 ```

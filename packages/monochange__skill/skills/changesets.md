@@ -18,7 +18,7 @@ If `mc change` is not configured, use the step command directly:
 mc step:create-change-file --package @acme/api --bump minor --reason "Add webhook delivery filters"
 ```
 
-Always run `mc validate` after creating or editing changesets.
+Always run `mc step:validate` after creating or editing changesets.
 
 The configured command may expose more inputs than the portable step command, such as `--type`, `--caused-by`, or repository-specific defaults. Check `mc help change` or the `[cli.change]` table before relying on a flag name.
 
@@ -137,6 +137,6 @@ Before adding a new changeset:
 3. Target package ids unless a configured group is the real release owner.
 4. Keep unrelated changes in separate files.
 5. Combine packages only when the release note would be the same.
-6. Validate with `mc validate`, `mc diagnostics --format json`, or `mc step:diagnose-changesets --format json`.
+6. Validate with `mc step:validate`, `mc step:diagnose-changesets --format json`, or `mc step:diagnose-changesets --format json`.
 
 Delete or rewrite stale changesets when the code they describe is reverted before release. Merge near-duplicate changesets when several packages changed for the same outward behavior, but keep unrelated features separate even if they touched the same package.

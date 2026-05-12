@@ -5,7 +5,7 @@
 Completed in PR #324: https://github.com/monochange/monochange/pull/324
 
 - Merge commit: `69f221dc1f9b4823e8aa98ebdea6b84aaa57baeb`
-- Previous publish-readiness slices shipped `mc publish-readiness`, readiness enforcement in `mc publish`, Cargo readiness blockers, readiness-backed publish planning, `mc publish-bootstrap`, and package publish resume artifacts.
+- Previous publish-readiness slices shipped `mc step:publish-readiness`, readiness enforcement in `mc publish`, Cargo readiness blockers, readiness-backed publish planning, `mc step:placeholder-publish`, and package publish resume artifacts.
 - This completed slice added deeper freshness checks for readiness artifacts by fingerprinting publish inputs that affect registry behavior.
 
 ## Problem
@@ -64,7 +64,7 @@ This slice extends readiness artifacts so they include a deterministic `inputFin
 - [x] `git diff --check`
 - [x] `devenv shell dprint check`
 - [x] `devenv shell mdt check`
-- [x] `devenv shell mc validate`
+- [x] `devenv shell mc step:validate`
 - [x] `devenv shell lint:test`
 - [x] `devenv shell coverage:all`
 - [x] `devenv shell coverage:patch` after commit — `PATCH_COVERAGE 267/267 (100.00%)`

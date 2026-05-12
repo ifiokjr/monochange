@@ -3229,3 +3229,105 @@ fn monochange_error_http_request_render_includes_context_and_source() {
 	let rendered = error.render();
 	assert!(rendered.contains("fetching releases"), "got: {rendered}");
 }
+
+#[test]
+fn generated_release_step_metadata_exposes_expected_inputs() {
+	let release_record = CliStepDefinition::ReleaseRecord {
+		name: None,
+		when: None,
+		always_run: false,
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(release_record.kind_name(), "ReleaseRecord");
+	assert_eq!(release_record.step_kebab_name(), "release-record");
+	assert_eq!(
+		release_record.expected_input_kind("format"),
+		Some(CliInputKind::Choice)
+	);
+	assert_eq!(
+		release_record.expected_input_kind("from"),
+		Some(CliInputKind::String)
+	);
+	assert_eq!(
+		release_record.expected_input_kind("sha"),
+		Some(CliInputKind::Boolean)
+	);
+	assert_eq!(release_record.expected_input_kind("unknown"), None);
+	assert_eq!(release_record.step_inputs_schema().len(), 3);
+
+	let publish_readiness = CliStepDefinition::PublishReadiness {
+		name: None,
+		when: None,
+		always_run: false,
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(publish_readiness.kind_name(), "PublishReadiness");
+	assert_eq!(publish_readiness.step_kebab_name(), "publish-readiness");
+	assert_eq!(
+		publish_readiness.expected_input_kind("format"),
+		Some(CliInputKind::Choice)
+	);
+	assert_eq!(
+		publish_readiness.expected_input_kind("from"),
+		Some(CliInputKind::String)
+	);
+	assert_eq!(
+		publish_readiness.expected_input_kind("package"),
+		Some(CliInputKind::StringList)
+	);
+	assert_eq!(
+		publish_readiness.expected_input_kind("output"),
+		Some(CliInputKind::Path)
+	);
+	assert_eq!(publish_readiness.expected_input_kind("unknown"), None);
+	assert_eq!(publish_readiness.step_inputs_schema().len(), 4);
+
+	let tag_release = CliStepDefinition::TagRelease {
+		name: None,
+		when: None,
+		always_run: false,
+		inputs: BTreeMap::new(),
+	};
+	assert_eq!(tag_release.kind_name(), "TagRelease");
+	assert_eq!(tag_release.step_kebab_name(), "tag-release");
+	assert_eq!(
+		tag_release.expected_input_kind("format"),
+		Some(CliInputKind::Choice)
+	);
+	assert_eq!(
+		tag_release.expected_input_kind("from"),
+		Some(CliInputKind::String)
+	);
+	assert_eq!(
+		tag_release.expected_input_kind("push"),
+		Some(CliInputKind::Boolean)
+	);
+	assert_eq!(tag_release.expected_input_kind("unknown"), None);
+	assert_eq!(tag_release.step_inputs_schema().len(), 3);
+}
+
+#[test]
+fn generated_release_steps_report_always_run_flag() {
+	for step in [
+		CliStepDefinition::ReleaseRecord {
+			name: None,
+			when: None,
+			always_run: true,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::PublishReadiness {
+			name: None,
+			when: None,
+			always_run: true,
+			inputs: BTreeMap::new(),
+		},
+		CliStepDefinition::TagRelease {
+			name: None,
+			when: None,
+			always_run: true,
+			inputs: BTreeMap::new(),
+		},
+	] {
+		assert!(step.always_run());
+	}
+}

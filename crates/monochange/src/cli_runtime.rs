@@ -921,12 +921,19 @@ pub(crate) fn execute_cli_command_with_options(
 					Ok(())
 				}
 				CliStepDefinition::OpenReleaseRequest { no_verify, .. } => {
-					let prepared_release = context.prepared_release.as_ref().ok_or_else(|| {
-						MonochangeError::Config(
-							"`OpenReleaseRequest` requires a previous `PrepareRelease` step"
-								.to_string(),
-						)
-					})?;
+					let build_file_diffs = context.show_diff;
+					ensure_prepared_release_for_consumer_step(
+						root,
+						configuration,
+						&mut context,
+						prepared_release_path.as_deref(),
+						dry_run,
+						build_file_diffs,
+						"OpenReleaseRequest",
+					)?;
+					let prepared_release = context.prepared_release.as_ref().expect(
+						"prepared release must be available before opening release request",
+					);
 					let source = configuration.source.clone().ok_or_else(|| {
 						MonochangeError::Config(
 							"`OpenReleaseRequest` requires `[source]` configuration".to_string(),
@@ -995,6 +1002,75 @@ pub(crate) fn execute_cli_command_with_options(
 					context.issue_comment_plans = issue_comment_plans;
 					context.issue_comment_results = results;
 					output = None;
+					Ok(())
+				}
+				CliStepDefinition::ReleaseRecord { .. } => {
+					let from = step_inputs
+						.get("from")
+						.and_then(|values| values.first())
+						.map(String::as_str)
+						.ok_or_else(|| {
+							MonochangeError::Config("missing release-record ref".to_string())
+						})?;
+					if boolean_step_input(&step_inputs, "sha") {
+						let discovery = discover_release_record(root, from)?;
+						output = Some(discovery.record_commit);
+					} else {
+						let format = cli_command_output_format(&step_inputs)?;
+						output = Some(render_release_record_discovery(root, from, format)?);
+					}
+					Ok(())
+				}
+				CliStepDefinition::PublishReadiness { .. } => {
+					let from = step_inputs
+						.get("from")
+						.and_then(|values| values.first())
+						.cloned()
+						.ok_or_else(|| {
+							MonochangeError::Config("missing publish-readiness ref".to_string())
+						})?;
+					let selected_packages = selected_package_ids(&step_inputs);
+					let format = cli_command_output_format(&step_inputs)?;
+					let output_path =
+						optional_path_input(&step_inputs, "output", "PublishReadiness")?;
+					let options = publish_readiness::PublishReadinessOptions {
+						from,
+						selected_packages,
+						format,
+						output: output_path,
+					};
+					output = Some(publish_readiness::run_publish_readiness(
+						root,
+						configuration,
+						&options,
+					)?);
+					Ok(())
+				}
+				CliStepDefinition::TagRelease { .. } => {
+					let from = step_inputs
+						.get("from")
+						.and_then(|values| values.first())
+						.map(String::as_str)
+						.ok_or_else(|| {
+							MonochangeError::Config("missing tag-release ref".to_string())
+						})?;
+					let format = cli_command_output_format(&step_inputs)?;
+					let push = step_inputs
+						.get("push")
+						.and_then(|values| values.first())
+						.is_none_or(|value| value == "true");
+					release_branch_policy::verify_release_ref_for_tags(
+						root,
+						configuration.source.as_ref(),
+						from,
+					)?;
+					output = Some(render_release_tag_report(
+						root,
+						from,
+						format,
+						push,
+						context.dry_run,
+					)?);
 					Ok(())
 				}
 				CliStepDefinition::AffectedPackages { .. } => {
@@ -2371,7 +2447,7 @@ fn optional_path_input(
 	let trimmed = path.trim();
 	if trimmed.is_empty() {
 		let message = match name {
-			"readiness" => "`--readiness <PATH>` must not be blank; run `mc publish-readiness --from HEAD --output <PATH>` first".to_string(),
+			"readiness" => "`--readiness <PATH>` must not be blank; run `mc step:publish-readiness --from HEAD --output <PATH>` first".to_string(),
 			_ => format!("`{step_name}` received a blank `{name}` path"),
 		};
 		return Err(MonochangeError::Config(message));

@@ -45,4 +45,4 @@ Explain the behavior change and impact.
 - Heading is sentence case and no trailing full stop if project policy requires it.
 - Breaking changes have migration instructions.
 - Similar package notes are combined instead of duplicated.
-- `mc validate` passes.
+- `mc step:validate` passes.

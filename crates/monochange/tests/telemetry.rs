@@ -15,7 +15,7 @@ fn local_jsonl_telemetry_records_cli_command_and_step_events() {
 		.current_dir(tempdir.path())
 		.env("MC_TELEMETRY_FILE", &telemetry_file)
 		.env_remove("MC_TELEMETRY")
-		.arg("validate")
+		.arg("step:validate")
 		.arg("--quiet")
 		.output()
 		.unwrap_or_else(|error| panic!("run validate with telemetry: {error}"));
@@ -34,15 +34,15 @@ fn local_jsonl_telemetry_records_cli_command_and_step_events() {
 	assert_eq!(step["body"]["string_value"], "command_step");
 	assert_eq!(step["resource"]["service.name"], "monochange");
 	assert_eq!(step["scope"]["name"], "monochange.telemetry");
-	assert_eq!(step["attributes"]["command_name"], "validate");
+	assert_eq!(step["attributes"]["command_name"], "step:validate");
 	assert_eq!(step["attributes"]["step_kind"], "Validate");
 	assert_eq!(step["attributes"]["outcome"], "success");
 	assert!(step["attributes"]["error_kind"].is_null());
 
 	let command = &events[1];
 	assert_eq!(command["body"]["string_value"], "command_run");
-	assert_eq!(command["attributes"]["command_name"], "validate");
-	assert_eq!(command["attributes"]["command_source"], "configured");
+	assert_eq!(command["attributes"]["command_name"], "step:validate");
+	assert_eq!(command["attributes"]["command_source"], "generated_step");
 	assert_eq!(command["attributes"]["progress_format"], "auto");
 	assert_eq!(command["attributes"]["step_count"], 1);
 	assert_eq!(command["attributes"]["outcome"], "success");

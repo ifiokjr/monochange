@@ -43,7 +43,7 @@ Add a built-in `mc skill` command that installs the monochange skill bundle into
 - `devenv shell cargo test -p monochange skill -- --nocapture`
 - `devenv shell cargo test -p monochange`
 - `devenv shell fix:all`
-- `devenv shell mc validate`
+- `devenv shell mc step:validate`
 - `devenv shell coverage:patch`
 
 ## Notes

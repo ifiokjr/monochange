@@ -130,7 +130,7 @@ monochange keeps its own changeset standard rather than reusing a narrower exter
 Validate before planning:
 
 ```bash
-mc validate
+mc step:validate
 ```
 
 ## Release manifests vs release records
@@ -182,17 +182,17 @@ Markdown and text output render unified diffs directly in the terminal. JSON out
 A good planning loop looks like this:
 
 ```bash
-mc validate
+mc step:validate
 mc discover --format json
-mc diagnostics --format json
+mc step:diagnose-changesets --format json
 mc release --dry-run --diff
 ```
 
 Use each command for a different question:
 
-- `mc validate` — is the config and changeset set valid?
+- `mc step:validate` — is the config and changeset set valid?
 - `mc discover --format json` — which package ids, groups, and dependency edges exist?
-- `mc diagnostics --format json` — who introduced these changesets and what review context is attached?
+- `mc step:diagnose-changesets --format json` — who introduced these changesets and what review context is attached?
 - `mc release --dry-run --diff` — what exact files would change if I prepared the release now?
 
 ### Compare preview modes
@@ -218,11 +218,11 @@ mc release
 
 <!-- {=releaseWorkflowBehavior} -->
 
-`mc release` is a config-driven workflow command. `mc init` writes a starter `[cli.release]` table that runs `PrepareRelease`, so initialized repositories can use `mc release` immediately while keeping the workflow editable in `monochange.toml`.
+`mc release` is a config-driven workflow command only when your repository defines a `[cli.release]` table. `mc init` writes a minimal starter config and does not seed default workflow aliases, so use the immutable `mc step:prepare-release` command unless you add your own named workflow.
 
-The binary no longer ships a hidden default workflow set for commands such as `discover`, `change`, `release`, `affected`, `diagnostics`, `repair-release`, `publish`, or `publish-plan`. Those names exist when your config defines them, usually because `mc init` generated the starter tables. If a repository has not opted into a named workflow, use the immutable step command instead, for example `mc step:discover`, `mc step:create-change-file`, `mc step:prepare-release`, `mc step:affected-packages`, or `mc step:retarget-release`.
+The binary no longer ships a hidden default workflow set for commands such as `discover`, `change`, `release`, `affected`, `diagnostics`, `repair-release`, `publish`, or `publish-plan`. Those names exist only when your config defines them. If a repository has not opted into a named workflow, use the immutable step command instead, for example `mc step:discover`, `mc step:create-change-file`, `mc step:prepare-release`, `mc step:affected-packages`, `mc step:diagnose-changesets`, `mc step:retarget-release`, `mc step:publish-readiness`, or `mc step:plan-publish-rate-limits`.
 
-`mc validate` remains a hardcoded binary command for normal preflight checks. The matching immutable step form is also available as `mc step:validate`. Do not define `[cli.validate]` or any `[cli.step:*]` command in `monochange.toml`; those names are reserved for built-in commands.
+`mc step:validate` is the immutable built-in step command for normal preflight checks. Do not define `[cli.validate]` or any `[cli.step:*]` command in `monochange.toml`; those names are reserved for built-in commands.
 
 Commands like `commit-release` combine `PrepareRelease` with later stateful steps such as `CommitRelease`. Provider request workflows such as `release-pr` can add `OpenReleaseRequest`. Keep both as explicit `[cli.*]` workflow commands when you want a durable, named release process.
 
@@ -342,9 +342,9 @@ Current planning rules:
 
 These commands answer different questions:
 
-- `mc diagnostics --format json` — what is currently pending in `.changeset/*.md`, and who introduced it?
-- `mc release-record --from <ref>` — what did a past release commit declare durably in git history?
-- `mc tag-release --from HEAD` — if `HEAD` is the merged release commit, which release tags should be created now?
+- `mc step:diagnose-changesets --format json` — what is currently pending in `.changeset/*.md`, and who introduced it?
+- `mc step:release-record --from <ref>` — what did a past release commit declare durably in git history?
+- `mc step:tag-release --from HEAD` — if `HEAD` is the merged release commit, which release tags should be created now?
 
 Use diagnostics **before** you release. Use release records **after** a release exists and you need to inspect it. Use `tag-release` in post-merge CI when the release commit has landed on the default branch and you want to create the declared tag set from that durable history record.
 

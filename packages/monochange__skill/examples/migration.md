@@ -32,7 +32,7 @@ lockfile_commands = ["pnpm install --lockfile-only"]
 Validate with:
 
 ```bash
-mc validate
+mc step:validate
 mc check
 mc step:discover --format json
 ```

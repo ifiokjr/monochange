@@ -176,4 +176,4 @@ steps = [
 ]
 ```
 
-Validate custom workflows with `mc validate` and inspect them with `mc help`.
+Validate custom workflows with `mc step:validate` and inspect them with `mc help`.

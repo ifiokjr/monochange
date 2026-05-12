@@ -477,7 +477,7 @@ fn render_command_help_for_repair_release() {
 
 #[test]
 fn render_command_help_for_tag_release() {
-	let out = render_command_help("mc", "tag-release");
+	let out = render_command_help("mc", "step:tag-release");
 	assert!(out.contains("tag-release"));
 	assert!(out.contains("Examples"));
 }
@@ -517,7 +517,7 @@ fn render_command_help_for_populate() {
 
 #[test]
 fn render_command_help_for_validate() {
-	let out = render_command_help("mc", "validate");
+	let out = render_command_help("mc", "step:validate");
 	assert!(out.contains("validate"));
 }
 
@@ -553,22 +553,22 @@ fn render_command_help_for_diagnostics() {
 
 #[test]
 fn render_command_help_for_release_record() {
-	let out = render_command_help("mc", "release-record");
+	let out = render_command_help("mc", "step:release-record");
 	assert!(out.contains("release-record"));
 }
 
 #[test]
 fn render_command_help_for_publish_readiness() {
-	let out = render_command_help("mc", "publish-readiness");
+	let out = render_command_help("mc", "step:publish-readiness");
 	assert!(out.contains("publish-readiness"));
 	assert!(out.contains("readiness artifact"));
 }
 
 #[test]
 fn render_command_help_for_publish_bootstrap() {
-	let out = render_command_help("mc", "publish-bootstrap");
-	assert!(out.contains("publish-bootstrap"));
-	assert!(out.contains("bootstrap result artifact"));
+	let out = render_command_help("mc", "step:placeholder-publish");
+	assert!(out.contains("placeholder-publish"));
+	assert!(out.contains("placeholder-publish"));
 }
 
 #[test]

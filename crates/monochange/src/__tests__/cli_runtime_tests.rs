@@ -2355,7 +2355,11 @@ fn optional_publish_plan_readiness_artifact_path_trims_and_rejects_blank_values(
 	let blank = BTreeMap::from([("readiness".to_string(), vec!["  ".to_string()])]);
 	let blank_error = optional_publish_plan_readiness_artifact_path(&blank)
 		.expect_err("blank readiness artifact path should fail");
-	assert!(blank_error.to_string().contains("mc publish-readiness"));
+	assert!(
+		blank_error
+			.to_string()
+			.contains("mc step:publish-readiness")
+	);
 }
 
 #[test]

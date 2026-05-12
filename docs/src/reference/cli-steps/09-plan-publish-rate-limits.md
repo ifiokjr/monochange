@@ -14,7 +14,7 @@ Use it when you want to answer questions like:
 - `format` — `text`, `markdown`, or `json`
 - `mode` — `publish` (default) or `placeholder`
 - `package` — optional repeated package ids used to filter the plan
-- `readiness` — optional path to a JSON artifact from `mc publish-readiness`; only valid when `mode = "publish"`
+- `readiness` — optional path to a JSON artifact from `mc step:publish-readiness`; only valid when `mode = "publish"`
 - `ci` — optional `github-actions` or `gitlab-ci` snippet renderer
 
 ## Step-level `always_run` flag
@@ -55,14 +55,14 @@ choices = ["text", "markdown", "json"]
 [[cli.publish-plan.inputs]]
 name = "readiness"
 type = "path"
-help_text = "JSON artifact from mc publish-readiness; limits publish plans to ready package work"
+help_text = "JSON artifact from mc step:publish-readiness; limits publish plans to ready package work"
 
 [[cli.publish-plan.steps]]
 name = "plan publish rate limits"
 type = "PlanPublishRateLimits"
 ```
 
-A readiness-backed plan validates the artifact header, release record commit, selected package coverage, package-set fingerprint, and publish input fingerprint before planning. The artifact may contain non-ready packages, but those package ids are excluded from the plan. Rerun `mc publish-readiness` if workspace config, package manifests, lockfiles, or registry/tooling files changed after the artifact was written. Placeholder plans reject `readiness`; use `mode = "placeholder"` without an artifact for first-time bootstrap planning.
+A readiness-backed plan validates the artifact header, release record commit, selected package coverage, package-set fingerprint, and publish input fingerprint before planning. The artifact may contain non-ready packages, but those package ids are excluded from the plan. Rerun `mc step:publish-readiness` if workspace config, package manifests, lockfiles, or registry/tooling files changed after the artifact was written. Placeholder plans reject `readiness`; use `mode = "placeholder"` without an artifact for first-time bootstrap planning.
 
 ### Plan placeholder bootstrap publishing
 

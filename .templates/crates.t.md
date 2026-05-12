@@ -38,7 +38,7 @@ mc mcp
 - aggregate all supported ecosystem adapters
 - load `monochange.toml`
 - load config-defined `[cli.*]` workflow commands from `monochange.toml`
-- expose hardcoded binary commands such as `init`, `validate`, `check`, `analyze`, `mcp`, `help`, and `version`
+- expose binary commands such as `init`, `check`, `analyze`, `mcp`, `help`, and `version`
 - generate immutable `mc step:*` commands from the built-in step schemas
 - resolve change input files
 - render discovery and release command output in text or JSON

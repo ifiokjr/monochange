@@ -12,7 +12,7 @@
 - `mc help subagents`
 - `mc subagents pi`
 - `mc mcp`
-- `mc validate`
+- `mc step:validate`
 - `build:all`
 - `lint:all`
 - `lint:architecture`

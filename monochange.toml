@@ -6,7 +6,7 @@
 # This file is the single source of truth for release planning, CLI commands,
 # changelog generation, and automation flows in this monorepo.
 #
-# Run `mc validate` to check this file against the workspace.
+# Run `mc step:validate` to check this file against the workspace.
 # Run `mc init` to generate a starter config from detected packages.
 
 # =============================================================================
