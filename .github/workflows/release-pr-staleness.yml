@@ -1,0 +1,112 @@
+name: "release-pr staleness"
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - ready_for_review
+      - reopened
+      - synchronize
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mark-release-pr-freshness:
+    if: >-
+      github.repository_owner == 'monochange' &&
+      (
+        github.event_name != 'pull_request' ||
+        (
+          github.head_ref == 'monochange/release/release-pr' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        )
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    steps:
+      - name: mark release PR freshness status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_BRANCH: monochange/release/release-pr
+          RELEASE_TITLE: "chore(release): prepare release"
+          STATUS_CONTEXT: release-pr/up-to-date-with-main
+        run: |
+          set -euo pipefail
+
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          main_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')"
+          release_pr="$({
+            gh pr list \
+              --repo "${GITHUB_REPOSITORY}" \
+              --state open \
+              --base main \
+              --limit 20 \
+              --json number,title,headRefName,headRefOid,url
+          } | jq -c \
+            --arg branch "${RELEASE_BRANCH}" \
+            --arg title "${RELEASE_TITLE}" \
+            '[.[] | select(.headRefName == $branch and .title == $title)] | .[0] // empty')"
+
+          if [ -z "${release_pr}" ]; then
+            echo "No open release PR found for ${RELEASE_BRANCH}; nothing to mark."
+            exit 0
+          fi
+
+          pr_number="$(jq -r '.number' <<<"${release_pr}")"
+          pr_url="$(jq -r '.url' <<<"${release_pr}")"
+          head_sha="$(jq -r '.headRefOid' <<<"${release_pr}")"
+          commit_info="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${head_sha}" \
+            --jq '{parent_count: (.parents | length), parent_sha: (.parents[0].sha // "")}')"
+          parent_count="$(jq -r '.parent_count' <<<"${commit_info}")"
+          parent_sha="$(jq -r '.parent_sha' <<<"${commit_info}")"
+
+          echo "Release PR: #${pr_number} ${pr_url}"
+          echo "Release PR head: ${head_sha}"
+          echo "Release PR parent: ${parent_sha}"
+          echo "Current main head: ${main_sha}"
+
+          if [ "${parent_count}" = "1" ] && [ "${parent_sha}" = "${main_sha}" ]; then
+            state="success"
+            description="Release PR is based on current main"
+            summary="Release PR #${pr_number} is current."
+          else
+            state="failure"
+            description="Release PR is stale; regenerate it from latest main"
+            summary="Release PR #${pr_number} is stale."
+          fi
+
+          gh api \
+            --method POST \
+            "repos/${GITHUB_REPOSITORY}/statuses/${head_sha}" \
+            -f state="${state}" \
+            -f context="${STATUS_CONTEXT}" \
+            -f description="${description}" \
+            -f target_url="${run_url}"
+
+          {
+            echo "## ${summary}"
+            echo
+            echo "- Release PR: ${pr_url}"
+            echo "- Status context: \`${STATUS_CONTEXT}\`"
+            echo "- Status state: \`${state}\`"
+            echo "- Release PR head: \`${head_sha}\`"
+            echo "- Release PR parent: \`${parent_sha}\`"
+            echo "- Current main head: \`${main_sha}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          if [ "${state}" != "success" ] && [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            echo "::error::${description}"
+            exit 1
+          fi
