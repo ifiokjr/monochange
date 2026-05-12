@@ -13,6 +13,23 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  security:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+
+      - name: run zizmor
+        uses: zizmorcore/zizmor-action@b1d7e1fb5de872772f31590499237e7cce841e8e # v0.5.3
+        with:
+          inputs: ".github/workflows/ .github/actions/"
+          advanced-security: true
+
   lint:
     timeout-minutes: 60
     runs-on: ubuntu-latest
