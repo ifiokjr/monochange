@@ -4397,6 +4397,55 @@ fn should_execute_cli_step_runs_when_condition_is_true() {
 }
 
 #[test]
+fn should_execute_cli_step_can_gate_on_command_inputs_not_declared_by_step() {
+	let mut context = cli_context_for_when_evaluation_tests();
+	context.inputs = BTreeMap::from([
+		("commit".to_string(), vec!["true".to_string()]),
+		("create_pr".to_string(), vec!["true".to_string()]),
+	]);
+	let step_inputs = BTreeMap::from([("no_verify".to_string(), vec!["true".to_string()])]);
+	let step = monochange_core::CliStepDefinition::Command {
+		show_progress: None,
+		name: None,
+		when: Some("{{ inputs.commit && inputs.create_pr }}".to_string()),
+		always_run: false,
+		command: "printf hi".to_string(),
+		dry_run_command: None,
+		shell: monochange_core::ShellConfig::default(),
+		id: None,
+		variables: None,
+		inputs: BTreeMap::new(),
+	};
+	assert!(
+		should_execute_cli_step(&step, &context, &step_inputs)
+			.unwrap_or_else(|error| { panic!("when condition: {error}") })
+	);
+}
+
+#[test]
+fn should_execute_cli_step_prefers_step_inputs_over_command_inputs() {
+	let mut context = cli_context_for_when_evaluation_tests();
+	context.inputs = BTreeMap::from([("run".to_string(), vec!["true".to_string()])]);
+	let step_inputs = BTreeMap::from([("run".to_string(), vec!["false".to_string()])]);
+	let step = monochange_core::CliStepDefinition::Command {
+		show_progress: None,
+		name: None,
+		when: Some("{{ inputs.run }}".to_string()),
+		always_run: false,
+		command: "printf hi".to_string(),
+		dry_run_command: None,
+		shell: monochange_core::ShellConfig::default(),
+		id: None,
+		variables: None,
+		inputs: BTreeMap::new(),
+	};
+	assert!(
+		!should_execute_cli_step(&step, &context, &step_inputs)
+			.unwrap_or_else(|error| { panic!("when condition: {error}") })
+	);
+}
+
+#[test]
 fn should_execute_cli_step_skips_when_condition_is_false() {
 	let context = cli_context_for_when_evaluation_tests();
 	let step_inputs = BTreeMap::from([("run".to_string(), vec!["false".to_string()])]);

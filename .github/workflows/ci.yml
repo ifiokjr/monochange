@@ -376,6 +376,8 @@ jobs:
       - name: create release commit
         id: release_commit
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           before="$(git rev-parse HEAD)"
           mc release --commit
           after="$(git rev-parse HEAD)"
@@ -418,6 +420,8 @@ jobs:
       - name: create release commit
         id: release_commit
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           before="$(git rev-parse HEAD)"
           mc release --commit
           after="$(git rev-parse HEAD)"
