@@ -18,6 +18,7 @@ use super::cli_command_summaries;
 use super::comma_separated_values;
 use super::command_input_kind_choices;
 use super::command_input_kind_is_known;
+use super::command_input_kind_name;
 use super::command_input_label;
 use super::command_step_with_default_inputs;
 use super::dashboard_actions;
@@ -218,13 +219,25 @@ fn upsert_cli_command_document_writes_step_inputs() {
 	fixed_step
 		.inputs
 		.insert("fix".to_string(), CliStepInputValue::Boolean(true));
+	let mut mixed_step = CommandStepDraft::shell_command("echo publish".to_string(), None);
+	mixed_step
+		.inputs
+		.insert("channel".to_string(), CliStepInputValue::Inherited);
+	mixed_step.inputs.insert(
+		"message".to_string(),
+		CliStepInputValue::String("ship it".to_string()),
+	);
+	mixed_step.inputs.insert(
+		"packages".to_string(),
+		CliStepInputValue::List(vec!["core".to_string(), "cli".to_string()]),
+	);
 	let update = CommandUpdate {
 		original_name: None,
 		name: "release-pr".to_string(),
 		help_text: None,
 		dry_run: false,
 		inputs: Vec::new(),
-		steps: CommandStepUpdate::Replace(vec![inherited_step, fixed_step]),
+		steps: CommandStepUpdate::Replace(vec![inherited_step, fixed_step, mixed_step]),
 	};
 
 	let rendered = render_update("", &update);
@@ -233,6 +246,35 @@ fn upsert_cli_command_document_writes_step_inputs() {
 
 	assert_eq!(steps[0]["inputs"][0].as_str(), Some("format"));
 	assert_eq!(steps[1]["inputs"]["fix"].as_bool(), Some(true));
+	assert_eq!(
+		steps[2]["inputs"]["channel"].as_str(),
+		Some("{{ inputs.channel }}")
+	);
+	assert_eq!(steps[2]["inputs"]["message"].as_str(), Some("ship it"));
+	assert_eq!(steps[2]["inputs"]["packages"][1].as_str(), Some("cli"));
+}
+
+#[test]
+fn read_cli_command_reads_step_input_formats() {
+	let config = r#"
+[cli.release-pr]
+steps = [
+  { type = "PrepareRelease", inputs = ["format"] },
+  { type = "Validate", inputs = { fix = true } },
+]
+"#;
+	let command = read_cli_command(config, "release-pr")
+		.unwrap_or_else(|error| panic!("command should parse: {error}"))
+		.unwrap_or_else(|| panic!("command should exist"));
+
+	assert_eq!(
+		command.steps[0].inputs.get("format"),
+		Some(&CliStepInputValue::Inherited)
+	);
+	assert_eq!(
+		command.steps[1].inputs.get("fix"),
+		Some(&CliStepInputValue::Boolean(true))
+	);
 }
 
 #[test]
@@ -249,6 +291,22 @@ fn command_step_with_default_inputs_adds_and_inherits_expected_inputs() {
 		step.inputs.get("format"),
 		Some(&CliStepInputValue::Inherited)
 	);
+	assert_config_error(
+		command_step_with_default_inputs("NotARealStep", &mut command_inputs).map(|_| ()),
+		"unknown CLI step type `NotARealStep`",
+	);
+}
+
+#[test]
+fn command_input_kind_name_returns_schema_names() {
+	assert_eq!(command_input_kind_name(CliInputKind::String), "string");
+	assert_eq!(
+		command_input_kind_name(CliInputKind::StringList),
+		"string_list"
+	);
+	assert_eq!(command_input_kind_name(CliInputKind::Path), "path");
+	assert_eq!(command_input_kind_name(CliInputKind::Choice), "choice");
+	assert_eq!(command_input_kind_name(CliInputKind::Boolean), "boolean");
 }
 
 #[test]
@@ -269,6 +327,41 @@ fn step_input_value_from_text_parses_typed_fixed_values() {
 			"alpha".to_string(),
 			"beta".to_string()
 		]))
+	);
+	assert_eq!(
+		step_input_value_from_text(&schema, "   ")
+			.unwrap_or_else(|error| panic!("blank should parse: {error}")),
+		None
+	);
+
+	let string_schema = CliInputDefinition {
+		name: "reason".to_string(),
+		kind: CliInputKind::String,
+		help_text: None,
+		required: false,
+		default: None,
+		choices: Vec::new(),
+		short: None,
+	};
+	assert_eq!(
+		step_input_value_from_text(&string_schema, "release notes")
+			.unwrap_or_else(|error| panic!("string should parse: {error}")),
+		Some(CliStepInputValue::String("release notes".to_string()))
+	);
+
+	let path_schema = CliInputDefinition {
+		name: "output".to_string(),
+		kind: CliInputKind::Path,
+		help_text: None,
+		required: false,
+		default: None,
+		choices: Vec::new(),
+		short: None,
+	};
+	assert_eq!(
+		step_input_value_from_text(&path_schema, "dist/plan.json")
+			.unwrap_or_else(|error| panic!("path should parse: {error}")),
+		Some(CliStepInputValue::String("dist/plan.json".to_string()))
 	);
 
 	let fix_schema = step_input_schemas_for_kind("Validate")
@@ -580,6 +673,13 @@ fn validate_step_draft_rejects_unknown_or_misconfigured_steps() {
 		validate_step_draft(&invalid_choice),
 		"step `PrepareRelease` input `format` expects one of: text, json",
 	);
+
+	let mut list_input = CommandStepDraft::built_in("PublishPackages");
+	list_input.inputs.insert(
+		"package".to_string(),
+		CliStepInputValue::List(vec!["monochange".to_string()]),
+	);
+	assert!(validate_step_draft(&list_input).is_ok());
 }
 
 #[test]
