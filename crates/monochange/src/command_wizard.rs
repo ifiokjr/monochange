@@ -1053,9 +1053,9 @@ fn normalize_short_flag(input: &str) -> Result<Option<char>, String> {
 		return Ok(None);
 	};
 	let mut chars = value.chars();
-	let Some(short) = chars.next() else {
-		return Ok(None);
-	};
+	let short = chars
+		.next()
+		.expect("normalize_optional_text returns non-empty strings");
 	if chars.next().is_some() {
 		return Err("short flag must be exactly one character".to_string());
 	}

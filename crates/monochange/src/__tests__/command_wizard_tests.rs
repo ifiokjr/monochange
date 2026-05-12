@@ -10,17 +10,26 @@ use super::DashboardAction;
 use super::SAVE_STEPS_LABEL;
 use super::STEP_KIND_SHELL_COMMAND;
 use super::cli_command_summaries;
+use super::comma_separated_values;
+use super::command_input_kind_choices;
+use super::command_input_kind_is_known;
+use super::command_input_label;
 use super::dashboard_actions;
+use super::filtered_step_choice_rank;
 use super::normalize_optional_text;
+use super::normalize_short_flag;
 use super::read_cli_command;
 use super::read_config_text;
 use super::render_document;
+use super::step_choice_description;
 use super::step_choice_scorer;
 use super::step_choice_sorter;
 use super::step_choices;
 use super::step_label;
+use super::unfiltered_step_choice_rank;
 use super::upsert_cli_command_document;
 use super::validate_command_input_draft;
+use super::validate_command_input_name_for_prompt;
 use super::validate_command_inputs;
 use super::validate_command_name;
 use super::validate_command_name_for_prompt;
@@ -324,6 +333,19 @@ fn step_choices_and_labels_include_described_ranked_shell_command_and_save_actio
 		Some(9_999)
 	);
 	assert_eq!(step_choice_scorer("zzzz", &choices[1], "", 0), None);
+	let save_choice = choices
+		.iter()
+		.find(|choice| choice.kind == SAVE_STEPS_LABEL)
+		.unwrap_or_else(|| panic!("save choice should exist"));
+	assert_eq!(
+		step_choice_scorer("", save_choice, "", 0),
+		Some(10_000 - usize::MAX as i64)
+	);
+	assert_eq!(step_choice_description("CustomStep"), "Add this CLI step");
+	assert_eq!(
+		unfiltered_step_choice_rank("CustomStep"),
+		100 + filtered_step_choice_rank("CustomStep")
+	);
 
 	let mut scored = vec![(1, 9_997), (0, 9_984), (2, 9_999)];
 	step_choice_sorter(&mut scored);
@@ -433,6 +455,88 @@ fn validate_command_inputs_reject_invalid_or_duplicate_inputs() {
 			command_input_string("workspace"),
 		]),
 		"duplicate CLI input `workspace`",
+	);
+
+	let mut short_a = command_input_string("workspace");
+	short_a.short = Some('w');
+	let mut short_b = command_input_string("worktree");
+	short_b.short = Some('w');
+	assert_config_error(
+		validate_command_inputs(&[short_a, short_b]),
+		"duplicate CLI input short flag `w`",
+	);
+
+	let mut list_with_default = command_input_string("packages");
+	list_with_default.kind = "string_list".to_string();
+	list_with_default.default = Some("monochange".to_string());
+	assert_config_error(
+		validate_command_input_draft(&list_with_default),
+		"string_list input `packages` cannot define a scalar default",
+	);
+
+	let mut invalid_short = command_input_string("workspace");
+	invalid_short.short = Some('-');
+	assert_config_error(
+		validate_command_input_draft(&invalid_short),
+		"input `workspace` short flag must be an ASCII letter or digit",
+	);
+}
+
+#[test]
+fn command_input_helpers_normalize_and_validate_prompt_values() {
+	assert_eq!(
+		command_input_kind_choices(),
+		vec!["string", "string_list", "path", "choice", "boolean"]
+	);
+	assert!(command_input_kind_is_known("boolean"));
+	assert!(!command_input_kind_is_known("object"));
+	assert_eq!(
+		comma_separated_values(" patch, minor ,, major "),
+		vec!["patch", "minor", "major"]
+	);
+	assert_eq!(normalize_short_flag("  r "), Ok(Some('r')));
+	assert_eq!(normalize_short_flag(" "), Ok(None));
+	assert_eq!(
+		normalize_short_flag("rr"),
+		Err("short flag must be exactly one character".to_string())
+	);
+	assert_eq!(
+		normalize_short_flag("-"),
+		Err("short flag must be an ASCII letter or digit".to_string())
+	);
+
+	let existing_names = vec!["release-type".to_string()];
+	assert_eq!(
+		validate_command_input_name_for_prompt("release-type", &existing_names),
+		Err("CLI input `release-type` already exists".to_string())
+	);
+	assert!(validate_command_input_name_for_prompt("workspace", &existing_names).is_ok());
+	for (name, expected) in [
+		("", "input name cannot be empty"),
+		(
+			" release-type",
+			"input name cannot include leading or trailing whitespace",
+		),
+		(
+			"release_type",
+			"use lowercase letters, digits, and hyphens only",
+		),
+		("release--type", "hyphens must separate words"),
+	] {
+		let error = validate_command_input_name_for_prompt(name, &[])
+			.err()
+			.unwrap_or_else(|| panic!("{name:?} should be invalid"));
+		assert!(
+			error.contains(expected),
+			"expected {error} to contain {expected}"
+		);
+	}
+
+	let mut required_input = command_input_string("workspace");
+	required_input.required = true;
+	assert_eq!(
+		command_input_label(&required_input),
+		"workspace (string, required)"
 	);
 }
 
