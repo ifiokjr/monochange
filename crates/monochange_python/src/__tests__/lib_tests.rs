@@ -973,16 +973,16 @@ empty = "not-an-array"
 		.get("project")
 		.unwrap_or_else(|| panic!("expected project table"));
 	let pep621_deps = crate::parse_pep621_dependencies(project_table);
-	assert!(
-		pep621_deps
-			.iter()
-			.any(|dep| dep.name == "requests" && !dep.optional)
-	);
-	assert!(
-		pep621_deps
-			.iter()
-			.any(|dep| dep.name == "pytest" && dep.optional)
-	);
+	assert!(pep621_deps.iter().any(|dep| {
+		dep.name == "requests"
+			&& !dep.optional
+			&& dep.source_field.as_deref() == Some("dependencies")
+	}));
+	assert!(pep621_deps.iter().any(|dep| {
+		dep.name == "pytest"
+			&& dep.optional
+			&& dep.source_field.as_deref() == Some("optional-dependencies")
+	}));
 
 	let poetry = toml::from_str::<toml::Value>(
 		r#"
@@ -1011,10 +1011,11 @@ numbered = 1
 	assert!(crate::parse_poetry_dependencies(&empty_poetry).is_empty());
 
 	let deps = crate::parse_poetry_dependencies(&poetry);
-	assert!(
-		deps.iter()
-			.any(|dep| dep.name == "django" && dep.version_constraint.as_deref() == Some("^4.2"))
-	);
+	assert!(deps.iter().any(|dep| {
+		dep.name == "django"
+			&& dep.version_constraint.as_deref() == Some("^4.2")
+			&& dep.source_field.as_deref() == Some("dependencies")
+	}));
 	assert!(
 		deps.iter()
 			.any(|dep| dep.name == "celery" && dep.version_constraint.as_deref() == Some("^5.3"))
@@ -1023,10 +1024,11 @@ numbered = 1
 		deps.iter()
 			.any(|dep| dep.name == "local" && dep.version_constraint.is_none())
 	);
-	assert!(
-		deps.iter()
-			.any(|dep| dep.name == "ruff" && dep.version_constraint.as_deref() == Some("^0.4"))
-	);
+	assert!(deps.iter().any(|dep| {
+		dep.name == "ruff"
+			&& dep.version_constraint.as_deref() == Some("^0.4")
+			&& dep.source_field.as_deref() == Some("group.dependencies")
+	}));
 	assert!(
 		deps.iter()
 			.any(|dep| dep.name == "tooling" && dep.version_constraint.is_none())

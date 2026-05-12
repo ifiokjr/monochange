@@ -368,6 +368,8 @@ pub struct PackageDependency {
 	pub kind: DependencyKind,
 	pub version_constraint: Option<String>,
 	pub optional: bool,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub source_field: Option<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -545,6 +547,8 @@ pub struct DependencyEdge {
 	pub version_constraint: Option<String>,
 	pub is_optional: bool,
 	pub is_direct: bool,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub source_field: Option<String>,
 }
 
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -1729,6 +1733,15 @@ pub struct EcosystemSettings {
 	pub lockfile_commands: Vec<LockfileCommandDefinition>,
 	#[serde(default)]
 	pub publish: PublishSettings,
+	#[serde(default)]
+	pub publish_order: PublishOrderSettings,
+}
+
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+pub struct PublishOrderSettings {
+	#[serde(default)]
+	pub dependency_fields: Option<Vec<String>>,
 }
 
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -4616,6 +4629,18 @@ impl EcosystemRegistry {
 	}
 }
 
+#[must_use]
+pub fn default_publish_order_dependency_fields(ecosystem: Ecosystem) -> &'static [&'static str] {
+	match ecosystem {
+		Ecosystem::Cargo => &["dependencies", "dev-dependencies", "build-dependencies"],
+		Ecosystem::Npm => &["dependencies", "devDependencies"],
+		Ecosystem::Deno => &["dependencies", "imports"],
+		Ecosystem::Dart | Ecosystem::Flutter => &["dependencies", "dev_dependencies"],
+		Ecosystem::Python => &["dependencies"],
+		Ecosystem::Go => &["require"],
+	}
+}
+
 pub fn materialize_dependency_edges(packages: &[PackageRecord]) -> Vec<DependencyEdge> {
 	let mut package_ids_by_name = BTreeMap::<String, Vec<String>>::new();
 	for package in packages {
@@ -4638,6 +4663,7 @@ pub fn materialize_dependency_edges(packages: &[PackageRecord]) -> Vec<Dependenc
 						version_constraint: dependency.version_constraint.clone(),
 						is_optional: dependency.optional,
 						is_direct: true,
+						source_field: dependency.source_field.clone(),
 					});
 				}
 			}

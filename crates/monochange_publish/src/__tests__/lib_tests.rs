@@ -1,7 +1,12 @@
+use monochange_core::ChangelogSettings;
+use monochange_core::ChangesetSettings;
 use monochange_core::DependencyKind;
 use monochange_core::GroupChangelogInclude;
 use monochange_core::PackageDependency;
+use monochange_core::PublishOrderSettings;
 use monochange_core::VersionFormat;
+use monochange_core::WorkspaceDefaults;
+use monochange_core::lint::WorkspaceLintSettings;
 
 use super::*;
 
@@ -616,6 +621,7 @@ fn publish_dependency_order_handles_realistic_cargo_dependency_graph() {
 	));
 
 	let ordered = order_release_requests_by_publish_dependencies(
+		&publish_order_configuration(None),
 		&[cli, core, test_helpers, codegen, schema],
 		vec![
 			publish_order_request("cli"),
@@ -650,6 +656,7 @@ fn publish_dependency_order_reports_development_dependency_cycles() {
 		.push(publish_order_dependency("app", DependencyKind::Development));
 
 	let error = order_release_requests_by_publish_dependencies(
+		&publish_order_configuration(None),
 		&[app, helper],
 		vec![
 			publish_order_request("app"),
@@ -662,6 +669,316 @@ fn publish_dependency_order_reports_development_dependency_cycles() {
 		error
 			.to_string()
 			.contains("cyclic publish dependencies detected")
+	);
+}
+
+#[test]
+fn npm_publish_order_ignores_peer_dependencies_by_default() {
+	let peer = npm_publish_order_package("peer", Vec::new());
+	let app = npm_publish_order_package(
+		"app",
+		vec![npm_publish_order_dependency("peer", "peerDependencies")],
+	);
+	let packages = vec![app.clone(), peer.clone()];
+	let requests = vec![
+		publish_order_request_for_package(&app),
+		publish_order_request_for_package(&peer),
+	];
+
+	let ordered = order_release_requests_by_publish_dependencies(
+		&publish_order_configuration(None),
+		&packages,
+		requests,
+	)
+	.unwrap();
+
+	let package_names = ordered
+		.into_iter()
+		.map(|request| request.package_name)
+		.collect::<Vec<_>>();
+	assert_eq!(package_names, ["app", "peer"]);
+}
+
+#[test]
+fn npm_publish_order_can_include_peer_dependencies() {
+	let peer = npm_publish_order_package("peer", Vec::new());
+	let app = npm_publish_order_package(
+		"app",
+		vec![npm_publish_order_dependency("peer", "peerDependencies")],
+	);
+	let packages = vec![app.clone(), peer.clone()];
+	let requests = vec![
+		publish_order_request_for_package(&app),
+		publish_order_request_for_package(&peer),
+	];
+
+	let ordered = order_release_requests_by_publish_dependencies(
+		&publish_order_configuration(Some(vec![
+			"dependencies",
+			"devDependencies",
+			"peerDependencies",
+		])),
+		&packages,
+		requests,
+	)
+	.unwrap();
+
+	let package_names = ordered
+		.into_iter()
+		.map(|request| request.package_name)
+		.collect::<Vec<_>>();
+	assert_eq!(package_names, ["peer", "app"]);
+}
+
+#[test]
+fn npm_publish_order_can_include_custom_manifest_fields() {
+	let tempdir = TempDir::new().unwrap();
+	let workspace = tempdir.path();
+	fs::create_dir_all(workspace.join("packages/app")).unwrap();
+	fs::write(
+		workspace.join("packages/app/package.json"),
+		r#"{"name":"app","version":"1.0.0","catalogDependencies":{"external":"1.0.0","tool":"1.0.0"}}"#,
+	)
+	.unwrap();
+
+	let tool = npm_publish_order_package("tool", Vec::new());
+	let mut app = npm_publish_order_package("app", Vec::new());
+	app.manifest_path = workspace.join("packages/app/package.json");
+	let packages = vec![app.clone(), tool.clone()];
+	let requests = vec![
+		publish_order_request_for_package(&app),
+		publish_order_request_for_package(&tool),
+	];
+
+	let ordered = order_release_requests_by_publish_dependencies(
+		&publish_order_configuration(Some(vec!["dependencies", "catalogDependencies"])),
+		&packages,
+		requests,
+	)
+	.unwrap();
+
+	let package_names = ordered
+		.into_iter()
+		.map(|request| request.package_name)
+		.collect::<Vec<_>>();
+	assert_eq!(package_names, ["tool", "app"]);
+}
+
+#[test]
+fn npm_publish_order_can_remove_dev_dependencies() {
+	let tool = npm_publish_order_package("tool", Vec::new());
+	let app = npm_publish_order_package(
+		"app",
+		vec![npm_publish_order_dependency("tool", "devDependencies")],
+	);
+	let packages = vec![app.clone(), tool.clone()];
+	let requests = vec![
+		publish_order_request_for_package(&app),
+		publish_order_request_for_package(&tool),
+	];
+
+	let ordered = order_release_requests_by_publish_dependencies(
+		&publish_order_configuration(Some(vec!["dependencies"])),
+		&packages,
+		requests,
+	)
+	.unwrap();
+
+	let package_names = ordered
+		.into_iter()
+		.map(|request| request.package_name)
+		.collect::<Vec<_>>();
+	assert_eq!(package_names, ["app", "tool"]);
+}
+
+#[test]
+fn non_npm_publish_order_uses_matching_ecosystem_defaults() {
+	let tool = python_publish_order_package("tool", Vec::new());
+	let app = python_publish_order_package(
+		"app",
+		vec![publish_order_dependency_from_field("tool", "dependencies")],
+	);
+	let packages = vec![app.clone(), tool.clone()];
+	let requests = vec![
+		publish_order_request_for_package(&app),
+		publish_order_request_for_package(&tool),
+	];
+
+	let ordered = order_release_requests_by_publish_dependencies(
+		&publish_order_configuration(None),
+		&packages,
+		requests,
+	)
+	.unwrap();
+
+	let package_names = ordered
+		.into_iter()
+		.map(|request| request.package_name)
+		.collect::<Vec<_>>();
+	assert_eq!(package_names, ["tool", "app"]);
+}
+
+#[test]
+fn python_publish_order_can_include_optional_dependencies() {
+	let extra = python_publish_order_package("extra", Vec::new());
+	let app = python_publish_order_package(
+		"app",
+		vec![publish_order_dependency_from_field(
+			"extra",
+			"optional-dependencies",
+		)],
+	);
+	let packages = vec![app.clone(), extra.clone()];
+
+	let default_order = order_release_requests_by_publish_dependencies(
+		&publish_order_configuration(None),
+		&packages,
+		vec![
+			publish_order_request_for_package(&app),
+			publish_order_request_for_package(&extra),
+		],
+	)
+	.unwrap();
+	assert_eq!(publish_order_package_names(default_order), ["app", "extra"]);
+
+	let configured_order = order_release_requests_by_publish_dependencies(
+		&publish_order_configuration_for(
+			Ecosystem::Python,
+			vec!["dependencies", "optional-dependencies"],
+		),
+		&packages,
+		vec![
+			publish_order_request_for_package(&app),
+			publish_order_request_for_package(&extra),
+		],
+	)
+	.unwrap();
+	assert_eq!(
+		publish_order_package_names(configured_order),
+		["extra", "app"]
+	);
+}
+
+#[test]
+fn go_publish_order_can_disable_require_dependencies() {
+	let library = ecosystem_publish_order_package(Ecosystem::Go, "library", Vec::new());
+	let app = ecosystem_publish_order_package(
+		Ecosystem::Go,
+		"app",
+		vec![publish_order_dependency_from_field("library", "require")],
+	);
+	let packages = vec![app.clone(), library.clone()];
+
+	let default_order = order_release_requests_by_publish_dependencies(
+		&publish_order_configuration(None),
+		&packages,
+		vec![
+			publish_order_request_for_package(&app),
+			publish_order_request_for_package(&library),
+		],
+	)
+	.unwrap();
+	assert_eq!(
+		publish_order_package_names(default_order),
+		["library", "app"]
+	);
+
+	let configured_order = order_release_requests_by_publish_dependencies(
+		&publish_order_configuration_for(Ecosystem::Go, Vec::new()),
+		&packages,
+		vec![
+			publish_order_request_for_package(&app),
+			publish_order_request_for_package(&library),
+		],
+	)
+	.unwrap();
+	assert_eq!(
+		publish_order_package_names(configured_order),
+		["app", "library"]
+	);
+}
+
+#[test]
+fn dart_publish_order_can_remove_dev_dependencies() {
+	let test_tool = ecosystem_publish_order_package(Ecosystem::Dart, "test_tool", Vec::new());
+	let app = ecosystem_publish_order_package(
+		Ecosystem::Dart,
+		"app",
+		vec![publish_order_dependency_from_field(
+			"test_tool",
+			"dev_dependencies",
+		)],
+	);
+	let packages = vec![app.clone(), test_tool.clone()];
+
+	let default_order = order_release_requests_by_publish_dependencies(
+		&publish_order_configuration(None),
+		&packages,
+		vec![
+			publish_order_request_for_package(&app),
+			publish_order_request_for_package(&test_tool),
+		],
+	)
+	.unwrap();
+	assert_eq!(
+		publish_order_package_names(default_order),
+		["test_tool", "app"]
+	);
+
+	let configured_order = order_release_requests_by_publish_dependencies(
+		&publish_order_configuration_for(Ecosystem::Dart, vec!["dependencies"]),
+		&packages,
+		vec![
+			publish_order_request_for_package(&app),
+			publish_order_request_for_package(&test_tool),
+		],
+	)
+	.unwrap();
+	assert_eq!(
+		publish_order_package_names(configured_order),
+		["app", "test_tool"]
+	);
+}
+
+#[test]
+fn deno_publish_order_can_remove_dependencies() {
+	let shared = ecosystem_publish_order_package(Ecosystem::Deno, "shared", Vec::new());
+	let app = ecosystem_publish_order_package(
+		Ecosystem::Deno,
+		"app",
+		vec![publish_order_dependency_from_field(
+			"shared",
+			"dependencies",
+		)],
+	);
+	let packages = vec![app.clone(), shared.clone()];
+
+	let default_order = order_release_requests_by_publish_dependencies(
+		&publish_order_configuration(None),
+		&packages,
+		vec![
+			publish_order_request_for_package(&app),
+			publish_order_request_for_package(&shared),
+		],
+	)
+	.unwrap();
+	assert_eq!(
+		publish_order_package_names(default_order),
+		["shared", "app"]
+	);
+
+	let configured_order = order_release_requests_by_publish_dependencies(
+		&publish_order_configuration_for(Ecosystem::Deno, vec!["imports"]),
+		&packages,
+		vec![
+			publish_order_request_for_package(&app),
+			publish_order_request_for_package(&shared),
+		],
+	)
+	.unwrap();
+	assert_eq!(
+		publish_order_package_names(configured_order),
+		["app", "shared"]
 	);
 }
 
@@ -687,6 +1004,147 @@ fn publish_order_dependency(name: &str, kind: DependencyKind) -> PackageDependen
 		kind,
 		version_constraint: Some("1.0.0".to_string()),
 		optional: false,
+		source_field: Some(
+			match kind {
+				DependencyKind::Development => "dev-dependencies",
+				DependencyKind::Build => "build-dependencies",
+				_ => "dependencies",
+			}
+			.to_string(),
+		),
+	}
+}
+
+fn npm_publish_order_package(name: &str, dependencies: Vec<PackageDependency>) -> PackageRecord {
+	let root = PathBuf::from("/workspace");
+	let mut package = PackageRecord::new(
+		Ecosystem::Npm,
+		name,
+		root.join("packages").join(name).join("package.json"),
+		root,
+		None,
+		PublishState::Public,
+	);
+	package.declared_dependencies = dependencies;
+	package
+}
+
+fn python_publish_order_package(name: &str, dependencies: Vec<PackageDependency>) -> PackageRecord {
+	ecosystem_publish_order_package(Ecosystem::Python, name, dependencies)
+}
+
+fn ecosystem_publish_order_package(
+	ecosystem: Ecosystem,
+	name: &str,
+	dependencies: Vec<PackageDependency>,
+) -> PackageRecord {
+	let root = PathBuf::from("/workspace");
+	let manifest_name = match ecosystem {
+		Ecosystem::Cargo => "Cargo.toml",
+		Ecosystem::Dart | Ecosystem::Flutter => "pubspec.yaml",
+		Ecosystem::Python => "pyproject.toml",
+		Ecosystem::Go => "go.mod",
+		_ => "package.json",
+	};
+	let mut package = PackageRecord::new(
+		ecosystem,
+		name,
+		root.join("packages").join(name).join(manifest_name),
+		root,
+		None,
+		PublishState::Public,
+	);
+	package.declared_dependencies = dependencies;
+	package
+}
+
+fn npm_publish_order_dependency(name: &str, source_field: &str) -> PackageDependency {
+	publish_order_dependency_from_field(name, source_field)
+}
+
+fn publish_order_dependency_from_field(name: &str, source_field: &str) -> PackageDependency {
+	PackageDependency {
+		name: name.to_string(),
+		kind: DependencyKind::Runtime,
+		version_constraint: Some("1.0.0".to_string()),
+		optional: false,
+		source_field: Some(source_field.to_string()),
+	}
+}
+
+fn publish_order_configuration(npm_dependency_fields: Option<Vec<&str>>) -> WorkspaceConfiguration {
+	let npm = EcosystemSettings {
+		publish_order: PublishOrderSettings {
+			dependency_fields: npm_dependency_fields
+				.map(|fields| fields.into_iter().map(str::to_string).collect()),
+		},
+		..EcosystemSettings::default()
+	};
+
+	WorkspaceConfiguration {
+		root_path: PathBuf::from("/workspace"),
+		defaults: WorkspaceDefaults::default(),
+		changelog: ChangelogSettings::default(),
+		packages: Vec::new(),
+		groups: Vec::new(),
+		cli: Vec::new(),
+		changesets: ChangesetSettings::default(),
+		source: None,
+		lints: WorkspaceLintSettings::default(),
+		cargo: EcosystemSettings::default(),
+		npm,
+		deno: EcosystemSettings::default(),
+		dart: EcosystemSettings::default(),
+		python: EcosystemSettings::default(),
+		go: EcosystemSettings::default(),
+	}
+}
+
+fn publish_order_configuration_for(
+	ecosystem: Ecosystem,
+	dependency_fields: Vec<&str>,
+) -> WorkspaceConfiguration {
+	let mut configuration = publish_order_configuration(None);
+	let settings = match ecosystem {
+		Ecosystem::Cargo => &mut configuration.cargo,
+		Ecosystem::Deno => &mut configuration.deno,
+		Ecosystem::Dart | Ecosystem::Flutter => &mut configuration.dart,
+		Ecosystem::Python => &mut configuration.python,
+		Ecosystem::Go => &mut configuration.go,
+		_ => &mut configuration.npm,
+	};
+	settings.publish_order.dependency_fields =
+		Some(dependency_fields.into_iter().map(str::to_string).collect());
+	configuration
+}
+
+fn publish_order_package_names(requests: Vec<PublishRequest>) -> Vec<String> {
+	requests
+		.into_iter()
+		.map(|request| request.package_name)
+		.collect()
+}
+
+fn publish_order_request_for_package(package: &PackageRecord) -> PublishRequest {
+	PublishRequest {
+		package_id: package.name.clone(),
+		package_name: package.name.clone(),
+		ecosystem: package.ecosystem,
+		manifest_path: package.manifest_path.clone(),
+		package_root: package.manifest_path.parent().unwrap().to_path_buf(),
+		registry: if package.ecosystem == Ecosystem::Cargo {
+			RegistryKind::CratesIo
+		} else {
+			RegistryKind::Npm
+		},
+		package_manager: None,
+		package_metadata: BTreeMap::new(),
+		mode: PublishMode::Builtin,
+		version: "1.0.0".to_string(),
+		placeholder: false,
+		trusted_publishing: TrustedPublishingSettings::default(),
+		attestations: PublishAttestationSettings::default(),
+		placeholder_readme: String::new(),
 	}
 }
 

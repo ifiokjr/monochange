@@ -339,7 +339,9 @@ fn workspace_and_manifest_helpers_cover_yaml_and_error_paths() {
 		Some("1.2.3")
 	);
 	assert!(app.declared_dependencies.iter().any(|dependency| {
-		dependency.name == "shared" && dependency.version_constraint.as_deref() == Some("^1.0.0")
+		dependency.name == "shared"
+			&& dependency.version_constraint.as_deref() == Some("^1.0.0")
+			&& dependency.source_field.as_deref() == Some("dependencies")
 	}));
 
 	let private_manifest = fixture_root.join("packages/private/pubspec.yaml");

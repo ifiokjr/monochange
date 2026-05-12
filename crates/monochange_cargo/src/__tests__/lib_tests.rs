@@ -397,6 +397,7 @@ fn lockfile_requires_command_refresh_for_incomplete_lockfiles() {
 			kind: monochange_core::DependencyKind::Runtime,
 			version_constraint: Some("1.0".to_string()),
 			optional: false,
+			source_field: None,
 		});
 	let app = PackageRecord::new(
 		Ecosystem::Cargo,

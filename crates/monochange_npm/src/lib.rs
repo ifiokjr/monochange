@@ -915,6 +915,7 @@ fn parse_dependency_map(
 							kind,
 							version_constraint: Some(constraint.to_string()),
 							optional: false,
+							source_field: Some(section.to_string()),
 						}
 					})
 				})

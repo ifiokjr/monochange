@@ -115,6 +115,7 @@ use monochange_core::ProviderReleaseNotesSource;
 use monochange_core::ProviderReleaseSettings;
 use monochange_core::PublishAttestationSettings;
 use monochange_core::PublishMode;
+use monochange_core::PublishOrderSettings;
 use monochange_core::PublishRegistry;
 use monochange_core::PublishSettings;
 use monochange_core::RegistryKind;
@@ -400,6 +401,8 @@ pub(crate) struct RawEcosystemSettings {
 	lockfile_commands: Vec<LockfileCommandDefinition>,
 	#[serde(default)]
 	publish: RawPublishSettings,
+	#[serde(default)]
+	publish_order: PublishOrderSettings,
 }
 
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -881,6 +884,7 @@ fn normalize_ecosystem_settings(
 		versioned_files,
 		lockfile_commands: raw.lockfile_commands,
 		publish,
+		publish_order: raw.publish_order,
 	})
 }
 

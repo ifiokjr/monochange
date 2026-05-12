@@ -196,6 +196,7 @@ require github.com/nats-io/nats.go v1.31.0
 	let gin = deps.iter().find(|d| d.name == "gin").unwrap();
 	assert_eq!(gin.kind, DependencyKind::Runtime);
 	assert_eq!(gin.version_constraint.as_deref(), Some("1.9.1"));
+	assert_eq!(gin.source_field.as_deref(), Some("require"));
 
 	let sys = deps.iter().find(|d| d.name == "sys").unwrap();
 	assert_eq!(sys.kind, DependencyKind::Development);

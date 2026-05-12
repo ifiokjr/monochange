@@ -5,7 +5,11 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
+use monochange_core::DependencyEdge;
+use monochange_core::DependencyKind;
+use monochange_core::DependencySourceKind;
 use monochange_core::Ecosystem;
+use monochange_core::EcosystemSettings;
 use monochange_core::GroupDefinition;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
@@ -19,6 +23,7 @@ use monochange_core::RegistryKind;
 use monochange_core::SourceConfiguration;
 use monochange_core::TrustedPublishingSettings;
 use monochange_core::WorkspaceConfiguration;
+use monochange_core::default_publish_order_dependency_fields;
 use reqwest::StatusCode;
 use reqwest::blocking::Client;
 use serde::Deserialize;
@@ -1134,7 +1139,7 @@ pub fn build_release_requests(
 		});
 	}
 
-	order_release_requests_by_publish_dependencies(packages, requests)
+	order_release_requests_by_publish_dependencies(configuration, packages, requests)
 }
 
 pub fn resolve_registry_kind(
@@ -2163,6 +2168,93 @@ fn circle_project_slug(env_map: &BTreeMap<String, String>) -> Option<String> {
 
 use monochange_core::materialize_dependency_edges;
 
+fn publish_order_dependency_edges(
+	configuration: &WorkspaceConfiguration,
+	packages: &[PackageRecord],
+) -> Vec<DependencyEdge> {
+	let mut edges = materialize_dependency_edges(packages);
+	let packages_by_name = packages
+		.iter()
+		.map(|package| (package.name.as_str(), package))
+		.collect::<BTreeMap<_, _>>();
+
+	for package in packages
+		.iter()
+		.filter(|package| package.ecosystem == Ecosystem::Npm)
+	{
+		let parsed = fs::read_to_string(&package.manifest_path)
+			.ok()
+			.and_then(|contents| serde_json::from_str::<JsonValue>(&contents).ok());
+		let Some(JsonValue::Object(root)) = parsed else {
+			continue;
+		};
+
+		let declared_fields = package
+			.declared_dependencies
+			.iter()
+			.filter_map(|dependency| dependency.source_field.as_deref())
+			.collect::<BTreeSet<_>>();
+		for field in publish_order_dependency_fields(configuration, package.ecosystem) {
+			if declared_fields.contains(field.as_str()) {
+				continue;
+			}
+			let Some(JsonValue::Object(dependencies)) = root.get(&field) else {
+				continue;
+			};
+			for (dependency_name, constraint) in dependencies {
+				let Some(target) = packages_by_name.get(dependency_name.as_str()) else {
+					continue;
+				};
+				edges.push(DependencyEdge {
+					from_package_id: package.id.clone(),
+					to_package_id: target.id.clone(),
+					dependency_kind: DependencyKind::Unknown,
+					source_kind: DependencySourceKind::Manifest,
+					version_constraint: constraint.as_str().map(ToString::to_string),
+					is_optional: false,
+					is_direct: true,
+					source_field: Some(field.clone()),
+				});
+			}
+		}
+	}
+
+	edges
+}
+
+fn publish_order_dependency_fields(
+	configuration: &WorkspaceConfiguration,
+	ecosystem: Ecosystem,
+) -> BTreeSet<String> {
+	let settings = ecosystem_settings(configuration, ecosystem);
+	settings
+		.publish_order
+		.dependency_fields
+		.clone()
+		.unwrap_or_else(|| {
+			default_publish_order_dependency_fields(ecosystem)
+				.iter()
+				.map(|field| (*field).to_string())
+				.collect()
+		})
+		.into_iter()
+		.collect()
+}
+
+fn ecosystem_settings(
+	configuration: &WorkspaceConfiguration,
+	ecosystem: Ecosystem,
+) -> &EcosystemSettings {
+	match ecosystem {
+		Ecosystem::Cargo => &configuration.cargo,
+		Ecosystem::Deno => &configuration.deno,
+		Ecosystem::Dart | Ecosystem::Flutter => &configuration.dart,
+		Ecosystem::Python => &configuration.python,
+		Ecosystem::Go => &configuration.go,
+		_ => &configuration.npm,
+	}
+}
+
 pub fn read_publish_report_artifact(path: &Path) -> MonochangeResult<PackagePublishReport> {
 	let body = fs::read_to_string(path).map_err(|error| {
 		MonochangeError::Io(format!(
@@ -2322,6 +2414,7 @@ pub fn merge_publish_resume_report(
 }
 
 pub fn order_release_requests_by_publish_dependencies(
+	configuration: &WorkspaceConfiguration,
 	packages: &[PackageRecord],
 	mut requests: Vec<PublishRequest>,
 ) -> MonochangeResult<Vec<PublishRequest>> {
@@ -2348,7 +2441,16 @@ pub fn order_release_requests_by_publish_dependencies(
 		.collect::<BTreeMap<_, _>>();
 	let mut dependents_by_package = BTreeMap::<String, BTreeSet<String>>::new();
 
-	for edge in materialize_dependency_edges(packages) {
+	for edge in publish_order_dependency_edges(configuration, packages) {
+		let from_package = packages
+			.iter()
+			.find(|package| package.id == edge.from_package_id)
+			.expect("publish-order edges originate from discovered packages");
+		if !publish_order_dependency_fields(configuration, from_package.ecosystem)
+			.contains(edge.source_field.as_deref().unwrap_or_default())
+		{
+			continue;
+		}
 		let Some(from_package_id) = config_ids_by_record_id.get(&edge.from_package_id) else {
 			continue;
 		};
@@ -2454,10 +2556,6 @@ pub fn packages_by_config_id(packages: &[PackageRecord]) -> BTreeMap<&str, &Pack
 		})
 		.collect()
 }
-
-#[cfg(test)]
-#[path = "__tests__/lib_tests.rs"]
-mod tests;
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RegistryEndpoints {
 	pub npm_registry: String,
@@ -2771,3 +2869,7 @@ pub fn crates_io_index_entry_path(package_name: &str) -> String {
 fn http_error(context: &'static str) -> impl Fn(reqwest::Error) -> MonochangeError {
 	move |error| MonochangeError::Discovery(format!("{context} failed: {error}"))
 }
+
+#[cfg(test)]
+#[path = "__tests__/lib_tests.rs"]
+mod tests;

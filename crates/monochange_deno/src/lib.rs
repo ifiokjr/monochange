@@ -417,6 +417,7 @@ fn parse_dependency_map(parsed: &Value, section: &str) -> Vec<PackageDependency>
 							kind: DependencyKind::Runtime,
 							version_constraint: Some(constraint.to_string()),
 							optional: false,
+							source_field: Some(section.to_string()),
 						}
 					})
 				})
