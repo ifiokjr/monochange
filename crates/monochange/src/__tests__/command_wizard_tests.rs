@@ -2,6 +2,7 @@ use tempfile::tempdir;
 use toml::Value;
 use toml_edit::DocumentMut;
 
+use super::CommandInputDraft;
 use super::CommandStepDraft;
 use super::CommandStepUpdate;
 use super::CommandUpdate;
@@ -14,9 +15,13 @@ use super::normalize_optional_text;
 use super::read_cli_command;
 use super::read_config_text;
 use super::render_document;
+use super::step_choice_scorer;
+use super::step_choice_sorter;
 use super::step_choices;
 use super::step_label;
 use super::upsert_cli_command_document;
+use super::validate_command_input_draft;
+use super::validate_command_inputs;
 use super::validate_command_name;
 use super::validate_command_name_for_prompt;
 use super::validate_step_draft;
@@ -29,6 +34,7 @@ fn upsert_cli_command_document_adds_command_to_empty_config() {
 		name: "ship-it".to_string(),
 		help_text: Some("Ship the release".to_string()),
 		dry_run: false,
+		inputs: Vec::new(),
 		steps: CommandStepUpdate::Replace(vec![CommandStepDraft::built_in("Discover")]),
 	};
 
@@ -68,6 +74,7 @@ steps = [{ type = "PrepareRelease", allow_empty_changesets = true }]
 		name: "release".to_string(),
 		help_text: Some("New help".to_string()),
 		dry_run: false,
+		inputs: Vec::new(),
 		steps: CommandStepUpdate::KeepExisting,
 	};
 
@@ -99,6 +106,7 @@ steps = [{ type = "Discover" }]
 		name: "new-name".to_string(),
 		help_text: None,
 		dry_run: false,
+		inputs: Vec::new(),
 		steps: CommandStepUpdate::KeepExisting,
 	};
 
@@ -124,6 +132,7 @@ fn upsert_cli_command_document_writes_shell_command_steps() {
 		name: "lockfiles".to_string(),
 		help_text: None,
 		dry_run: true,
+		inputs: Vec::new(),
 		steps: CommandStepUpdate::Replace(vec![CommandStepDraft::shell_command(
 			"pnpm install --lockfile-only".to_string(),
 			Some("generate lockfiles".to_string()),
@@ -144,6 +153,42 @@ fn upsert_cli_command_document_writes_shell_command_steps() {
 		step["command"].as_str(),
 		Some("pnpm install --lockfile-only")
 	);
+}
+
+#[test]
+fn upsert_cli_command_document_writes_command_inputs() {
+	let mut release_type = command_input_string("release-type");
+	release_type.kind = "choice".to_string();
+	release_type.help_text = Some("Release type to prepare".to_string());
+	release_type.required = true;
+	release_type.default = Some("patch".to_string());
+	release_type.choices = vec![
+		"patch".to_string(),
+		"minor".to_string(),
+		"major".to_string(),
+	];
+	release_type.short = Some('r');
+	let update = CommandUpdate {
+		original_name: None,
+		name: "release-pr".to_string(),
+		help_text: None,
+		dry_run: false,
+		inputs: vec![release_type],
+		steps: CommandStepUpdate::Replace(vec![CommandStepDraft::built_in("PrepareRelease")]),
+	};
+
+	let rendered = render_update("", &update);
+	let value = parse_rendered_toml(&rendered);
+	let input = &value["cli"]["release-pr"]["inputs"][0];
+
+	assert_eq!(input["name"].as_str(), Some("release-type"));
+	assert_eq!(input["type"].as_str(), Some("choice"));
+	assert_eq!(input["help_text"].as_str(), Some("Release type to prepare"));
+	assert_eq!(input["required"].as_bool(), Some(true));
+	assert_eq!(input["default"].as_str(), Some("patch"));
+	assert_eq!(input["short"].as_str(), Some("r"));
+	assert_eq!(input["choices"][0].as_str(), Some("patch"));
+	assert_eq!(input["choices"][2].as_str(), Some("major"));
 }
 
 #[test]
@@ -213,6 +258,7 @@ fn read_cli_command_returns_details_for_existing_command() {
 [cli.lockfiles]
 help_text = "Generate lockfiles"
 dry_run = true
+inputs = [{ name = "workspace", type = "path", help_text = "Workspace path", required = true, short = "w" }]
 steps = [{ type = "Command", name = "install", command = "pnpm install --lockfile-only" }]
 "#;
 
@@ -226,6 +272,15 @@ steps = [{ type = "Command", name = "install", command = "pnpm install --lockfil
 	assert_eq!(command.name, "lockfiles");
 	assert_eq!(command.help_text.as_deref(), Some("Generate lockfiles"));
 	assert!(command.dry_run);
+	assert_eq!(command.inputs.len(), 1);
+	assert_eq!(command.inputs[0].name, "workspace");
+	assert_eq!(command.inputs[0].kind, "path");
+	assert_eq!(
+		command.inputs[0].help_text.as_deref(),
+		Some("Workspace path")
+	);
+	assert!(command.inputs[0].required);
+	assert_eq!(command.inputs[0].short, Some('w'));
 	assert_eq!(command.steps.len(), 1);
 	assert_eq!(command.steps[0].kind, STEP_KIND_SHELL_COMMAND);
 	assert_eq!(command.steps[0].name.as_deref(), Some("install"));
@@ -236,15 +291,43 @@ steps = [{ type = "Command", name = "install", command = "pnpm install --lockfil
 }
 
 #[test]
-fn step_choices_and_labels_include_shell_command_and_save_action() {
+fn step_choices_and_labels_include_described_ranked_shell_command_and_save_action() {
 	let choices = step_choices();
+	let labels = choices
+		.iter()
+		.map(|choice| choice.kind.as_str())
+		.collect::<Vec<_>>();
 
-	assert!(
-		choices
-			.iter()
-			.any(|choice| choice == STEP_KIND_SHELL_COMMAND)
+	assert_eq!(
+		labels.get(0..4),
+		Some(
+			[
+				"PrepareRelease",
+				STEP_KIND_SHELL_COMMAND,
+				"CreateChangeFile",
+				"Validate",
+			]
+			.as_slice()
+		)
 	);
-	assert_eq!(choices.last().map(String::as_str), Some(SAVE_STEPS_LABEL));
+	assert!(labels.contains(&STEP_KIND_SHELL_COMMAND));
+	assert_eq!(labels.last().copied(), Some(SAVE_STEPS_LABEL));
+	assert!(choices[0].to_string().contains("\x1b[2m— Plan a release"));
+	assert!(
+		choices[1]
+			.to_string()
+			.contains("Run a custom shell command")
+	);
+	assert_eq!(step_choice_scorer("", &choices[0], "", 0), Some(10_000));
+	assert_eq!(
+		step_choice_scorer("command", &choices[1], "", 0),
+		Some(9_999)
+	);
+	assert_eq!(step_choice_scorer("zzzz", &choices[1], "", 0), None);
+
+	let mut scored = vec![(1, 9_997), (0, 9_984), (2, 9_999)];
+	step_choice_sorter(&mut scored);
+	assert_eq!(scored, vec![(2, 9_999), (1, 9_997), (0, 9_984)]);
 	assert_eq!(
 		step_label(&CommandStepDraft {
 			kind: "Validate".to_string(),
@@ -322,6 +405,38 @@ fn validate_step_draft_rejects_unknown_or_misconfigured_steps() {
 }
 
 #[test]
+fn validate_command_inputs_reject_invalid_or_duplicate_inputs() {
+	let mut unknown = command_input_string("release-type");
+	unknown.kind = "object".to_string();
+	assert_config_error(
+		validate_command_input_draft(&unknown),
+		"unknown CLI input type `object`",
+	);
+
+	let mut misplaced_choices = command_input_string("release-type");
+	misplaced_choices.choices = vec!["patch".to_string()];
+	assert_config_error(
+		validate_command_input_draft(&misplaced_choices),
+		"only `choice` inputs can define choices",
+	);
+
+	let mut choice_without_values = command_input_string("release-type");
+	choice_without_values.kind = "choice".to_string();
+	assert_config_error(
+		validate_command_input_draft(&choice_without_values),
+		"choice input `release-type` needs at least one choice",
+	);
+
+	assert_config_error(
+		validate_command_inputs(&[
+			command_input_string("workspace"),
+			command_input_string("workspace"),
+		]),
+		"duplicate CLI input `workspace`",
+	);
+}
+
+#[test]
 fn upsert_cli_command_document_rejects_create_and_rename_conflicts() {
 	let config = r#"
 [cli.release]
@@ -335,6 +450,7 @@ steps = [{ type = "Discover" }]
 		name: "release".to_string(),
 		help_text: None,
 		dry_run: false,
+		inputs: Vec::new(),
 		steps: CommandStepUpdate::Replace(vec![CommandStepDraft::built_in("Validate")]),
 	};
 	let duplicate_rename = CommandUpdate {
@@ -342,6 +458,7 @@ steps = [{ type = "Discover" }]
 		name: "deploy".to_string(),
 		help_text: None,
 		dry_run: false,
+		inputs: Vec::new(),
 		steps: CommandStepUpdate::KeepExisting,
 	};
 
@@ -362,6 +479,7 @@ fn upsert_cli_command_document_rejects_empty_replacement_steps() {
 		name: "release-pr".to_string(),
 		help_text: None,
 		dry_run: false,
+		inputs: Vec::new(),
 		steps: CommandStepUpdate::Replace(Vec::new()),
 	};
 
@@ -453,6 +571,18 @@ fn assert_config_error(result: monochange_core::MonochangeResult<()>, expected: 
 fn render_update(config: &str, update: &CommandUpdate) -> String {
 	upsert_cli_command_document(config, update)
 		.unwrap_or_else(|error| panic!("command update should render: {error}"))
+}
+
+fn command_input_string(name: impl Into<String>) -> CommandInputDraft {
+	CommandInputDraft {
+		name: name.into(),
+		kind: "string".to_string(),
+		help_text: None,
+		required: false,
+		default: None,
+		choices: Vec::new(),
+		short: None,
+	}
 }
 
 fn parse_rendered_toml(rendered: &str) -> Value {

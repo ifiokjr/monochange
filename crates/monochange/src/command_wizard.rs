@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::fmt;
 use std::fs;
 use std::path::Path;
@@ -22,6 +23,10 @@ use toml_edit::value;
 const CONFIG_FILE: &str = "monochange.toml";
 const STEP_KIND_SHELL_COMMAND: &str = "Command";
 const SAVE_STEPS_LABEL: &str = "Save command steps";
+const MUTED_TEXT_START: &str = "\x1b[2m";
+const MUTED_TEXT_END: &str = "\x1b[0m";
+const STEP_SCORE_BASE: i64 = 10_000;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct CommandSummary {
 	pub(crate) name: String,
@@ -43,6 +48,23 @@ pub(crate) struct CommandStepDraft {
 	pub(crate) kind: String,
 	pub(crate) name: Option<String>,
 	pub(crate) command: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize)]
+pub(crate) struct CommandInputDraft {
+	pub(crate) name: String,
+	#[serde(rename = "type")]
+	pub(crate) kind: String,
+	#[serde(default)]
+	pub(crate) help_text: Option<String>,
+	#[serde(default)]
+	pub(crate) required: bool,
+	#[serde(default)]
+	pub(crate) default: Option<String>,
+	#[serde(default)]
+	pub(crate) choices: Vec<String>,
+	#[serde(default)]
+	pub(crate) short: Option<char>,
 }
 
 impl CommandStepDraft {
@@ -75,6 +97,7 @@ pub(crate) struct CommandUpdate {
 	pub(crate) name: String,
 	pub(crate) help_text: Option<String>,
 	pub(crate) dry_run: bool,
+	pub(crate) inputs: Vec<CommandInputDraft>,
 	pub(crate) steps: CommandStepUpdate,
 }
 
@@ -83,6 +106,7 @@ struct CommandDetails {
 	name: String,
 	help_text: Option<String>,
 	dry_run: bool,
+	inputs: Vec<CommandInputDraft>,
 	steps: Vec<CommandStepDraft>,
 }
 
@@ -96,6 +120,8 @@ struct RawCliRoot {
 struct RawCliCommand {
 	#[serde(default)]
 	help_text: Option<String>,
+	#[serde(default)]
+	inputs: Vec<CommandInputDraft>,
 	#[serde(default)]
 	steps: Vec<RawCliStep>,
 	#[serde(default)]
@@ -118,6 +144,42 @@ enum DashboardAction {
 	EditCommand,
 	OpenEditor,
 	Quit,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct StepChoice {
+	kind: String,
+	description: &'static str,
+	is_save: bool,
+}
+
+impl StepChoice {
+	fn new(kind: impl Into<String>) -> Self {
+		let kind = kind.into();
+		Self {
+			description: step_choice_description(&kind),
+			kind,
+			is_save: false,
+		}
+	}
+
+	fn save() -> Self {
+		Self {
+			kind: SAVE_STEPS_LABEL.to_string(),
+			description: "Finish the command after adding at least one step",
+			is_save: true,
+		}
+	}
+}
+
+impl fmt::Display for StepChoice {
+	fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(
+			formatter,
+			"{} {MUTED_TEXT_START}— {}{MUTED_TEXT_END}",
+			self.kind, self.description
+		)
+	}
 }
 
 impl fmt::Display for DashboardAction {
@@ -291,6 +353,7 @@ fn prompt_command_update(
 		.with_default(existing.is_some_and(|command| command.dry_run))
 		.prompt()
 		.map_err(map_inquire_error)?;
+	let inputs = prompt_command_inputs(existing)?;
 	let steps = prompt_step_update(existing)?;
 
 	Ok(CommandUpdate {
@@ -298,6 +361,7 @@ fn prompt_command_update(
 		name,
 		help_text,
 		dry_run,
+		inputs,
 		steps,
 	})
 }
@@ -379,20 +443,23 @@ fn prompt_replacement_steps() -> MonochangeResult<Vec<CommandStepDraft>> {
 			"Step dashboard — add the next step or save:",
 			step_choices(),
 		)
+		.with_scorer(&step_choice_scorer)
+		.with_sorter(&step_choice_sorter)
+		.with_formatter(&|answer| answer.value.kind.clone())
 		.prompt()
 		.map_err(map_inquire_error)?;
 
-		if selected == SAVE_STEPS_LABEL {
+		if selected.is_save {
 			if steps.is_empty() {
 				return Err(config_error("a CLI command needs at least one step"));
 			}
 			return Ok(steps);
 		}
 
-		if selected == STEP_KIND_SHELL_COMMAND {
+		if selected.kind == STEP_KIND_SHELL_COMMAND {
 			steps.push(prompt_shell_command_step()?);
 		} else {
-			steps.push(CommandStepDraft::built_in(selected));
+			steps.push(CommandStepDraft::built_in(selected.kind));
 		}
 	}
 }
@@ -420,6 +487,146 @@ fn prompt_shell_command_step() -> MonochangeResult<CommandStepDraft> {
 	))
 }
 
+#[coverage(off)]
+fn prompt_command_inputs(
+	existing: Option<&CommandDetails>,
+) -> MonochangeResult<Vec<CommandInputDraft>> {
+	if let Some(existing) = existing
+		&& !existing.inputs.is_empty()
+	{
+		let input_summary = existing
+			.inputs
+			.iter()
+			.map(command_input_label)
+			.collect::<Vec<_>>()
+			.join(", ");
+		let keep_existing =
+			Confirm::new(&format!("Keep existing command inputs ({input_summary})?"))
+				.with_default(true)
+				.prompt()
+				.map_err(map_inquire_error)?;
+
+		if keep_existing {
+			return Ok(existing.inputs.clone());
+		}
+	}
+
+	let add_inputs = Confirm::new("Add or replace top-level command inputs?")
+		.with_default(false)
+		.prompt()
+		.map_err(map_inquire_error)?;
+	if !add_inputs {
+		return Ok(Vec::new());
+	}
+
+	prompt_replacement_inputs()
+}
+
+#[coverage(off)]
+fn prompt_replacement_inputs() -> MonochangeResult<Vec<CommandInputDraft>> {
+	let mut inputs = Vec::new();
+
+	loop {
+		let input = prompt_command_input(&inputs)?;
+		inputs.push(input);
+
+		let add_another = Confirm::new("Add another command input?")
+			.with_default(false)
+			.prompt()
+			.map_err(map_inquire_error)?;
+		if !add_another {
+			return Ok(inputs);
+		}
+	}
+}
+
+#[coverage(off)]
+fn prompt_command_input(existing: &[CommandInputDraft]) -> MonochangeResult<CommandInputDraft> {
+	let existing_names = existing
+		.iter()
+		.map(|input| input.name.clone())
+		.collect::<Vec<_>>();
+	let name = Text::new("Input name (for --<name>):")
+		.with_validator(move |input: &str| {
+			match validate_command_input_name_for_prompt(input, &existing_names) {
+				Ok(()) => Ok(Validation::Valid),
+				Err(message) => Ok(Validation::Invalid(message.into())),
+			}
+		})
+		.prompt()
+		.map_err(map_inquire_error)?
+		.trim()
+		.to_string();
+	let kind = Select::new("Input type:", command_input_kind_choices())
+		.prompt()
+		.map_err(map_inquire_error)?;
+	let help_text = prompt_help_text(None)?;
+	let required = Confirm::new("Require this input?")
+		.with_default(false)
+		.prompt()
+		.map_err(map_inquire_error)?;
+	let default = prompt_command_input_default(kind.as_str())?;
+	let choices = prompt_command_input_choices(kind.as_str())?;
+	let short = prompt_command_input_short()?;
+
+	Ok(CommandInputDraft {
+		name,
+		kind,
+		help_text,
+		required,
+		default,
+		choices,
+		short,
+	})
+}
+
+#[coverage(off)]
+fn prompt_command_input_default(kind: &str) -> MonochangeResult<Option<String>> {
+	if kind == "string_list" {
+		return Ok(None);
+	}
+
+	let default = Text::new("Default value (blank to omit):")
+		.prompt()
+		.map_err(map_inquire_error)?;
+	Ok(normalize_optional_text(&default))
+}
+
+#[coverage(off)]
+fn prompt_command_input_choices(kind: &str) -> MonochangeResult<Vec<String>> {
+	if kind != "choice" {
+		return Ok(Vec::new());
+	}
+
+	let choices = Text::new("Choices (comma-separated):")
+		.with_validator(|input: &str| {
+			if comma_separated_values(input).is_empty() {
+				Ok(Validation::Invalid(
+					"choice inputs need at least one choice".into(),
+				))
+			} else {
+				Ok(Validation::Valid)
+			}
+		})
+		.prompt()
+		.map_err(map_inquire_error)?;
+	Ok(comma_separated_values(&choices))
+}
+
+#[coverage(off)]
+fn prompt_command_input_short() -> MonochangeResult<Option<char>> {
+	let short = Text::new("Short flag character (blank to omit):")
+		.with_validator(|input: &str| {
+			match normalize_short_flag(input) {
+				Ok(_) => Ok(Validation::Valid),
+				Err(message) => Ok(Validation::Invalid(message.into())),
+			}
+		})
+		.prompt()
+		.map_err(map_inquire_error)?;
+	normalize_short_flag(&short).map_err(config_error)
+}
+
 fn dashboard_actions(has_commands: bool) -> Vec<DashboardAction> {
 	let mut actions = vec![DashboardAction::AddCommand];
 	if has_commands {
@@ -437,6 +644,7 @@ fn read_cli_command(config_text: &str, name: &str) -> MonochangeResult<Option<Co
 			name: name.to_string(),
 			help_text: command.help_text.clone(),
 			dry_run: command.dry_run,
+			inputs: command.inputs.clone(),
 			steps: command
 				.steps
 				.iter()
@@ -468,11 +676,51 @@ fn write_command_fields(command: &mut Table, update: &CommandUpdate) -> Monochan
 		command.remove("dry_run");
 	}
 
+	if update.inputs.is_empty() {
+		command.remove("inputs");
+	} else {
+		command["inputs"] = Item::Value(Value::Array(command_input_array(&update.inputs)?));
+	}
+
 	if let CommandStepUpdate::Replace(steps) = &update.steps {
 		command["steps"] = Item::Value(Value::Array(step_array(steps)?));
 	}
 
 	Ok(())
+}
+
+fn command_input_array(inputs: &[CommandInputDraft]) -> MonochangeResult<Array> {
+	let mut array = Array::new();
+	for input in inputs {
+		array.push(Value::InlineTable(command_input_inline_table(input)?));
+	}
+	Ok(array)
+}
+
+fn command_input_inline_table(input: &CommandInputDraft) -> MonochangeResult<InlineTable> {
+	validate_command_input_draft(input)?;
+	let mut table = InlineTable::new();
+	table.insert("name", Value::from(input.name.as_str()));
+	table.insert("type", Value::from(input.kind.as_str()));
+
+	if let Some(help_text) = &input.help_text {
+		table.insert("help_text", Value::from(help_text.as_str()));
+	}
+	if input.required {
+		table.insert("required", Value::from(true));
+	}
+	if let Some(default) = &input.default {
+		table.insert("default", Value::from(default.as_str()));
+	}
+	if !input.choices.is_empty() {
+		table.insert("choices", Value::Array(string_array(&input.choices)));
+	}
+	if let Some(short) = input.short {
+		let short = short.to_string();
+		table.insert("short", Value::from(short.as_str()));
+	}
+
+	Ok(table)
 }
 
 fn step_array(steps: &[CommandStepDraft]) -> MonochangeResult<Array> {
@@ -499,19 +747,109 @@ fn step_inline_table(step: &CommandStepDraft) -> MonochangeResult<InlineTable> {
 	Ok(table)
 }
 
-fn step_choices() -> Vec<String> {
+fn step_choices() -> Vec<StepChoice> {
 	let mut choices = monochange_core::all_step_variants()
 		.into_iter()
-		.map(|step| step.kind_name().to_string())
+		.map(|step| StepChoice::new(step.kind_name()))
 		.collect::<Vec<_>>();
 	if !choices
 		.iter()
-		.any(|choice| choice == STEP_KIND_SHELL_COMMAND)
+		.any(|choice| choice.kind == STEP_KIND_SHELL_COMMAND)
 	{
-		choices.push(STEP_KIND_SHELL_COMMAND.to_string());
+		choices.push(StepChoice::new(STEP_KIND_SHELL_COMMAND));
 	}
-	choices.push(SAVE_STEPS_LABEL.to_string());
+	choices.sort_by_key(|choice| unfiltered_step_choice_rank(&choice.kind));
+	choices.push(StepChoice::save());
 	choices
+}
+
+fn step_choice_scorer(
+	input: &str,
+	option: &StepChoice,
+	_display: &str,
+	_index: usize,
+) -> Option<i64> {
+	let input = input.trim().to_lowercase();
+	if input.is_empty() {
+		return Some(STEP_SCORE_BASE - unfiltered_step_choice_rank(&option.kind) as i64);
+	}
+
+	let searchable = format!("{} {}", option.kind, option.description).to_lowercase();
+	if !searchable.contains(&input) {
+		return None;
+	}
+
+	Some(STEP_SCORE_BASE - filtered_step_choice_rank(&option.kind) as i64)
+}
+
+fn step_choice_sorter(options: &mut [(usize, i64)]) {
+	options.sort_unstable_by_key(|(_index, score)| std::cmp::Reverse(*score));
+}
+
+fn unfiltered_step_choice_rank(kind: &str) -> usize {
+	match kind {
+		"PrepareRelease" => 0,
+		STEP_KIND_SHELL_COMMAND => 1,
+		"CreateChangeFile" => 2,
+		"Validate" => 3,
+		"Discover" => 4,
+		"DisplayVersions" => 5,
+		"CommitRelease" => 6,
+		"PublishRelease" => 7,
+		"PublishPackages" => 8,
+		"OpenReleaseRequest" => 9,
+		"AffectedPackages" => 10,
+		"Config" => 11,
+		"VerifyReleaseBranch" => 12,
+		"PlanPublishRateLimits" => 13,
+		"PlaceholderPublish" => 14,
+		"CommentReleasedIssues" => 15,
+		"DiagnoseChangesets" => 16,
+		"RetargetRelease" => 17,
+		SAVE_STEPS_LABEL => usize::MAX,
+		_ => 100 + filtered_step_choice_rank(kind),
+	}
+}
+
+fn filtered_step_choice_rank(kind: &str) -> usize {
+	let mut labels = monochange_core::all_step_variants()
+		.into_iter()
+		.map(|step| step.kind_name().to_string())
+		.collect::<Vec<_>>();
+	if !labels.iter().any(|label| label == STEP_KIND_SHELL_COMMAND) {
+		labels.push(STEP_KIND_SHELL_COMMAND.to_string());
+	}
+	labels.push(SAVE_STEPS_LABEL.to_string());
+	labels.sort();
+	labels
+		.iter()
+		.position(|label| label == kind)
+		.unwrap_or(labels.len())
+}
+
+fn step_choice_description(kind: &str) -> &'static str {
+	match kind {
+		"Config" => "Load workspace configuration for later steps",
+		"Validate" => "Check config, changesets, and package manifests",
+		"Discover" => "List packages across supported ecosystems",
+		"DisplayVersions" => "Show planned package and group versions",
+		"CreateChangeFile" => "Create an interactive or prefilled changeset",
+		"PrepareRelease" => "Plan a release and expose release context",
+		"CommitRelease" => "Commit prepared release files locally",
+		"VerifyReleaseBranch" => "Ensure a release commit is on an allowed branch",
+		"PublishRelease" => "Create or update hosted releases",
+		"PlaceholderPublish" => "Publish placeholder versions for missing packages",
+		"PublishPackages" => "Publish prepared package artifacts",
+		"PlanPublishRateLimits" => "Group publish work around registry rate limits",
+		"OpenReleaseRequest" => "Open or update a release pull request",
+		"CommentReleasedIssues" => "Comment on issues included in a release",
+		"AffectedPackages" => "Report packages affected by changed files",
+		"DiagnoseChangesets" => "Explain changeset and release-plan decisions",
+		"RetargetRelease" => "Retarget an existing release to another commit",
+		STEP_KIND_SHELL_COMMAND => "Run a custom shell command",
+		SAVE_STEPS_LABEL => "Finish the command after adding at least one step",
+		_ => "Add this CLI step",
+	}
 }
 
 fn step_label(step: &CommandStepDraft) -> String {
@@ -527,6 +865,8 @@ fn validate_command_update(update: &CommandUpdate) -> MonochangeResult<()> {
 	if let Some(original_name) = &update.original_name {
 		validate_command_name(original_name)?;
 	}
+
+	validate_command_inputs(&update.inputs)?;
 
 	match &update.steps {
 		CommandStepUpdate::KeepExisting => {}
@@ -587,6 +927,155 @@ fn validate_command_name_message(name: &str) -> Result<(), String> {
 		return Err("hyphens must separate words, e.g. release-pr".to_string());
 	}
 	Ok(())
+}
+
+fn validate_command_inputs(inputs: &[CommandInputDraft]) -> MonochangeResult<()> {
+	let mut names = BTreeSet::new();
+	let mut shorts = BTreeSet::new();
+
+	for input in inputs {
+		validate_command_input_draft(input)?;
+		if !names.insert(input.name.as_str()) {
+			return Err(config_error(format!(
+				"duplicate CLI input `{}`; input names must be unique",
+				input.name
+			)));
+		}
+		if let Some(short) = input.short
+			&& !shorts.insert(short)
+		{
+			return Err(config_error(format!(
+				"duplicate CLI input short flag `{short}`; short flags must be unique"
+			)));
+		}
+	}
+
+	Ok(())
+}
+
+fn validate_command_input_draft(input: &CommandInputDraft) -> MonochangeResult<()> {
+	validate_command_input_name(&input.name)?;
+	if !command_input_kind_is_known(&input.kind) {
+		return Err(config_error(format!(
+			"unknown CLI input type `{}`",
+			input.kind
+		)));
+	}
+	if input.kind != "choice" && !input.choices.is_empty() {
+		return Err(config_error(format!(
+			"only `choice` inputs can define choices (input `{}`)",
+			input.name
+		)));
+	}
+	if input.kind == "choice" && input.choices.is_empty() {
+		return Err(config_error(format!(
+			"choice input `{}` needs at least one choice",
+			input.name
+		)));
+	}
+	if input.kind == "string_list" && input.default.is_some() {
+		return Err(config_error(format!(
+			"string_list input `{}` cannot define a scalar default",
+			input.name
+		)));
+	}
+	if let Some(short) = input.short
+		&& !short.is_ascii_alphanumeric()
+	{
+		return Err(config_error(format!(
+			"input `{}` short flag must be an ASCII letter or digit",
+			input.name
+		)));
+	}
+	Ok(())
+}
+
+fn validate_command_input_name(name: &str) -> MonochangeResult<()> {
+	validate_command_input_name_message(name).map_err(config_error)
+}
+
+fn validate_command_input_name_for_prompt(
+	name: &str,
+	existing_names: &[String],
+) -> Result<(), String> {
+	validate_command_input_name_message(name)?;
+	let name = name.trim();
+	if existing_names.iter().any(|existing| existing == name) {
+		return Err(format!("CLI input `{name}` already exists"));
+	}
+	Ok(())
+}
+
+fn validate_command_input_name_message(name: &str) -> Result<(), String> {
+	let trimmed = name.trim();
+	if trimmed.is_empty() {
+		return Err("input name cannot be empty".to_string());
+	}
+	if name != trimmed {
+		return Err("input name cannot include leading or trailing whitespace".to_string());
+	}
+	if !trimmed
+		.bytes()
+		.all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+	{
+		return Err(
+			"use lowercase letters, digits, and hyphens only, e.g. release-type".to_string(),
+		);
+	}
+	if trimmed.starts_with('-') || trimmed.ends_with('-') || trimmed.contains("--") {
+		return Err("hyphens must separate words, e.g. release-type".to_string());
+	}
+	Ok(())
+}
+
+fn command_input_kind_is_known(kind: &str) -> bool {
+	command_input_kind_choices()
+		.iter()
+		.any(|choice| choice == kind)
+}
+
+fn command_input_kind_choices() -> Vec<String> {
+	["string", "string_list", "path", "choice", "boolean"]
+		.into_iter()
+		.map(str::to_string)
+		.collect()
+}
+
+fn comma_separated_values(input: &str) -> Vec<String> {
+	input
+		.split(',')
+		.filter_map(normalize_optional_text)
+		.collect()
+}
+
+fn normalize_short_flag(input: &str) -> Result<Option<char>, String> {
+	let Some(value) = normalize_optional_text(input) else {
+		return Ok(None);
+	};
+	let mut chars = value.chars();
+	let Some(short) = chars.next() else {
+		return Ok(None);
+	};
+	if chars.next().is_some() {
+		return Err("short flag must be exactly one character".to_string());
+	}
+	if !short.is_ascii_alphanumeric() {
+		return Err("short flag must be an ASCII letter or digit".to_string());
+	}
+	Ok(Some(short))
+}
+
+fn command_input_label(input: &CommandInputDraft) -> String {
+	let required = if input.required { ", required" } else { "" };
+	format!("{} ({}{required})", input.name, input.kind)
+}
+
+fn string_array(values: &[String]) -> Array {
+	let mut array = Array::new();
+	for value in values {
+		array.push(value.as_str());
+	}
+	array
 }
 
 fn validate_step_draft(step: &CommandStepDraft) -> MonochangeResult<()> {
