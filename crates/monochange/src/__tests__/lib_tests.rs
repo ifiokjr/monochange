@@ -609,14 +609,14 @@ fn publish_release_help_documents_draft_release_options() {
 		"mc",
 		[
 			OsString::from("mc"),
-			OsString::from("publish-release"),
+			OsString::from("step:publish-release"),
 			OsString::from("--help"),
 		],
 		&root,
 	)
 	.unwrap_or_else(|error| panic!("publish-release help: {error}"));
 
-	assert!(output.contains("Create provider releases from a durable release record"));
+	assert!(output.contains("Publish provider release objects from a prepared release artifact"));
 	assert!(output.contains("--from-ref <FROM-REF>"));
 	assert!(output.contains("--draft"));
 	assert!(output.contains("--format <FORMAT>"));
@@ -629,14 +629,14 @@ fn comment_released_issues_help_documents_post_merge_options() {
 		"mc",
 		[
 			OsString::from("mc"),
-			OsString::from("comment-released-issues"),
+			OsString::from("step:comment-released-issues"),
 			OsString::from("--help"),
 		],
 		&root,
 	)
 	.unwrap_or_else(|error| panic!("comment-released-issues help: {error}"));
 
-	assert!(output.contains("Comment on and optionally close issues"));
+	assert!(output.contains("Run the built-in comment-released-issues release workflow step"));
 	assert!(output.contains("--from-ref <FROM-REF>"));
 	assert!(output.contains("--auto-close-issues"));
 }

@@ -338,6 +338,120 @@ jobs:
           fi
         shell: devenv shell -- bash -e {0}
 
+  release-test:
+    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'monochange/release')
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: create release commit
+        id: release_commit
+        run: |
+          before="$(git rev-parse HEAD)"
+          mc release --commit
+          after="$(git rev-parse HEAD)"
+          if [ "$before" != "$after" ]; then
+            echo "created=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "created=false" >> "$GITHUB_OUTPUT"
+          fi
+        shell: devenv shell -- bash -e {0}
+
+      - name: run cargo tests
+        if: steps.release_commit.outputs.created == 'true'
+        run: test:cargo:expensive
+        shell: devenv shell -- bash -e {0}
+
+      - name: run doc tests
+        if: steps.release_commit.outputs.created == 'true'
+        run: test:docs
+        shell: devenv shell -- bash -e {0}
+
+      - name: skip release tests when no release commit is created
+        if: steps.release_commit.outputs.created == 'false'
+        run: echo "No pull-request release commit was created; skipping release test preflight."
+
+  release-lint:
+    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'monochange/release')
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: create release commit
+        id: release_commit
+        run: |
+          before="$(git rev-parse HEAD)"
+          mc release --commit
+          after="$(git rev-parse HEAD)"
+          if [ "$before" != "$after" ]; then
+            echo "created=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "created=false" >> "$GITHUB_OUTPUT"
+          fi
+        shell: devenv shell -- bash -e {0}
+
+      - name: lint clippy
+        if: steps.release_commit.outputs.created == 'true'
+        run: lint:clippy
+        shell: devenv shell -- bash -e {0}
+
+      - name: lint formatting
+        if: steps.release_commit.outputs.created == 'true'
+        run: lint:format
+        shell: devenv shell -- bash -e {0}
+
+      - name: check architecture boundaries
+        if: steps.release_commit.outputs.created == 'true'
+        run: lint:architecture
+        shell: devenv shell -- bash -e {0}
+
+      - name: check documentation sync
+        if: steps.release_commit.outputs.created == 'true'
+        run: docs:check
+        shell: devenv shell -- bash -e {0}
+
+      - name: lint js
+        if: steps.release_commit.outputs.created == 'true'
+        run: pnpm oxlint .
+        shell: devenv shell -- bash -e {0}
+
+      - name: cargo deny
+        if: steps.release_commit.outputs.created == 'true'
+        run: deny:check
+        shell: devenv shell -- bash -e {0}
+
+      - name: manifest lint
+        if: steps.release_commit.outputs.created == 'true'
+        run: lint:monochange
+        shell: devenv shell -- bash -e {0}
+
+      - name: schema check
+        if: steps.release_commit.outputs.created == 'true'
+        run: schema:check
+        shell: devenv shell -- bash -e {0}
+
+      - name: skip release lints when no release commit is created
+        if: steps.release_commit.outputs.created == 'false'
+        run: echo "No pull-request release commit was created; skipping release lint preflight."
+
   release-pr:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'monochange'
     timeout-minutes: 20
@@ -397,7 +511,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN  }}
           GITHUB_COMMIT_TOKEN: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
-        run: mc --log-level=debug release-pr
+        run: mc --log-level=debug release --commit --create-pr
         shell: devenv shell -- bash -e {0}
 
       - name: skip refresh on merged release commit
@@ -446,14 +560,14 @@ jobs:
         if: steps.tag_release.outputs.is_release_commit == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: mc publish-release --from-ref="HEAD" --draft --format json | tee /tmp/publish-release.json
+        run: mc step:publish-release --from-ref="HEAD" --draft --format json | tee /tmp/publish-release.json
         shell: devenv shell -- bash -e {0}
 
       - name: comment on released issues
         if: steps.tag_release.outputs.is_release_commit == 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PR_MERGE_TOKEN }}
-        run: mc comment-released-issues --from-ref="HEAD" --auto-close-issues
+        run: mc step:comment-released-issues --from-ref="HEAD" --auto-close-issues
         shell: devenv shell -- bash -e {0}
 
       - name: trigger release workflow

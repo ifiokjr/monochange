@@ -145,7 +145,7 @@ in
     "publish:check" = {
       exec = ''
         set -euo pipefail
-        mc publish --dry-run || true
+        mc publish-check || true
       '';
       description = "Check that publication is valid for this project";
       binary = "bash";
