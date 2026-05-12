@@ -134,7 +134,7 @@ impl CliProgressReporter {
 		let color_enabled = stderr_is_terminal && env::var("TERM").is_ok_and(|term| term != "dumb");
 		let no_color = env::var_os("NO_COLOR").is_some();
 		let no_progress = env::var_os("MONOCHANGE_NO_PROGRESS").is_some();
-		let ci = running_in_ci();
+		let ci = running_in_ci() && !running_under_test();
 		let (enabled, render_mode, symbols) = match format {
 			ProgressFormat::Auto => {
 				if quiet || no_progress {
@@ -662,6 +662,17 @@ fn running_in_ci() -> bool {
 		"BUILDKITE",
 		"CIRCLECI",
 		"TF_BUILD",
+	]
+	.iter()
+	.any(|name| env::var_os(name).is_some())
+}
+
+fn running_under_test() -> bool {
+	[
+		"CARGO_NEXTEST",
+		"NEXTEST",
+		"INSTA_WORKSPACE_ROOT",
+		"INSTA_UPDATE",
 	]
 	.iter()
 	.any(|name| env::var_os(name).is_some())
