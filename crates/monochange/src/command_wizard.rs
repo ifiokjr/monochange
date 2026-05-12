@@ -9,6 +9,10 @@ use inquire::Confirm;
 use inquire::Select;
 use inquire::Text;
 use inquire::validator::Validation;
+use monochange_core::CliInputDefinition;
+use monochange_core::CliInputKind;
+use monochange_core::CliStepDefinition;
+use monochange_core::CliStepInputValue;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use serde::Deserialize;
@@ -48,6 +52,7 @@ pub(crate) struct CommandStepDraft {
 	pub(crate) kind: String,
 	pub(crate) name: Option<String>,
 	pub(crate) command: Option<String>,
+	pub(crate) inputs: BTreeMap<String, CliStepInputValue>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize)]
@@ -97,6 +102,7 @@ impl CommandStepDraft {
 			kind: kind.into(),
 			name: None,
 			command: None,
+			inputs: BTreeMap::new(),
 		}
 	}
 
@@ -105,6 +111,7 @@ impl CommandStepDraft {
 			kind: STEP_KIND_SHELL_COMMAND.to_string(),
 			name,
 			command: Some(command),
+			inputs: BTreeMap::new(),
 		}
 	}
 }
@@ -160,6 +167,32 @@ struct RawCliStep {
 	name: Option<String>,
 	#[serde(default)]
 	command: Option<String>,
+	#[serde(default, deserialize_with = "deserialize_command_step_inputs")]
+	inputs: BTreeMap<String, CliStepInputValue>,
+}
+
+fn deserialize_command_step_inputs<'de, D>(
+	deserializer: D,
+) -> Result<BTreeMap<String, CliStepInputValue>, D::Error>
+where
+	D: serde::Deserializer<'de>,
+{
+	#[derive(Deserialize)]
+	#[serde(untagged)]
+	enum RawInputs {
+		Overrides(BTreeMap<String, CliStepInputValue>),
+		Inherited(Vec<String>),
+	}
+
+	match RawInputs::deserialize(deserializer)? {
+		RawInputs::Overrides(overrides) => Ok(overrides),
+		RawInputs::Inherited(names) => {
+			Ok(names
+				.into_iter()
+				.map(|name| (name, CliStepInputValue::Inherited))
+				.collect())
+		}
+	}
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -377,8 +410,8 @@ fn prompt_command_update(
 		.with_default(existing.is_some_and(|command| command.dry_run))
 		.prompt()
 		.map_err(map_inquire_error)?;
-	let inputs = prompt_command_inputs(existing)?;
-	let steps = prompt_step_update(existing)?;
+	let mut inputs = prompt_command_inputs(existing)?;
+	let steps = prompt_step_update(existing, &mut inputs)?;
 
 	Ok(CommandUpdate {
 		original_name: original_name.map(str::to_string),
@@ -435,7 +468,10 @@ fn prompt_help_text(initial: Option<&str>) -> MonochangeResult<Option<String>> {
 }
 
 #[coverage(off)]
-fn prompt_step_update(existing: Option<&CommandDetails>) -> MonochangeResult<CommandStepUpdate> {
+fn prompt_step_update(
+	existing: Option<&CommandDetails>,
+	command_inputs: &mut Vec<CommandInputDraft>,
+) -> MonochangeResult<CommandStepUpdate> {
 	if let Some(existing) = existing
 		&& !existing.steps.is_empty()
 	{
@@ -455,11 +491,15 @@ fn prompt_step_update(existing: Option<&CommandDetails>) -> MonochangeResult<Com
 		}
 	}
 
-	Ok(CommandStepUpdate::Replace(prompt_replacement_steps()?))
+	Ok(CommandStepUpdate::Replace(prompt_replacement_steps(
+		command_inputs,
+	)?))
 }
 
 #[coverage(off)]
-fn prompt_replacement_steps() -> MonochangeResult<Vec<CommandStepDraft>> {
+fn prompt_replacement_steps(
+	command_inputs: &mut Vec<CommandInputDraft>,
+) -> MonochangeResult<Vec<CommandStepDraft>> {
 	let mut steps = Vec::new();
 
 	loop {
@@ -483,7 +523,7 @@ fn prompt_replacement_steps() -> MonochangeResult<Vec<CommandStepDraft>> {
 		if selected.kind == STEP_KIND_SHELL_COMMAND {
 			steps.push(prompt_shell_command_step()?);
 		} else {
-			steps.push(CommandStepDraft::built_in(selected.kind));
+			steps.push(prompt_built_in_step(&selected.kind, command_inputs)?);
 		}
 	}
 }
@@ -509,6 +549,72 @@ fn prompt_shell_command_step() -> MonochangeResult<CommandStepDraft> {
 		command.trim().to_string(),
 		name,
 	))
+}
+
+#[coverage(off)]
+fn prompt_built_in_step(
+	kind: &str,
+	command_inputs: &mut Vec<CommandInputDraft>,
+) -> MonochangeResult<CommandStepDraft> {
+	let mut step = CommandStepDraft::built_in(kind);
+	let schemas = step_input_schemas_for_kind(kind);
+	if schemas.is_empty() {
+		return Ok(step);
+	}
+
+	let input_names = schemas
+		.iter()
+		.map(|schema| schema.name.as_str())
+		.collect::<Vec<_>>()
+		.join(", ");
+	let add_default_inputs = Confirm::new(&format!(
+		"Add default inputs for `{kind}` to this command ({input_names})?"
+	))
+	.with_default(true)
+	.prompt()
+	.map_err(map_inquire_error)?;
+	if add_default_inputs {
+		step = command_step_with_default_inputs(kind, command_inputs)?;
+		return Ok(step);
+	}
+
+	let set_values = Confirm::new("Set fixed values for this step's inputs?")
+		.with_default(false)
+		.prompt()
+		.map_err(map_inquire_error)?;
+	if set_values {
+		step.inputs = prompt_step_input_values(&schemas)?;
+	}
+	Ok(step)
+}
+
+#[coverage(off)]
+fn prompt_step_input_values(
+	schemas: &[CliInputDefinition],
+) -> MonochangeResult<BTreeMap<String, CliStepInputValue>> {
+	let mut inputs = BTreeMap::new();
+	for schema in schemas {
+		let value = Text::new(&format!(
+			"Value for `{}` ({}; blank to omit):",
+			schema.name,
+			command_input_kind_name(schema.kind)
+		))
+		.with_validator(|input: &str| {
+			if input.trim().is_empty() {
+				return Ok(Validation::Valid);
+			}
+			match step_input_value_from_text(schema, input) {
+				Ok(_) => Ok(Validation::Valid),
+				Err(error) => Ok(Validation::Invalid(error.to_string().into())),
+			}
+		})
+		.prompt()
+		.map_err(map_inquire_error)?;
+		if let Some(value) = step_input_value_from_text(schema, &value)? {
+			inputs.insert(schema.name.clone(), value);
+		}
+	}
+	Ok(inputs)
 }
 
 #[coverage(off)]
@@ -677,6 +783,7 @@ fn read_cli_command(config_text: &str, name: &str) -> MonochangeResult<Option<Co
 						kind: step.kind.clone(),
 						name: step.name.clone(),
 						command: step.command.clone(),
+						inputs: step.inputs.clone(),
 					}
 				})
 				.collect(),
@@ -767,8 +874,35 @@ fn step_inline_table(step: &CommandStepDraft) -> MonochangeResult<InlineTable> {
 	if let Some(command) = &step.command {
 		table.insert("command", Value::from(command.as_str()));
 	}
+	if !step.inputs.is_empty() {
+		table.insert("inputs", step_inputs_value(&step.inputs));
+	}
 
 	Ok(table)
+}
+
+fn step_inputs_value(inputs: &BTreeMap<String, CliStepInputValue>) -> Value {
+	if inputs
+		.values()
+		.all(|value| matches!(value, CliStepInputValue::Inherited))
+	{
+		return Value::Array(string_array(&inputs.keys().cloned().collect::<Vec<_>>()));
+	}
+
+	let mut table = InlineTable::new();
+	for (name, value) in inputs {
+		table.insert(name, step_input_value(name, value));
+	}
+	Value::InlineTable(table)
+}
+
+fn step_input_value(name: &str, input: &CliStepInputValue) -> Value {
+	match input {
+		CliStepInputValue::Inherited => Value::from(format!("{{{{ inputs.{name} }}}}").as_str()),
+		CliStepInputValue::String(value) => Value::from(value.as_str()),
+		CliStepInputValue::Boolean(value) => Value::from(*value),
+		CliStepInputValue::List(values) => Value::Array(string_array(values)),
+	}
 }
 
 fn step_choices() -> Vec<StepChoice> {
@@ -1065,6 +1199,116 @@ fn command_input_kind_choices() -> Vec<String> {
 		.collect()
 }
 
+fn command_input_kind_name(kind: CliInputKind) -> &'static str {
+	match kind {
+		CliInputKind::String => "string",
+		CliInputKind::StringList => "string_list",
+		CliInputKind::Path => "path",
+		CliInputKind::Choice => "choice",
+		CliInputKind::Boolean => "boolean",
+	}
+}
+
+fn step_variant_for_kind(kind: &str) -> Option<CliStepDefinition> {
+	monochange_core::all_step_variants()
+		.into_iter()
+		.find(|step| step.kind_name() == kind)
+}
+
+fn step_input_schemas_for_kind(kind: &str) -> Vec<CliInputDefinition> {
+	step_variant_for_kind(kind).map_or_else(Vec::new, |step| step.step_inputs_schema())
+}
+
+fn command_input_from_step_schema(schema: &CliInputDefinition) -> CommandInputDraft {
+	CommandInputDraft {
+		name: schema.name.clone(),
+		kind: command_input_kind_name(schema.kind).to_string(),
+		help_text: schema.help_text.clone(),
+		required: schema.required,
+		default: schema.default.clone(),
+		choices: schema.choices.clone(),
+		short: None,
+	}
+}
+
+fn add_missing_command_inputs_for_step(
+	command_inputs: &mut Vec<CommandInputDraft>,
+	schemas: &[CliInputDefinition],
+) {
+	let existing_names = command_inputs
+		.iter()
+		.map(|input| input.name.as_str())
+		.collect::<BTreeSet<_>>();
+	let additions = schemas
+		.iter()
+		.filter(|schema| !existing_names.contains(schema.name.as_str()))
+		.map(command_input_from_step_schema)
+		.collect::<Vec<_>>();
+	command_inputs.extend(additions);
+}
+
+fn inherited_step_inputs(schemas: &[CliInputDefinition]) -> BTreeMap<String, CliStepInputValue> {
+	schemas
+		.iter()
+		.map(|schema| (schema.name.clone(), CliStepInputValue::Inherited))
+		.collect()
+}
+
+fn command_step_with_default_inputs(
+	kind: &str,
+	command_inputs: &mut Vec<CommandInputDraft>,
+) -> MonochangeResult<CommandStepDraft> {
+	let schemas = step_input_schemas_for_kind(kind);
+	if schemas.is_empty() && step_variant_for_kind(kind).is_none() {
+		return Err(config_error(format!("unknown CLI step type `{kind}`")));
+	}
+	add_missing_command_inputs_for_step(command_inputs, &schemas);
+	let mut step = CommandStepDraft::built_in(kind);
+	step.inputs = inherited_step_inputs(&schemas);
+	Ok(step)
+}
+
+fn step_input_value_from_text(
+	schema: &CliInputDefinition,
+	value: &str,
+) -> MonochangeResult<Option<CliStepInputValue>> {
+	let value = value.trim();
+	if value.is_empty() {
+		return Ok(None);
+	}
+	match schema.kind {
+		CliInputKind::Boolean => {
+			match value {
+				"true" => Ok(Some(CliStepInputValue::Boolean(true))),
+				"false" => Ok(Some(CliStepInputValue::Boolean(false))),
+				_ => {
+					Err(config_error(format!(
+						"input `{}` expects `true` or `false`",
+						schema.name
+					)))
+				}
+			}
+		}
+		CliInputKind::StringList => {
+			Ok(Some(CliStepInputValue::List(comma_separated_values(value))))
+		}
+		CliInputKind::Choice => {
+			if schema.choices.iter().any(|choice| choice == value) {
+				Ok(Some(CliStepInputValue::String(value.to_string())))
+			} else {
+				Err(config_error(format!(
+					"input `{}` expects one of: {}",
+					schema.name,
+					schema.choices.join(", ")
+				)))
+			}
+		}
+		CliInputKind::String | CliInputKind::Path => {
+			Ok(Some(CliStepInputValue::String(value.to_string())))
+		}
+	}
+}
+
 fn comma_separated_values(input: &str) -> Vec<String> {
 	input
 		.split(',')
@@ -1121,7 +1365,54 @@ fn validate_step_draft(step: &CommandStepDraft) -> MonochangeResult<()> {
 			"only `{STEP_KIND_SHELL_COMMAND}` steps can define `command`"
 		)));
 	}
+	validate_step_inputs(step)?;
 	Ok(())
+}
+
+fn validate_step_inputs(step: &CommandStepDraft) -> MonochangeResult<()> {
+	let Some(step_variant) = step_variant_for_kind(&step.kind) else {
+		return Ok(());
+	};
+	for (name, value) in &step.inputs {
+		let Some(expected_kind) = step_variant.expected_input_kind(name) else {
+			return Err(config_error(format!(
+				"step `{}` does not support input `{name}`",
+				step.kind
+			)));
+		};
+		if !step_input_value_matches_kind(value, expected_kind) {
+			return Err(config_error(format!(
+				"step `{}` input `{name}` expects `{}` values",
+				step.kind,
+				command_input_kind_name(expected_kind)
+			)));
+		}
+		if let CliStepInputValue::String(value) = value
+			&& let Some(choices) = step_variant.valid_input_choices(name)
+			&& !choices.contains(&value.as_str())
+		{
+			return Err(config_error(format!(
+				"step `{}` input `{name}` expects one of: {}",
+				step.kind,
+				choices.join(", ")
+			)));
+		}
+	}
+	Ok(())
+}
+
+fn step_input_value_matches_kind(value: &CliStepInputValue, kind: CliInputKind) -> bool {
+	match value {
+		CliStepInputValue::Inherited => true,
+		CliStepInputValue::String(_) => {
+			matches!(
+				kind,
+				CliInputKind::String | CliInputKind::Path | CliInputKind::Choice
+			)
+		}
+		CliStepInputValue::Boolean(_) => kind == CliInputKind::Boolean,
+		CliStepInputValue::List(_) => kind == CliInputKind::StringList,
+	}
 }
 
 fn step_kind_is_known(kind: &str) -> bool {

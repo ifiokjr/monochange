@@ -1,3 +1,8 @@
+use std::collections::BTreeMap;
+
+use monochange_core::CliInputDefinition;
+use monochange_core::CliInputKind;
+use monochange_core::CliStepInputValue;
 use tempfile::tempdir;
 use toml::Value;
 use toml_edit::DocumentMut;
@@ -14,6 +19,7 @@ use super::comma_separated_values;
 use super::command_input_kind_choices;
 use super::command_input_kind_is_known;
 use super::command_input_label;
+use super::command_step_with_default_inputs;
 use super::dashboard_actions;
 use super::filtered_step_choice_rank;
 use super::normalize_optional_text;
@@ -25,6 +31,8 @@ use super::step_choice_description;
 use super::step_choice_scorer;
 use super::step_choice_sorter;
 use super::step_choices;
+use super::step_input_schemas_for_kind;
+use super::step_input_value_from_text;
 use super::step_label;
 use super::unfiltered_step_choice_rank;
 use super::upsert_cli_command_document;
@@ -198,6 +206,98 @@ fn upsert_cli_command_document_writes_command_inputs() {
 	assert_eq!(input["short"].as_str(), Some("r"));
 	assert_eq!(input["choices"][0].as_str(), Some("patch"));
 	assert_eq!(input["choices"][2].as_str(), Some("major"));
+}
+
+#[test]
+fn upsert_cli_command_document_writes_step_inputs() {
+	let mut inherited_step = CommandStepDraft::built_in("PrepareRelease");
+	inherited_step
+		.inputs
+		.insert("format".to_string(), CliStepInputValue::Inherited);
+	let mut fixed_step = CommandStepDraft::built_in("Validate");
+	fixed_step
+		.inputs
+		.insert("fix".to_string(), CliStepInputValue::Boolean(true));
+	let update = CommandUpdate {
+		original_name: None,
+		name: "release-pr".to_string(),
+		help_text: None,
+		dry_run: false,
+		inputs: Vec::new(),
+		steps: CommandStepUpdate::Replace(vec![inherited_step, fixed_step]),
+	};
+
+	let rendered = render_update("", &update);
+	let value = parse_rendered_toml(&rendered);
+	let steps = &value["cli"]["release-pr"]["steps"];
+
+	assert_eq!(steps[0]["inputs"][0].as_str(), Some("format"));
+	assert_eq!(steps[1]["inputs"]["fix"].as_bool(), Some(true));
+}
+
+#[test]
+fn command_step_with_default_inputs_adds_and_inherits_expected_inputs() {
+	let mut command_inputs = Vec::new();
+	let step = command_step_with_default_inputs("PrepareRelease", &mut command_inputs)
+		.unwrap_or_else(|error| panic!("step should be created: {error}"));
+
+	assert_eq!(command_inputs.len(), 1);
+	assert_eq!(command_inputs[0].name, "format");
+	assert_eq!(command_inputs[0].kind, "choice");
+	assert_eq!(command_inputs[0].choices[0], "text");
+	assert_eq!(
+		step.inputs.get("format"),
+		Some(&CliStepInputValue::Inherited)
+	);
+}
+
+#[test]
+fn step_input_value_from_text_parses_typed_fixed_values() {
+	let schema = CliInputDefinition {
+		name: "items".to_string(),
+		kind: CliInputKind::StringList,
+		help_text: None,
+		required: false,
+		default: None,
+		choices: Vec::new(),
+		short: None,
+	};
+	assert_eq!(
+		step_input_value_from_text(&schema, "alpha, beta")
+			.unwrap_or_else(|error| panic!("list should parse: {error}")),
+		Some(CliStepInputValue::List(vec![
+			"alpha".to_string(),
+			"beta".to_string()
+		]))
+	);
+
+	let fix_schema = step_input_schemas_for_kind("Validate")
+		.into_iter()
+		.find(|schema| schema.name == "fix")
+		.unwrap_or_else(|| panic!("fix schema should exist"));
+	assert_eq!(
+		step_input_value_from_text(&fix_schema, "true")
+			.unwrap_or_else(|error| panic!("boolean should parse: {error}")),
+		Some(CliStepInputValue::Boolean(true))
+	);
+	assert_config_error(
+		step_input_value_from_text(&fix_schema, "yes").map(|_| ()),
+		"expects `true` or `false`",
+	);
+
+	let format_schema = step_input_schemas_for_kind("PrepareRelease")
+		.into_iter()
+		.find(|schema| schema.name == "format")
+		.unwrap_or_else(|| panic!("format schema should exist"));
+	assert_eq!(
+		step_input_value_from_text(&format_schema, "json")
+			.unwrap_or_else(|error| panic!("choice should parse: {error}")),
+		Some(CliStepInputValue::String("json".to_string()))
+	);
+	assert_config_error(
+		step_input_value_from_text(&format_schema, "yaml").map(|_| ()),
+		"expects one of: text, json",
+	);
 }
 
 #[test]
@@ -378,6 +478,7 @@ fn step_choices_and_labels_include_described_ranked_shell_command_and_save_actio
 			kind: "Validate".to_string(),
 			name: Some("lint".to_string()),
 			command: None,
+			inputs: BTreeMap::new(),
 		}),
 		"Validate (lint)"
 	);
@@ -386,6 +487,7 @@ fn step_choices_and_labels_include_described_ranked_shell_command_and_save_actio
 			kind: STEP_KIND_SHELL_COMMAND.to_string(),
 			name: None,
 			command: Some("cargo test".to_string()),
+			inputs: BTreeMap::new(),
 		}),
 		"Command (cargo test)"
 	);
@@ -436,6 +538,7 @@ fn validate_step_draft_rejects_unknown_or_misconfigured_steps() {
 			kind: STEP_KIND_SHELL_COMMAND.to_string(),
 			name: None,
 			command: Some("   ".to_string()),
+			inputs: BTreeMap::new(),
 		}),
 		"Command steps need a non-empty `command` value",
 	);
@@ -444,8 +547,38 @@ fn validate_step_draft_rejects_unknown_or_misconfigured_steps() {
 			kind: "Discover".to_string(),
 			name: None,
 			command: Some("cargo test".to_string()),
+			inputs: BTreeMap::new(),
 		}),
 		"only `Command` steps can define `command`",
+	);
+
+	let mut unsupported_input = CommandStepDraft::built_in("Discover");
+	unsupported_input
+		.inputs
+		.insert("fix".to_string(), CliStepInputValue::Inherited);
+	assert_config_error(
+		validate_step_draft(&unsupported_input),
+		"step `Discover` does not support input `fix`",
+	);
+
+	let mut wrong_type = CommandStepDraft::built_in("Validate");
+	wrong_type.inputs.insert(
+		"fix".to_string(),
+		CliStepInputValue::String("true".to_string()),
+	);
+	assert_config_error(
+		validate_step_draft(&wrong_type),
+		"step `Validate` input `fix` expects `boolean` values",
+	);
+
+	let mut invalid_choice = CommandStepDraft::built_in("PrepareRelease");
+	invalid_choice.inputs.insert(
+		"format".to_string(),
+		CliStepInputValue::String("yaml".to_string()),
+	);
+	assert_config_error(
+		validate_step_draft(&invalid_choice),
+		"step `PrepareRelease` input `format` expects one of: text, json",
 	);
 }
 
