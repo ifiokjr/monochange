@@ -233,10 +233,11 @@ fn release_record_schema_multiline_fields_are_snapshot_individually() -> Result<
 	let changelog = parse_json(&paths.migration_changelog)?;
 
 	let description = json_str(&release_schema, "/description")?;
-	let redacted_description = description.replace(
-		monochange_schema::CURRENT_SCHEMA_VERSION_TEXT,
-		"[schema version]",
-	);
+	// The committed schema description can lag or lead the crate's current schema
+	// version while release PRs regenerate assets. Redact any artifact-version
+	// number here so this snapshot protects the wording instead of coupling CI to
+	// the transient release bump order.
+	let redacted_description = redact_schema_description_version(description);
 	assert_snapshot!("release_record_schema_description", redacted_description);
 	assert_json_snapshot!(
 		"release_record_required_fields",
@@ -396,6 +397,48 @@ fn release_record_migration_outcomes_match_snapshot() {
 // Snapshot redaction is intentional: schema versions are derived from release
 // package versions, so release PRs must prove behavior without baking the next
 // version number into expected output.
+fn redact_schema_description_version(text: &str) -> String {
+	let marker = "artifact version ";
+	let Some(marker_start) = text.find(marker) else {
+		return text.replace(
+			monochange_schema::CURRENT_SCHEMA_VERSION_TEXT,
+			"[schema version]",
+		);
+	};
+	let version_start = marker_start + marker.len();
+	let Some(version_len) = schema_version_prefix_len(&text[version_start..]) else {
+		return text.to_string();
+	};
+	let version_end = version_start + version_len;
+	format!(
+		"{}[schema version]{}",
+		&text[..version_start],
+		&text[version_end..]
+	)
+}
+
+fn schema_version_prefix_len(text: &str) -> Option<usize> {
+	let mut seen_separator = false;
+	let mut seen_minor_digit = false;
+	let mut end = 0;
+	for (index, character) in text.char_indices() {
+		if character.is_ascii_digit() {
+			if seen_separator {
+				seen_minor_digit = true;
+			}
+			end = index + character.len_utf8();
+			continue;
+		}
+		if character == '.' && !seen_separator {
+			seen_separator = true;
+			end = index + character.len_utf8();
+			continue;
+		}
+		break;
+	}
+	seen_minor_digit.then_some(end)
+}
+
 fn redact_schema_versions(text: &str, versions: &[&str]) -> String {
 	versions.iter().fold(text.to_string(), |redacted, version| {
 		redacted.replace(version, "[schema version]")
