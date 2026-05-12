@@ -8,7 +8,7 @@ use super::*;
 
 #[cfg(test)]
 thread_local! {
-	static FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR: Cell<bool> = const { Cell::new(false) };
+	pub(crate) static FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR: Cell<bool> = const { Cell::new(false) };
 }
 
 thread_local! {

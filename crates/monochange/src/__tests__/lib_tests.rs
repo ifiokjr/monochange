@@ -1,5 +1,6 @@
 #![allow(clippy::large_futures)]
 #![allow(clippy::disallowed_methods)]
+#![allow(unused_imports, unused_qualifications)]
 use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
@@ -69,7 +70,6 @@ use tempfile::tempdir;
 
 use crate::CliContext;
 use crate::PreparedFileDiff;
-pub(crate) use crate::TEST_ENV_LOCK;
 use crate::add_change_file;
 use crate::add_interactive_change_file;
 use crate::affected_packages;
@@ -111,8 +111,8 @@ use crate::render_change_target_markdown;
 use crate::run_with_args;
 use crate::run_with_args_in_dir;
 use crate::workspace_ops::build_lockfile_command_executions;
-use crate::workspace_ops::prepare_release_execution;
 use crate::workspace_ops::change_type_default_bump;
+use crate::workspace_ops::prepare_release_execution;
 use crate::workspace_ops::render_cli_commands_toml;
 use crate::workspace_ops::render_interactive_changeset_markdown;
 
@@ -6814,7 +6814,6 @@ async fn execute_cli_command_retarget_release_requires_from_input() {
 			.contains("`RetargetRelease` requires a `from` input")
 	);
 }
-
 
 #[tokio::test(flavor = "multi_thread")]
 async fn execute_cli_command_builtin_release_steps_require_from_input() {

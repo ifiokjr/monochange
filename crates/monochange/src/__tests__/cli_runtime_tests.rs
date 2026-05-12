@@ -1934,7 +1934,6 @@ async fn execute_cli_command_with_options_rejects_readiness_for_placeholder_publ
 	);
 }
 
-
 #[tokio::test(flavor = "multi_thread")]
 async fn execute_cli_command_with_options_reuses_prepared_release_artifact_for_versions() {
 	let _guard = TEST_ENV_LOCK

@@ -1071,7 +1071,8 @@ pub(crate) async fn execute_cli_command_with_options(
 						dry_run,
 						build_file_diffs,
 						"OpenReleaseRequest",
-					)?;
+					)
+					.await?;
 					let prepared_release = context.prepared_release.as_ref().expect(
 						"prepared release must be available before opening release request",
 					);
@@ -1158,11 +1159,11 @@ pub(crate) async fn execute_cli_command_with_options(
 							MonochangeError::Config("missing release-record ref".to_string())
 						})?;
 					if boolean_step_input(&step_inputs, "sha") {
-						let discovery = discover_release_record(root, from)?;
+						let discovery = discover_release_record(root, from).await?;
 						output = Some(discovery.record_commit);
 					} else {
 						let format = cli_command_output_format(&step_inputs)?;
-						output = Some(render_release_record_discovery(root, from, format)?);
+						output = Some(render_release_record_discovery(root, from, format).await?);
 					}
 					Ok(())
 				}
@@ -1184,11 +1185,10 @@ pub(crate) async fn execute_cli_command_with_options(
 						format,
 						output: output_path,
 					};
-					output = Some(publish_readiness::run_publish_readiness(
-						root,
-						configuration,
-						&options,
-					)?);
+					output = Some(
+						publish_readiness::run_publish_readiness(root, configuration, &options)
+							.await?,
+					);
 					Ok(())
 				}
 				CliStepDefinition::TagRelease { .. } => {
@@ -1208,14 +1208,12 @@ pub(crate) async fn execute_cli_command_with_options(
 						root,
 						configuration.source.as_ref(),
 						from,
-					)?;
-					output = Some(render_release_tag_report(
-						root,
-						from,
-						format,
-						push,
-						context.dry_run,
-					)?);
+					)
+					.await?;
+					output = Some(
+						render_release_tag_report(root, from, format, push, context.dry_run)
+							.await?,
+					);
 					Ok(())
 				}
 				CliStepDefinition::AffectedPackages { .. } => {

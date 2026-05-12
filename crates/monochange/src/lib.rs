@@ -1,4 +1,5 @@
 #![allow(unstable_features)]
+#![cfg_attr(test, allow(unused_imports, unused_qualifications))]
 #![feature(coverage_attribute)]
 
 //! # `monochange`
@@ -87,8 +88,6 @@ pub use cli::build_command;
 #[cfg(test)]
 pub(crate) use cli::build_command_for_root;
 use cli::build_command_with_cli;
-#[cfg(test)]
-pub(crate) use cli::build_release_record_subcommand;
 #[cfg(test)]
 pub(crate) use cli::build_skill_subcommand;
 #[cfg(test)]

@@ -1,4 +1,3 @@
-
 #![allow(clippy::disallowed_methods)]
 use super::*;
 

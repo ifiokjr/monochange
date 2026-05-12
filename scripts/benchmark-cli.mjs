@@ -114,7 +114,11 @@ function parseHyperfineTable(path) {
 		}
 		const label = cols[0].replace(/^`|`$/g, "").trim();
 		if (!label || !hasRelative || cols.length < 5) continue;
-		const relativeText = cols.at(-1)?.replace(/\\u00b1.*|±.*|\u00b1.*/u, "").trim() ?? "";
+		const relativeText =
+			cols
+				.at(-1)
+				?.replace(/\\u00b1.*|±.*|\u00b1.*/u, "")
+				.trim() ?? "";
 		const relative = Number.parseFloat(relativeText);
 		if (Number.isNaN(relative) || label.startsWith("main")) continue;
 		results.push({
