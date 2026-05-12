@@ -1,5 +1,6 @@
 ---
 source: crates/monochange/src/__tests__/lib_tests.rs
+assertion_line: 892
 expression: output
 ---
 Generate repo-local monochange subagents and agent guidance files
@@ -10,16 +11,18 @@ Arguments:
   [TARGET]...  Subagent target(s) to generate [possible values: claude, vscode, copilot, pi, codex, cursor]
 
 Options:
-      --all                       Generate files for all supported targets
-      --force                     Overwrite generated files that already exist with different contents
+      --all              Generate files for all supported targets
+      --force            Overwrite generated files that already exist with different contents
+      --dry-run          Preview the generated files without writing them
+      --format <format>  Output format for the generated subagent plan [default: markdown] [possible values: text, json, markdown, md]
+      --sha              Output only the commit SHA of the discovered release record
+      --no-mcp           Skip repo-local MCP config files for supported targets
+  -h, --help             Print help
+
+Global Options:
   -q, --quiet                     Suppress stdout/stderr output and run in dry-run mode when supported
-      --dry-run                   Preview the generated files without writing them
       --progress-format <FORMAT>  Control progress output on stderr [possible values: auto, unicode, ascii, json]
-      --format <format>           Output format for the generated subagent plan [default: markdown] [possible values: text, json, markdown, md]
       --jq <EXPRESSION>           Filter JSON output with a jq-style expression, such as `.assets[].name`
-      --sha                       Output only the commit SHA of the discovered release record
-      --no-mcp                    Skip repo-local MCP config files for supported targets
-  -h, --help                      Print help
 
 Examples:
   mc help subagents

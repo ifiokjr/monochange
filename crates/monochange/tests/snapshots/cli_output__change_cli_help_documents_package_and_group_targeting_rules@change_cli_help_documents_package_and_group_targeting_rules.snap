@@ -18,20 +18,26 @@ Create a change file for one or more packages
 Usage: mc change [--dry-run] [--interactive] [--package <PACKAGE>] [--bump <BUMP>] [--version <VERSION>] [--reason <REASON>] [--type <TYPE>] [--caused-by <CAUSED_BY>] [--details <DETAILS>] [--output <PATH>]
 
 Options:
-      --dry-run                   Run the command in dry-run mode when supported
-  -i, --interactive               Select packages, bumps, and options interactively
+  -h, --help  Print help
+
+Release Options:
+      --dry-run  Run the command in dry-run mode when supported
+
+Options:
+  -i, --interactive            Select packages, bumps, and options interactively
+      --package <PACKAGE>      Package or group to include in the change
+      --bump <BUMP>            Requested semantic version bump [default: patch] [possible values: none, patch, minor, major]
+      --version <VERSION>      Pin an explicit version for this release
+      --reason <REASON>        Short release-note summary for this change
+      --type <TYPE>            Optional release-note type such as `security` or `note` [possible values: security, test]
+      --caused-by <CAUSED_BY>  Package or group ids that caused this dependent change
+      --details <DETAILS>      Optional multi-line release-note details
+      --output <PATH>          Write the generated change file to a specific path
+
+Global Options:
   -q, --quiet                     Suppress stdout/stderr output and run in dry-run mode when supported
-      --package <PACKAGE>         Package or group to include in the change
       --progress-format <FORMAT>  Control progress output on stderr [possible values: auto, unicode, ascii, json]
-      --bump <BUMP>               Requested semantic version bump [default: patch] [possible values: none, patch, minor, major]
       --jq <EXPRESSION>           Filter JSON output with a jq-style expression, such as `.assets[].name`
-      --version <VERSION>         Pin an explicit version for this release
-      --reason <REASON>           Short release-note summary for this change
-      --type <TYPE>               Optional release-note type such as `security` or `note` [possible values: security, test]
-      --caused-by <CAUSED_BY>     Package or group ids that caused this dependent change
-      --details <DETAILS>         Optional multi-line release-note details
-      --output <PATH>             Write the generated change file to a specific path
-  -h, --help                      Print help
 
 Examples:
   mc change --package sdk-core --bump patch --reason "fix panic"
