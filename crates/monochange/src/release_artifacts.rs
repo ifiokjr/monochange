@@ -935,11 +935,6 @@ fn diff_output_colors_enabled() -> bool {
 	diff_output_supports_color(std::io::stdout().is_terminal())
 }
 
-#[cfg(test)]
-pub(crate) fn set_force_build_file_diff_previews_error(enabled: bool) {
-	FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR.with(|value| value.set(enabled));
-}
-
 pub(crate) fn diff_output_supports_color(stdout_is_terminal: bool) -> bool {
 	if std::env::var_os("NO_COLOR").is_some() {
 		return false;

@@ -17,31 +17,6 @@ fn set_force_build_file_diff_previews_error(enabled: bool) {
 	crate::release_artifacts::FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR.with(|value| value.set(enabled));
 }
 
-fn find_previous_tag(root: &Path, current_tag: &str) -> Option<String> {
-	let output =
-		monochange_core::git::git_command_output(root, &["tag", "--list", "--sort=-v:refname"])
-			.ok()?;
-	let sorted_tags = String::from_utf8_lossy(&output.stdout)
-		.lines()
-		.map(str::trim)
-		.filter(|tag| !tag.is_empty())
-		.map(ToString::to_string)
-		.collect::<Vec<_>>();
-	let (prefix, current_version) =
-		crate::release_artifacts::parse_tag_prefix_and_version(current_tag)?;
-	sorted_tags
-		.iter()
-		.filter(|tag| tag.as_str() != current_tag)
-		.filter_map(|tag| {
-			let (candidate_prefix, candidate_version) =
-				crate::release_artifacts::parse_tag_prefix_and_version(tag)?;
-			(candidate_prefix == prefix && candidate_version < current_version)
-				.then(|| (tag.clone(), candidate_version))
-		})
-		.max_by(|left, right| left.1.cmp(&right.1))
-		.map(|(tag, _)| tag)
-}
-
 pub(crate) static TEST_ENV_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 use clap::Command;
@@ -118,14 +93,6 @@ use crate::workspace_ops::render_interactive_changeset_markdown;
 
 fn clear_dedup_cache() {
 	crate::release_artifacts::DEDUPLICATED_CACHE.with(|cache| cache.borrow_mut().clear());
-}
-
-fn read_git_commit_message(root: &Path, commit: &str) -> monochange_core::MonochangeResult<String> {
-	run_git_capture(
-		root,
-		&["show", "-s", "--format=%B", commit],
-		&format!("failed to read commit message for `{commit}`"),
-	)
 }
 
 #[allow(unused_macro_rules)]

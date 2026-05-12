@@ -149,6 +149,7 @@ fn initialized_workspace_dir() -> TempDir {
 	git_in_dir(root, &["init", "-b", "main"]);
 	git_in_dir(root, &["config", "user.name", "monochange Tests"]);
 	git_in_dir(root, &["config", "user.email", "monochange@example.com"]);
+	git_in_dir(root, &["config", "commit.gpgsign", "false"]);
 	git_in_dir(root, &["add", "Cargo.toml"]);
 	git_in_dir(root, &["commit", "-m", "initial"]);
 	workspace_dir
