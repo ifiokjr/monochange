@@ -4,61 +4,6 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
-## [0.5.0](https://github.com/monochange/monochange/releases/tag/v0.5.0) (2026-05-12)
-
-### Breaking Change
-
-#### require CLI steps to opt in to inherited command inputs
-
-> **Breaking change** — CLI step inputs are now explicit. Command-level inputs no longer automatically appear in every configured CLI step.
-
-A configured step now receives only the inputs listed in that step's `inputs` field. This removes ambiguous behavior where a command-level flag could unexpectedly shadow a step-specific input with the same name.
-
-**Before:** every step implicitly saw all command inputs, even with no step-level `inputs` entry:
-
-```toml
-[cli.release]
-inputs = [{ name = "format", type = "choice", choices = ["text", "json"], default = "text" }]
-steps = [{ type = "PrepareRelease" }]
-```
-
-**After:** inherit command inputs explicitly with the array shorthand:
-
-```toml
-[cli.release]
-inputs = [{ name = "format", type = "choice", choices = ["text", "json"], default = "text" }]
-steps = [{ type = "PrepareRelease", inputs = ["format"] }]
-```
-
-Map overrides still work for fixed or templated step values:
-
-```toml
-steps = [
-	{ type = "PrepareRelease", inputs = ["format"] },
-	{ type = "PublishRelease", inputs = { format = "json", draft = "{{ inputs.draft }}" } },
-]
-```
-
-Migration path: review custom `[cli.<command>]` definitions and add `inputs = ["name"]` to every step that needs a command-level input. Built-in default CLI commands and generated templates have been updated to declare their inherited inputs explicitly.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #467](https://github.com/monochange/monochange/pull/467) _Introduced in:_ [`ce4712f`](https://github.com/monochange/monochange/commit/ce4712f2890e0636c368b056db756df32f4cf769)
-
-### Added
-
-#### Publish all configured packages
-
-Add a `--all` flag to the PublishPackages CLI step so migration workflows can publish every configured package, including packages that were not part of the prepared release record.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #461](https://github.com/monochange/monochange/pull/461) _Introduced in:_ [`3d956cd`](https://github.com/monochange/monochange/commit/3d956cd3e34747e088add98fe0358251f388782f)
-
-### Fixed
-
-#### Add lints to the monochange config schema
-
-Allow the top-level `[lints]` table in generated `monochange.toml` JSON Schema assets. The lint configuration schema is intentionally permissive so all current and future lint rule shapes are accepted by editors and TOML language servers.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #462](https://github.com/monochange/monochange/pull/462) _Introduced in:_ [`953bb8c`](https://github.com/monochange/monochange/commit/953bb8c6e3532a31621c47c6e0b71eaa684771fc)
-
 ## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)
 
 ### Added
