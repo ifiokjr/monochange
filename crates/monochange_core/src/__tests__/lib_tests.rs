@@ -2241,6 +2241,33 @@ fn parse_release_record_block_accepts_current_schema_version_header() {
 }
 
 #[test]
+fn parse_release_record_block_accepts_older_schema_version_header() {
+	let old = format!(
+		r#"{RELEASE_RECORD_HEADING}
+
+{RELEASE_RECORD_START_MARKER}
+```json
+{{
+  "schemaVersion": "0.1",
+  "kind": "{RELEASE_RECORD_KIND}",
+  "createdAt": "2026-04-06T12:00:00Z",
+  "command": "release-pr",
+  "releaseTargets": [],
+  "releasedPackages": [],
+  "changedFiles": []
+}}
+```
+{RELEASE_RECORD_END_MARKER}"#
+	);
+
+	let parsed = crate::parse_release_record_block(&old)
+		.unwrap_or_else(|error| panic!("parse old release record: {error}"));
+
+	assert_eq!(parsed.schema_version, RELEASE_RECORD_SCHEMA_VERSION);
+	assert_eq!(parsed.kind, RELEASE_RECORD_KIND);
+}
+
+#[test]
 fn parse_release_record_block_rejects_future_schema_version_header() {
 	let future = format!(
 		r#"{RELEASE_RECORD_HEADING}

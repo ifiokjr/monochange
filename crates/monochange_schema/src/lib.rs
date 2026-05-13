@@ -8,31 +8,7 @@ use serde::Serializer;
 use serde_json::Value;
 use thiserror::Error;
 
-/// Current durable public schema version text.
-///
-/// This derives from the Cargo package version by stripping the patch component
-/// at compile time.
-pub const CURRENT_SCHEMA_VERSION_TEXT: &str = extract_major_minor(env!("CARGO_PKG_VERSION"));
-
-const fn extract_major_minor(version: &str) -> &str {
-	let bytes = version.as_bytes();
-	let mut remaining = bytes;
-	let mut index = 0;
-	let mut dots = 0;
-
-	while let Some((byte, rest)) = remaining.split_first() {
-		if *byte == b'.' {
-			dots += 1;
-			if dots == 2 {
-				break;
-			}
-		}
-		remaining = rest;
-		index += 1;
-	}
-
-	version.split_at(index).0
-}
+include!(concat!(env!("OUT_DIR"), "/schema_version.rs"));
 
 /// A durable schema version written as `major.minor`.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -204,7 +180,7 @@ pub enum SchemaError {
 		/// Parse failure.
 		source: SchemaVersionParseError,
 	},
-	/// Artifact used a non-current schema version.
+	/// Artifact used a schema version newer than this binary can read.
 	#[error(
 		"artifact uses unsupported schema version `{actual}`; current supported version is `{current}`"
 	)]
@@ -213,6 +189,16 @@ pub enum SchemaError {
 		actual: String,
 		/// Current supported version.
 		current: SchemaVersion,
+	},
+	/// Artifact has no explicit migration path to the current schema version.
+	#[error("artifact `{artifact}` has no migration path from schema version `{from}` to `{to}`")]
+	MissingMigrationPath {
+		/// Durable artifact kind.
+		artifact: &'static str,
+		/// Version found in the payload.
+		from: SchemaVersion,
+		/// Current supported version.
+		to: SchemaVersion,
 	},
 	/// JSON conversion failure.
 	#[error("artifact json error: {0}")]
@@ -258,6 +244,7 @@ pub mod release_record {
 	use crate::SchemaError;
 	use crate::SchemaVersion;
 	use crate::current_schema_version_for_error;
+	use crate::migration_changelog;
 	use crate::object_mut;
 	use crate::parse_current_version;
 	use crate::validate_kind;
@@ -270,6 +257,90 @@ pub mod release_record {
 	/// Return the current release-record schema version.
 	pub fn current_version() -> Result<SchemaVersion, SchemaError> {
 		Ok(current_schema_version_for_error())
+	}
+
+	/// Render the current deterministic populated release-record artifact.
+	#[must_use]
+	pub fn current_populated_artifact_json() -> String {
+		populated_artifact_json(CURRENT_SCHEMA_VERSION_TEXT)
+	}
+
+	/// Render a deterministic populated release-record artifact for a schema version.
+	#[must_use]
+	pub fn populated_artifact_json(version: &str) -> String {
+		let release_version = format!("{version}.0");
+		let tag_name = format!("v{release_version}");
+		let schema_tag_name = format!("monochange_schema/v{release_version}");
+		let versioned_artifact =
+			format!("crates/monochange_schema/schemas/artifacts/release-record.v{version}.json");
+		let artifact = serde_json::json!({
+			"schemaVersion": version,
+			"kind": KIND,
+			"createdAt": "2026-01-01T00:00:00Z",
+			"command": "mc release --commit",
+			"version": release_version.as_str(),
+			"versions": {
+				"main": release_version.as_str(),
+				"monochange_schema": release_version.as_str()
+			},
+			"releaseTargets": [
+				{
+					"id": "main",
+					"kind": "group",
+					"version": release_version.as_str(),
+					"versionFormat": "primary",
+					"tag": true,
+					"release": true,
+					"tagName": tag_name.as_str(),
+					"members": ["monochange", "monochange_core"]
+				},
+				{
+					"id": "monochange_schema",
+					"kind": "package",
+					"version": release_version.as_str(),
+					"versionFormat": "namespaced",
+					"tag": false,
+					"release": false,
+					"tagName": schema_tag_name.as_str(),
+					"members": []
+				}
+			],
+			"releasedPackages": ["monochange", "monochange_core", "monochange_schema"],
+			"changedFiles": [
+				"Cargo.toml",
+				"crates/monochange_schema/Cargo.toml",
+				"crates/monochange_schema/schemas/artifacts/release-record.current.json",
+				versioned_artifact
+			],
+			"updatedChangelogs": ["changelog.md"],
+			"deletedChangesets": [".changeset/release-record-schema-compat.md"],
+			"changesets": [
+				{
+					"path": ".changeset/release-record-schema-compat.md",
+					"summary": "Keep release record schema compatibility checks stable",
+					"details": "Generated release-record artifact fixtures are parsed through the same migration path as commit-embedded records.",
+					"targets": [
+						{
+							"id": "monochange_schema",
+							"kind": "package",
+							"bump": "major",
+							"origin": "frontmatter",
+							"evidenceRefs": ["crates/monochange_schema/src/lib.rs"],
+							"changeType": "fix",
+							"causedBy": ["release-record-schema-compat"]
+						}
+					]
+				}
+			],
+			"provider": {
+				"kind": "github",
+				"owner": "monochange",
+				"repo": "monochange",
+				"host": "github.com"
+			}
+		});
+		serde_json::to_string_pretty(&artifact)
+			.unwrap_or_else(|error| panic!("serialize release-record artifact fixture: {error}"))
 	}
 
 	/// Convert a release-record JSON value into the current durable wire shape.
@@ -289,9 +360,12 @@ pub mod release_record {
 
 	/// Validate a release-record JSON value against the current durable wire shape.
 	///
-	/// `0.0` is the first supported public schema version. Values without `schemaVersion`
-	/// or with any non-current `schemaVersion` fail instead of taking a migration path.
-	/// Legacy `v` fields are accepted as a compatibility bridge.
+	/// Release records are embedded in git commits and must remain readable by
+	/// newer monochange binaries after schema upgrades. Older `schemaVersion`
+	/// values must traverse explicit migration edges; missing edges fail instead
+	/// of silently accepting older records. Future versions still fail so older
+	/// binaries do not silently misread newer data. Legacy `v` fields are accepted
+	/// as a compatibility bridge.
 	pub fn migrate_value(mut value: Value) -> Result<Value, SchemaError> {
 		let object = object_mut(&mut value)?;
 		validate_kind(object, KIND)?;
@@ -301,19 +375,76 @@ pub mod release_record {
 			.ok_or(SchemaError::MissingVersion)?;
 		let version = parse_current_version(version_value)?;
 		let current = current_version()?;
-		if version != current {
+		if version > current {
 			return Err(SchemaError::UnsupportedVersion {
 				actual: version.to_string(),
 				current,
 			});
 		}
-		// Normalize legacy `v` to `schemaVersion` for downstream consumers.
+		migrate_edges(&mut value, version, current)?;
+
+		let object = object_mut(&mut value)?;
 		object.remove(LEGACY_VERSION_FIELD);
 		object.insert(
 			SCHEMA_VERSION_FIELD.to_string(),
 			Value::String(CURRENT_SCHEMA_VERSION_TEXT.to_string()),
 		);
 		Ok(value)
+	}
+
+	fn migrate_edges(
+		value: &mut Value,
+		from: SchemaVersion,
+		to: SchemaVersion,
+	) -> Result<(), SchemaError> {
+		let mut cursor = from;
+		while cursor != to {
+			let Some(edge) = migration_edge_from(cursor) else {
+				return Err(SchemaError::MissingMigrationPath {
+					artifact: KIND,
+					from: cursor,
+					to,
+				});
+			};
+			if edge.to > to {
+				return Err(SchemaError::MissingMigrationPath {
+					artifact: KIND,
+					from: cursor,
+					to,
+				});
+			}
+			apply_migration_edge(value, edge)?;
+			cursor = edge.to;
+		}
+		Ok(())
+	}
+
+	fn migration_edge_from(
+		version: SchemaVersion,
+	) -> Option<&'static migration_changelog::MigrationChangelogEntry> {
+		migration_changelog::entries_for_artifact(KIND)
+			.into_iter()
+			.find(|entry| migration_source_version(entry.from) == version)
+	}
+
+	fn migration_source_version(source: migration_changelog::MigrationSource) -> SchemaVersion {
+		match source {
+			migration_changelog::MigrationSource::Version { schema_version } => schema_version,
+		}
+	}
+
+	fn apply_migration_edge(
+		_value: &mut Value,
+		edge: &migration_changelog::MigrationChangelogEntry,
+	) -> Result<(), SchemaError> {
+		if edge.operation == migration_changelog::MigrationOperation::Noop && edge.noop {
+			return Ok(());
+		}
+		Err(SchemaError::MissingMigrationPath {
+			artifact: KIND,
+			from: migration_source_version(edge.from),
+			to: edge.to,
+		})
 	}
 }
 
@@ -324,10 +455,19 @@ pub mod migration_changelog {
 	use crate::SchemaVersion;
 
 	/// All known durable migration changelog entries.
-	///
-	/// `0.0` is the first public schema version, so the initial changelog is
-	/// intentionally empty. Future breaking changes add explicit edges here.
-	pub const ENTRIES: &[MigrationChangelogEntry] = &[];
+	pub const ENTRIES: &[MigrationChangelogEntry] = &[MigrationChangelogEntry {
+		artifact: crate::release_record::KIND,
+		from: MigrationSource::Version {
+			schema_version: SchemaVersion::new(0, 1),
+		},
+		to: SchemaVersion::new(0, 2),
+		operation: MigrationOperation::Noop,
+		changes: &[],
+		noop: true,
+		reason: Some(
+			"Release-record schema 0.2 preserves the 0.1 wire shape; the explicit edge keeps older artifact readability covered by CI.",
+		),
+	}];
 
 	/// A structured migration changelog entry.
 	#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
@@ -356,6 +496,7 @@ pub mod migration_changelog {
 		/// Current string schema version field.
 		Version {
 			/// Source `schemaVersion` value.
+			#[serde(rename = "schemaVersion")]
 			schema_version: SchemaVersion,
 		},
 	}

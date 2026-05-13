@@ -8,6 +8,8 @@ use serde_json::Map;
 use serde_json::Value;
 use serde_json::json;
 
+const HISTORICAL_RELEASE_RECORD_ARTIFACT: &str = "release-record.v0.1.json";
+
 #[test]
 fn committed_schema_assets_are_json_and_hosted_copy_is_current() -> Result<(), Box<dyn Error>> {
 	let paths = schema_asset_paths()?;
@@ -23,6 +25,72 @@ fn committed_schema_assets_are_json_and_hosted_copy_is_current() -> Result<(), B
 		std::fs::read_to_string(&paths.canonical_release_schema)?,
 		std::fs::read_to_string(&paths.hosted_release_schema)?
 	);
+
+	Ok(())
+}
+
+#[test]
+fn release_record_artifact_fixtures_load_through_parser() -> Result<(), Box<dyn Error>> {
+	let paths = schema_asset_paths()?;
+	let artifact_paths = release_record_artifact_paths(&paths)?;
+	let names = artifact_paths
+		.iter()
+		.map(|path| file_name(path))
+		.collect::<Result<Vec<_>, _>>()?;
+	let current_versioned_name = format!(
+		"release-record.v{}.json",
+		monochange_schema::CURRENT_SCHEMA_VERSION_TEXT
+	);
+
+	assert!(
+		names
+			.iter()
+			.any(|name| name == "release-record.current.json")
+	);
+	assert!(names.iter().any(|name| name == &current_versioned_name));
+	assert!(
+		names
+			.iter()
+			.any(|name| name == HISTORICAL_RELEASE_RECORD_ARTIFACT),
+		"expected at least one historical release-record artifact fixture"
+	);
+
+	for artifact_path in artifact_paths {
+		let name = file_name(&artifact_path)?;
+		let text = std::fs::read_to_string(&artifact_path)?;
+		let raw = serde_json::from_str::<Value>(&text)?;
+		let raw_schema_version = json_str(&raw, "/schemaVersion")?;
+		let record = monochange_core::parse_release_record_json(&text)?;
+
+		if name == "release-record.current.json" || name == current_versioned_name {
+			assert_eq!(
+				raw_schema_version,
+				monochange_schema::CURRENT_SCHEMA_VERSION_TEXT
+			);
+		}
+		assert_eq!(
+			record.schema_version,
+			monochange_schema::CURRENT_SCHEMA_VERSION_TEXT,
+			"{name} should migrate to the current schema version"
+		);
+		assert_eq!(record.kind, monochange_schema::release_record::KIND);
+		assert!(
+			!record.release_targets.is_empty(),
+			"{name} should exercise release targets"
+		);
+		assert!(
+			!record.released_packages.is_empty(),
+			"{name} should exercise released packages"
+		);
+		assert!(
+			!record.changed_files.is_empty(),
+			"{name} should exercise changed files"
+		);
+		assert!(
+			!record.changesets.is_empty(),
+			"{name} should exercise embedded changeset records"
+		);
+	}
 
 	Ok(())
 }
@@ -265,24 +333,17 @@ fn schema_crate_version_stays_decoupled_from_public_schema_version() -> Result<(
 		.and_then(toml::Value::as_str)
 		.unwrap_or_default();
 
-	let (_expected_major, _expected_minor) = {
-		let parts: Vec<&str> = expected_version.split('.').take(2).collect();
-		(
-			parts.first().unwrap_or(&"0").parse::<u64>().unwrap_or(0),
-			parts.get(1).unwrap_or(&"0").parse::<u64>().unwrap_or(0),
-		)
-	};
-
 	assert_eq!(schema_crate_version(&paths)?, expected_version);
-	let expected_schema = monochange_schema::SchemaVersion::from_package_version(expected_version)
+	let manifest_schema = monochange_schema::SchemaVersion::from_package_version(expected_version)
 		.map_err(|error| test_error(format!("invalid manifest version: {error}")))?;
-	assert_eq!(
-		monochange_schema::CURRENT_SCHEMA_VERSION_TEXT,
-		expected_schema.to_string()
+	let current_schema = monochange_schema::current_schema_version()?;
+	assert!(
+		current_schema >= manifest_schema,
+		"current durable schema {current_schema} must not lag manifest-derived schema {manifest_schema}"
 	);
 	assert_eq!(
-		monochange_schema::current_schema_version()?,
-		expected_schema
+		monochange_schema::CURRENT_SCHEMA_VERSION_TEXT,
+		current_schema.to_string()
 	);
 
 	Ok(())
@@ -461,6 +522,7 @@ struct SchemaAssetPaths {
 	canonical_release_schema: PathBuf,
 	migration_changelog: PathBuf,
 	schema_crate_manifest: PathBuf,
+	release_record_artifacts_dir: PathBuf,
 }
 
 fn schema_asset_paths() -> Result<SchemaAssetPaths, Box<dyn Error>> {
@@ -481,8 +543,37 @@ fn schema_asset_paths() -> Result<SchemaAssetPaths, Box<dyn Error>> {
 			.join("crates/monochange_schema/schemas/release-record.schema.json"),
 		migration_changelog: root.join("crates/monochange_schema/schemas/migration-changelog.json"),
 		schema_crate_manifest: root.join("crates/monochange_schema/Cargo.toml"),
+		release_record_artifacts_dir: root.join("crates/monochange_schema/schemas/artifacts"),
 		root,
 	})
+}
+
+fn release_record_artifact_paths(paths: &SchemaAssetPaths) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+	let mut artifact_paths = Vec::new();
+	for entry in std::fs::read_dir(&paths.release_record_artifacts_dir)? {
+		let path = entry?.path();
+		let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+			continue;
+		};
+		if name.starts_with("release-record.") && name.ends_with(".json") {
+			artifact_paths.push(path);
+		}
+	}
+	artifact_paths.sort();
+	if artifact_paths.is_empty() {
+		return Err(test_error("no release-record artifact fixtures were found"));
+	}
+	Ok(artifact_paths)
+}
+
+fn file_name(path: &Path) -> Result<String, Box<dyn Error>> {
+	let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+		return Err(test_error(format!(
+			"path has no UTF-8 file name: {}",
+			path.display()
+		)));
+	};
+	Ok(name.to_string())
 }
 
 fn workspace_root() -> Result<PathBuf, Box<dyn Error>> {

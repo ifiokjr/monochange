@@ -4,7 +4,7 @@ version = "0.1.1"
 categories = { workspace = true }
 documentation = "https://docs.rs/monochange_schema"
 edition = { workspace = true }
-include = ["src/**/*.rs", "schemas/**/*.json", "Cargo.toml", "readme.md"]
+include = ["src/**/*.rs", "schemas/**/*.json", "Cargo.toml", "SCHEMA_VERSION", "readme.md"]
 keywords = ["changelog", "migrations", "monorepo", "releases", "schema"]
 license = { workspace = true }
 readme = "readme.md"

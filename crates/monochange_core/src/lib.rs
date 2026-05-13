@@ -3843,7 +3843,6 @@ pub fn parse_release_record_block(commit_message: &str) -> ReleaseRecordResult<R
 	let json_text = extract_release_record_json(block_contents)?;
 	let mut raw = serde_json::from_str::<serde_json::Value>(&json_text)?;
 	normalize_legacy_schema_version(&mut raw);
-	normalize_legacy_schema_version(&mut raw);
 	let kind = raw
 		.get("kind")
 		.and_then(serde_json::Value::as_str)
