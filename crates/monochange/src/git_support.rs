@@ -241,13 +241,10 @@ pub(crate) async fn run_git_capture(
 		let stderr = git_stderr_trimmed(&output);
 		tracing::warn!(args = ?args, %stderr, "git command failed");
 
-		let detail = [error_message, stderr.as_str()]
-			.into_iter()
-			.filter(|part| !part.is_empty())
-			.collect::<Vec<_>>()
-			.join(": ");
-
-		return Err(MonochangeError::Discovery(detail));
+		return Err(MonochangeError::Discovery(git_error_message_with_detail(
+			error_message,
+			&stderr,
+		)));
 	}
 
 	Ok(git_stdout_trimmed(&output))
@@ -436,18 +433,31 @@ pub(crate) async fn run_git_process_with_stdin(
 	handle_git_process_output(&output, error_message)
 }
 
+fn git_error_message_with_detail(error_message: &str, stderr: &str) -> String {
+	if error_message.is_empty() {
+		return stderr.to_string();
+	}
+	if stderr.is_empty() {
+		return error_message.to_string();
+	}
+
+	let mut detail = String::with_capacity(error_message.len() + 2 + stderr.len());
+	detail.push_str(error_message);
+	detail.push_str(": ");
+	detail.push_str(stderr);
+	detail
+}
+
 fn handle_git_process_output(
 	output: &std::process::Output,
 	error_message: &str,
 ) -> MonochangeResult<()> {
 	if !output.status.success() {
 		let stderr = git_error_detail(output);
-		let detail = [error_message, stderr.as_str()]
-			.into_iter()
-			.filter(|part| !part.is_empty())
-			.collect::<Vec<_>>()
-			.join(": ");
-		return Err(MonochangeError::Discovery(detail));
+		return Err(MonochangeError::Discovery(git_error_message_with_detail(
+			error_message,
+			&stderr,
+		)));
 	}
 	Ok(())
 }

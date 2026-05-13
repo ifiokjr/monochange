@@ -60,6 +60,7 @@
   - Reduced versioned-file update allocations by deduplicating borrowed definitions, passing dependency names as borrowed strings, streaming glob matches, rendering cached JSON directly into bytes, borrowing package release versions by config id, and bypassing UTF-8 conversion for binary Bun lockfiles.
   - Streamed publish-readiness text, Markdown, JSON newline, and package-fingerprint rendering directly into output buffers instead of allocating temporary line or identity-render vectors before joining, and made publish-readiness package identities borrow report fields instead of cloning strings for validation and fingerprinting.
   - Streamed release-branch policy error construction directly into one string, avoiding temporary branch-name vectors and joined strings on rejection paths.
+  - Streamed git error details directly into one string, avoiding temporary two-item vectors and joins when git commands fail.
 
 ## Current benchmark summary
 
