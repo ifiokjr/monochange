@@ -313,11 +313,14 @@ fn truthy(value: &Value) -> bool {
 }
 
 fn render_values(values: &[Value]) -> String {
-	values
-		.iter()
-		.map(render_value)
-		.collect::<Vec<_>>()
-		.join("\n")
+	let mut rendered = String::new();
+	for (index, value) in values.iter().enumerate() {
+		if index > 0 {
+			rendered.push('\n');
+		}
+		rendered.push_str(&render_value(value));
+	}
+	rendered
 }
 
 fn render_value(value: &Value) -> String {
