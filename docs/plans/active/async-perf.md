@@ -61,7 +61,7 @@
   - Streamed publish-readiness text, Markdown, JSON newline, and package-fingerprint rendering directly into output buffers instead of allocating temporary line or identity-render vectors before joining, and made publish-readiness package identities borrow report fields instead of cloning strings for validation and fingerprinting.
   - Streamed release-branch policy error construction directly into one string, avoiding temporary branch-name vectors and joined strings on rejection paths.
   - Streamed git error details directly into one string, avoiding temporary two-item vectors and joins when git commands fail.
-  - Streamed `--jq` output rendering directly into one buffer instead of collecting rendered values into a temporary vector before joining, and writes scalar filtered values without allocating per-value strings.
+  - Streamed `--jq` output rendering directly into one buffer instead of collecting rendered values into a temporary vector before joining, and writes scalar and composite filtered values without allocating per-value strings.
   - Streamed publish rate-limit enforcement error details directly into one string, avoiding temporary blocked-window and detail vectors on rejection paths.
   - Streamed publish-readiness package identity lists directly into one string instead of joining cloned identity strings.
 

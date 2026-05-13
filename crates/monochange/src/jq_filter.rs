@@ -336,9 +336,7 @@ fn write_value(output: &mut String, value: &Value) {
 		}
 		Value::String(value) => output.push_str(value),
 		Value::Array(_) | Value::Object(_) => {
-			output.push_str(&serde_json::to_string(value).unwrap_or_else(|error| {
-				panic!("serializing filtered JSON should succeed: {error}")
-			}));
+			let _ = write!(output, "{value}");
 		}
 	}
 }

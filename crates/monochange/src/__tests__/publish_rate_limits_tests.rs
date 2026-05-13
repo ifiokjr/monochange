@@ -1289,8 +1289,11 @@ async fn enforce_publish_rate_limits_blocks_multi_batch_runs_when_enabled() {
 			}
 		})
 		.collect::<Vec<_>>();
-	let report =
+	let mut report =
 		plan_publish_rate_limits_for_requests(&requests, RateLimitOperation::Publish, true);
+	let mut second_window = report.windows[0].clone();
+	second_window.registry = RegistryKind::CratesIo;
+	report.windows.push(second_window);
 
 	let configuration = WorkspaceConfiguration {
 		root_path: Path::new(".").to_path_buf(),
@@ -1335,7 +1338,9 @@ async fn enforce_publish_rate_limits_blocks_multi_batch_runs_when_enabled() {
 	};
 	let error = enforce_publish_rate_limits(&configuration, &report, PublishRateLimitMode::Publish)
 		.unwrap_err();
-	assert!(error.to_string().contains("blocked this run"));
+	let error = error.to_string();
+	assert!(error.contains("blocked this run"));
+	assert!(error.contains("; "));
 }
 
 #[tokio::test(flavor = "multi_thread")]
