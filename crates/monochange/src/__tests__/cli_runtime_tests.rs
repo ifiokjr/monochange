@@ -364,6 +364,20 @@ fn git_in_dir(root: &Path, args: &[&str]) {
 	assert!(status.success(), "git {args:?} failed");
 }
 
+fn prepared_release_git_workspace() -> TempDir {
+	let workspace_dir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = workspace_dir.path();
+	fs::write(root.join("Cargo.toml"), "[workspace]\n")
+		.unwrap_or_else(|error| panic!("write workspace manifest: {error}"));
+	git_in_dir(root, &["init", "-b", "main"]);
+	git_in_dir(root, &["config", "user.name", "monochange Tests"]);
+	git_in_dir(root, &["config", "user.email", "monochange@example.com"]);
+	git_in_dir(root, &["config", "commit.gpgsign", "false"]);
+	git_in_dir(root, &["add", "Cargo.toml"]);
+	git_in_dir(root, &["commit", "-m", "initial"]);
+	workspace_dir
+}
+
 #[test]
 fn evaluate_cli_step_condition_returns_false_for_blank_conditions() {
 	assert!(
@@ -1832,10 +1846,7 @@ async fn execute_cli_command_with_options_covers_final_artifact_save_call() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn execute_cli_command_with_options_plans_publish_rate_limits_from_prepared_release_artifact() {
-	let _guard = TEST_ENV_LOCK
-		.lock()
-		.unwrap_or_else(|error| panic!("test env lock: {error}"));
-	let workspace_dir = initialized_workspace_dir();
+	let workspace_dir = prepared_release_git_workspace();
 	let root = workspace_dir.path();
 	let configuration = sample_configuration(root);
 	let artifact_dir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
@@ -1937,10 +1948,7 @@ async fn execute_cli_command_with_options_rejects_readiness_for_placeholder_publ
 
 #[tokio::test(flavor = "multi_thread")]
 async fn execute_cli_command_with_options_reuses_prepared_release_artifact_for_versions() {
-	let _guard = TEST_ENV_LOCK
-		.lock()
-		.unwrap_or_else(|error| panic!("test env lock: {error}"));
-	let workspace_dir = initialized_workspace_dir();
+	let workspace_dir = prepared_release_git_workspace();
 	let root = workspace_dir.path();
 	let configuration = sample_configuration(root);
 	let artifact_dir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
@@ -2013,10 +2021,7 @@ async fn execute_cli_command_with_options_reports_invalid_versions_artifacts() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn execute_cli_command_with_options_reports_invalid_versions_output_formats() {
-	let _guard = TEST_ENV_LOCK
-		.lock()
-		.unwrap_or_else(|error| panic!("test env lock: {error}"));
-	let workspace_dir = initialized_workspace_dir();
+	let workspace_dir = prepared_release_git_workspace();
 	let root = workspace_dir.path();
 	let configuration = sample_configuration(root);
 	let artifact_dir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
