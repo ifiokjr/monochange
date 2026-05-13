@@ -210,28 +210,33 @@ pub(crate) fn build_versioned_file_updates(
 		}
 	}
 
+	let planned_group_versions = plan
+		.groups
+		.iter()
+		.filter_map(|group| {
+			group
+				.planned_version
+				.as_ref()
+				.map(|version| (group.group_id.as_str(), version))
+		})
+		.collect::<BTreeMap<_, _>>();
+	let mut group_dep_names = Vec::new();
+
 	for group_definition in &configuration.groups {
-		let Some(group_version) = plan
-			.groups
-			.iter()
-			.find(|group| group.group_id == group_definition.id)
-			.and_then(|group| group.planned_version.as_ref())
+		let Some(group_version) = planned_group_versions
+			.get(group_definition.id.as_str())
 			.map(ToString::to_string)
 		else {
 			continue;
 		};
 
-		// For groups, collect all member native names
-		let group_dep_names = group_definition
-			.packages
-			.iter()
-			.map(|member_id| {
-				context
-					.package_by_config_id
-					.get(member_id.as_str())
-					.map_or(member_id.as_str(), |package| package.name.as_str())
-			})
-			.collect::<Vec<_>>();
+		group_dep_names.clear();
+		group_dep_names.extend(group_definition.packages.iter().map(|member_id| {
+			context
+				.package_by_config_id
+				.get(member_id.as_str())
+				.map_or(member_id.as_str(), |package| package.name.as_str())
+		}));
 
 		for versioned_file in &group_definition.versioned_files {
 			apply_versioned_file_definition(
