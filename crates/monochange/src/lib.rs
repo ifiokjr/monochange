@@ -146,7 +146,6 @@ pub(crate) use git_support::run_git_status;
 use migration_audit::run_migration_command;
 #[cfg(feature = "cargo")]
 use monochange_cargo::RustSemverProvider;
-use monochange_config::load_changeset_file;
 use monochange_config::load_workspace_configuration;
 use monochange_config::resolve_package_reference;
 use monochange_core::BumpSeverity;

@@ -26,9 +26,13 @@ pub(crate) async fn diagnose_changesets(
 		resolved
 	};
 
+	let changeset_load_context =
+		monochange_config::build_changeset_load_context(&configuration, &discovery.packages);
 	let loaded_changesets = changeset_paths
 		.iter()
-		.map(|path| load_changeset_file(path, &configuration, &discovery.packages))
+		.map(|path| {
+			monochange_config::load_changeset_file_with_context(path, &changeset_load_context)
+		})
 		.collect::<MonochangeResult<Vec<_>>>()?;
 
 	let mut changesets = build_prepared_changesets(root, &loaded_changesets);
@@ -39,9 +43,9 @@ pub(crate) async fn diagnose_changesets(
 			.await;
 	}
 
-	let requested_changesets = changeset_paths
+	let requested_changesets = changesets
 		.iter()
-		.map(|path| root_relative(root, path))
+		.map(|changeset| changeset.path.clone())
 		.collect();
 
 	Ok(ChangesetDiagnosticsReport {
@@ -246,17 +250,23 @@ pub(crate) fn build_prepared_changesets(
 	root: &Path,
 	loaded_changesets: &[monochange_config::LoadedChangesetFile],
 ) -> Vec<PreparedChangeset> {
+	let relative_paths = loaded_changesets
+		.iter()
+		.map(|changeset| root_relative(root, &changeset.path))
+		.collect::<Vec<_>>();
+
 	// Batch-load all changeset git context in a single pass instead of
 	// spawning two git-log subprocesses per changeset (which was O(2N)
 	// subprocess spawns and dominated release planning time).
-	let git_contexts = batch_load_changeset_contexts(root, loaded_changesets);
+	let git_contexts = batch_load_changeset_contexts(root, &relative_paths);
 
 	loaded_changesets
 		.iter()
+		.zip(relative_paths.iter())
 		.enumerate()
-		.map(|(index, changeset)| {
+		.map(|(index, (changeset, relative_path))| {
 			PreparedChangeset {
-				path: root_relative(root, &changeset.path),
+				path: relative_path.clone(),
 				summary: changeset.summary.clone(),
 				details: changeset.details.clone(),
 				targets: changeset
@@ -282,18 +292,15 @@ pub(crate) fn build_prepared_changesets(
 
 /// Load git context for all changesets in two batched git-log calls instead
 /// of 2*N individual subprocess spawns.
-#[tracing::instrument(skip_all, fields(count = loaded_changesets.len()))]
-fn batch_load_changeset_contexts(
-	root: &Path,
-	loaded_changesets: &[monochange_config::LoadedChangesetFile],
-) -> Vec<ChangesetContext> {
-	if loaded_changesets.is_empty() {
+#[tracing::instrument(skip_all, fields(count = relative_paths.len()))]
+fn batch_load_changeset_contexts(root: &Path, relative_paths: &[PathBuf]) -> Vec<ChangesetContext> {
+	if relative_paths.is_empty() {
 		return Vec::new();
 	}
 
 	// Skip git operations entirely if there's no git repository.
 	if !root.join(".git").exists() {
-		return loaded_changesets
+		return relative_paths
 			.iter()
 			.map(|_| {
 				ChangesetContext {
@@ -308,13 +315,7 @@ fn batch_load_changeset_contexts(
 			.collect();
 	}
 
-	// Build file list for git log.
-	let relative_paths: Vec<_> = loaded_changesets
-		.iter()
-		.map(|cs| root_relative(root, &cs.path))
-		.collect();
-
-	let (introduced_map, last_updated_map) = batch_git_log(root, &relative_paths);
+	let (introduced_map, last_updated_map) = batch_git_log(root, relative_paths);
 
 	relative_paths
 		.iter()

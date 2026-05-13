@@ -36,6 +36,12 @@
   - Produced an HTML benchmark comparison report and hosted it in a secret gist for review.
 - Follow-up automation:
   - Scheduled a workspace-scoped recurring prompt every 15 minutes for the next 24 hours: `Keep improving performance and reducing memory usage`.
+- Post-report optimization iteration:
+  - Profiled `step:diagnose-changesets` on the large fixture and found repeated changeset load-context construction plus repeated root-relative path normalization in the hot path.
+  - Reused a shared `ChangesetLoadContext` while loading all diagnosed changesets.
+  - Reused a shared `ChangesetLoadContext` while validating attached changesets in affected-package policy checks.
+  - Reused precomputed changeset-relative paths while building prepared changesets and diagnostics output.
+  - Added a focused unit test covering multi-file diagnose loading through the shared-context path.
 
 ## Current benchmark summary
 
@@ -73,11 +79,23 @@ Measured with `hyperfine --warmup 3 --runs 8` on 200 packages, 500 changesets, 5
 
 Step-command benchmark violations: `0`.
 
+## Latest targeted optimization results
+
+Measured on the 200-package / 500-changeset / 500-commit profiling fixture after rebuilding the current branch release binary.
+
+| Command                                                                                     | Baseline |  Current | Result       |
+| :------------------------------------------------------------------------------------------ | -------: | -------: | :----------- |
+| `mc step:diagnose-changesets --dry-run --format json` vs `main`                             |  2.919 s | 596.4 ms | 4.89× faster |
+| `mc step:diagnose-changesets --dry-run --format json` vs pre-optimization async             |  2.731 s | 596.4 ms | 4.58× faster |
+| `mc step:affected-packages --dry-run --format json --from HEAD~1` vs pre-optimization async |  1.229 s |  1.252 s | flat / noisy |
+
+Peak memory sampling with `/usr/bin/time -l` for `step:diagnose-changesets` also improved slightly: max RSS went from about 21.6 MB to 21.3 MB, peak footprint from about 11.6 MB to 11.4 MB, and retired instructions from about 37.6B to 6.9B.
+
 ## Main bottlenecks to tackle next
 
-1. `step:diagnose-changesets` remains the slowest direct step path at about `2.44 s` on the large fixture.
-   - The hyperfine output shows high system time, which suggests repeated filesystem, process, or git operations.
-   - Next work: profile its call graph, count git invocations, and cache shared discovery/configuration data across the diagnose phases.
+1. `step:diagnose-changesets` is much faster after shared changeset context reuse, but still spends about `0.60 s` on the large fixture.
+   - Remaining time is likely split across workspace discovery, git history lookup, JSON construction, and unavoidable changeset file reads.
+   - Next work: profile the remaining call graph after this optimization and reduce any remaining repeated path normalization or discovery work.
 2. `step:affected-packages` remains over `1.0 s` on the large fixture.
    - Likely bottlenecks are git history traversal, repeated package graph lookups, and repeated changeset or manifest reads.
    - Next work: inspect whether affected-package computation can reuse release workspace discovery and parsed changesets.
@@ -95,7 +113,7 @@ Step-command benchmark violations: `0`.
 
 - [ ] Add lightweight profiling for the slow step paths without affecting normal output.
 - [ ] Measure peak RSS for top-level CLI and direct step-command benchmarks.
-- [ ] Profile `step:diagnose-changesets` and reduce repeated git or filesystem work.
+- [x] Profile `step:diagnose-changesets` and reduce repeated git or filesystem work.
 - [ ] Profile `step:affected-packages` and reuse package graph / changeset discovery data where possible.
 - [ ] Profile `step:display-versions` and reduce cloning or serialization overhead.
 - [ ] Re-run the benchmark scripts after each optimization.

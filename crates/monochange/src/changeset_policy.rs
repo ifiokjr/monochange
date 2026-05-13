@@ -4,7 +4,6 @@ use std::path::Path;
 use std::process::Command as ProcessCommand;
 
 use glob::Pattern;
-use monochange_config::load_change_signals;
 use monochange_config::load_workspace_configuration;
 use monochange_config::resolve_package_reference;
 use monochange_core::ChangesetAffectedSettings;
@@ -144,26 +143,33 @@ pub async fn affected_packages(
 
 	let mut covered_package_ids = BTreeSet::new();
 	let mut errors = Vec::new();
-	for changeset_path in &changeset_paths {
-		let absolute_path = root.join(changeset_path);
-		if !absolute_path.exists() {
-			errors.push(format!(
-				"attached changeset `{changeset_path}` does not exist in the checked-out workspace"
-			));
-			continue;
-		}
-		match load_change_signals(&absolute_path, &configuration, &discovery.packages) {
-			Ok(signals) => {
-				for signal in signals {
-					covered_package_ids.insert(
-						config_ids_by_package_id
-							.get(&signal.package_id)
-							.cloned()
-							.unwrap_or(signal.package_id),
-					);
-				}
+	if !changeset_paths.is_empty() {
+		let changeset_load_context =
+			monochange_config::build_changeset_load_context(&configuration, &discovery.packages);
+		for changeset_path in &changeset_paths {
+			let absolute_path = root.join(changeset_path);
+			if !absolute_path.exists() {
+				errors.push(format!(
+					"attached changeset `{changeset_path}` does not exist in the checked-out workspace"
+				));
+				continue;
 			}
-			Err(error) => errors.push(error.render()),
+			match monochange_config::load_changeset_file_with_context(
+				&absolute_path,
+				&changeset_load_context,
+			) {
+				Ok(loaded) => {
+					for signal in loaded.signals {
+						covered_package_ids.insert(
+							config_ids_by_package_id
+								.get(&signal.package_id)
+								.cloned()
+								.unwrap_or(signal.package_id),
+						);
+					}
+				}
+				Err(error) => errors.push(error.render()),
+			}
 		}
 	}
 

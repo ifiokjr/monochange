@@ -1,10 +1,54 @@
 #![allow(clippy::disallowed_methods)]
+use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
+use monochange_core::ChangesetTargetKind;
+
 use super::batch_git_log;
+use super::diagnose_changesets;
 use super::parse_batch_git_log_bytes;
 use super::parse_batch_git_log_output;
+
+fn setup_fixture(relative: &str) -> tempfile::TempDir {
+	monochange_test_helpers::fs::setup_fixture_from(env!("CARGO_MANIFEST_DIR"), relative)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn diagnose_changesets_loads_multiple_files_with_shared_context() {
+	let fixture = setup_fixture("monochange/changeset-policy-base");
+	fs::create_dir_all(fixture.path().join(".changeset"))
+		.unwrap_or_else(|error| panic!("create changeset dir: {error}"));
+	fs::write(
+		fixture.path().join(".changeset/bug-fix.md"),
+		"---\ncore: patch\n---\n\nFix a bug.\n",
+	)
+	.unwrap_or_else(|error| panic!("write bug fix changeset: {error}"));
+	fs::write(
+		fixture.path().join(".changeset/feature.md"),
+		"---\ncore: minor\n---\n\nAdd a feature.\n",
+	)
+	.unwrap_or_else(|error| panic!("write feature changeset: {error}"));
+
+	let report = diagnose_changesets(fixture.path(), &[])
+		.await
+		.unwrap_or_else(|error| panic!("diagnose changesets: {error}"));
+
+	assert_eq!(
+		report.requested_changesets,
+		vec![
+			PathBuf::from(".changeset/bug-fix.md"),
+			PathBuf::from(".changeset/feature.md")
+		]
+	);
+	assert_eq!(report.changesets.len(), 2);
+	assert!(report.changesets.iter().all(|changeset| {
+		changeset
+			.targets
+			.iter()
+			.any(|target| target.id == "core" && target.kind == ChangesetTargetKind::Package)
+	}));
+}
 
 #[test]
 fn batch_git_log_returns_empty_maps_for_empty_paths() {
