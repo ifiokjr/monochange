@@ -4,6 +4,73 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.5.0](https://github.com/monochange/monochange/releases/tag/v0.5.0) (2026-05-13)
+
+### Breaking Change
+
+#### require CLI steps to opt in to inherited command inputs
+
+> **Breaking change** — CLI step inputs are now explicit. Command-level inputs no longer automatically appear in every configured CLI step.
+
+A configured step now receives only the inputs listed in that step's `inputs` field. This removes ambiguous behavior where a command-level flag could unexpectedly shadow a step-specific input with the same name.
+
+**Before:** every step implicitly saw all command inputs, even with no step-level `inputs` entry:
+
+```toml
+[cli.release]
+inputs = [{ name = "format", type = "choice", choices = ["text", "json"], default = "text" }]
+steps = [{ type = "PrepareRelease" }]
+```
+
+**After:** inherit command inputs explicitly with the array shorthand:
+
+```toml
+[cli.release]
+inputs = [{ name = "format", type = "choice", choices = ["text", "json"], default = "text" }]
+steps = [{ type = "PrepareRelease", inputs = ["format"] }]
+```
+
+Map overrides still work for fixed or templated step values:
+
+```toml
+steps = [
+	{ type = "PrepareRelease", inputs = ["format"] },
+	{ type = "PublishRelease", inputs = { format = "json", draft = "{{ inputs.draft }}" } },
+]
+```
+
+Migration path: review custom `[cli.<command>]` definitions and add `inputs = ["name"]` to every step that needs a command-level input. Built-in default CLI commands and generated templates have been updated to declare their inherited inputs explicitly.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #467](https://github.com/monochange/monochange/pull/467) _Introduced in:_ [`ce4712f`](https://github.com/monochange/monochange/commit/ce4712f2890e0636c368b056db756df32f4cf769) _Last updated in:_ [`4cf0b03`](https://github.com/monochange/monochange/commit/4cf0b0349fc4aa5f5775d6a6db624c6cd18b7a39) _Related issues:_ [#489](https://github.com/monochange/monochange/issues/489)
+
+### Added
+
+#### Configurable publish-order dependency fields
+
+Add configurable ecosystem-specific dependency fields for package publish ordering across npm, Cargo, Deno, Dart/Flutter, Python, and Go.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #472](https://github.com/monochange/monochange/pull/472) _Introduced in:_ [`0d9cf46`](https://github.com/monochange/monochange/commit/0d9cf461a05057b61efa987d361ebd27d800dbdb) _Last updated in:_ [`4cf0b03`](https://github.com/monochange/monochange/commit/4cf0b0349fc4aa5f5775d6a6db624c6cd18b7a39) _Closed issues:_ [#465](https://github.com/monochange/monochange/issues/465) _Related issues:_ [#489](https://github.com/monochange/monochange/issues/489)
+
+#### Publish all configured packages
+
+Add a `--all` flag to the PublishPackages CLI step so migration workflows can publish every configured package, including packages that were not part of the prepared release record.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #461](https://github.com/monochange/monochange/pull/461) _Introduced in:_ [`3d956cd`](https://github.com/monochange/monochange/commit/3d956cd3e34747e088add98fe0358251f388782f) _Last updated in:_ [`4cf0b03`](https://github.com/monochange/monochange/commit/4cf0b0349fc4aa5f5775d6a6db624c6cd18b7a39) _Related issues:_ [#489](https://github.com/monochange/monochange/issues/489)
+
+### Fixed
+
+#### Add interactive CLI command wizard
+
+Added `mc command`, an interactive dashboard for adding and editing `[cli.<name>]` commands in `monochange.toml`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #471](https://github.com/monochange/monochange/pull/471) _Introduced in:_ [`fea471c`](https://github.com/monochange/monochange/commit/fea471c4b67b618cde51eaacfd4e30742cfb0dc1) _Last updated in:_ [`4cf0b03`](https://github.com/monochange/monochange/commit/4cf0b0349fc4aa5f5775d6a6db624c6cd18b7a39) _Related issues:_ [#489](https://github.com/monochange/monochange/issues/489)
+
+#### Add lints to the monochange config schema
+
+Allow the top-level `[lints]` table in generated `monochange.toml` JSON Schema assets. The lint configuration schema is intentionally permissive so all current and future lint rule shapes are accepted by editors and TOML language servers.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #462](https://github.com/monochange/monochange/pull/462) _Introduced in:_ [`953bb8c`](https://github.com/monochange/monochange/commit/953bb8c6e3532a31621c47c6e0b71eaa684771fc) _Last updated in:_ [`4cf0b03`](https://github.com/monochange/monochange/commit/4cf0b0349fc4aa5f5775d6a6db624c6cd18b7a39) _Related issues:_ [#489](https://github.com/monochange/monochange/issues/489)
+
 ## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)
 
 ### Added
