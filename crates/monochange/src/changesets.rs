@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fmt::Write as _;
 
 use super::*;
 use crate::changeset_policy::configuration_package_records;
@@ -28,7 +29,7 @@ pub(crate) async fn diagnose_changesets(
 
 	let loaded_changesets = load_diagnostic_changesets(root, &configuration, &changeset_paths)?;
 
-	let mut changesets = build_prepared_changesets(root, &loaded_changesets);
+	let mut changesets = build_prepared_changesets(root, loaded_changesets);
 
 	if let Some(source) = configuration.source.as_ref() {
 		hosted_sources::configured_hosted_source_adapter(source)
@@ -157,58 +158,79 @@ pub(crate) fn render_changeset_diagnostics(report: &ChangesetDiagnosticsReport) 
 		return "no matching changesets found".to_string();
 	}
 
-	let mut lines = Vec::new();
+	let mut rendered = String::new();
 
-	for changeset in &report.changesets {
+	for (index, changeset) in report.changesets.iter().enumerate() {
+		if index > 0 {
+			rendered.push('\n');
+		}
+
 		let change_summary = changeset.summary.as_deref().unwrap_or("<missing summary>");
 
-		lines.push(format!("changeset: {}", changeset.path.display()));
-		lines.push(format!("  summary: {change_summary}"));
+		let _ = writeln!(&mut rendered, "changeset: {}", changeset.path.display());
+		let _ = writeln!(&mut rendered, "  summary: {change_summary}");
 
 		if let Some(details) = &changeset.details {
-			lines.push(format!("  details: {details}"));
+			let _ = writeln!(&mut rendered, "  details: {details}");
 		}
 
 		if !changeset.targets.is_empty() {
-			lines.push("  targets:".to_string());
+			rendered.push_str("  targets:\n");
 
 			for target in &changeset.targets {
-				let bump = target
-					.bump
-					.map_or_else(|| "auto".to_string(), |bump| bump.to_string());
-				lines.push(format!(
-					"  - {} {} (bump: {}, origin: {})",
-					target.kind, target.id, bump, target.origin,
-				));
+				let _ = match target.bump {
+					Some(bump) => {
+						writeln!(
+							&mut rendered,
+							"  - {} {} (bump: {}, origin: {})",
+							target.kind, target.id, bump, target.origin,
+						)
+					}
+					None => {
+						writeln!(
+							&mut rendered,
+							"  - {} {} (bump: auto, origin: {})",
+							target.kind, target.id, target.origin,
+						)
+					}
+				};
 
 				if !target.caused_by.is_empty() {
-					lines.push(format!("    caused by: {}", target.caused_by.join(", ")));
+					rendered.push_str("    caused by: ");
+					push_comma_separated(
+						&mut rendered,
+						target.caused_by.iter().map(String::as_str),
+					);
+					rendered.push('\n');
 				}
 
 				if !target.evidence_refs.is_empty() {
-					lines.push(format!("    evidence: {}", target.evidence_refs.join(", ")));
+					rendered.push_str("    evidence: ");
+					push_comma_separated(
+						&mut rendered,
+						target.evidence_refs.iter().map(String::as_str),
+					);
+					rendered.push('\n');
 				}
 			}
 		}
 
 		if let Some(context) = &changeset.context {
-			push_changeset_context_lines(&mut lines, context);
+			push_changeset_context_lines(&mut rendered, context);
 		}
-
-		lines.push(String::new());
 	}
 
-	lines.pop();
-	lines.join("\n")
+	rendered.pop();
+	rendered
 }
 
-fn push_changeset_context_lines(lines: &mut Vec<String>, context: &ChangesetContext) {
+fn push_changeset_context_lines(rendered: &mut String, context: &ChangesetContext) {
 	if let Some(introduced) = context
 		.introduced
 		.as_ref()
 		.and_then(|revision| revision.commit.as_ref())
 	{
-		lines.push(format!("  introduced: {}", introduced.short_sha));
+		let _ = writeln!(rendered, "  introduced: {}", introduced.short_sha);
 	}
 
 	if let Some(last_updated) = context
@@ -216,7 +238,7 @@ fn push_changeset_context_lines(lines: &mut Vec<String>, context: &ChangesetCont
 		.as_ref()
 		.and_then(|revision| revision.commit.as_ref())
 	{
-		lines.push(format!("  last-updated: {}", last_updated.short_sha));
+		let _ = writeln!(rendered, "  last-updated: {}", last_updated.short_sha);
 	}
 
 	let review_request = context
@@ -231,25 +253,38 @@ fn push_changeset_context_lines(lines: &mut Vec<String>, context: &ChangesetCont
 		});
 
 	if let Some(review_request) = review_request {
-		let review_request_line = match &review_request.url {
-			Some(url) => format!("  review request: {} ({})", review_request.id, url),
-			None => format!("  review request: {}", review_request.id),
+		let _ = match &review_request.url {
+			Some(url) => {
+				writeln!(
+					rendered,
+					"  review request: {} ({})",
+					review_request.id, url,
+				)
+			}
+			None => writeln!(rendered, "  review request: {}", review_request.id),
 		};
-
-		lines.push(review_request_line);
 	}
 
 	if context.related_issues.is_empty() {
 		return;
 	}
 
-	let issues = context
-		.related_issues
-		.iter()
-		.map(|issue| issue.id.as_str())
-		.collect::<Vec<_>>()
-		.join(", ");
-	lines.push(format!("  related issues: {issues}"));
+	rendered.push_str("  related issues: ");
+	push_comma_separated(
+		rendered,
+		context.related_issues.iter().map(|issue| issue.id.as_str()),
+	);
+	rendered.push('\n');
+}
+
+fn push_comma_separated<'a>(rendered: &mut String, values: impl Iterator<Item = &'a str>) {
+	let mut separator = "";
+
+	for value in values {
+		rendered.push_str(separator);
+		rendered.push_str(value);
+		separator = ", ";
+	}
 }
 
 #[must_use = "the discovery result must be checked"]
@@ -293,7 +328,7 @@ pub(crate) fn discover_changeset_paths(
 
 pub(crate) fn build_prepared_changesets(
 	root: &Path,
-	loaded_changesets: &[monochange_config::LoadedChangesetFile],
+	loaded_changesets: Vec<monochange_config::LoadedChangesetFile>,
 ) -> Vec<PreparedChangeset> {
 	let relative_paths = loaded_changesets
 		.iter()
@@ -303,33 +338,43 @@ pub(crate) fn build_prepared_changesets(
 	// Batch-load all changeset git context in a single pass instead of
 	// spawning two git-log subprocesses per changeset (which was O(2N)
 	// subprocess spawns and dominated release planning time).
-	let git_contexts = batch_load_changeset_contexts(root, &relative_paths);
+	let mut git_contexts = batch_load_changeset_contexts(root, &relative_paths).into_iter();
 
 	loaded_changesets
-		.iter()
-		.zip(relative_paths.iter())
-		.enumerate()
-		.map(|(index, (changeset, relative_path))| {
+		.into_iter()
+		.zip(relative_paths)
+		.map(|(changeset, relative_path)| {
 			PreparedChangeset {
-				path: relative_path.clone(),
-				summary: changeset.summary.clone(),
-				details: changeset.details.clone(),
+				path: relative_path,
+				summary: changeset.summary,
+				details: changeset.details,
 				targets: changeset
 					.targets
-					.iter()
+					.into_iter()
 					.map(|target| {
+						let monochange_config::LoadedChangesetTarget {
+							id,
+							kind,
+							bump,
+							explicit_version: _,
+							origin,
+							evidence_refs,
+							change_type,
+							caused_by,
+						} = target;
+
 						PreparedChangesetTarget {
-							id: target.id.clone(),
-							kind: target.kind,
-							bump: target.bump,
-							origin: target.origin.clone(),
-							evidence_refs: target.evidence_refs.clone(),
-							change_type: target.change_type.clone(),
-							caused_by: target.caused_by.clone(),
+							id,
+							kind,
+							bump,
+							origin,
+							evidence_refs,
+							change_type,
+							caused_by,
 						}
 					})
 					.collect(),
-				context: git_contexts.get(index).cloned(),
+				context: git_contexts.next(),
 			}
 		})
 		.collect()

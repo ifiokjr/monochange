@@ -1566,7 +1566,7 @@ pub(crate) async fn prepare_release_execution_with_file_diffs(
 		.collect::<Vec<_>>();
 	let prepared_changesets =
 		measure_prepare_phase(&mut phase_timings, "build prepared changesets", || {
-			Ok(build_prepared_changesets(root, &loaded_changesets))
+			Ok(build_prepared_changesets(root, loaded_changesets))
 		})?;
 	let mut changesets = Some(prepared_changesets);
 	let background_changeset_context =
