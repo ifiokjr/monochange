@@ -448,6 +448,23 @@ pub mod release_record {
 	}
 }
 
+/// Configuration schema artifact support.
+pub mod config {
+	/// Render a deterministic populated workspace-configuration artifact.
+	#[must_use]
+	pub fn populated_artifact_json() -> String {
+		let artifact = serde_json::json!({
+			"source": {
+				"owner": "monochange",
+				"repo": "monochange",
+				"provider": "github"
+			}
+		});
+		serde_json::to_string_pretty(&artifact)
+			.unwrap_or_else(|error| panic!("serialize config artifact fixture: {error}"))
+	}
+}
+
 /// Machine-readable migration changelog entries.
 pub mod migration_changelog {
 	use serde::Serialize;

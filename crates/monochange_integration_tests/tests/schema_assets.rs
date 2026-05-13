@@ -96,6 +96,35 @@ fn release_record_artifact_fixtures_load_through_parser() -> Result<(), Box<dyn 
 }
 
 #[test]
+fn config_artifact_fixtures_are_valid_json() -> Result<(), Box<dyn Error>> {
+	let paths = schema_asset_paths()?;
+	let artifact_paths = config_artifact_paths(&paths)?;
+	let names = artifact_paths
+		.iter()
+		.map(|path| file_name(path))
+		.collect::<Result<Vec<_>, _>>()?;
+	let current_versioned_name = format!(
+		"monochange.v{}.json",
+		monochange_schema::CURRENT_SCHEMA_VERSION_TEXT
+	);
+
+	assert!(names.iter().any(|name| name == "monochange.current.json"));
+	assert!(names.iter().any(|name| name == &current_versioned_name));
+
+	let expected: Value =
+		serde_json::from_str(&monochange_schema::config::populated_artifact_json())?;
+	for artifact_path in artifact_paths {
+		let name = file_name(&artifact_path)?;
+		let text = std::fs::read_to_string(&artifact_path)?;
+		let raw: Value = serde_json::from_str(&text)?;
+
+		assert_eq!(raw, expected, "{name} should match the generated fixture");
+	}
+
+	Ok(())
+}
+
+#[test]
 fn release_record_schema_declares_current_artifact_contract() -> Result<(), Box<dyn Error>> {
 	let paths = schema_asset_paths()?;
 	let schema = parse_json(&paths.canonical_release_schema)?;
@@ -522,7 +551,7 @@ struct SchemaAssetPaths {
 	canonical_release_schema: PathBuf,
 	migration_changelog: PathBuf,
 	schema_crate_manifest: PathBuf,
-	release_record_artifacts_dir: PathBuf,
+	artifacts_dir: PathBuf,
 }
 
 fn schema_asset_paths() -> Result<SchemaAssetPaths, Box<dyn Error>> {
@@ -543,14 +572,14 @@ fn schema_asset_paths() -> Result<SchemaAssetPaths, Box<dyn Error>> {
 			.join("crates/monochange_schema/schemas/release-record.schema.json"),
 		migration_changelog: root.join("crates/monochange_schema/schemas/migration-changelog.json"),
 		schema_crate_manifest: root.join("crates/monochange_schema/Cargo.toml"),
-		release_record_artifacts_dir: root.join("crates/monochange_schema/schemas/artifacts"),
+		artifacts_dir: root.join("crates/monochange_schema/schemas/artifacts"),
 		root,
 	})
 }
 
 fn release_record_artifact_paths(paths: &SchemaAssetPaths) -> Result<Vec<PathBuf>, Box<dyn Error>> {
 	let mut artifact_paths = Vec::new();
-	for entry in std::fs::read_dir(&paths.release_record_artifacts_dir)? {
+	for entry in std::fs::read_dir(&paths.artifacts_dir)? {
 		let path = entry?.path();
 		let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
 			continue;
@@ -562,6 +591,24 @@ fn release_record_artifact_paths(paths: &SchemaAssetPaths) -> Result<Vec<PathBuf
 	artifact_paths.sort();
 	if artifact_paths.is_empty() {
 		return Err(test_error("no release-record artifact fixtures were found"));
+	}
+	Ok(artifact_paths)
+}
+
+fn config_artifact_paths(paths: &SchemaAssetPaths) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+	let mut artifact_paths = Vec::new();
+	for entry in std::fs::read_dir(&paths.artifacts_dir)? {
+		let path = entry?.path();
+		let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+			continue;
+		};
+		if name.starts_with("monochange.") && name.ends_with(".json") {
+			artifact_paths.push(path);
+		}
+	}
+	artifact_paths.sort();
+	if artifact_paths.is_empty() {
+		return Err(test_error("no config artifact fixtures were found"));
 	}
 	Ok(artifact_paths)
 }

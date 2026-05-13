@@ -260,6 +260,12 @@ fn run_cli_round_trip() {
 			.join(format!("release-record.v{version}.json"))
 			.exists()
 	);
+	assert!(artifacts.join("monochange.current.json").exists());
+	assert!(
+		artifacts
+			.join(format!("monochange.v{version}.json"))
+			.exists()
+	);
 	assert!(
 		docs.join(format!("release-record.v{version}.schema.json"))
 			.exists()

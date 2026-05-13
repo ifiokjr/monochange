@@ -143,6 +143,7 @@ pub fn run_with_paths(
 	let config_json = serde_json::to_string_pretty(&config_value).unwrap();
 	let release_record_artifact_json =
 		monochange_schema::release_record::populated_artifact_json(version);
+	let config_artifact_json = monochange_schema::config::populated_artifact_json();
 	let migration_changelog_json = format!(
 		"{}\n",
 		monochange_schema::migration_changelog::to_json_pretty().unwrap()
@@ -172,11 +173,12 @@ pub fn run_with_paths(
 	let release_path = schemas_dir.join("release-record.schema.json");
 	let config_path = schemas_dir.join("monochange.schema.json");
 	let migration_changelog_path = schemas_dir.join("migration-changelog.json");
-	let release_record_artifacts_dir = schemas_dir.join("artifacts");
-	let release_record_artifact_current_path =
-		release_record_artifacts_dir.join("release-record.current.json");
+	let artifacts_dir = schemas_dir.join("artifacts");
+	let release_record_artifact_current_path = artifacts_dir.join("release-record.current.json");
 	let release_record_artifact_versioned_path =
-		release_record_artifacts_dir.join(format!("release-record.v{version}.json"));
+		artifacts_dir.join(format!("release-record.v{version}.json"));
+	let config_artifact_current_path = artifacts_dir.join("monochange.current.json");
+	let config_artifact_versioned_path = artifacts_dir.join(format!("monochange.v{version}.json"));
 	let docs_release_path = docs_schemas_dir.join("release-record.schema.json");
 	let docs_config_path = docs_schemas_dir.join("monochange.schema.json");
 	let docs_release_versioned_path =
@@ -187,7 +189,7 @@ pub fn run_with_paths(
 	if update_mode {
 		fs::create_dir_all(schemas_dir).unwrap();
 		fs::create_dir_all(docs_schemas_dir).unwrap();
-		fs::create_dir_all(&release_record_artifacts_dir).unwrap();
+		fs::create_dir_all(&artifacts_dir).unwrap();
 		if let Some(parent) = schema_version_path.parent() {
 			fs::create_dir_all(parent).unwrap();
 		}
@@ -206,6 +208,8 @@ pub fn run_with_paths(
 			&release_record_artifact_json,
 		)
 		.unwrap();
+		fs::write(&config_artifact_current_path, &config_artifact_json).unwrap();
+		fs::write(&config_artifact_versioned_path, &config_artifact_json).unwrap();
 
 		// Also write to docs directory (unversioned aliases)
 		fs::write(&docs_release_path, &release_json).unwrap();
@@ -238,6 +242,11 @@ pub fn run_with_paths(
 		(
 			&release_record_artifact_versioned_path,
 			release_record_artifact_json.as_str(),
+		),
+		(&config_artifact_current_path, config_artifact_json.as_str()),
+		(
+			&config_artifact_versioned_path,
+			config_artifact_json.as_str(),
 		),
 		(&docs_release_path, release_json.as_str()),
 		(&docs_config_path, config_json.as_str()),
