@@ -260,7 +260,7 @@ in
         set -euo pipefail
         cargo xtask schema update
       '';
-      description = "Regenerate committed JSON Schema assets.";
+      description = "Regenerate committed current JSON Schema assets.";
       binary = "bash";
     };
     "schema:check" = {
@@ -268,7 +268,23 @@ in
         set -euo pipefail
         cargo xtask schema check
       '';
-      description = "Check committed JSON Schema assets are up to date.";
+      description = "Check committed current JSON Schema assets are up to date.";
+      binary = "bash";
+    };
+    "schema:release:update" = {
+      exec = ''
+        set -euo pipefail
+        cargo xtask schema release update
+      '';
+      description = "Regenerate committed release JSON Schema assets, including versioned files.";
+      binary = "bash";
+    };
+    "schema:release:check" = {
+      exec = ''
+        set -euo pipefail
+        cargo xtask schema release check
+      '';
+      description = "Check committed release JSON Schema assets, including versioned files.";
       binary = "bash";
     };
     "fix:clippy" = {

@@ -93,7 +93,7 @@ pub fn post_process_config(schema: &mut serde_json::Value, id: &str, title: &str
 		});
 }
 
-/// Generate schema JSON strings and write them to disk (update_mode) or compare to disk (check mode).
+/// Generate current schema JSON strings and write them to disk (update_mode) or compare to disk (check mode).
 ///
 /// Returns `Ok(())` on success, or an error message describing the mismatch.
 pub fn run(update_mode: bool) -> Result<(), String> {
@@ -102,9 +102,10 @@ pub fn run(update_mode: bool) -> Result<(), String> {
 	let schemas_dir = workspace_dir.join("crates/monochange_schema/schemas");
 	let docs_schemas_dir = workspace_dir.join("docs/src/schemas");
 	let schema_version_path = workspace_dir.join("crates/monochange_schema/SCHEMA_VERSION");
-	let version = expected_schema_version(workspace_dir)?;
+	let version = current_schema_version(&schema_version_path)?;
 	run_with_paths(
 		update_mode,
+		SchemaMode::Current,
 		&schemas_dir,
 		&docs_schemas_dir,
 		&schema_version_path,
@@ -112,15 +113,94 @@ pub fn run(update_mode: bool) -> Result<(), String> {
 	)
 }
 
+/// Generate release schema JSON strings, including immutable versioned files.
+pub fn run_release(update_mode: bool) -> Result<(), String> {
+	let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+	let workspace_dir = crate_dir.parent().unwrap().parent().unwrap();
+	let schemas_dir = workspace_dir.join("crates/monochange_schema/schemas");
+	let docs_schemas_dir = workspace_dir.join("docs/src/schemas");
+	let schema_version_path = workspace_dir.join("crates/monochange_schema/SCHEMA_VERSION");
+	let version = expected_schema_version(workspace_dir)?;
+	run_with_paths(
+		update_mode,
+		SchemaMode::Release,
+		&schemas_dir,
+		&docs_schemas_dir,
+		&schema_version_path,
+		&version,
+	)
+}
+
+/// Selects which generated schema assets are maintained.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SchemaMode {
+	/// Maintain moving current aliases and deterministic current fixtures only.
+	Current,
+	/// Maintain current aliases plus immutable versioned release artifacts.
+	Release,
+}
+
+struct GeneratedFile {
+	path: PathBuf,
+	contents: String,
+}
+
 /// Core schema generation logic with configurable output directories.
 pub fn run_with_paths(
 	update_mode: bool,
-	schemas_dir: &PathBuf,
-	docs_schemas_dir: &PathBuf,
-	schema_version_path: &PathBuf,
+	mode: SchemaMode,
+	schemas_dir: &Path,
+	docs_schemas_dir: &Path,
+	schema_version_path: &Path,
 	version: &str,
 ) -> Result<(), String> {
-	// Release record schema
+	let generated_files = schema_files(schemas_dir, docs_schemas_dir, version, mode);
+	let schema_version_contents = schema_version_file_contents(version);
+
+	if update_mode {
+		if let Some(parent) = schema_version_path.parent() {
+			fs::create_dir_all(parent)
+				.map_err(|error| format!("Could not create {}: {error}", parent.display()))?;
+		}
+		fs::write(schema_version_path, schema_version_contents).map_err(|error| {
+			format!("Could not write {}: {error}", schema_version_path.display())
+		})?;
+		for generated_file in &generated_files {
+			write_generated_file(generated_file)?;
+		}
+		remove_stale_current_artifact_aliases(schemas_dir)?;
+		println!("Schemas updated successfully.");
+		return Ok(());
+	}
+
+	let mut errors = Vec::new();
+	if let Err(error) = check_text_files(&[(schema_version_path, schema_version_contents.as_str())])
+	{
+		errors.push(error);
+	}
+
+	let schema_checks = generated_files
+		.iter()
+		.map(|file| (file.path.as_path(), file.contents.as_str()))
+		.collect::<Vec<_>>();
+	if let Err(error) = check_schemas(&schema_checks) {
+		errors.push(error);
+	}
+
+	if errors.is_empty() {
+		println!("Schemas are up to date.");
+		Ok(())
+	} else {
+		Err(errors.join("\n"))
+	}
+}
+
+fn schema_files(
+	schemas_dir: &Path,
+	docs_schemas_dir: &Path,
+	version: &str,
+	mode: SchemaMode,
+) -> Vec<GeneratedFile> {
 	let release_schema = monochange_core::schema::release_record();
 	let mut release_value = release_schema.to_value();
 	post_process_release(
@@ -130,7 +210,6 @@ pub fn run_with_paths(
 		version,
 	);
 
-	// Config schema from raw TOML types
 	let config_schema = monochange_config::schema::workspace_configuration();
 	let mut config_value = config_schema.to_value();
 	post_process_config(
@@ -149,121 +228,119 @@ pub fn run_with_paths(
 		monochange_schema::migration_changelog::to_json_pretty().unwrap()
 	);
 
-	// Versioned schemas (identical content, different $id)
-	let mut release_versioned_value = release_value.clone();
-	let mut config_versioned_value = config_value.clone();
-	post_process_release(
-		&mut release_versioned_value,
-		&format!(
-			"https://monochange.github.io/monochange/schemas/release-record.v{version}.schema.json"
-		),
-		"monochange release record",
-		version,
-	);
-	post_process_config(
-		&mut config_versioned_value,
-		&format!(
-			"https://monochange.github.io/monochange/schemas/monochange.v{version}.schema.json"
-		),
-		"monochange configuration",
-	);
-	let release_versioned_json = serde_json::to_string_pretty(&release_versioned_value).unwrap();
-	let config_versioned_json = serde_json::to_string_pretty(&config_versioned_value).unwrap();
-
-	let release_path = schemas_dir.join("release-record.schema.json");
-	let config_path = schemas_dir.join("monochange.schema.json");
-	let migration_changelog_path = schemas_dir.join("migration-changelog.json");
 	let artifacts_dir = schemas_dir.join("artifacts");
-	let release_record_artifact_current_path = artifacts_dir.join("release-record.current.json");
-	let release_record_artifact_versioned_path =
-		artifacts_dir.join(format!("release-record.v{version}.json"));
-	let config_artifact_current_path = artifacts_dir.join("monochange.current.json");
-	let config_artifact_versioned_path = artifacts_dir.join(format!("monochange.v{version}.json"));
-	let docs_release_path = docs_schemas_dir.join("release-record.schema.json");
-	let docs_config_path = docs_schemas_dir.join("monochange.schema.json");
-	let docs_release_versioned_path =
-		docs_schemas_dir.join(format!("release-record.v{version}.schema.json"));
-	let docs_config_versioned_path =
-		docs_schemas_dir.join(format!("monochange.v{version}.schema.json"));
+	let current_artifacts_dir = artifacts_dir.join("current");
+	let mut files = vec![
+		GeneratedFile {
+			path: schemas_dir.join("release-record.schema.json"),
+			contents: release_json.clone(),
+		},
+		GeneratedFile {
+			path: schemas_dir.join("monochange.schema.json"),
+			contents: config_json.clone(),
+		},
+		GeneratedFile {
+			path: schemas_dir.join("migration-changelog.json"),
+			contents: migration_changelog_json,
+		},
+		GeneratedFile {
+			path: current_artifacts_dir.join("release-record.json"),
+			contents: release_record_artifact_json.clone(),
+		},
+		GeneratedFile {
+			path: current_artifacts_dir.join("monochange.json"),
+			contents: config_artifact_json.clone(),
+		},
+		GeneratedFile {
+			path: docs_schemas_dir.join("release-record.schema.json"),
+			contents: release_json,
+		},
+		GeneratedFile {
+			path: docs_schemas_dir.join("monochange.schema.json"),
+			contents: config_json,
+		},
+	];
 
-	if update_mode {
-		fs::create_dir_all(schemas_dir).unwrap();
-		fs::create_dir_all(docs_schemas_dir).unwrap();
-		fs::create_dir_all(&artifacts_dir).unwrap();
-		if let Some(parent) = schema_version_path.parent() {
-			fs::create_dir_all(parent).unwrap();
+	if mode == SchemaMode::Release {
+		let mut release_versioned_value = release_value.clone();
+		let mut config_versioned_value = config_value.clone();
+		post_process_release(
+			&mut release_versioned_value,
+			&format!(
+				"https://monochange.github.io/monochange/schemas/release-record.v{version}.schema.json"
+			),
+			"monochange release record",
+			version,
+		);
+		post_process_config(
+			&mut config_versioned_value,
+			&format!(
+				"https://monochange.github.io/monochange/schemas/monochange.v{version}.schema.json"
+			),
+			"monochange configuration",
+		);
+		files.extend([
+			GeneratedFile {
+				path: artifacts_dir.join(format!("release-record.v{version}.json")),
+				contents: release_record_artifact_json,
+			},
+			GeneratedFile {
+				path: artifacts_dir.join(format!("monochange.v{version}.json")),
+				contents: config_artifact_json,
+			},
+			GeneratedFile {
+				path: docs_schemas_dir.join(format!("release-record.v{version}.schema.json")),
+				contents: serde_json::to_string_pretty(&release_versioned_value).unwrap(),
+			},
+			GeneratedFile {
+				path: docs_schemas_dir.join(format!("monochange.v{version}.schema.json")),
+				contents: serde_json::to_string_pretty(&config_versioned_value).unwrap(),
+			},
+		]);
+	}
+
+	files
+}
+
+fn write_generated_file(generated_file: &GeneratedFile) -> Result<(), String> {
+	if let Some(parent) = generated_file.path.parent() {
+		fs::create_dir_all(parent)
+			.map_err(|error| format!("Could not create {}: {error}", parent.display()))?;
+	}
+	fs::write(&generated_file.path, &generated_file.contents)
+		.map_err(|error| format!("Could not write {}: {error}", generated_file.path.display()))
+}
+
+fn remove_stale_current_artifact_aliases(schemas_dir: &Path) -> Result<(), String> {
+	let artifacts_dir = schemas_dir.join("artifacts");
+	for path in [
+		artifacts_dir.join("release-record.current.json"),
+		artifacts_dir.join("monochange.current.json"),
+	] {
+		if let Err(error) = fs::remove_file(&path)
+			&& error.kind() != std::io::ErrorKind::NotFound
+		{
+			return Err(format!("Could not remove {}: {error}", path.display()));
 		}
+	}
+	Ok(())
+}
 
-		fs::write(schema_version_path, schema_version_file_contents(version)).unwrap();
-		fs::write(&release_path, &release_json).unwrap();
-		fs::write(&config_path, &config_json).unwrap();
-		fs::write(&migration_changelog_path, &migration_changelog_json).unwrap();
-		fs::write(
-			&release_record_artifact_current_path,
-			&release_record_artifact_json,
+fn current_schema_version(schema_version_path: &Path) -> Result<String, String> {
+	let contents = fs::read_to_string(schema_version_path).map_err(|error| {
+		format!(
+			"Could not read current schema version from {}: {error}",
+			schema_version_path.display()
 		)
-		.unwrap();
-		fs::write(
-			&release_record_artifact_versioned_path,
-			&release_record_artifact_json,
-		)
-		.unwrap();
-		fs::write(&config_artifact_current_path, &config_artifact_json).unwrap();
-		fs::write(&config_artifact_versioned_path, &config_artifact_json).unwrap();
-
-		// Also write to docs directory (unversioned aliases)
-		fs::write(&docs_release_path, &release_json).unwrap();
-		fs::write(&docs_config_path, &config_json).unwrap();
-
-		// Write versioned schemas
-		fs::write(&docs_release_versioned_path, &release_versioned_json).unwrap();
-		fs::write(&docs_config_versioned_path, &config_versioned_json).unwrap();
-
-		println!("Schemas updated successfully.");
-		return Ok(());
+	})?;
+	let version = contents.trim();
+	if version.is_empty() {
+		return Err(format!(
+			"Current schema version file is empty: {}",
+			schema_version_path.display()
+		));
 	}
-
-	// Check mode: compare existing files
-	let mut errors = Vec::new();
-	if let Err(error) = check_text_files(&[(
-		schema_version_path,
-		schema_version_file_contents(version).as_str(),
-	)]) {
-		errors.push(error);
-	}
-	if let Err(error) = check_schemas(&[
-		(&release_path, release_json.as_str()),
-		(&config_path, config_json.as_str()),
-		(&migration_changelog_path, migration_changelog_json.as_str()),
-		(
-			&release_record_artifact_current_path,
-			release_record_artifact_json.as_str(),
-		),
-		(
-			&release_record_artifact_versioned_path,
-			release_record_artifact_json.as_str(),
-		),
-		(&config_artifact_current_path, config_artifact_json.as_str()),
-		(
-			&config_artifact_versioned_path,
-			config_artifact_json.as_str(),
-		),
-		(&docs_release_path, release_json.as_str()),
-		(&docs_config_path, config_json.as_str()),
-		(
-			&docs_release_versioned_path,
-			release_versioned_json.as_str(),
-		),
-		(&docs_config_versioned_path, config_versioned_json.as_str()),
-	]) {
-		errors.push(error);
-	}
-	if errors.is_empty() {
-		println!("Schemas are up to date.");
-		Ok(())
-	} else {
-		Err(errors.join("\n"))
-	}
+	Ok(version.to_string())
 }
 
 fn schema_version_file_contents(version: &str) -> String {
@@ -575,7 +652,7 @@ fn replace_commands_inventory(current: &str, expected: &str) -> Result<String, S
 }
 
 /// Compare expected text strings against files on disk.
-fn check_text_files(paths: &[(&PathBuf, &str)]) -> Result<(), String> {
+fn check_text_files(paths: &[(&Path, &str)]) -> Result<(), String> {
 	let mut errors = Vec::new();
 	for (path, expected) in paths {
 		if path.exists() {
@@ -595,7 +672,7 @@ fn check_text_files(paths: &[(&PathBuf, &str)]) -> Result<(), String> {
 }
 
 /// Compare expected schema JSON strings against files on disk.
-fn check_schemas(paths: &[(&PathBuf, &str)]) -> Result<(), String> {
+fn check_schemas(paths: &[(&Path, &str)]) -> Result<(), String> {
 	let mut errors = Vec::new();
 	for (path, expected) in paths {
 		if path.exists() {

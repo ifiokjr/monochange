@@ -236,14 +236,24 @@ Each module should expose:
 
 ## JSON Schema files
 
-Commit generated schemas under stable paths. The implementation uses source templates plus Rust wire constants and writes both moving aliases and versioned copies:
+Commit generated schemas under stable paths. Normal schema generation maintains only moving current aliases plus deterministic current artifact fixtures:
 
 ```text
 crates/monochange_schema/schemas/release-record.schema.json
+crates/monochange_schema/schemas/monochange.schema.json
+crates/monochange_schema/schemas/artifacts/current/release-record.json
+crates/monochange_schema/schemas/artifacts/current/monochange.json
 docs/src/schemas/release-record.schema.json
-docs/src/schemas/release-record.v0.1.schema.json
 docs/src/schemas/monochange.schema.json
-docs/src/schemas/monochange.v0.1.schema.json
+```
+
+Release schema generation additionally writes immutable versioned copies:
+
+```text
+crates/monochange_schema/schemas/artifacts/release-record.v{version}.json
+crates/monochange_schema/schemas/artifacts/monochange.v{version}.json
+docs/src/schemas/release-record.v{version}.schema.json
+docs/src/schemas/monochange.v{version}.schema.json
 ```
 
 Generation is deterministic and checked by tests plus devenv scripts:
@@ -251,9 +261,11 @@ Generation is deterministic and checked by tests plus devenv scripts:
 ```text
 schema:update
 schema:check
+schema:release:update
+schema:release:check
 ```
 
-`fix:all` runs `schema:update`; `lint:all` runs `schema:check`.
+`fix:all` runs `schema:update`; `lint:all` runs `schema:check`. Release automation uses `schema:release:update` after `PrepareRelease`, and release preflight uses `schema:release:check`.
 
 ## Implementation checklist
 

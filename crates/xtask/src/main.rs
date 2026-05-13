@@ -50,11 +50,27 @@ enum SkillCommandActions {
 	Check,
 }
 
+#[derive(Parser)]
+struct SchemaReleaseArgs {
+	#[command(subcommand)]
+	command: SchemaReleaseCommands,
+}
+
 #[derive(Subcommand)]
 enum SchemaCommands {
-	/// Write (update) schema files to disk
+	/// Write (update) current schema files to disk
 	Update,
-	/// Check committed schema files are up to date
+	/// Check committed current schema files are up to date
+	Check,
+	/// Generate or check release schema files, including versioned assets
+	Release(SchemaReleaseArgs),
+}
+
+#[derive(Subcommand)]
+enum SchemaReleaseCommands {
+	/// Write (update) release schema files to disk
+	Update,
+	/// Check committed release schema files are up to date
 	Check,
 }
 
@@ -66,6 +82,12 @@ fn main() {
 			match args.command {
 				SchemaCommands::Update => xtask::run(true),
 				SchemaCommands::Check => xtask::run(false),
+				SchemaCommands::Release(release_args) => {
+					match release_args.command {
+						SchemaReleaseCommands::Update => xtask::run_release(true),
+						SchemaReleaseCommands::Check => xtask::run_release(false),
+					}
+				}
 			}
 		}
 		Commands::Skill(args) => {

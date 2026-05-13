@@ -93,6 +93,18 @@ fn populated_release_record_artifact_uses_current_schema_version() {
 			.iter()
 			.any(|entry| {
 				entry
+					== &json!(
+						"crates/monochange_schema/schemas/artifacts/current/release-record.json"
+					)
+			})
+	);
+	assert!(
+		value["changedFiles"]
+			.as_array()
+			.unwrap()
+			.iter()
+			.any(|entry| {
+				entry
 					== &json!(format!(
 						"crates/monochange_schema/schemas/artifacts/release-record.v{version}.json"
 					))

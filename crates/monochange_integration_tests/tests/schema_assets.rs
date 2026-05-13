@@ -42,11 +42,7 @@ fn release_record_artifact_fixtures_load_through_parser() -> Result<(), Box<dyn 
 		monochange_schema::CURRENT_SCHEMA_VERSION_TEXT
 	);
 
-	assert!(
-		names
-			.iter()
-			.any(|name| name == "release-record.current.json")
-	);
+	assert!(names.iter().any(|name| name == "release-record.json"));
 	assert!(names.iter().any(|name| name == &current_versioned_name));
 	assert!(
 		names
@@ -62,7 +58,7 @@ fn release_record_artifact_fixtures_load_through_parser() -> Result<(), Box<dyn 
 		let raw_schema_version = json_str(&raw, "/schemaVersion")?;
 		let record = monochange_core::parse_release_record_json(&text)?;
 
-		if name == "release-record.current.json" || name == current_versioned_name {
+		if name == "release-record.json" || name == current_versioned_name {
 			assert_eq!(
 				raw_schema_version,
 				monochange_schema::CURRENT_SCHEMA_VERSION_TEXT
@@ -108,7 +104,7 @@ fn config_artifact_fixtures_are_valid_json() -> Result<(), Box<dyn Error>> {
 		monochange_schema::CURRENT_SCHEMA_VERSION_TEXT
 	);
 
-	assert!(names.iter().any(|name| name == "monochange.current.json"));
+	assert!(names.iter().any(|name| name == "monochange.json"));
 	assert!(names.iter().any(|name| name == &current_versioned_name));
 
 	let expected: Value =
@@ -121,6 +117,29 @@ fn config_artifact_fixtures_are_valid_json() -> Result<(), Box<dyn Error>> {
 		assert_eq!(raw, expected, "{name} should match the generated fixture");
 	}
 
+	Ok(())
+}
+
+#[test]
+fn current_artifact_fixtures_are_colocated() -> Result<(), Box<dyn Error>> {
+	let paths = schema_asset_paths()?;
+	let mut names = Vec::new();
+	for entry in std::fs::read_dir(&paths.current_artifacts_dir)? {
+		let path = entry?.path();
+		if path.extension().and_then(|extension| extension.to_str()) == Some("json") {
+			names.push(file_name(&path)?);
+		}
+	}
+	names.sort();
+
+	assert_eq!(names, vec!["monochange.json", "release-record.json"]);
+	assert!(!paths.artifacts_dir.join("monochange.current.json").exists());
+	assert!(
+		!paths
+			.artifacts_dir
+			.join("release-record.current.json")
+			.exists()
+	);
 	Ok(())
 }
 
@@ -552,6 +571,7 @@ struct SchemaAssetPaths {
 	migration_changelog: PathBuf,
 	schema_crate_manifest: PathBuf,
 	artifacts_dir: PathBuf,
+	current_artifacts_dir: PathBuf,
 }
 
 fn schema_asset_paths() -> Result<SchemaAssetPaths, Box<dyn Error>> {
@@ -573,18 +593,19 @@ fn schema_asset_paths() -> Result<SchemaAssetPaths, Box<dyn Error>> {
 		migration_changelog: root.join("crates/monochange_schema/schemas/migration-changelog.json"),
 		schema_crate_manifest: root.join("crates/monochange_schema/Cargo.toml"),
 		artifacts_dir: root.join("crates/monochange_schema/schemas/artifacts"),
+		current_artifacts_dir: root.join("crates/monochange_schema/schemas/artifacts/current"),
 		root,
 	})
 }
 
 fn release_record_artifact_paths(paths: &SchemaAssetPaths) -> Result<Vec<PathBuf>, Box<dyn Error>> {
-	let mut artifact_paths = Vec::new();
+	let mut artifact_paths = vec![paths.current_artifacts_dir.join("release-record.json")];
 	for entry in std::fs::read_dir(&paths.artifacts_dir)? {
 		let path = entry?.path();
 		let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
 			continue;
 		};
-		if name.starts_with("release-record.") && name.ends_with(".json") {
+		if name.starts_with("release-record.v") && name.ends_with(".json") {
 			artifact_paths.push(path);
 		}
 	}
@@ -592,23 +613,39 @@ fn release_record_artifact_paths(paths: &SchemaAssetPaths) -> Result<Vec<PathBuf
 	if artifact_paths.is_empty() {
 		return Err(test_error("no release-record artifact fixtures were found"));
 	}
+	for artifact_path in &artifact_paths {
+		if !artifact_path.exists() {
+			return Err(test_error(format!(
+				"missing release-record artifact fixture: {}",
+				artifact_path.display()
+			)));
+		}
+	}
 	Ok(artifact_paths)
 }
 
 fn config_artifact_paths(paths: &SchemaAssetPaths) -> Result<Vec<PathBuf>, Box<dyn Error>> {
-	let mut artifact_paths = Vec::new();
+	let mut artifact_paths = vec![paths.current_artifacts_dir.join("monochange.json")];
 	for entry in std::fs::read_dir(&paths.artifacts_dir)? {
 		let path = entry?.path();
 		let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
 			continue;
 		};
-		if name.starts_with("monochange.") && name.ends_with(".json") {
+		if name.starts_with("monochange.v") && name.ends_with(".json") {
 			artifact_paths.push(path);
 		}
 	}
 	artifact_paths.sort();
 	if artifact_paths.is_empty() {
 		return Err(test_error("no config artifact fixtures were found"));
+	}
+	for artifact_path in &artifact_paths {
+		if !artifact_path.exists() {
+			return Err(test_error(format!(
+				"missing config artifact fixture: {}",
+				artifact_path.display()
+			)));
+		}
 	}
 	Ok(artifact_paths)
 }
