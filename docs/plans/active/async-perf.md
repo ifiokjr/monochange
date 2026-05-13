@@ -59,6 +59,7 @@
   - Streamed release deduplication index reads/writes through buffered files, parsed JSONL entries into borrowed structs, and wrote sorted borrowed hashes instead of allocating formatted line strings and a joined file body.
   - Reduced versioned-file update allocations by deduplicating borrowed definitions, passing dependency names as borrowed strings, streaming glob matches, rendering cached JSON directly into bytes, borrowing package release versions by config id, and bypassing UTF-8 conversion for binary Bun lockfiles.
   - Streamed publish-readiness text, Markdown, JSON newline, and package-fingerprint rendering directly into output buffers instead of allocating temporary line or identity-render vectors before joining, and made publish-readiness package identities borrow report fields instead of cloning strings for validation and fingerprinting.
+  - Streamed release-branch policy error construction directly into one string, avoiding temporary branch-name vectors and joined strings on rejection paths.
 
 ## Current benchmark summary
 

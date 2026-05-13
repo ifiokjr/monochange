@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use std::path::Path;
 
 use glob::Pattern;
@@ -92,22 +93,43 @@ pub(crate) async fn verify_release_ref(
 		}
 	}
 
-	let available = branch_refs
-		.iter()
-		.map(|branch| branch.display_name.as_str())
-		.collect::<Vec<_>>()
-		.join(", ");
-	let available = if available.is_empty() {
-		"none found".to_string()
-	} else {
-		available
-	};
+	let mut message = String::new();
+	let _ = write!(
+		message,
+		"release ref `{ref_name}` resolves to commit {}, which is not reachable from any configured release branch pattern [",
+		crate::short_commit_sha(&commit)
+	);
+	write_comma_separated(&mut message, policy.branches.iter().map(String::as_str));
+	message.push_str("]; matching branch refs: ");
+	write_branch_ref_names(&mut message, &branch_refs);
 
-	Err(MonochangeError::Config(format!(
-		"release ref `{ref_name}` resolves to commit {}, which is not reachable from any configured release branch pattern [{}]; matching branch refs: {available}",
-		crate::short_commit_sha(&commit),
-		policy.branches.join(", ")
-	)))
+	Err(MonochangeError::Config(message))
+}
+
+fn write_branch_ref_names(output: &mut String, branch_refs: &[BranchRef]) {
+	if branch_refs.is_empty() {
+		output.push_str("none found");
+		return;
+	}
+
+	write_comma_separated(
+		output,
+		branch_refs
+			.iter()
+			.map(|branch| branch.display_name.as_str()),
+	);
+}
+
+fn write_comma_separated<'a>(output: &mut String, values: impl IntoIterator<Item = &'a str>) {
+	let mut is_first = true;
+	for value in values {
+		if is_first {
+			is_first = false;
+		} else {
+			output.push_str(", ");
+		}
+		output.push_str(value);
+	}
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
