@@ -16,7 +16,61 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+      fixtures: ${{ steps.filter.outputs.fixtures }}
+      global: ${{ steps.filter.outputs.global }}
+      js: ${{ steps.filter.outputs.js }}
+      docs: ${{ steps.filter.outputs.docs }}
+      workflows: ${{ steps.filter.outputs.workflows }}
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            rust:
+              - '**.rs'
+              - '**/Cargo.toml'
+              - 'Cargo.lock'
+              - 'rust-toolchain.toml'
+              - '.cargo/config.toml'
+              - 'deny.toml'
+              - 'clippy.toml'
+            fixtures:
+              - 'fixtures/**'
+              - 'crates/**/fixtures/**'
+              - 'crates/**/tests/**'
+              - 'crates/**/__tests__/**'
+              - 'crates/**/snapshots/**'
+            global:
+              - '.github/workflows/ci.yml'
+              - 'monochange.toml'
+              - '.changeset/**'
+            js:
+              - '**.js'
+              - '**.mjs'
+              - '**.ts'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.oxlintrc.json'
+            docs:
+              - 'docs/**'
+              - '**.md'
+              - 'book.toml'
+              - 'scripts/**'
+            workflows:
+              - '.github/workflows/**'
+              - '.github/actions/**'
+
   security:
+    needs: changes
+    if: github.event_name == 'merge_group' || needs.changes.outputs.workflows == 'true' || needs.changes.outputs.global == 'true'
     timeout-minutes: 5
     runs-on: ubuntu-latest
     permissions:
@@ -34,6 +88,8 @@ jobs:
           advanced-security: true
 
   lint:
+    needs: changes
+    if: github.event_name == 'merge_group' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.global == 'true' || needs.changes.outputs.js == 'true' || needs.changes.outputs.docs == 'true'
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
@@ -78,6 +134,8 @@ jobs:
         shell: devenv shell -- bash -e {0}
 
   test:
+    needs: changes
+    if: github.event_name == 'merge_group' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.fixtures == 'true' || needs.changes.outputs.global == 'true'
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
@@ -98,6 +156,8 @@ jobs:
         shell: devenv shell -- bash -e {0}
 
   build:
+    needs: changes
+    if: github.event_name == 'merge_group' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.global == 'true'
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -169,6 +229,8 @@ jobs:
         shell: devenv shell -- bash -e {0}
 
   coverage:
+    needs: changes
+    if: github.event_name == 'merge_group' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.fixtures == 'true' || needs.changes.outputs.global == 'true'
     timeout-minutes: 60
     runs-on: ubuntu-latest
     outputs:
@@ -267,6 +329,8 @@ jobs:
           verbose: true
 
   benchmark:
+    needs: changes
+    if: github.event_name == 'merge_group' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.global == 'true'
     timeout-minutes: 30
     runs-on: ubuntu-latest
     continue-on-error: true
@@ -304,7 +368,8 @@ jobs:
           retention-days: 90
 
   benchmark-binary:
-    if: github.event_name == 'pull_request'
+    needs: changes
+    if: github.event_name == 'pull_request' && (needs.changes.outputs.rust == 'true' || needs.changes.outputs.global == 'true')
     timeout-minutes: 30
     runs-on: ubuntu-latest
     env:
@@ -369,7 +434,8 @@ jobs:
         shell: devenv shell -- bash -e {0}
 
   release-test:
-    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'monochange/release')
+    needs: changes
+    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'monochange/release') && (needs.changes.outputs.rust == 'true' || needs.changes.outputs.fixtures == 'true' || needs.changes.outputs.global == 'true')
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
@@ -413,7 +479,8 @@ jobs:
         run: echo "No pull-request release commit was created; skipping release test preflight."
 
   release-records:
-    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'monochange/release')
+    needs: changes
+    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'monochange/release') && (needs.changes.outputs.rust == 'true' || needs.changes.outputs.fixtures == 'true' || needs.changes.outputs.global == 'true')
     timeout-minutes: 20
     runs-on: ubuntu-latest
     steps:
@@ -460,7 +527,8 @@ jobs:
         run: echo "No pull-request release commit was created; skipping release record preflight."
 
   release-lint:
-    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'monochange/release')
+    needs: changes
+    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'monochange/release') && (needs.changes.outputs.rust == 'true' || needs.changes.outputs.global == 'true' || needs.changes.outputs.js == 'true' || needs.changes.outputs.docs == 'true')
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
