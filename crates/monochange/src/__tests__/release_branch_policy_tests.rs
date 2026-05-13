@@ -9,6 +9,13 @@ use tempfile::tempdir;
 use super::*;
 
 #[test]
+fn write_comma_separated_joins_multiple_values() {
+	let mut output = String::new();
+	write_comma_separated(&mut output, ["main", "release/*"]);
+	assert_eq!(output, "main, release/*");
+}
+
+#[test]
 fn release_branch_pattern_matches_local_and_remote_branches() {
 	let patterns = vec![
 		Pattern::new("main").unwrap_or_else(|error| panic!("pattern: {error}")),

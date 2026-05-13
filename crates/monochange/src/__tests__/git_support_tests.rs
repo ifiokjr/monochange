@@ -6,6 +6,19 @@ use tempfile::tempdir;
 
 use super::*;
 
+#[test]
+fn git_error_message_with_detail_handles_empty_parts() {
+	assert_eq!(
+		git_error_message_with_detail("capture failure", "fatal"),
+		"capture failure: fatal"
+	);
+	assert_eq!(git_error_message_with_detail("", "fatal"), "fatal");
+	assert_eq!(
+		git_error_message_with_detail("capture failure", ""),
+		"capture failure"
+	);
+}
+
 fn git(root: &Path, args: &[&str]) {
 	let output = monochange_core::git::git_command(root)
 		.args(args)
