@@ -1,4 +1,6 @@
 use std::fs;
+use std::io::BufWriter;
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::time::Instant;
@@ -11,6 +13,7 @@ use monochange_core::git::git_error_detail;
 use monochange_core::git::git_head_commit;
 use serde::Deserialize;
 use serde::Serialize;
+use serde::ser::SerializeSeq;
 use similar::TextDiff;
 
 use crate::PreparedFileDiff;
@@ -22,6 +25,8 @@ use crate::root_relative;
 
 const PREPARED_RELEASE_ARTIFACT_SCHEMA_VERSION: u32 = 1;
 const DEFAULT_PREPARED_RELEASE_CACHE_PATH: &str = ".monochange/local/prepared-release-cache.json";
+const CONFIGURATION_SNAPSHOT_ERROR: &str =
+	"failed to serialize workspace configuration for prepared release caching";
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct LoadedPreparedReleaseExecution {
@@ -40,6 +45,18 @@ struct PreparedReleaseArtifact {
 	prepared_release: PreparedRelease,
 	#[serde(default)]
 	file_diffs: Vec<PersistedPreparedFileDiff>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PreparedReleaseArtifactRef<'a> {
+	schema_version: u32,
+	configuration_snapshot: String,
+	head_commit: String,
+	worktree_status: Vec<String>,
+	tracked_paths: Vec<PreparedReleaseTrackedPath>,
+	prepared_release: &'a PreparedRelease,
+	file_diffs: PreparedFileDiffsRef<'a>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -63,6 +80,33 @@ struct PersistedPreparedFileDiff {
 	path: PathBuf,
 	diff: String,
 	display_diff: String,
+}
+
+struct PreparedFileDiffsRef<'a>(&'a [PreparedFileDiff]);
+
+impl Serialize for PreparedFileDiffsRef<'_> {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer,
+	{
+		let mut sequence = serializer.serialize_seq(Some(self.0.len()))?;
+		for file_diff in self.0 {
+			sequence.serialize_element(&PreparedFileDiffRef {
+				path: file_diff.path.as_path(),
+				diff: file_diff.diff.as_str(),
+				display_diff: file_diff.display_diff.as_str(),
+			})?;
+		}
+		sequence.end()
+	}
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PreparedFileDiffRef<'a> {
+	path: &'a Path,
+	diff: &'a str,
+	display_diff: &'a str,
 }
 
 pub(crate) fn default_prepared_release_cache_path(root: &Path) -> PathBuf {
@@ -169,9 +213,8 @@ pub(crate) async fn save_prepared_release_execution(
 ) -> MonochangeResult<()> {
 	let artifact_path = resolve_prepared_release_artifact_path(root, explicit_path);
 	ensure_monochange_artifact_ignored(root, &artifact_path).await?;
-	let parent = artifact_path.parent().map(Path::to_path_buf);
-	if let Some(parent) = parent {
-		fs::create_dir_all(&parent).map_err(|error| {
+	if let Some(parent) = artifact_path.parent() {
+		fs::create_dir_all(parent).map_err(|error| {
 			MonochangeError::Io(format!(
 				"failed to create prepared release artifact directory {}: {error}",
 				parent.display()
@@ -179,30 +222,35 @@ pub(crate) async fn save_prepared_release_execution(
 		})?;
 	}
 
-	let artifact = PreparedReleaseArtifact {
+	let artifact = PreparedReleaseArtifactRef {
 		schema_version: PREPARED_RELEASE_ARTIFACT_SCHEMA_VERSION,
 		configuration_snapshot: configuration_snapshot(configuration)?,
 		head_commit: git_head_commit(root).await?,
 		worktree_status: git_status_snapshot(root, Some(&artifact_path)).await?,
 		tracked_paths: tracked_path_snapshots(root, prepared_release).await?,
-		prepared_release: prepared_release.clone(),
-		file_diffs: file_diffs
-			.iter()
-			.map(|file_diff| {
-				PersistedPreparedFileDiff {
-					path: file_diff.path.clone(),
-					diff: file_diff.diff.clone(),
-					display_diff: file_diff.display_diff.clone(),
-				}
-			})
-			.collect(),
+		prepared_release,
+		file_diffs: PreparedFileDiffsRef(file_diffs),
 	};
-	let rendered = serde_json::to_string_pretty(&artifact).map_err(|error| {
-		MonochangeError::Config(format!(
-			"failed to serialize prepared release artifact: {error}"
+	let file = fs::File::create(&artifact_path).map_err(|error| {
+		MonochangeError::Io(format!(
+			"failed to write prepared release artifact {}: {error}",
+			artifact_path.display()
 		))
 	})?;
-	fs::write(&artifact_path, rendered).map_err(|error| {
+	let mut writer = BufWriter::new(file);
+	serde_json::to_writer_pretty(&mut writer, &artifact).map_err(|error| {
+		if error.is_io() {
+			MonochangeError::Io(format!(
+				"failed to write prepared release artifact {}: {error}",
+				artifact_path.display()
+			))
+		} else {
+			MonochangeError::Config(format!(
+				"failed to serialize prepared release artifact: {error}"
+			))
+		}
+	})?;
+	writer.flush().map_err(|error| {
 		MonochangeError::Io(format!(
 			"failed to write prepared release artifact {}: {error}",
 			artifact_path.display()
@@ -303,11 +351,11 @@ fn stale_artifact_error(path: &Path, detail: impl AsRef<str>) -> MonochangeError
 }
 
 fn configuration_snapshot(configuration: &WorkspaceConfiguration) -> MonochangeResult<String> {
-	serde_json::to_string(configuration).map_err(|error| {
-		MonochangeError::Config(format!(
-			"failed to serialize workspace configuration for prepared release caching: {error}"
-		))
-	})
+	serde_json::to_string(configuration).map_err(|error| configuration_snapshot_error(&error))
+}
+
+fn configuration_snapshot_error(error: &serde_json::Error) -> MonochangeError {
+	MonochangeError::Config(format!("{CONFIGURATION_SNAPSHOT_ERROR}: {error}"))
 }
 
 async fn git_status_snapshot(
@@ -328,26 +376,27 @@ async fn git_status_snapshot(
 	}
 
 	let excluded = excluded_path.map(|path| root_relative(root, path));
-	let mut lines = String::from_utf8_lossy(&output.stdout)
+	let stdout = String::from_utf8_lossy(&output.stdout);
+	let mut lines = stdout
 		.lines()
-		.map(str::to_string)
 		.filter(|line| {
 			let Some(excluded) = &excluded else {
 				return true;
 			};
-			status_line_path(line).is_none_or(|path| path != *excluded)
+			status_line_path(line).is_none_or(|path| Path::new(path) != excluded.as_path())
 		})
+		.map(str::to_string)
 		.collect::<Vec<_>>();
 	lines.sort();
 	Ok(lines)
 }
 
 #[allow(clippy::unused_async)]
-fn status_line_path(line: &str) -> Option<PathBuf> {
+fn status_line_path(line: &str) -> Option<&str> {
 	if line.len() < 4 {
 		return None;
 	}
-	Some(PathBuf::from(line[3..].trim()))
+	Some(line[3..].trim())
 }
 
 #[allow(clippy::unused_async)]
@@ -355,22 +404,25 @@ async fn tracked_path_snapshots(
 	root: &Path,
 	prepared_release: &PreparedRelease,
 ) -> MonochangeResult<Vec<PreparedReleaseTrackedPath>> {
-	let mut tracked_paths = prepared_release.changed_files.clone();
-	tracked_paths.extend(prepared_release.deleted_changesets.clone());
+	let mut tracked_paths = Vec::with_capacity(
+		prepared_release.changed_files.len() + prepared_release.deleted_changesets.len(),
+	);
+	tracked_paths.extend(prepared_release.changed_files.iter());
+	tracked_paths.extend(prepared_release.deleted_changesets.iter());
 	tracked_paths.sort();
 	tracked_paths.dedup();
 
 	let mut snapshot_inputs = Vec::with_capacity(tracked_paths.len());
-	let mut file_paths = Vec::new();
+	let mut file_paths = Vec::with_capacity(tracked_paths.len());
 	for path in tracked_paths {
-		let absolute_path = resolve_config_path(root, &path);
+		let absolute_path = resolve_config_path(root, path);
 		if absolute_path.exists() {
 			let relative_path = root_relative(root, &absolute_path);
 			let relative = relative_path.to_string_lossy().into_owned();
 			file_paths.push(relative);
-			snapshot_inputs.push(TrackedPathSnapshotInput::File { path });
+			snapshot_inputs.push(TrackedPathSnapshotInput::File { path: path.clone() });
 		} else {
-			snapshot_inputs.push(TrackedPathSnapshotInput::Deleted { path });
+			snapshot_inputs.push(TrackedPathSnapshotInput::Deleted { path: path.clone() });
 		}
 	}
 

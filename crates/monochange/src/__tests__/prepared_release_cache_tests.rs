@@ -103,6 +103,13 @@ fn read_prepared_release_artifact_reports_invalid_json() {
 	);
 }
 
+#[test]
+fn configuration_snapshot_error_reports_serialization_context() {
+	let error = serde_json::from_str::<serde_json::Value>("{invalid json").unwrap_err();
+	let message = configuration_snapshot_error(&error).to_string();
+	assert!(message.contains(CONFIGURATION_SNAPSHOT_ERROR));
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn hash_file_helpers_return_single_hash_and_reject_mismatched_output() {
 	let tempdir = setup_prepared_release_repo();
@@ -456,10 +463,7 @@ async fn load_prepared_release_execution_rejects_missing_diff_previews_when_requ
 #[test]
 fn status_line_path_handles_short_and_standard_status_lines() {
 	assert_eq!(status_line_path("??"), None);
-	assert_eq!(
-		status_line_path(" M Cargo.toml"),
-		Some(PathBuf::from("Cargo.toml"))
-	);
+	assert_eq!(status_line_path(" M Cargo.toml"), Some("Cargo.toml"));
 }
 
 #[tokio::test(flavor = "multi_thread")]
