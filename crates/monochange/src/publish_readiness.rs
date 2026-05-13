@@ -83,12 +83,12 @@ struct PublishReadinessSource<'a> {
 	record_commit: &'a str,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
-struct PackageIdentity {
-	package: String,
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
+struct PackageIdentity<'a> {
+	package: &'a str,
 	ecosystem: Ecosystem,
-	registry: String,
-	version: String,
+	registry: &'a str,
+	version: &'a str,
 }
 
 pub(crate) async fn run_publish_readiness(
@@ -596,11 +596,11 @@ fn validate_readiness_package_subset(
 
 fn package_identities(
 	packages: &[PublishReadinessPackage],
-) -> MonochangeResult<BTreeSet<PackageIdentity>> {
+) -> MonochangeResult<BTreeSet<PackageIdentity<'_>>> {
 	let mut identities = BTreeSet::new();
 	for package in packages {
 		let identity = package_identity(package);
-		if !identities.insert(identity.clone()) {
+		if !identities.insert(identity) {
 			return Err(MonochangeError::Config(format!(
 				"publish readiness artifact contains duplicate package entry {}",
 				render_package_identity(&identity)
@@ -625,22 +625,22 @@ fn package_set_fingerprint(packages: &[PublishReadinessPackage]) -> String {
 	fingerprint
 }
 
-fn package_identity(package: &PublishReadinessPackage) -> PackageIdentity {
+fn package_identity(package: &PublishReadinessPackage) -> PackageIdentity<'_> {
 	PackageIdentity {
-		package: package.package.clone(),
+		package: package.package.as_str(),
 		ecosystem: package.ecosystem,
-		registry: package.registry.clone(),
-		version: package.version.clone(),
+		registry: package.registry.as_str(),
+		version: package.version.as_str(),
 	}
 }
 
-fn render_package_identity(identity: &PackageIdentity) -> String {
+fn render_package_identity(identity: &PackageIdentity<'_>) -> String {
 	let mut rendered = String::new();
 	write_package_identity(&mut rendered, identity);
 	rendered
 }
 
-fn write_package_identity(output: &mut String, identity: &PackageIdentity) {
+fn write_package_identity(output: &mut String, identity: &PackageIdentity<'_>) {
 	let _ = write!(
 		output,
 		"{} {:?} {} {}",
