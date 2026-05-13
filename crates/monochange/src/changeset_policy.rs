@@ -11,7 +11,10 @@ use monochange_core::ChangesetPolicyEvaluation;
 use monochange_core::ChangesetPolicyStatus;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
+use monochange_core::PackageRecord;
+use monochange_core::PublishState;
 use monochange_core::SourceConfiguration;
+use monochange_core::WorkspaceConfiguration;
 use monochange_core::git::git_current_branch;
 
 use crate::discover_workspace;
@@ -37,8 +40,6 @@ pub async fn affected_packages(
 		));
 	}
 
-	// Discover workspace and normalize inputs
-	let discovery = discover_workspace(root)?;
 	// Normalize labels and changed paths
 	let labels = labels
 		.iter()
@@ -79,17 +80,17 @@ pub async fn affected_packages(
 		.cloned()
 		.collect::<Vec<_>>();
 
-	// Build package ID mapping
-	let config_ids_by_package_id = configuration
+	// Classify changed paths against package definitions
+	let ignored_path_patterns = compile_patterns(&verify.ignored_paths);
+	let changed_path_patterns = compile_patterns(&verify.changed_paths);
+	let configured_changelog_paths =
+		configured_changelog_paths(&configuration.packages, &configuration.groups);
+	let package_matchers = configuration
 		.packages
 		.iter()
-		.map(|package| {
-			resolve_package_reference(&package.id, &configuration.root_path, &discovery.packages)
-				.map(|package_id| (package_id, package.id.clone()))
-		})
-		.collect::<MonochangeResult<BTreeMap<_, _>>>()?;
+		.map(PackagePathMatcher::new)
+		.collect::<Vec<_>>();
 
-	// Classify changed paths against package definitions
 	let mut matched_paths = Vec::new();
 	let mut ignored_paths = Vec::new();
 	let mut affected_package_ids = BTreeSet::new();
@@ -97,21 +98,17 @@ pub async fn affected_packages(
 		.iter()
 		.filter(|path| !is_changeset_markdown_path(path))
 	{
-		if path_matches_any_global_pattern(path, &verify.ignored_paths) {
+		if path_matches_compiled_patterns(path, &ignored_path_patterns) {
 			ignored_paths.push(path.clone());
 			continue;
 		}
 
-		if path_matches_any_configured_changelog(
-			path,
-			&configuration.packages,
-			&configuration.groups,
-		) {
+		if configured_changelog_paths.contains(path.as_str()) {
 			ignored_paths.push(path.clone());
 			continue;
 		}
 
-		if path_matches_any_global_pattern(path, &verify.changed_paths) {
+		if path_matches_compiled_patterns(path, &changed_path_patterns) {
 			matched_paths.push(path.clone());
 			affected_package_ids.extend(
 				configuration
@@ -124,14 +121,16 @@ pub async fn affected_packages(
 
 		let mut matched_any_package = false;
 		let mut ignored_by_package = false;
-		for package in &configuration.packages {
-			if path_touches_package(path, package) {
-				matched_any_package = true;
-				affected_package_ids.insert(package.id.clone());
-				continue;
-			}
-			if path_is_ignored_for_package(path, package) {
-				ignored_by_package = true;
+		for matcher in &package_matchers {
+			match matcher.classify(path) {
+				PackagePathMatch::Touched => {
+					matched_any_package = true;
+					affected_package_ids.insert(matcher.package.id.clone());
+				}
+				PackagePathMatch::Ignored => {
+					ignored_by_package = true;
+				}
+				PackagePathMatch::Unmatched => {}
 			}
 		}
 		if matched_any_package {
@@ -144,31 +143,46 @@ pub async fn affected_packages(
 	let mut covered_package_ids = BTreeSet::new();
 	let mut errors = Vec::new();
 	if !changeset_paths.is_empty() {
-		let changeset_load_context =
-			monochange_config::build_changeset_load_context(&configuration, &discovery.packages);
-		for changeset_path in &changeset_paths {
-			let absolute_path = root.join(changeset_path);
-			if !absolute_path.exists() {
-				errors.push(format!(
-					"attached changeset `{changeset_path}` does not exist in the checked-out workspace"
-				));
-				continue;
-			}
-			match monochange_config::load_changeset_file_with_context(
-				&absolute_path,
-				&changeset_load_context,
+		let config_packages = configuration_package_records(&configuration);
+		let config_ids_by_package_id = config_packages
+			.iter()
+			.map(|package| (package.id.clone(), package.id.clone()))
+			.collect::<BTreeMap<_, _>>();
+		if let Ok(config_covered_package_ids) = covered_package_ids_from_changesets(
+			root,
+			&configuration,
+			&changeset_paths,
+			&config_packages,
+			&config_ids_by_package_id,
+		) {
+			covered_package_ids = config_covered_package_ids;
+		} else {
+			let discovery = discover_workspace(root)?;
+			let config_ids_by_package_id = configuration
+				.packages
+				.iter()
+				.map(|package| {
+					resolve_package_reference(
+						&package.id,
+						&configuration.root_path,
+						&discovery.packages,
+					)
+					.map(|package_id| (package_id, package.id.clone()))
+				})
+				.collect::<MonochangeResult<BTreeMap<_, _>>>()?;
+			match covered_package_ids_from_changesets(
+				root,
+				&configuration,
+				&changeset_paths,
+				&discovery.packages,
+				&config_ids_by_package_id,
 			) {
-				Ok(loaded) => {
-					for signal in loaded.signals {
-						covered_package_ids.insert(
-							config_ids_by_package_id
-								.get(&signal.package_id)
-								.cloned()
-								.unwrap_or(signal.package_id),
-						);
-					}
+				Ok(discovered_covered_package_ids) => {
+					covered_package_ids = discovered_covered_package_ids;
 				}
-				Err(error) => errors.push(error.render()),
+				Err(discovered_errors) => {
+					errors.extend(discovered_errors);
+				}
 			}
 		}
 	}
@@ -334,7 +348,7 @@ pub(crate) fn compute_changed_paths_since(
 			"git diff --name-only {since_rev} failed: {stderr}"
 		)));
 	}
-	let mut paths: Vec<String> = String::from_utf8_lossy(&diff_output.stdout)
+	let mut paths: BTreeSet<String> = String::from_utf8_lossy(&diff_output.stdout)
 		.lines()
 		.map(|line| line.trim().to_string())
 		.filter(|line| !line.is_empty())
@@ -351,14 +365,13 @@ pub(crate) fn compute_changed_paths_since(
 	if untracked_output.status.success() {
 		for line in String::from_utf8_lossy(&untracked_output.stdout).lines() {
 			let path = line.trim().to_string();
-			if !path.is_empty() && !paths.contains(&path) {
-				paths.push(path);
+			if !path.is_empty() {
+				paths.insert(path);
 			}
 		}
 	}
 
-	paths.sort();
-	Ok(paths)
+	Ok(paths.into_iter().collect())
 }
 
 pub(crate) fn normalize_changed_path(path: &str) -> String {
@@ -374,70 +387,175 @@ pub(crate) fn is_changeset_markdown_path(path: &str) -> bool {
 			.is_some_and(|extension| extension.eq_ignore_ascii_case("md"))
 }
 
-fn path_matches_any_global_pattern(path: &str, patterns: &[String]) -> bool {
-	patterns.iter().any(|pattern| {
-		Pattern::new(pattern)
-			.ok()
-			.is_some_and(|compiled| compiled.matches(path))
-	})
+struct PackagePathMatcher<'a> {
+	package: &'a monochange_core::PackageDefinition,
+	package_root: String,
+	package_root_prefix: String,
+	additional_patterns: Vec<Pattern>,
+	ignored_patterns: Vec<Pattern>,
 }
 
-fn path_touches_package(path: &str, package: &monochange_core::PackageDefinition) -> bool {
-	if matches_any_package_pattern(path, package, &package.additional_paths) {
-		return true;
+impl<'a> PackagePathMatcher<'a> {
+	fn new(package: &'a monochange_core::PackageDefinition) -> Self {
+		let package_root = normalize_changed_path(&package.path.to_string_lossy());
+		let package_root_prefix = format!("{package_root}/");
+
+		Self {
+			package,
+			package_root,
+			package_root_prefix,
+			additional_patterns: compile_patterns(&package.additional_paths),
+			ignored_patterns: compile_patterns(&package.ignored_paths),
+		}
 	}
-	if !path_is_within_package(path, package) {
-		return false;
+
+	fn classify(&self, path: &str) -> PackagePathMatch {
+		let relative_path =
+			package_relative_path(path, &self.package_root, &self.package_root_prefix);
+		if matches_any_compiled_package_pattern(path, relative_path, &self.additional_patterns) {
+			return PackagePathMatch::Touched;
+		}
+		if relative_path.is_none() {
+			return PackagePathMatch::Unmatched;
+		}
+		if self.is_ignored(path) {
+			return PackagePathMatch::Ignored;
+		}
+		PackagePathMatch::Touched
 	}
-	!path_is_ignored_for_package(path, package)
+
+	fn is_ignored(&self, path: &str) -> bool {
+		let relative_path =
+			package_relative_path(path, &self.package_root, &self.package_root_prefix);
+		relative_path.is_some()
+			&& matches_any_compiled_package_pattern(path, relative_path, &self.ignored_patterns)
+	}
 }
 
-fn path_is_ignored_for_package(path: &str, package: &monochange_core::PackageDefinition) -> bool {
-	path_is_within_package(path, package)
-		&& matches_any_package_pattern(path, package, &package.ignored_paths)
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PackagePathMatch {
+	Touched,
+	Ignored,
+	Unmatched,
 }
 
-fn path_matches_any_configured_changelog(
-	path: &str,
+fn covered_package_ids_from_changesets(
+	root: &Path,
+	configuration: &WorkspaceConfiguration,
+	changeset_paths: &[String],
+	packages: &[PackageRecord],
+	config_ids_by_package_id: &BTreeMap<String, String>,
+) -> Result<BTreeSet<String>, Vec<String>> {
+	let changeset_load_context =
+		monochange_config::build_changeset_load_context(configuration, packages);
+	let mut covered_package_ids = BTreeSet::new();
+	let mut errors = Vec::new();
+
+	for changeset_path in changeset_paths {
+		let absolute_path = root.join(changeset_path);
+		if !absolute_path.exists() {
+			errors.push(format!(
+				"attached changeset `{changeset_path}` does not exist in the checked-out workspace"
+			));
+			continue;
+		}
+		match monochange_config::load_changeset_file_with_context(
+			&absolute_path,
+			&changeset_load_context,
+		) {
+			Ok(loaded) => {
+				for signal in loaded.signals {
+					covered_package_ids.insert(
+						config_ids_by_package_id
+							.get(&signal.package_id)
+							.cloned()
+							.unwrap_or(signal.package_id),
+					);
+				}
+			}
+			Err(error) => errors.push(error.render()),
+		}
+	}
+
+	if errors.is_empty() {
+		Ok(covered_package_ids)
+	} else {
+		Err(errors)
+	}
+}
+
+fn configuration_package_records(configuration: &WorkspaceConfiguration) -> Vec<PackageRecord> {
+	configuration
+		.packages
+		.iter()
+		.map(|package| {
+			let mut metadata = BTreeMap::new();
+			metadata.insert("config_id".to_string(), package.id.clone());
+
+			PackageRecord {
+				id: package.id.clone(),
+				name: package.id.clone(),
+				ecosystem: package.package_type.into(),
+				manifest_path: configuration
+					.root_path
+					.join(&package.path)
+					.join(".monochange-config-package"),
+				workspace_root: configuration.root_path.clone(),
+				current_version: None,
+				publish_state: PublishState::Unpublished,
+				version_group_id: None,
+				metadata,
+				declared_dependencies: Vec::new(),
+			}
+		})
+		.collect()
+}
+
+fn compile_patterns(patterns: &[String]) -> Vec<Pattern> {
+	patterns
+		.iter()
+		.filter_map(|pattern| Pattern::new(pattern).ok())
+		.collect()
+}
+
+fn path_matches_compiled_patterns(path: &str, patterns: &[Pattern]) -> bool {
+	patterns.iter().any(|pattern| pattern.matches(path))
+}
+
+fn configured_changelog_paths(
 	packages: &[monochange_core::PackageDefinition],
 	groups: &[monochange_core::GroupDefinition],
-) -> bool {
-	packages.iter().any(|package| {
-		package
-			.changelog
-			.as_ref()
-			.is_some_and(|target| path_matches_changelog_target(path, &target.path))
-	}) || groups.iter().any(|group| {
-		group
-			.changelog
-			.as_ref()
-			.is_some_and(|target| path_matches_changelog_target(path, &target.path))
-	})
+) -> BTreeSet<String> {
+	packages
+		.iter()
+		.filter_map(|package| package.changelog.as_ref())
+		.map(|target| normalize_changed_path(&target.path.to_string_lossy()))
+		.chain(
+			groups
+				.iter()
+				.filter_map(|group| group.changelog.as_ref())
+				.map(|target| normalize_changed_path(&target.path.to_string_lossy())),
+		)
+		.collect()
 }
 
-fn path_matches_changelog_target(path: &str, changelog_path: &Path) -> bool {
-	normalize_changed_path(&changelog_path.to_string_lossy()) == path
+fn package_relative_path<'path>(
+	path: &'path str,
+	package_root: &str,
+	package_root_prefix: &str,
+) -> Option<&'path str> {
+	path.strip_prefix(package_root_prefix)
+		.or_else(|| (path == package_root).then_some(""))
 }
 
-fn path_is_within_package(path: &str, package: &monochange_core::PackageDefinition) -> bool {
-	let package_root = normalize_changed_path(&package.path.to_string_lossy());
-	path == package_root || path.starts_with(&format!("{package_root}/"))
-}
-
-fn matches_any_package_pattern(
+fn matches_any_compiled_package_pattern(
 	path: &str,
-	package: &monochange_core::PackageDefinition,
-	patterns: &[String],
+	relative_path: Option<&str>,
+	patterns: &[Pattern],
 ) -> bool {
-	let package_root = normalize_changed_path(&package.path.to_string_lossy());
-	let relative_path = path
-		.strip_prefix(&format!("{package_root}/"))
-		.or_else(|| (path == package_root).then_some(""));
 	patterns.iter().any(|pattern| {
-		Pattern::new(pattern).ok().is_some_and(|compiled| {
-			compiled.matches(path)
-				|| relative_path.is_some_and(|relative_path| compiled.matches(relative_path))
-		})
+		pattern.matches(path)
+			|| relative_path.is_some_and(|relative_path| pattern.matches(relative_path))
 	})
 }
 

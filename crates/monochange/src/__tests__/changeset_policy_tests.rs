@@ -241,6 +241,101 @@ async fn current_branch_prefix_matching_requires_non_empty_prefix() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn affected_packages_defers_workspace_discovery_until_changesets_are_present() {
+	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::create_dir_all(tempdir.path().join("crates/core/src"))
+		.unwrap_or_else(|error| panic!("create source tree: {error}"));
+	fs::write(tempdir.path().join("crates/core/Cargo.toml"), "not toml\n")
+		.unwrap_or_else(|error| panic!("write package manifest: {error}"));
+	fs::write(
+		tempdir.path().join("crates/core/src/lib.rs"),
+		"pub fn core() {}\n",
+	)
+	.unwrap_or_else(|error| panic!("write source file: {error}"));
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		"[defaults]\n\
+		package_type = \"cargo\"\n\
+		\n\
+		[changesets.affected]\n\
+		enabled = true\n\
+		required = true\n\
+		\n\
+		[package.core]\n\
+		path = \"crates/core\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+
+	let evaluation = affected_packages(
+		tempdir.path(),
+		&["crates/core/src/lib.rs".to_string()],
+		&Vec::new(),
+	)
+	.await
+	.unwrap_or_else(|error| panic!("evaluate affected packages: {error}"));
+
+	assert_eq!(evaluation.status, ChangesetPolicyStatus::Failed);
+	assert_eq!(evaluation.affected_package_ids, vec!["core".to_string()]);
+	assert!(evaluation.covered_package_ids.is_empty());
+	assert!(
+		evaluation
+			.errors
+			.iter()
+			.any(|error| error.contains("not covered by attached changesets"))
+	);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn affected_packages_uses_configuration_index_for_attached_changesets() {
+	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::create_dir_all(tempdir.path().join(".changeset"))
+		.unwrap_or_else(|error| panic!("create changeset directory: {error}"));
+	fs::create_dir_all(tempdir.path().join("crates/core/src"))
+		.unwrap_or_else(|error| panic!("create source tree: {error}"));
+	fs::write(tempdir.path().join("crates/core/Cargo.toml"), "not toml\n")
+		.unwrap_or_else(|error| panic!("write package manifest: {error}"));
+	fs::write(
+		tempdir.path().join("crates/core/src/lib.rs"),
+		"pub fn core() {}\n",
+	)
+	.unwrap_or_else(|error| panic!("write source file: {error}"));
+	fs::write(
+		tempdir.path().join(".changeset/core.md"),
+		"---\ncore: patch\n---\n\n#### cover core\n",
+	)
+	.unwrap_or_else(|error| panic!("write changeset: {error}"));
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		"[defaults]\n\
+		package_type = \"cargo\"\n\
+		\n\
+		[changesets.affected]\n\
+		enabled = true\n\
+		required = true\n\
+		\n\
+		[package.core]\n\
+		path = \"crates/core\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+
+	let evaluation = affected_packages(
+		tempdir.path(),
+		&[
+			"crates/core/src/lib.rs".to_string(),
+			".changeset/core.md".to_string(),
+		],
+		&Vec::new(),
+	)
+	.await
+	.unwrap_or_else(|error| panic!("evaluate affected packages: {error}"));
+
+	assert_eq!(evaluation.status, ChangesetPolicyStatus::Passed);
+	assert_eq!(evaluation.affected_package_ids, vec!["core".to_string()]);
+	assert_eq!(evaluation.covered_package_ids, vec!["core".to_string()]);
+	assert!(evaluation.errors.is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn affected_packages_reports_missing_and_invalid_changeset_inputs() {
 	let fixture = setup_fixture("monochange/changeset-policy-base");
 	fs::create_dir_all(fixture.path().join(".changeset"))
@@ -361,16 +456,26 @@ fn path_helpers_cover_normalization_matching_and_comment_rendering() {
 	);
 	assert!(is_changeset_markdown_path(".changeset/test.md"));
 	assert!(!is_changeset_markdown_path(".changeset/test.txt"));
-	assert!(path_touches_package("crates/core/src/lib.rs", &package));
-	assert!(path_touches_package("shared/config.json", &package));
-	assert!(path_is_ignored_for_package(
-		"crates/core/README.md",
-		&package
-	));
-	assert!(matches_any_package_pattern(
+
+	let matcher = PackagePathMatcher::new(&package);
+	assert_eq!(
+		matcher.classify("crates/core/src/lib.rs"),
+		PackagePathMatch::Touched
+	);
+	assert_eq!(
+		matcher.classify("shared/config.json"),
+		PackagePathMatch::Touched
+	);
+	assert!(matcher.is_ignored("crates/core/README.md"));
+	let docs_relative_path = package_relative_path(
 		"crates/core/docs/guide.md",
-		&package,
-		&package.ignored_paths
+		&matcher.package_root,
+		&matcher.package_root_prefix,
+	);
+	assert!(matches_any_compiled_package_pattern(
+		"crates/core/docs/guide.md",
+		docs_relative_path,
+		&matcher.ignored_patterns
 	));
 
 	let verify = ChangesetAffectedSettings {
@@ -462,32 +567,55 @@ fn render_comment_includes_related_skip_guidance() {
 #[test]
 fn package_pattern_helpers_cover_root_relative_and_invalid_patterns() {
 	let package = sample_package();
+	let matcher = PackagePathMatcher::new(&package);
 
-	assert!(path_is_within_package("crates/core", &package));
-	assert!(!path_is_within_package("docs/readme.md", &package));
-	assert!(path_is_ignored_for_package(
-		"crates/core/docs/guide.md",
-		&package
-	));
-	assert!(matches_any_package_pattern(
+	assert_eq!(
+		package_relative_path(
+			"crates/core",
+			&matcher.package_root,
+			&matcher.package_root_prefix,
+		),
+		Some("")
+	);
+	assert!(
+		package_relative_path(
+			"docs/readme.md",
+			&matcher.package_root,
+			&matcher.package_root_prefix,
+		)
+		.is_none()
+	);
+	assert!(matcher.is_ignored("crates/core/docs/guide.md"));
+	assert!(matches_any_compiled_package_pattern(
 		"crates/core/README.md",
-		&package,
-		&package.ignored_paths
+		package_relative_path(
+			"crates/core/README.md",
+			&matcher.package_root,
+			&matcher.package_root_prefix,
+		),
+		&compile_patterns(&package.ignored_paths)
 	));
-	assert!(!matches_any_package_pattern(
+	assert!(!matches_any_compiled_package_pattern(
 		"crates/core/src/lib.rs",
-		&package,
-		&["[".to_string()]
+		package_relative_path(
+			"crates/core/src/lib.rs",
+			&matcher.package_root,
+			&matcher.package_root_prefix,
+		),
+		&compile_patterns(&["[".to_string()])
 	));
-	assert!(path_matches_any_global_pattern(
+	assert!(path_matches_compiled_patterns(
 		"docs/readme.md",
-		&["docs/**".to_string()]
+		&compile_patterns(&["docs/**".to_string()])
 	));
-	assert!(!path_matches_any_global_pattern(
+	assert!(!path_matches_compiled_patterns(
 		"docs/readme.md",
-		&["[".to_string()]
+		&compile_patterns(&["[".to_string()])
 	));
-	assert!(!path_touches_package("docs/readme.md", &package));
+	assert_eq!(
+		matcher.classify("docs/readme.md"),
+		PackagePathMatch::Unmatched
+	);
 }
 
 #[tokio::test(flavor = "multi_thread")]

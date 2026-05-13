@@ -42,6 +42,11 @@
   - Reused a shared `ChangesetLoadContext` while validating attached changesets in affected-package policy checks.
   - Reused precomputed changeset-relative paths while building prepared changesets and diagnostics output.
   - Added a focused unit test covering multi-file diagnose loading through the shared-context path.
+  - Deferred workspace discovery and changeset package-reference mapping in affected-package policy until attached changeset files are present.
+  - Precompiled affected-package path globs and normalized package roots once per policy evaluation instead of rebuilding them for every changed-path/package pair.
+  - Switched changed-path collection from repeated `Vec::contains` checks to a `BTreeSet` while merging diff and untracked paths.
+  - Added a configuration-only attached-changeset coverage index so common policy checks can validate config package/group ids without manifest discovery, falling back to full discovery only when needed.
+  - Added regression tests proving affected-package checks without attached changesets and config-id attached changesets do not require workspace discovery.
 
 ## Current benchmark summary
 
@@ -83,22 +88,27 @@ Step-command benchmark violations: `0`.
 
 Measured on the 200-package / 500-changeset / 500-commit profiling fixture after rebuilding the current branch release binary.
 
-| Command                                                                                     | Baseline |  Current | Result       |
-| :------------------------------------------------------------------------------------------ | -------: | -------: | :----------- |
-| `mc step:diagnose-changesets --dry-run --format json` vs `main`                             |  2.919 s | 596.4 ms | 4.89× faster |
-| `mc step:diagnose-changesets --dry-run --format json` vs pre-optimization async             |  2.731 s | 596.4 ms | 4.58× faster |
-| `mc step:affected-packages --dry-run --format json --from HEAD~1` vs pre-optimization async |  1.229 s |  1.252 s | flat / noisy |
+| Command                                                                                                                                                          | Baseline |  Current | Result         |
+| :--------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------: | -------: | :------------- |
+| `mc step:diagnose-changesets --dry-run --format json` vs `main`                                                                                                  |  2.919 s | 596.4 ms | 4.89× faster   |
+| `mc step:diagnose-changesets --dry-run --format json` vs pre-optimization async                                                                                  |  2.731 s | 596.4 ms | 4.58× faster   |
+| `mc step:affected-packages --dry-run --format json --changed-paths crates/pkg-499/src/lib.rs` vs pre-optimization async                                          |  1.223 s |   7.7 ms | 158.95× faster |
+| `mc step:affected-packages --dry-run --format json --changed-paths crates/pkg-99/src/lib.rs --changed-paths .changeset/change-0499.md` vs pre-optimization async |  1.244 s |  12.7 ms | 97.93× faster  |
+| `mc step:affected-packages --dry-run --format json --from HEAD~1` vs pre-optimization async                                                                      |  1.248 s |  38.9 ms | 32.07× faster  |
 
-Peak memory sampling with `/usr/bin/time -l` for `step:diagnose-changesets` also improved slightly: max RSS went from about 21.6 MB to 21.3 MB, peak footprint from about 11.6 MB to 11.4 MB, and retired instructions from about 37.6B to 6.9B.
+The explicit no-changeset path now skips discovery entirely and validates config-path classification only. Attached changeset checks first use a configuration-only package/group index, so PR policy runs that reference config ids no longer pay full manifest discovery cost.
+
+Peak memory sampling with `/usr/bin/time -l` for `step:diagnose-changesets` also improved slightly: max RSS went from about 21.6 MB to 21.3 MB, peak footprint from about 11.6 MB to 11.4 MB, and retired instructions from about 37.6B to 6.9B. For the explicit no-changeset affected-package path, max RSS dropped from about 16.2 MB to 13.1 MB, peak footprint from about 6.6 MB to 5.1 MB, and retired instructions from about 17.8B to 79.5M. For the explicit attached-changeset path, max RSS dropped from about 17.2 MB to 14.3 MB, peak footprint from about 7.4 MB to 5.6 MB, and retired instructions from about 18.1B to 142.4M.
 
 ## Main bottlenecks to tackle next
 
 1. `step:diagnose-changesets` is much faster after shared changeset context reuse, but still spends about `0.60 s` on the large fixture.
    - Remaining time is likely split across workspace discovery, git history lookup, JSON construction, and unavoidable changeset file reads.
    - Next work: profile the remaining call graph after this optimization and reduce any remaining repeated path normalization or discovery work.
-2. `step:affected-packages` remains over `1.0 s` on the large fixture.
-   - Likely bottlenecks are git history traversal, repeated package graph lookups, and repeated changeset or manifest reads.
-   - Next work: inspect whether affected-package computation can reuse release workspace discovery and parsed changesets.
+2. `step:affected-packages` is now fast for both explicit no-changeset and config-id attached-changeset policy checks.
+   - No-changeset explicit path checks complete in about `7.7 ms` on the large fixture.
+   - Explicit config-id attached changeset checks complete in about `12.7 ms`; `--from HEAD~1` with git diff and an attached changeset completes in about `38.9 ms`.
+   - Remaining work: rerun the full step-command matrix and look for non-policy affected-package cases that still fall back to full discovery.
 3. `step:display-versions` is only flat after the async migration.
    - It may not benefit from the current async paths or may be dominated by serialization/output construction.
    - Next work: isolate computation versus JSON formatting and avoid cloning large version-plan structures.
@@ -106,15 +116,15 @@ Peak memory sampling with `/usr/bin/time -l` for `step:diagnose-changesets` also
    - Next work: identify whether validation repeatedly loads manifests or performs serial registry/source checks that can be cached or batched.
 5. Release phase timings do not fully explain the wall-clock `mc release` / `mc release --dry-run` durations.
    - Next work: add or inspect outer phase spans around command startup, fixture setup, workflow orchestration, and subprocess boundaries so the remaining wall time is attributable.
-6. Memory usage has not yet been measured alongside runtime.
-   - Next work: add peak RSS measurements for the benchmarked commands, then target allocation-heavy structures with borrowed data, streaming iteration, or smaller owned summaries.
+6. Memory usage has targeted spot checks but not broad benchmark coverage yet.
+   - Next work: add peak RSS measurements for the benchmarked command matrix, then target allocation-heavy structures with borrowed data, streaming iteration, or smaller owned summaries.
 
 ## Iteration checklist
 
 - [ ] Add lightweight profiling for the slow step paths without affecting normal output.
 - [ ] Measure peak RSS for top-level CLI and direct step-command benchmarks.
 - [x] Profile `step:diagnose-changesets` and reduce repeated git or filesystem work.
-- [ ] Profile `step:affected-packages` and reuse package graph / changeset discovery data where possible.
+- [x] Profile `step:affected-packages` and skip package graph discovery for no-changeset and config-id attached-changeset policy paths.
 - [ ] Profile `step:display-versions` and reduce cloning or serialization overhead.
 - [ ] Re-run the benchmark scripts after each optimization.
 - [ ] Keep this file updated with changes, results, and remaining bottlenecks.
