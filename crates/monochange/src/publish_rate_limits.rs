@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::fmt::Write as _;
 use std::path::Path;
 
 use monochange_core::MonochangeError;
@@ -401,30 +402,29 @@ pub(crate) fn enforce_publish_rate_limits(
 		return Ok(());
 	}
 
-	let blocked = report
+	let mut details = String::new();
+	for window in report
 		.windows
 		.iter()
 		.filter(|window| !window.fits_single_window)
-		.collect::<Vec<_>>();
-	if blocked.is_empty() {
+	{
+		if !details.is_empty() {
+			details.push_str("; ");
+		}
+		let _ = write!(
+			details,
+			"{} {} {} packages={} batches={} window={}",
+			mode.description(),
+			window.registry,
+			window.operation,
+			window.pending,
+			window.batches_required,
+			render_window(window.window_seconds)
+		);
+	}
+	if details.is_empty() {
 		return Ok(());
 	}
-
-	let details = blocked
-		.into_iter()
-		.map(|window| {
-			format!(
-				"{} {} {} packages={} batches={} window={}",
-				mode.description(),
-				window.registry,
-				window.operation,
-				window.pending,
-				window.batches_required,
-				render_window(window.window_seconds)
-			)
-		})
-		.collect::<Vec<_>>()
-		.join("; ");
 
 	Err(MonochangeError::Config(format!(
 		"configured publish rate-limit enforcement blocked this run: {details}; use `mc publish-plan` to inspect batches or publish a filtered package subset"
