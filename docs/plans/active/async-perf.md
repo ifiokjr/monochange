@@ -63,6 +63,7 @@
   - Streamed git error details directly into one string, avoiding temporary two-item vectors and joins when git commands fail.
   - Streamed `--jq` output rendering directly into one buffer instead of collecting rendered values into a temporary vector before joining, and writes scalar filtered values without allocating per-value strings.
   - Streamed publish rate-limit enforcement error details directly into one string, avoiding temporary blocked-window and detail vectors on rejection paths.
+  - Streamed publish-readiness package identity lists directly into one string instead of joining cloned identity strings.
 
 ## Current benchmark summary
 

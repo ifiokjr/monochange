@@ -693,6 +693,13 @@ fn render_package_identity_list_labels_empty_lists() {
 		render_package_identity_list(&["core Cargo crates.io 1.2.3".to_string()]),
 		"core Cargo crates.io 1.2.3"
 	);
+	assert_eq!(
+		render_package_identity_list(&[
+			"core Cargo crates.io 1.2.3".to_string(),
+			"web Npm npmjs 4.5.6".to_string(),
+		]),
+		"core Cargo crates.io 1.2.3, web Npm npmjs 4.5.6"
+	);
 }
 
 #[tokio::test(flavor = "multi_thread")]

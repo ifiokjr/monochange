@@ -652,7 +652,15 @@ fn render_package_identity_list(identities: &[String]) -> String {
 	if identities.is_empty() {
 		return "none".to_string();
 	}
-	identities.join(", ")
+
+	let mut rendered = String::new();
+	for identity in identities {
+		if !rendered.is_empty() {
+			rendered.push_str(", ");
+		}
+		rendered.push_str(identity);
+	}
+	rendered
 }
 
 fn publish_readiness_json_error(error: impl std::fmt::Display) -> MonochangeError {
