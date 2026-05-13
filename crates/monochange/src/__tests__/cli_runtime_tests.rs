@@ -678,10 +678,8 @@ fn render_display_versions_output_supports_text_markdown_and_json() {
 
 #[test]
 fn release_version_summary_renderers_cover_empty_and_single_section_states() {
-	let empty = ReleaseVersionSummary {
-		groups: BTreeMap::new(),
-		packages: BTreeMap::new(),
-	};
+	let empty_release = sample_prepared_release();
+	let empty = build_release_version_summary(&empty_release);
 	assert_eq!(
 		render_release_version_summary_text(&empty),
 		"no package or group versions were planned"
@@ -691,10 +689,9 @@ fn release_version_summary_renderers_cover_empty_and_single_section_states() {
 		"No package or group versions were planned."
 	);
 
-	let groups_only = ReleaseVersionSummary {
-		groups: BTreeMap::from([("sdk".to_string(), "2.0.0".to_string())]),
-		packages: BTreeMap::new(),
-	};
+	let mut groups_release = sample_prepared_release_with_versions();
+	groups_release.plan.decisions.clear();
+	let groups_only = build_release_version_summary(&groups_release);
 	assert_eq!(
 		render_release_version_summary_text(&groups_only),
 		"group versions:\n- sdk: 2.0.0"
@@ -704,13 +701,9 @@ fn release_version_summary_renderers_cover_empty_and_single_section_states() {
 		"## Group versions\n\n- `sdk`: `2.0.0`"
 	);
 
-	let packages_only = ReleaseVersionSummary {
-		groups: BTreeMap::new(),
-		packages: BTreeMap::from([
-			("core".to_string(), "1.2.0".to_string()),
-			("web".to_string(), "1.2.1".to_string()),
-		]),
-	};
+	let mut packages_release = sample_prepared_release_with_versions();
+	packages_release.plan.groups.clear();
+	let packages_only = build_release_version_summary(&packages_release);
 	assert_eq!(
 		render_release_version_summary_text(&packages_only),
 		"package versions:\n- core: 1.2.0\n- web: 1.2.1"

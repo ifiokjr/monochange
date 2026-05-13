@@ -3,6 +3,7 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
+use monochange_core::BumpSeverity;
 use monochange_core::ChangesetTargetKind;
 
 use super::batch_git_log;
@@ -90,6 +91,49 @@ async fn diagnose_changesets_uses_configuration_index_before_workspace_discovery
 			.iter()
 			.any(|target| { target.id == "core" && target.kind == ChangesetTargetKind::Package })
 	);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn diagnose_changesets_falls_back_to_workspace_versions_for_explicit_versions() {
+	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::create_dir_all(tempdir.path().join(".changeset"))
+		.unwrap_or_else(|error| panic!("create changeset directory: {error}"));
+	fs::create_dir_all(tempdir.path().join("crates/core/src"))
+		.unwrap_or_else(|error| panic!("create source tree: {error}"));
+	fs::write(
+		tempdir.path().join("crates/core/Cargo.toml"),
+		"[package]\nname = \"real-core\"\nversion = \"1.0.0\"\nedition = \"2021\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write package manifest: {error}"));
+	fs::write(
+		tempdir.path().join("crates/core/src/lib.rs"),
+		"pub fn core() {}\n",
+	)
+	.unwrap_or_else(|error| panic!("write source file: {error}"));
+	fs::write(
+		tempdir.path().join(".changeset/core.md"),
+		"---\ncore:\n  version: 1.2.0\n---\n\nPin core.\n",
+	)
+	.unwrap_or_else(|error| panic!("write changeset: {error}"));
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		"[defaults]\n\
+		package_type = \"cargo\"\n\
+		\n\
+		[package.core]\n\
+		path = \"crates/core\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+
+	let report = diagnose_changesets(tempdir.path(), &[])
+		.await
+		.unwrap_or_else(|error| panic!("diagnose changesets: {error}"));
+	let target = report.changesets[0]
+		.targets
+		.iter()
+		.find(|target| target.id == "core")
+		.unwrap_or_else(|| panic!("expected core target"));
+	assert_eq!(target.bump, Some(BumpSeverity::Minor));
 }
 
 #[test]

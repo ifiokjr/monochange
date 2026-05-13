@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::fmt::Write as _;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::IsTerminal;
@@ -37,6 +38,8 @@ use monochange_telemetry::StepTelemetry;
 use monochange_telemetry::TelemetryOutcome;
 use monochange_telemetry::TelemetrySink;
 use serde::Serialize;
+use serde::ser::SerializeMap;
+use serde::ser::SerializeStruct;
 
 use crate::cli::command_supports_release_diff_preview;
 use crate::cli_progress::CliProgressReporter;
@@ -3267,78 +3270,160 @@ fn render_prepared_release_summary(
 	}
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ReleaseVersionSummary {
-	packages: BTreeMap<String, String>,
-	groups: BTreeMap<String, String>,
+#[derive(Debug, Clone, Eq, PartialEq)]
+struct ReleaseVersionSummary<'a> {
+	packages: Vec<&'a monochange_core::ReleaseDecision>,
+	groups: Vec<&'a monochange_core::PlannedVersionGroup>,
 }
 
-fn build_release_version_summary(prepared_release: &PreparedRelease) -> ReleaseVersionSummary {
-	ReleaseVersionSummary {
-		packages: prepared_release
-			.plan
-			.decisions
-			.iter()
-			.filter(|decision| decision.recommended_bump.is_release())
-			.filter_map(|decision| {
-				decision
-					.planned_version
-					.as_ref()
-					.map(|version| (decision.package_id.clone(), version.to_string()))
-			})
-			.collect(),
-		groups: prepared_release
-			.plan
-			.groups
-			.iter()
-			.filter(|group| group.recommended_bump.is_release())
-			.filter_map(|group| {
-				group
-					.planned_version
-					.as_ref()
-					.map(|version| (group.group_id.clone(), version.to_string()))
-			})
-			.collect(),
+struct ReleaseVersionPackages<'a> {
+	packages: &'a [&'a monochange_core::ReleaseDecision],
+}
+
+struct ReleaseVersionGroups<'a> {
+	groups: &'a [&'a monochange_core::PlannedVersionGroup],
+}
+
+struct DisplayVersion<'a, T: ?Sized>(&'a T);
+
+impl<T> Serialize for DisplayVersion<'_, T>
+where
+	T: std::fmt::Display + ?Sized,
+{
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer,
+	{
+		serializer.collect_str(self.0)
 	}
 }
 
-fn render_release_version_summary_text(summary: &ReleaseVersionSummary) -> String {
-	let mut lines = Vec::new();
+impl Serialize for ReleaseVersionSummary<'_> {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer,
+	{
+		let mut state = serializer.serialize_struct("ReleaseVersionSummary", 2)?;
+		state.serialize_field(
+			"packages",
+			&ReleaseVersionPackages {
+				packages: &self.packages,
+			},
+		)?;
+		state.serialize_field(
+			"groups",
+			&ReleaseVersionGroups {
+				groups: &self.groups,
+			},
+		)?;
+		state.end()
+	}
+}
+
+impl Serialize for ReleaseVersionPackages<'_> {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer,
+	{
+		let mut map = serializer.serialize_map(Some(self.packages.len()))?;
+		for decision in self.packages {
+			if let Some(version) = &decision.planned_version {
+				map.serialize_entry(decision.package_id.as_str(), &DisplayVersion(version))?;
+			}
+		}
+		map.end()
+	}
+}
+
+impl Serialize for ReleaseVersionGroups<'_> {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer,
+	{
+		let mut map = serializer.serialize_map(Some(self.groups.len()))?;
+		for group in self.groups {
+			if let Some(version) = &group.planned_version {
+				map.serialize_entry(group.group_id.as_str(), &DisplayVersion(version))?;
+			}
+		}
+		map.end()
+	}
+}
+
+fn build_release_version_summary(prepared_release: &PreparedRelease) -> ReleaseVersionSummary<'_> {
+	let mut packages = prepared_release
+		.plan
+		.decisions
+		.iter()
+		.filter(|decision| {
+			decision.recommended_bump.is_release() && decision.planned_version.is_some()
+		})
+		.collect::<Vec<_>>();
+	packages.sort_by(|left, right| left.package_id.cmp(&right.package_id));
+
+	let mut groups = prepared_release
+		.plan
+		.groups
+		.iter()
+		.filter(|group| group.recommended_bump.is_release() && group.planned_version.is_some())
+		.collect::<Vec<_>>();
+	groups.sort_by(|left, right| left.group_id.cmp(&right.group_id));
+
+	ReleaseVersionSummary { packages, groups }
+}
+
+fn render_release_version_summary_text(summary: &ReleaseVersionSummary<'_>) -> String {
+	if summary.groups.is_empty() && summary.packages.is_empty() {
+		return "no package or group versions were planned".to_string();
+	}
+
+	let mut output = String::new();
 	if !summary.groups.is_empty() {
-		lines.push("group versions:".to_string());
-		for (group, version) in &summary.groups {
-			lines.push(format!("- {group}: {version}"));
+		output.push_str("group versions:");
+		for group in &summary.groups {
+			if let Some(version) = &group.planned_version {
+				let _ = write!(output, "\n- {}: {version}", group.group_id);
+			}
 		}
 	}
 	if !summary.packages.is_empty() {
-		lines.push("package versions:".to_string());
-		for (package, version) in &summary.packages {
-			lines.push(format!("- {package}: {version}"));
+		if !output.is_empty() {
+			output.push('\n');
+		}
+		output.push_str("package versions:");
+		for decision in &summary.packages {
+			if let Some(version) = &decision.planned_version {
+				let _ = write!(output, "\n- {}: {version}", decision.package_id);
+			}
 		}
 	}
-	if lines.is_empty() {
-		return "no package or group versions were planned".to_string();
-	}
-	lines.join("\n")
+	output
 }
 
-fn render_release_version_summary_markdown(summary: &ReleaseVersionSummary) -> String {
+fn render_release_version_summary_markdown(summary: &ReleaseVersionSummary<'_>) -> String {
 	if summary.groups.is_empty() && summary.packages.is_empty() {
 		return "No package or group versions were planned.".to_string();
 	}
 	let color = stdout_supports_color();
-	let mut sections = Vec::new();
+	let mut sections = Vec::with_capacity(
+		usize::from(!summary.groups.is_empty()) + usize::from(!summary.packages.is_empty()),
+	);
 	if !summary.groups.is_empty() {
 		let lines = summary
 			.groups
 			.iter()
-			.map(|(group, version)| {
-				format!(
-					"- {}: {}",
-					paint_markdown_inline(&format!("`{group}`"), MarkdownStyle::Code, color),
-					paint_markdown_inline(&format!("`{version}`"), MarkdownStyle::Code, color),
-				)
+			.filter_map(|group| {
+				group.planned_version.as_ref().map(|version| {
+					format!(
+						"- {}: {}",
+						paint_markdown_inline(
+							&format!("`{}`", group.group_id),
+							MarkdownStyle::Code,
+							color,
+						),
+						paint_markdown_inline(&format!("`{version}`"), MarkdownStyle::Code, color,),
+					)
+				})
 			})
 			.collect::<Vec<_>>();
 		sections.push(render_markdown_section("Group versions", &lines, color));
@@ -3347,12 +3432,18 @@ fn render_release_version_summary_markdown(summary: &ReleaseVersionSummary) -> S
 		let lines = summary
 			.packages
 			.iter()
-			.map(|(package, version)| {
-				format!(
-					"- {}: {}",
-					paint_markdown_inline(&format!("`{package}`"), MarkdownStyle::Code, color),
-					paint_markdown_inline(&format!("`{version}`"), MarkdownStyle::Code, color),
-				)
+			.filter_map(|decision| {
+				decision.planned_version.as_ref().map(|version| {
+					format!(
+						"- {}: {}",
+						paint_markdown_inline(
+							&format!("`{}`", decision.package_id),
+							MarkdownStyle::Code,
+							color,
+						),
+						paint_markdown_inline(&format!("`{version}`"), MarkdownStyle::Code, color,),
+					)
+				})
 			})
 			.collect::<Vec<_>>();
 		sections.push(render_markdown_section("Package versions", &lines, color));

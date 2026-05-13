@@ -49,6 +49,9 @@
   - Added regression tests proving affected-package checks without attached changesets and config-id attached changesets do not require workspace discovery.
   - Reused the same configuration-only package index for diagnostics, so `step:diagnose-changesets` can skip manifest discovery when changesets only use configured package/group ids and explicit bumps.
   - Added a regression test proving diagnostics can load config-id changesets without parsing package manifests.
+  - Reworked `step:display-versions` summary rendering to borrow sorted package/group version-plan entries instead of cloning them into owned maps.
+  - Replaced eager version `to_string()` allocation for JSON with streaming `Display` serialization, and render text output directly into one buffer instead of building a temporary `Vec<String>`.
+  - Kept a diagnostics fallback regression test for explicit-version changesets so the optimized config-only fast path remains covered without regressing patch coverage.
 
 ## Current benchmark summary
 
@@ -112,9 +115,9 @@ Peak memory sampling with `/usr/bin/time -l` for `step:diagnose-changesets` impr
    - No-changeset explicit path checks complete in about `7.7 ms` on the large fixture.
    - Explicit config-id attached changeset checks complete in about `12.7 ms`; `--from HEAD~1` with git diff and an attached changeset completes in about `38.9 ms`.
    - Remaining work: rerun the full step-command matrix and look for non-policy affected-package cases that still fall back to full discovery.
-3. `step:display-versions` is only flat after the async migration.
-   - It may not benefit from the current async paths or may be dominated by serialization/output construction.
-   - Next work: isolate computation versus JSON formatting and avoid cloning large version-plan structures.
+3. `step:display-versions` now avoids cloning package/group ids and formatted versions while rendering its version summary.
+   - JSON output streams version display values directly and text output writes into one buffer.
+   - Next work: rerun the full step-command matrix and isolate any remaining prepare-release or serialization costs.
 4. Large-fixture `mc step:validate` still spends roughly `0.49 s` on the PR branch.
    - Next work: identify whether validation repeatedly loads manifests or performs serial registry/source checks that can be cached or batched.
 5. Release phase timings do not fully explain the wall-clock `mc release` / `mc release --dry-run` durations.
@@ -128,7 +131,7 @@ Peak memory sampling with `/usr/bin/time -l` for `step:diagnose-changesets` impr
 - [ ] Measure peak RSS for top-level CLI and direct step-command benchmarks.
 - [x] Profile `step:diagnose-changesets` and reduce repeated git or filesystem work.
 - [x] Profile `step:affected-packages` and skip package graph discovery for no-changeset and config-id attached-changeset policy paths.
-- [ ] Profile `step:display-versions` and reduce cloning or serialization overhead.
+- [x] Profile `step:display-versions` and reduce cloning or serialization overhead.
 - [x] Re-run the benchmark scripts after each optimization.
 - [x] Keep this file updated with changes, results, and remaining bottlenecks.
 
