@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Write;
 use std::path::Path;
@@ -231,41 +232,47 @@ pub(crate) async fn save_prepared_release_execution(
 		prepared_release,
 		file_diffs: PreparedFileDiffsRef(file_diffs),
 	};
-	let file = fs::File::create(&artifact_path).map_err(|error| {
-		MonochangeError::Io(format!(
-			"failed to write prepared release artifact {}: {error}",
-			artifact_path.display()
-		))
-	})?;
+	let file = fs::File::create(&artifact_path)
+		.map_err(|error| prepared_release_artifact_io_error(&artifact_path, &error))?;
 	let mut writer = BufWriter::new(file);
-	serde_json::to_writer_pretty(&mut writer, &artifact).map_err(|error| {
-		if error.is_io() {
-			MonochangeError::Io(format!(
-				"failed to write prepared release artifact {}: {error}",
-				artifact_path.display()
-			))
-		} else {
-			MonochangeError::Config(format!(
-				"failed to serialize prepared release artifact: {error}"
-			))
-		}
-	})?;
-	writer.flush().map_err(|error| {
-		MonochangeError::Io(format!(
-			"failed to write prepared release artifact {}: {error}",
-			artifact_path.display()
+	serde_json::to_writer_pretty(&mut writer, &artifact)
+		.map_err(|error| prepared_release_artifact_write_error(&artifact_path, &error))?;
+	writer
+		.flush()
+		.map_err(|error| prepared_release_artifact_io_error(&artifact_path, &error))
+}
+
+fn prepared_release_artifact_io_error(
+	path: &Path,
+	error: impl std::fmt::Display,
+) -> MonochangeError {
+	MonochangeError::Io(format!(
+		"failed to write prepared release artifact {}: {error}",
+		path.display()
+	))
+}
+
+fn prepared_release_artifact_write_error(
+	path: &Path,
+	error: &serde_json::Error,
+) -> MonochangeError {
+	if error.is_io() {
+		prepared_release_artifact_io_error(path, error)
+	} else {
+		MonochangeError::Config(format!(
+			"failed to serialize prepared release artifact: {error}"
 		))
-	})
+	}
 }
 
 fn read_prepared_release_artifact(path: &Path) -> MonochangeResult<PreparedReleaseArtifact> {
-	let contents = fs::read_to_string(path).map_err(|error| {
+	let file = fs::File::open(path).map_err(|error| {
 		MonochangeError::Io(format!(
 			"failed to read prepared release artifact {}: {error}",
 			path.display()
 		))
 	})?;
-	serde_json::from_str(&contents).map_err(|error| {
+	serde_json::from_reader(BufReader::new(file)).map_err(|error| {
 		MonochangeError::Config(format!(
 			"failed to parse prepared release artifact {}: {error}",
 			path.display()
@@ -412,50 +419,38 @@ async fn tracked_path_snapshots(
 	tracked_paths.sort();
 	tracked_paths.dedup();
 
-	let mut snapshot_inputs = Vec::with_capacity(tracked_paths.len());
+	let mut snapshots = Vec::with_capacity(tracked_paths.len());
 	let mut file_paths = Vec::with_capacity(tracked_paths.len());
+	let mut file_snapshot_indices = Vec::with_capacity(tracked_paths.len());
 	for path in tracked_paths {
 		let absolute_path = resolve_config_path(root, path);
 		if absolute_path.exists() {
 			let relative_path = root_relative(root, &absolute_path);
 			let relative = relative_path.to_string_lossy().into_owned();
 			file_paths.push(relative);
-			snapshot_inputs.push(TrackedPathSnapshotInput::File { path: path.clone() });
+			file_snapshot_indices.push(snapshots.len());
+			snapshots.push(PreparedReleaseTrackedPath {
+				path: path.clone(),
+				state: PreparedReleaseTrackedPathState::File,
+				hash: None,
+			});
 		} else {
-			snapshot_inputs.push(TrackedPathSnapshotInput::Deleted { path: path.clone() });
+			snapshots.push(PreparedReleaseTrackedPath {
+				path: path.clone(),
+				state: PreparedReleaseTrackedPathState::Deleted,
+				hash: None,
+			});
 		}
 	}
 
-	let mut hashes = hash_files_at_paths(root, &file_paths).await?.into_iter();
-	let snapshots = snapshot_inputs
-		.into_iter()
-		.map(|input| {
-			match input {
-				TrackedPathSnapshotInput::File { path } => {
-					PreparedReleaseTrackedPath {
-						path,
-						state: PreparedReleaseTrackedPathState::File,
-						hash: hashes.next(),
-					}
-				}
-				TrackedPathSnapshotInput::Deleted { path } => {
-					PreparedReleaseTrackedPath {
-						path,
-						state: PreparedReleaseTrackedPathState::Deleted,
-						hash: None,
-					}
-				}
-			}
-		})
-		.collect();
+	let hashes = hash_files_at_paths(root, &file_paths).await?;
+	for (snapshot_index, hash) in file_snapshot_indices.into_iter().zip(hashes) {
+		if let Some(snapshot) = snapshots.get_mut(snapshot_index) {
+			snapshot.hash = Some(hash);
+		}
+	}
 
 	Ok(snapshots)
-}
-
-#[derive(Debug)]
-enum TrackedPathSnapshotInput {
-	File { path: PathBuf },
-	Deleted { path: PathBuf },
 }
 
 #[cfg(test)]

@@ -110,6 +110,19 @@ fn configuration_snapshot_error_reports_serialization_context() {
 	assert!(message.contains(CONFIGURATION_SNAPSHOT_ERROR));
 }
 
+#[test]
+fn prepared_release_artifact_write_error_reports_io_and_serialization_context() {
+	let path = Path::new("cache.json");
+	let io_error = serde_json::Error::io(std::io::Error::other("disk full"));
+	let message = prepared_release_artifact_write_error(path, &io_error).to_string();
+	assert!(message.contains("failed to write prepared release artifact cache.json"));
+
+	let serialization_error =
+		serde_json::from_str::<serde_json::Value>("{invalid json").unwrap_err();
+	let message = prepared_release_artifact_write_error(path, &serialization_error).to_string();
+	assert!(message.contains("failed to serialize prepared release artifact"));
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn hash_file_helpers_return_single_hash_and_reject_mismatched_output() {
 	let tempdir = setup_prepared_release_repo();
