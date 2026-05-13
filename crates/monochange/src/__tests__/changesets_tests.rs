@@ -22,6 +22,7 @@ use super::discover_changeset_paths;
 use super::parse_batch_git_log_bytes;
 use super::parse_batch_git_log_output;
 use super::render_changeset_diagnostics;
+use super::render_changeset_markdown;
 use crate::ChangesetDiagnosticsReport;
 use crate::PreparedChangeset;
 use crate::PreparedChangesetTarget;
@@ -149,6 +150,49 @@ async fn diagnose_changesets_falls_back_to_workspace_versions_for_explicit_versi
 		.find(|target| target.id == "core")
 		.unwrap_or_else(|| panic!("expected core target"));
 	assert_eq!(target.bump, Some(BumpSeverity::Minor));
+}
+
+#[test]
+fn render_changeset_markdown_streams_targets_and_details() {
+	let fixture = setup_fixture("changeset-target-metadata/render-workspace");
+	let configuration = crate::load_workspace_configuration(fixture.path())
+		.unwrap_or_else(|error| panic!("load configuration: {error}"));
+	let package_refs = vec!["core".to_string(), "sdk".to_string()];
+	let caused_by = vec!["sdk".to_string(), "pkg\"name".to_string()];
+
+	let markdown = render_changeset_markdown(
+		&configuration,
+		&package_refs,
+		BumpSeverity::Patch,
+		Some("2.0.0"),
+		"Ship runtime",
+		Some("security"),
+		&caused_by,
+		Some("\nMore details\n"),
+	)
+	.unwrap_or_else(|error| panic!("render changeset markdown: {error}"));
+
+	assert_eq!(
+		markdown,
+		concat!(
+			"---\n",
+			"core:\n",
+			"  bump: patch\n",
+			"  type: security\n",
+			"  version: \"2.0.0\"\n",
+			"  caused_by: [\"sdk\", \"pkg\\\"name\"]\n",
+			"sdk:\n",
+			"  bump: patch\n",
+			"  type: security\n",
+			"  version: \"2.0.0\"\n",
+			"  caused_by: [\"sdk\", \"pkg\\\"name\"]\n",
+			"---\n",
+			"\n",
+			"# Ship runtime\n",
+			"\n",
+			"More details\n",
+		)
+	);
 }
 
 #[test]

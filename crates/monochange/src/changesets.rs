@@ -717,23 +717,16 @@ pub(crate) fn default_change_path(root: &Path, package_refs: &[String]) -> PathB
 		.duration_since(UNIX_EPOCH)
 		.map_or(0, |duration| duration.as_secs());
 	let slug_source = package_refs.first().map_or("change", String::as_str);
-	let slug = slug_source
-		.chars()
-		.map(|character| {
-			if character.is_ascii_alphanumeric() {
-				character.to_ascii_lowercase()
-			} else {
-				'-'
-			}
-		})
-		.collect::<String>()
-		.trim_matches('-')
-		.to_string();
-	let slug = if slug.is_empty() {
-		"change".to_string()
-	} else {
-		slug
-	};
+	let mut slug = String::with_capacity(slug_source.len());
+	for character in slug_source.chars() {
+		if character.is_ascii_alphanumeric() {
+			slug.push(character.to_ascii_lowercase());
+		} else {
+			slug.push('-');
+		}
+	}
+	let slug = slug.trim_matches('-');
+	let slug = if slug.is_empty() { "change" } else { slug };
 	root.join(CHANGESET_DIR)
 		.join(format!("{timestamp}-{slug}.md"))
 }
@@ -749,26 +742,37 @@ pub(crate) fn render_changeset_markdown(
 	caused_by: &[String],
 	details: Option<&str>,
 ) -> MonochangeResult<String> {
-	let mut lines = vec!["---".to_string()];
+	let mut rendered = String::from("---\n");
 	for package in package_refs {
-		lines.extend(render_change_target_markdown(
-			configuration,
-			package,
-			bump,
-			version,
-			change_type,
-			caused_by,
-		)?);
+		push_markdown_lines(
+			&mut rendered,
+			render_change_target_markdown(
+				configuration,
+				package,
+				bump,
+				version,
+				change_type,
+				caused_by,
+			)?,
+		);
 	}
-	lines.push("---".to_string());
-	lines.push(String::new());
-	lines.push(format!("# {reason}"));
-	if let Some(details) = details.filter(|value| !value.trim().is_empty()) {
-		lines.push(String::new());
-		lines.push(details.trim().to_string());
+
+	rendered.push_str("---\n\n# ");
+	rendered.push_str(reason);
+	rendered.push('\n');
+	if let Some(details) = details.map(str::trim).filter(|value| !value.is_empty()) {
+		rendered.push('\n');
+		rendered.push_str(details);
+		rendered.push('\n');
 	}
-	lines.push(String::new());
-	Ok(lines.join("\n"))
+	Ok(rendered)
+}
+
+fn push_markdown_lines(rendered: &mut String, lines: Vec<String>) {
+	for line in lines {
+		rendered.push_str(&line);
+		rendered.push('\n');
+	}
 }
 
 #[cfg(test)]
