@@ -65,6 +65,7 @@
   - Streamed publish rate-limit enforcement error details directly into one string, avoiding temporary blocked-window and detail vectors on rejection paths.
   - Streamed publish-readiness package identity lists directly into one string instead of joining cloned identity strings.
   - Streamed lint progress summary counts directly into one line, avoiding a temporary parts vector and comma-join path.
+  - Streamed workspace operation TOML array and inline-table rendering directly into output strings instead of collecting temporary fragments before joining.
 
 ## Current benchmark summary
 

@@ -34,13 +34,39 @@ fn render_step_inputs_toml_uses_array_for_inherited_and_map_for_mixed_inputs() {
 	assert_eq!(rendered, "inputs = [\"format\"]\n");
 
 	inherited_inputs.insert(
+		"release".to_string(),
+		monochange_core::CliStepInputValue::Inherited,
+	);
+	let mut rendered = String::new();
+	render_step_inputs_toml(&mut rendered, &inherited_inputs);
+	assert_eq!(rendered, "inputs = [\"format\", \"release\"]\n");
+
+	inherited_inputs.insert(
 		"draft".to_string(),
 		monochange_core::CliStepInputValue::Boolean(true),
 	);
 	let rendered = render_step_inputs_inline_table(&inherited_inputs);
 	assert_eq!(
 		rendered,
-		"{ draft = true, format = \"{{ inputs.format }}\" }"
+		"{ draft = true, format = \"{{ inputs.format }}\", release = \"{{ inputs.release }}\" }"
+	);
+}
+
+#[test]
+fn render_command_variables_inline_table_streams_multiple_variables() {
+	let mut variables = BTreeMap::new();
+	variables.insert(
+		"changed".to_string(),
+		monochange_core::CommandVariable::ChangedFiles,
+	);
+	variables.insert(
+		"version".to_string(),
+		monochange_core::CommandVariable::Version,
+	);
+
+	assert_eq!(
+		render_command_variables_inline_table(&variables),
+		"{ changed = \"changed_files\", version = \"version\" }"
 	);
 }
 

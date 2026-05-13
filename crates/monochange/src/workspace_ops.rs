@@ -333,7 +333,11 @@ fn render_cli_input_toml(rendered: &mut String, input: &monochange_core::CliInpu
 		write_toml_key_value(rendered, "default", &render_toml_string(default));
 	}
 	if !input.choices.is_empty() {
-		write_toml_key_value(rendered, "choices", &render_toml_array(&input.choices));
+		write_toml_key_value(
+			rendered,
+			"choices",
+			&render_toml_array(input.choices.iter()),
+		);
 	}
 	if let Some(short) = input.short {
 		write_toml_key_value(rendered, "short", &render_toml_string(&short.to_string()));
@@ -409,7 +413,7 @@ fn render_step_inputs_toml(
 		.values()
 		.all(|value| matches!(value, monochange_core::CliStepInputValue::Inherited))
 	{
-		render_toml_array(&inputs.keys().cloned().collect::<Vec<_>>())
+		render_toml_array(inputs.keys())
 	} else {
 		render_step_inputs_inline_table(inputs)
 	};
@@ -420,14 +424,22 @@ fn render_step_inputs_toml(
 fn render_step_inputs_inline_table(
 	inputs: &BTreeMap<String, monochange_core::CliStepInputValue>,
 ) -> String {
-	format!(
-		"{{ {} }}",
-		inputs
-			.iter()
-			.map(|(name, value)| format!("{name} = {}", render_step_input_value(name, value)))
-			.collect::<Vec<_>>()
-			.join(", ")
-	)
+	let mut rendered = String::from("{ ");
+	let mut first = true;
+	for (name, value) in inputs {
+		if first {
+			first = false;
+		} else {
+			rendered.push_str(", ");
+		}
+		let _ = write!(
+			rendered,
+			"{name} = {}",
+			render_step_input_value(name, value)
+		);
+	}
+	rendered.push_str(" }");
+	rendered
 }
 
 fn render_step_input_value(name: &str, value: &monochange_core::CliStepInputValue) -> String {
@@ -437,43 +449,51 @@ fn render_step_input_value(name: &str, value: &monochange_core::CliStepInputValu
 		}
 		monochange_core::CliStepInputValue::String(value) => render_toml_string(value),
 		monochange_core::CliStepInputValue::Boolean(value) => value.to_string(),
-		monochange_core::CliStepInputValue::List(values) => render_toml_array(values),
+		monochange_core::CliStepInputValue::List(values) => render_toml_array(values.iter()),
 	}
 }
 
 fn render_command_variables_inline_table(
 	variables: &BTreeMap<String, monochange_core::CommandVariable>,
 ) -> String {
-	format!(
-		"{{ {} }}",
-		variables
-			.iter()
-			.map(|(name, value)| {
-				format!(
-					"{name} = {}",
-					render_toml_string(match value {
-						monochange_core::CommandVariable::Version => "version",
-						monochange_core::CommandVariable::GroupVersion => "group_version",
-						monochange_core::CommandVariable::ReleasedPackages => "released_packages",
-						monochange_core::CommandVariable::ChangedFiles => "changed_files",
-						monochange_core::CommandVariable::Changesets => "changesets",
-					})
-				)
-			})
-			.collect::<Vec<_>>()
-			.join(", ")
-	)
+	let mut rendered = String::from("{ ");
+	let mut first = true;
+	for (name, value) in variables {
+		if first {
+			first = false;
+		} else {
+			rendered.push_str(", ");
+		}
+		let value = match value {
+			monochange_core::CommandVariable::Version => "version",
+			monochange_core::CommandVariable::GroupVersion => "group_version",
+			monochange_core::CommandVariable::ReleasedPackages => "released_packages",
+			monochange_core::CommandVariable::ChangedFiles => "changed_files",
+			monochange_core::CommandVariable::Changesets => "changesets",
+		};
+		let _ = write!(rendered, "{name} = {}", render_toml_string(value));
+	}
+	rendered.push_str(" }");
+	rendered
 }
 
-fn render_toml_array(values: &[String]) -> String {
-	format!(
-		"[{}]",
-		values
-			.iter()
-			.map(|value| render_toml_string(value))
-			.collect::<Vec<_>>()
-			.join(", ")
-	)
+fn render_toml_array<I, S>(values: I) -> String
+where
+	I: IntoIterator<Item = S>,
+	S: AsRef<str>,
+{
+	let mut rendered = String::from("[");
+	let mut first = true;
+	for value in values {
+		if first {
+			first = false;
+		} else {
+			rendered.push_str(", ");
+		}
+		rendered.push_str(&render_toml_string(value.as_ref()));
+	}
+	rendered.push(']');
+	rendered
 }
 
 fn render_toml_string(value: &str) -> String {
@@ -546,11 +566,7 @@ fn render_annotated_init_config(
 	let has_python = packages.iter().any(|p| p.ecosystem == Ecosystem::Python);
 	let has_go = packages.iter().any(|p| p.ecosystem == Ecosystem::Go);
 
-	let package_ids_toml = package_ids
-		.iter()
-		.map(|id| format!("\"{id}\""))
-		.collect::<Vec<_>>()
-		.join(", ");
+	let package_ids_toml = render_toml_array(package_ids.iter());
 
 	let context = json!({
 		"packages": template_packages,
