@@ -16,54 +16,70 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-
   changes:
     runs-on: ubuntu-latest
     outputs:
       rust: ${{ steps.filter.outputs.rust }}
       fixtures: ${{ steps.filter.outputs.fixtures }}
       global: ${{ steps.filter.outputs.global }}
+      release: ${{ steps.filter.outputs.release }}
       js: ${{ steps.filter.outputs.js }}
       docs: ${{ steps.filter.outputs.docs }}
       workflows: ${{ steps.filter.outputs.workflows }}
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@6852f92c20ea7fd3b0c25de3b5112db3a98da050 # v3
         id: filter
         with:
           filters: |
             rust:
-              - '**.rs'
+              - '**/*.rs'
               - '**/Cargo.toml'
               - 'Cargo.lock'
               - 'rust-toolchain.toml'
-              - '.cargo/config.toml'
-              - 'deny.toml'
+              - 'rustfmt.toml'
               - 'clippy.toml'
+              - 'deny.toml'
+              - '.cargo/**'
             fixtures:
               - 'fixtures/**'
               - 'crates/**/fixtures/**'
-              - 'crates/**/tests/**'
-              - 'crates/**/__tests__/**'
+              - 'crates/**/test-data/**'
               - 'crates/**/snapshots/**'
             global:
               - '.github/workflows/ci.yml'
               - 'monochange.toml'
+              - 'devenv.nix'
+              - 'devenv.lock'
+              - 'devenv.yaml'
+            release:
               - '.changeset/**'
+              - '.monochange/**'
+              - 'changelog.md'
             js:
-              - '**.js'
-              - '**.mjs'
-              - '**.ts'
+              - '**/*.js'
+              - '**/*.mjs'
+              - '**/*.ts'
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
+              - 'tsconfig.json'
+              - 'tsdown.config.json'
               - '.oxlintrc.json'
+              - '.oxfmtrc.json'
+              - 'scripts/**'
+              - 'packages/**'
             docs:
               - 'docs/**'
-              - '**.md'
-              - 'book.toml'
-              - 'scripts/**'
+              - 'readme.md'
+              - 'CONTRIBUTING.md'
+              - 'ARCHITECTURE.md'
+              - 'AGENTS.md'
+              - 'CLAUDE.md'
+              - 'research.md'
+              - 'mdt.toml'
+              - '.templates/**'
             workflows:
               - '.github/workflows/**'
               - '.github/actions/**'
@@ -89,7 +105,7 @@ jobs:
 
   lint:
     needs: changes
-    if: github.event_name == 'merge_group' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.global == 'true' || needs.changes.outputs.js == 'true' || needs.changes.outputs.docs == 'true'
+    if: github.event_name == 'merge_group' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.global == 'true' || needs.changes.outputs.release == 'true' || needs.changes.outputs.js == 'true' || needs.changes.outputs.docs == 'true' || needs.changes.outputs.workflows == 'true'
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
@@ -102,34 +118,42 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: lint clippy
+        if: github.event_name == 'merge_group' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.global == 'true'
         run: lint:clippy
         shell: devenv shell -- bash -e {0}
 
       - name: lint formatting
+        if: github.event_name == 'merge_group' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.global == 'true' || needs.changes.outputs.release == 'true' || needs.changes.outputs.js == 'true' || needs.changes.outputs.docs == 'true' || needs.changes.outputs.workflows == 'true'
         run: lint:format
         shell: devenv shell -- bash -e {0}
 
       - name: check architecture boundaries
+        if: github.event_name == 'merge_group' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.js == 'true' || needs.changes.outputs.global == 'true'
         run: lint:architecture
         shell: devenv shell -- bash -e {0}
 
       - name: check documentation sync
+        if: github.event_name == 'merge_group' || needs.changes.outputs.docs == 'true' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.js == 'true' || needs.changes.outputs.global == 'true'
         run: docs:check
         shell: devenv shell -- bash -e {0}
 
       - name: lint js
+        if: github.event_name == 'merge_group' || needs.changes.outputs.js == 'true' || needs.changes.outputs.global == 'true'
         run: pnpm oxlint .
         shell: devenv shell -- bash -e {0}
 
       - name: cargo deny
+        if: github.event_name == 'merge_group' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.global == 'true'
         run: deny:check
         shell: devenv shell -- bash -e {0}
 
       - name: manifest lint
+        if: github.event_name == 'merge_group' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.global == 'true' || needs.changes.outputs.release == 'true'
         run: lint:monochange
         shell: devenv shell -- bash -e {0}
 
       - name: schema check
+        if: github.event_name == 'merge_group' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.fixtures == 'true' || needs.changes.outputs.global == 'true'
         run: schema:check
         shell: devenv shell -- bash -e {0}
 
@@ -182,16 +206,16 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: build
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && (github.event_name == 'merge_group' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.global == 'true')
         run: build:all
         shell: devenv shell -- bash -e {0}
 
       - name: build on windows
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && (github.event_name == 'merge_group' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.global == 'true')
         run: cargo build --workspace --all-features --locked
 
       - name: detect current release commit
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && (github.event_name == 'merge_group' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.global == 'true' || needs.changes.outputs.release == 'true')
         id: release_record
         run: |
           set -euo pipefail
@@ -214,17 +238,35 @@ jobs:
         shell: devenv shell -- bash -e {0}
 
       - name: check publish builds
-        if: runner.os != 'Windows' && steps.release_record.outputs.is_release_commit != 'true'
+        if: runner.os != 'Windows' && (github.event_name == 'merge_group' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.global == 'true' || needs.changes.outputs.release == 'true') && steps.release_record.outputs.is_release_commit != 'true'
         run: publish:check
         shell: devenv shell -- bash -e {0}
 
       - name: skip publish build check on release commit
-        if: runner.os != 'Windows' && steps.release_record.outputs.is_release_commit == 'true'
+        if: runner.os != 'Windows' && (github.event_name == 'merge_group' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.global == 'true' || needs.changes.outputs.release == 'true') && steps.release_record.outputs.is_release_commit == 'true'
         run: echo "HEAD is a release commit; skipping publish:check."
         shell: devenv shell -- bash -e {0}
 
       - name: build book
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && (github.event_name == 'merge_group' || needs.changes.outputs.global == 'true')
+        run: build:book
+        shell: devenv shell -- bash -e {0}
+
+  build-docs:
+    needs: changes
+    if: github.event_name != 'merge_group' && needs.changes.outputs.docs == 'true' && needs.changes.outputs.rust != 'true' && needs.changes.outputs.global != 'true'
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: build book
         run: build:book
         shell: devenv shell -- bash -e {0}
 
@@ -435,7 +477,7 @@ jobs:
 
   release-test:
     needs: changes
-    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'monochange/release') && (needs.changes.outputs.rust == 'true' || needs.changes.outputs.fixtures == 'true' || needs.changes.outputs.global == 'true')
+    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'monochange/release') && (needs.changes.outputs.rust == 'true' || needs.changes.outputs.fixtures == 'true' || needs.changes.outputs.global == 'true' || needs.changes.outputs.release == 'true')
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
@@ -480,7 +522,7 @@ jobs:
 
   release-records:
     needs: changes
-    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'monochange/release') && (needs.changes.outputs.rust == 'true' || needs.changes.outputs.fixtures == 'true' || needs.changes.outputs.global == 'true')
+    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'monochange/release') && (needs.changes.outputs.rust == 'true' || needs.changes.outputs.fixtures == 'true' || needs.changes.outputs.global == 'true' || needs.changes.outputs.release == 'true')
     timeout-minutes: 20
     runs-on: ubuntu-latest
     steps:
@@ -528,7 +570,7 @@ jobs:
 
   release-lint:
     needs: changes
-    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'monochange/release') && (needs.changes.outputs.rust == 'true' || needs.changes.outputs.global == 'true' || needs.changes.outputs.js == 'true' || needs.changes.outputs.docs == 'true')
+    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'monochange/release') && (needs.changes.outputs.rust == 'true' || needs.changes.outputs.global == 'true' || needs.changes.outputs.release == 'true' || needs.changes.outputs.js == 'true' || needs.changes.outputs.docs == 'true')
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
