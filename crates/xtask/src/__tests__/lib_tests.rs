@@ -279,8 +279,10 @@ fn run_cli_round_trip() {
 
 	let artifacts = schemas.join("artifacts");
 	let current_artifacts = artifacts.join("current");
-	assert!(current_artifacts.join("release-record.json").exists());
-	assert!(current_artifacts.join("monochange.json").exists());
+	assert!(current_artifacts.join("release-record/1.json").exists());
+	assert!(current_artifacts.join("release-record/10.json").exists());
+	assert!(current_artifacts.join("monochange/1.json").exists());
+	assert!(current_artifacts.join("monochange/10.json").exists());
 	assert!(!artifacts.join("release-record.current.json").exists());
 	assert!(!artifacts.join("monochange.current.json").exists());
 	assert!(
@@ -334,15 +336,17 @@ fn run_cli_round_trip() {
 		)
 		.is_ok()
 	);
-	assert!(current_artifacts.join("release-record.json").exists());
-	assert!(current_artifacts.join("monochange.json").exists());
+	assert!(current_artifacts.join("release-record/1.json").exists());
+	assert!(current_artifacts.join("release-record/10.json").exists());
+	assert!(current_artifacts.join("monochange/1.json").exists());
+	assert!(current_artifacts.join("monochange/10.json").exists());
 	assert!(
-		artifacts
+		!artifacts
 			.join(format!("release-record.v{version}.json"))
 			.exists()
 	);
 	assert!(
-		artifacts
+		!artifacts
 			.join(format!("monochange.v{version}.json"))
 			.exists()
 	);

@@ -2,14 +2,13 @@
 	"changedFiles": [
 		"Cargo.toml",
 		"crates/monochange_schema/Cargo.toml",
-		"crates/monochange_schema/schemas/artifacts/current/release-record.json",
-		"crates/monochange_schema/schemas/artifacts/release-record.v0.2.json"
+		"crates/monochange_schema/schemas/artifacts/current/release-record/1.json"
 	],
 	"changesets": [
 		{
-			"details": "Generated release-record artifact fixtures are parsed through the same migration path as commit-embedded records.",
-			"path": ".changeset/release-record-schema-compat.md",
-			"summary": "Keep release record schema compatibility checks stable",
+			"details": "Generated from deterministic proptest seed 117.",
+			"path": ".changeset/schema-artifact-1.md",
+			"summary": "Exercise schema artifact fixture 1",
 			"targets": [
 				{
 					"bump": "major",
@@ -30,14 +29,14 @@
 	"command": "mc release --commit",
 	"createdAt": "2026-01-01T00:00:00Z",
 	"deletedChangesets": [
-		".changeset/release-record-schema-compat.md"
+		".changeset/schema-artifact-1.md"
 	],
 	"kind": "monochange.releaseRecord",
 	"provider": {
 		"host": "github.com",
 		"kind": "github",
 		"owner": "monochange",
-		"repo": "monochange"
+		"repo": "release-kit"
 	},
 	"releaseTargets": [
 		{
@@ -49,8 +48,8 @@
 			],
 			"release": true,
 			"tag": true,
-			"tagName": "v0.2.0",
-			"version": "0.2.0",
+			"tagName": "v0.2.1",
+			"version": "0.2.1",
 			"versionFormat": "primary"
 		},
 		{
@@ -59,23 +58,22 @@
 			"members": [],
 			"release": false,
 			"tag": false,
-			"tagName": "monochange_schema/v0.2.0",
-			"version": "0.2.0",
+			"tagName": "monochange_schema/v0.2.1",
+			"version": "0.2.1",
 			"versionFormat": "namespaced"
 		}
 	],
 	"releasedPackages": [
 		"monochange",
-		"monochange_core",
-		"monochange_schema"
+		"monochange_core"
 	],
 	"schemaVersion": "0.2",
 	"updatedChangelogs": [
-		"changelog.md"
+		"fixtures/changelog-1.md"
 	],
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"versions": {
-		"main": "0.2.0",
-		"monochange_schema": "0.2.0"
+		"main": "0.2.1",
+		"monochange_schema": "0.2.1"
 	}
 }

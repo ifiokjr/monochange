@@ -4,6 +4,14 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use monochange_core::BumpSeverity;
+use proptest::prelude::*;
+use proptest::strategy::ValueTree;
+use proptest::test_runner::Config;
+use proptest::test_runner::RngAlgorithm;
+use proptest::test_runner::TestRng;
+use proptest::test_runner::TestRunner;
+use serde_json::Value;
+use serde_json::json;
 
 /// Post-process a generated JSON schema by adding `$id`, `title`, and `description`.
 pub fn post_process(schema: &mut serde_json::Value, id: &str, title: &str, description: &str) {
@@ -145,6 +153,18 @@ struct GeneratedFile {
 	contents: String,
 }
 
+const CURRENT_ARTIFACT_FIXTURE_COUNT: usize = 10;
+
+#[derive(Clone, Debug)]
+struct ArtifactVariant {
+	seed: u8,
+	owner: &'static str,
+	repo: &'static str,
+	package_count: usize,
+	dry_run: bool,
+	with_host: bool,
+}
+
 /// Core schema generation logic with configurable output directories.
 pub fn run_with_paths(
 	update_mode: bool,
@@ -168,7 +188,7 @@ pub fn run_with_paths(
 		for generated_file in &generated_files {
 			write_generated_file(generated_file)?;
 		}
-		remove_stale_current_artifact_aliases(schemas_dir)?;
+		remove_stale_artifact_files(schemas_dir)?;
 		println!("Schemas updated successfully.");
 		return Ok(());
 	}
@@ -184,6 +204,9 @@ pub fn run_with_paths(
 		.map(|file| (file.path.as_path(), file.contents.as_str()))
 		.collect::<Vec<_>>();
 	if let Err(error) = check_schemas(&schema_checks) {
+		errors.push(error);
+	}
+	if let Err(error) = check_stale_artifact_files_absent(schemas_dir) {
 		errors.push(error);
 	}
 
@@ -220,9 +243,6 @@ fn schema_files(
 
 	let release_json = serde_json::to_string_pretty(&release_value).unwrap();
 	let config_json = serde_json::to_string_pretty(&config_value).unwrap();
-	let release_record_artifact_json =
-		monochange_schema::release_record::populated_artifact_json(version);
-	let config_artifact_json = monochange_schema::config::populated_artifact_json();
 	let migration_changelog_json = format!(
 		"{}\n",
 		monochange_schema::migration_changelog::to_json_pretty().unwrap()
@@ -244,14 +264,6 @@ fn schema_files(
 			contents: migration_changelog_json,
 		},
 		GeneratedFile {
-			path: current_artifacts_dir.join("release-record.json"),
-			contents: release_record_artifact_json.clone(),
-		},
-		GeneratedFile {
-			path: current_artifacts_dir.join("monochange.json"),
-			contents: config_artifact_json.clone(),
-		},
-		GeneratedFile {
 			path: docs_schemas_dir.join("release-record.schema.json"),
 			contents: release_json,
 		},
@@ -260,6 +272,7 @@ fn schema_files(
 			contents: config_json,
 		},
 	];
+	files.extend(current_artifact_files(&current_artifacts_dir, version));
 
 	if mode == SchemaMode::Release {
 		let mut release_versioned_value = release_value.clone();
@@ -281,14 +294,6 @@ fn schema_files(
 		);
 		files.extend([
 			GeneratedFile {
-				path: artifacts_dir.join(format!("release-record.v{version}.json")),
-				contents: release_record_artifact_json,
-			},
-			GeneratedFile {
-				path: artifacts_dir.join(format!("monochange.v{version}.json")),
-				contents: config_artifact_json,
-			},
-			GeneratedFile {
 				path: docs_schemas_dir.join(format!("release-record.v{version}.schema.json")),
 				contents: serde_json::to_string_pretty(&release_versioned_value).unwrap(),
 			},
@@ -302,6 +307,176 @@ fn schema_files(
 	files
 }
 
+fn current_artifact_files(current_artifacts_dir: &Path, version: &str) -> Vec<GeneratedFile> {
+	let variants = current_artifact_variants();
+	let mut files = Vec::with_capacity(CURRENT_ARTIFACT_FIXTURE_COUNT * 2);
+	for (index, variant) in variants.iter().enumerate() {
+		let name = format!("{}.json", index + 1);
+		files.push(GeneratedFile {
+			path: current_artifacts_dir.join("release-record").join(&name),
+			contents: release_record_artifact_fixture(version, index + 1, variant),
+		});
+		files.push(GeneratedFile {
+			path: current_artifacts_dir.join("monochange").join(name),
+			contents: config_artifact_fixture(variant),
+		});
+	}
+	files
+}
+
+fn current_artifact_variants() -> Vec<ArtifactVariant> {
+	let strategy = (
+		0u8..=u8::MAX,
+		prop::sample::select(&["monochange", "aipi", "schema-lab", "release-tools"]),
+		prop::sample::select(&["monochange", "workspace", "release-kit", "schema-fixtures"]),
+		1usize..=3,
+		any::<bool>(),
+		any::<bool>(),
+	)
+		.prop_map(|(seed, owner, repo, package_count, dry_run, with_host)| {
+			ArtifactVariant {
+				seed,
+				owner,
+				repo,
+				package_count,
+				dry_run,
+				with_host,
+			}
+		});
+	let mut runner = TestRunner::new_with_rng(
+		Config::default(),
+		TestRng::from_seed(RngAlgorithm::ChaCha, b"monochange-current-artifact-seed"),
+	);
+	(0..CURRENT_ARTIFACT_FIXTURE_COUNT)
+		.map(|_| {
+			strategy
+				.new_tree(&mut runner)
+				.expect("generate current artifact fixture variant")
+				.current()
+		})
+		.collect()
+}
+
+fn release_record_artifact_fixture(
+	version: &str,
+	fixture_index: usize,
+	variant: &ArtifactVariant,
+) -> String {
+	let mut value: Value = serde_json::from_str(
+		&monochange_schema::release_record::populated_artifact_json(version),
+	)
+	.expect("parse release-record artifact fixture template");
+	let release_version = format!("{version}.{fixture_index}");
+	let command = if variant.dry_run {
+		"mc release --dry-run"
+	} else {
+		"mc release --commit"
+	};
+	let packages = ["monochange", "monochange_core", "monochange_schema"];
+	let released_packages = packages
+		.iter()
+		.take(variant.package_count)
+		.copied()
+		.collect::<Vec<_>>();
+	let object = value
+		.as_object_mut()
+		.expect("release-record fixture object");
+	object.insert(
+		"createdAt".to_string(),
+		json!(format!("2026-01-{fixture_index:02}T00:00:00Z")),
+	);
+	object.insert("command".to_string(), json!(command));
+	object.insert("version".to_string(), json!(release_version));
+	object.insert("releasedPackages".to_string(), json!(released_packages));
+	object.insert(
+		"changedFiles".to_string(),
+		json!([
+			"Cargo.toml",
+			"crates/monochange_schema/Cargo.toml",
+			format!(
+				"crates/monochange_schema/schemas/artifacts/current/release-record/{fixture_index}.json"
+			),
+		]),
+	);
+	object.insert(
+		"updatedChangelogs".to_string(),
+		json!([format!("fixtures/changelog-{fixture_index}.md")]),
+	);
+	object.insert(
+		"deletedChangesets".to_string(),
+		json!([format!(".changeset/schema-artifact-{fixture_index}.md")]),
+	);
+	if let Some(versions) = object.get_mut("versions").and_then(Value::as_object_mut) {
+		versions.insert(
+			"main".to_string(),
+			json!(format!("{version}.{fixture_index}")),
+		);
+		versions.insert(
+			"monochange_schema".to_string(),
+			json!(format!("{version}.{fixture_index}")),
+		);
+	}
+	if let Some(targets) = object
+		.get_mut("releaseTargets")
+		.and_then(Value::as_array_mut)
+	{
+		for target in targets {
+			if let Some(target) = target.as_object_mut() {
+				target.insert(
+					"version".to_string(),
+					json!(format!("{version}.{fixture_index}")),
+				);
+				if let Some(id) = target.get("id").and_then(Value::as_str) {
+					let tag_name = if id == "main" {
+						format!("v{version}.{fixture_index}")
+					} else {
+						format!("{id}/v{version}.{fixture_index}")
+					};
+					target.insert("tagName".to_string(), json!(tag_name));
+				}
+			}
+		}
+	}
+	if let Some(changesets) = object.get_mut("changesets").and_then(Value::as_array_mut)
+		&& let Some(changeset) = changesets.first_mut().and_then(Value::as_object_mut)
+	{
+		changeset.insert(
+			"path".to_string(),
+			json!(format!(".changeset/schema-artifact-{fixture_index}.md")),
+		);
+		changeset.insert(
+			"summary".to_string(),
+			json!(format!("Exercise schema artifact fixture {fixture_index}")),
+		);
+		changeset.insert(
+			"details".to_string(),
+			json!(format!(
+				"Generated from deterministic proptest seed {}.",
+				variant.seed
+			)),
+		);
+	}
+	if let Some(provider) = object.get_mut("provider").and_then(Value::as_object_mut) {
+		provider.insert("owner".to_string(), json!(variant.owner));
+		provider.insert("repo".to_string(), json!(variant.repo));
+	}
+	serde_json::to_string_pretty(&value).expect("serialize release-record artifact fixture")
+}
+
+fn config_artifact_fixture(variant: &ArtifactVariant) -> String {
+	let mut source = serde_json::Map::new();
+	source.insert("provider".to_string(), json!("github"));
+	source.insert("owner".to_string(), json!(variant.owner));
+	source.insert("repo".to_string(), json!(variant.repo));
+	if variant.with_host {
+		source.insert("host".to_string(), json!("github.com"));
+	}
+	let value = json!({
+		"source": Value::Object(source)
+	});
+	serde_json::to_string_pretty(&value).expect("serialize config artifact fixture")
+}
+
 fn write_generated_file(generated_file: &GeneratedFile) -> Result<(), String> {
 	if let Some(parent) = generated_file.path.parent() {
 		fs::create_dir_all(parent)
@@ -311,12 +486,8 @@ fn write_generated_file(generated_file: &GeneratedFile) -> Result<(), String> {
 		.map_err(|error| format!("Could not write {}: {error}", generated_file.path.display()))
 }
 
-fn remove_stale_current_artifact_aliases(schemas_dir: &Path) -> Result<(), String> {
-	let artifacts_dir = schemas_dir.join("artifacts");
-	for path in [
-		artifacts_dir.join("release-record.current.json"),
-		artifacts_dir.join("monochange.current.json"),
-	] {
+fn remove_stale_artifact_files(schemas_dir: &Path) -> Result<(), String> {
+	for path in stale_artifact_files(schemas_dir)? {
 		if let Err(error) = fs::remove_file(&path)
 			&& error.kind() != std::io::ErrorKind::NotFound
 		{
@@ -324,6 +495,52 @@ fn remove_stale_current_artifact_aliases(schemas_dir: &Path) -> Result<(), Strin
 		}
 	}
 	Ok(())
+}
+
+fn check_stale_artifact_files_absent(schemas_dir: &Path) -> Result<(), String> {
+	let stale_files = stale_artifact_files(schemas_dir)?
+		.into_iter()
+		.filter(|path| path.exists())
+		.map(|path| path.display().to_string())
+		.collect::<Vec<_>>();
+	if stale_files.is_empty() {
+		Ok(())
+	} else {
+		Err(format!(
+			"Stale artifact files should be removed: {}",
+			stale_files.join(", ")
+		))
+	}
+}
+
+fn stale_artifact_files(schemas_dir: &Path) -> Result<Vec<PathBuf>, String> {
+	let artifacts_dir = schemas_dir.join("artifacts");
+	let current_artifacts_dir = artifacts_dir.join("current");
+	let mut paths = vec![
+		artifacts_dir.join("release-record.current.json"),
+		artifacts_dir.join("monochange.current.json"),
+		current_artifacts_dir.join("release-record.json"),
+		current_artifacts_dir.join("monochange.json"),
+	];
+	if !artifacts_dir.exists() {
+		return Ok(paths);
+	}
+	for entry in fs::read_dir(&artifacts_dir)
+		.map_err(|error| format!("Could not read {}: {error}", artifacts_dir.display()))?
+	{
+		let path = entry
+			.map_err(|error| format!("Could not read {}: {error}", artifacts_dir.display()))?
+			.path();
+		let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+			continue;
+		};
+		if (name.starts_with("release-record.v") || name.starts_with("monochange.v"))
+			&& name.ends_with(".json")
+		{
+			paths.push(path);
+		}
+	}
+	Ok(paths)
 }
 
 fn current_schema_version(schema_version_path: &Path) -> Result<String, String> {

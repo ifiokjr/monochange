@@ -241,17 +241,15 @@ Commit generated schemas under stable paths. Normal schema generation maintains 
 ```text
 crates/monochange_schema/schemas/release-record.schema.json
 crates/monochange_schema/schemas/monochange.schema.json
-crates/monochange_schema/schemas/artifacts/current/release-record.json
-crates/monochange_schema/schemas/artifacts/current/monochange.json
+crates/monochange_schema/schemas/artifacts/current/release-record/{1..10}.json
+crates/monochange_schema/schemas/artifacts/current/monochange/{1..10}.json
 docs/src/schemas/release-record.schema.json
 docs/src/schemas/monochange.schema.json
 ```
 
-Release schema generation additionally writes immutable versioned copies:
+Release schema generation additionally writes immutable versioned schema copies:
 
 ```text
-crates/monochange_schema/schemas/artifacts/release-record.v{version}.json
-crates/monochange_schema/schemas/artifacts/monochange.v{version}.json
 docs/src/schemas/release-record.v{version}.schema.json
 docs/src/schemas/monochange.v{version}.schema.json
 ```

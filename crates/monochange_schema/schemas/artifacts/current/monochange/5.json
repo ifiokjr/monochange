@@ -1,6 +1,6 @@
 {
 	"source": {
-		"owner": "monochange",
+		"owner": "release-tools",
 		"provider": "github",
 		"repo": "monochange"
 	}

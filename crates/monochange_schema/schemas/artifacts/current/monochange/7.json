@@ -1,0 +1,7 @@
+{
+	"source": {
+		"owner": "schema-lab",
+		"provider": "github",
+		"repo": "schema-fixtures"
+	}
+}

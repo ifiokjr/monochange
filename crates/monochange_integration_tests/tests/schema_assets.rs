@@ -8,8 +8,6 @@ use serde_json::Map;
 use serde_json::Value;
 use serde_json::json;
 
-const HISTORICAL_RELEASE_RECORD_ARTIFACT: &str = "release-record.v0.1.json";
-
 #[test]
 fn committed_schema_assets_are_json_and_hosted_copy_is_current() -> Result<(), Box<dyn Error>> {
 	let paths = schema_asset_paths()?;
@@ -33,23 +31,9 @@ fn committed_schema_assets_are_json_and_hosted_copy_is_current() -> Result<(), B
 fn release_record_artifact_fixtures_load_through_parser() -> Result<(), Box<dyn Error>> {
 	let paths = schema_asset_paths()?;
 	let artifact_paths = release_record_artifact_paths(&paths)?;
-	let names = artifact_paths
-		.iter()
-		.map(|path| file_name(path))
-		.collect::<Result<Vec<_>, _>>()?;
-	let current_versioned_name = format!(
-		"release-record.v{}.json",
-		monochange_schema::CURRENT_SCHEMA_VERSION_TEXT
-	);
+	let names = artifact_file_names(&artifact_paths)?;
 
-	assert!(names.iter().any(|name| name == "release-record.json"));
-	assert!(names.iter().any(|name| name == &current_versioned_name));
-	assert!(
-		names
-			.iter()
-			.any(|name| name == HISTORICAL_RELEASE_RECORD_ARTIFACT),
-		"expected at least one historical release-record artifact fixture"
-	);
+	assert_eq!(names, expected_current_artifact_file_names());
 
 	for artifact_path in artifact_paths {
 		let name = file_name(&artifact_path)?;
@@ -58,12 +42,10 @@ fn release_record_artifact_fixtures_load_through_parser() -> Result<(), Box<dyn 
 		let raw_schema_version = json_str(&raw, "/schemaVersion")?;
 		let record = monochange_core::parse_release_record_json(&text)?;
 
-		if name == "release-record.json" || name == current_versioned_name {
-			assert_eq!(
-				raw_schema_version,
-				monochange_schema::CURRENT_SCHEMA_VERSION_TEXT
-			);
-		}
+		assert_eq!(
+			raw_schema_version,
+			monochange_schema::CURRENT_SCHEMA_VERSION_TEXT
+		);
 		assert_eq!(
 			record.schema_version,
 			monochange_schema::CURRENT_SCHEMA_VERSION_TEXT,
@@ -95,26 +77,28 @@ fn release_record_artifact_fixtures_load_through_parser() -> Result<(), Box<dyn 
 fn config_artifact_fixtures_are_valid_json() -> Result<(), Box<dyn Error>> {
 	let paths = schema_asset_paths()?;
 	let artifact_paths = config_artifact_paths(&paths)?;
-	let names = artifact_paths
-		.iter()
-		.map(|path| file_name(path))
-		.collect::<Result<Vec<_>, _>>()?;
-	let current_versioned_name = format!(
-		"monochange.v{}.json",
-		monochange_schema::CURRENT_SCHEMA_VERSION_TEXT
-	);
+	let names = artifact_file_names(&artifact_paths)?;
 
-	assert!(names.iter().any(|name| name == "monochange.json"));
-	assert!(names.iter().any(|name| name == &current_versioned_name));
+	assert_eq!(names, expected_current_artifact_file_names());
 
-	let expected: Value =
-		serde_json::from_str(&monochange_schema::config::populated_artifact_json())?;
 	for artifact_path in artifact_paths {
 		let name = file_name(&artifact_path)?;
 		let text = std::fs::read_to_string(&artifact_path)?;
 		let raw: Value = serde_json::from_str(&text)?;
+		let source = json_object(&raw, "/source")?;
 
-		assert_eq!(raw, expected, "{name} should match the generated fixture");
+		assert_eq!(json_str(&raw, "/source/provider")?, "github");
+		assert!(!json_str(&raw, "/source/owner")?.is_empty());
+		assert!(!json_str(&raw, "/source/repo")?.is_empty());
+		for key in source.keys() {
+			assert!(
+				["provider", "owner", "repo", "host"].contains(&key.as_str()),
+				"{name} includes unexpected source key `{key}`"
+			);
+		}
+		if source.contains_key("host") {
+			assert_eq!(json_str(&raw, "/source/host")?, "github.com");
+		}
 	}
 
 	Ok(())
@@ -126,13 +110,28 @@ fn current_artifact_fixtures_are_colocated() -> Result<(), Box<dyn Error>> {
 	let mut names = Vec::new();
 	for entry in std::fs::read_dir(&paths.current_artifacts_dir)? {
 		let path = entry?.path();
-		if path.extension().and_then(|extension| extension.to_str()) == Some("json") {
+		if path.is_dir() {
 			names.push(file_name(&path)?);
 		}
 	}
 	names.sort();
 
-	assert_eq!(names, vec!["monochange.json", "release-record.json"]);
+	assert_eq!(names, vec!["monochange", "release-record"]);
+	assert_eq!(
+		artifact_file_names(&config_artifact_paths(&paths)?)?,
+		expected_current_artifact_file_names()
+	);
+	assert_eq!(
+		artifact_file_names(&release_record_artifact_paths(&paths)?)?,
+		expected_current_artifact_file_names()
+	);
+	assert!(!paths.current_artifacts_dir.join("monochange.json").exists());
+	assert!(
+		!paths
+			.current_artifacts_dir
+			.join("release-record.json")
+			.exists()
+	);
 	assert!(!paths.artifacts_dir.join("monochange.current.json").exists());
 	assert!(
 		!paths
@@ -140,6 +139,16 @@ fn current_artifact_fixtures_are_colocated() -> Result<(), Box<dyn Error>> {
 			.join("release-record.current.json")
 			.exists()
 	);
+	for entry in std::fs::read_dir(&paths.artifacts_dir)? {
+		let path = entry?.path();
+		let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+			continue;
+		};
+		assert!(
+			!(name.starts_with("monochange.v") || name.starts_with("release-record.v")),
+			"versioned artifact fixture should not exist before a release writes it: {name}"
+		);
+	}
 	Ok(())
 }
 
@@ -599,55 +608,66 @@ fn schema_asset_paths() -> Result<SchemaAssetPaths, Box<dyn Error>> {
 }
 
 fn release_record_artifact_paths(paths: &SchemaAssetPaths) -> Result<Vec<PathBuf>, Box<dyn Error>> {
-	let mut artifact_paths = vec![paths.current_artifacts_dir.join("release-record.json")];
-	for entry in std::fs::read_dir(&paths.artifacts_dir)? {
-		let path = entry?.path();
-		let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
-			continue;
-		};
-		if name.starts_with("release-record.v") && name.ends_with(".json") {
-			artifact_paths.push(path);
-		}
-	}
+	artifact_paths_for_kind(paths, "release-record")
+}
+
+fn config_artifact_paths(paths: &SchemaAssetPaths) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+	artifact_paths_for_kind(paths, "monochange")
+}
+
+fn artifact_paths_for_kind(
+	paths: &SchemaAssetPaths,
+	kind: &str,
+) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+	let mut artifact_paths = Vec::new();
+	collect_artifact_paths_for_kind(&paths.artifacts_dir, kind, &mut artifact_paths)?;
 	artifact_paths.sort();
 	if artifact_paths.is_empty() {
-		return Err(test_error("no release-record artifact fixtures were found"));
-	}
-	for artifact_path in &artifact_paths {
-		if !artifact_path.exists() {
-			return Err(test_error(format!(
-				"missing release-record artifact fixture: {}",
-				artifact_path.display()
-			)));
-		}
+		return Err(test_error(format!(
+			"no {kind} artifact fixtures were found"
+		)));
 	}
 	Ok(artifact_paths)
 }
 
-fn config_artifact_paths(paths: &SchemaAssetPaths) -> Result<Vec<PathBuf>, Box<dyn Error>> {
-	let mut artifact_paths = vec![paths.current_artifacts_dir.join("monochange.json")];
-	for entry in std::fs::read_dir(&paths.artifacts_dir)? {
+fn collect_artifact_paths_for_kind(
+	dir: &Path,
+	kind: &str,
+	artifact_paths: &mut Vec<PathBuf>,
+) -> Result<(), Box<dyn Error>> {
+	for entry in std::fs::read_dir(dir)? {
 		let path = entry?.path();
-		let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+		if path.is_dir() {
+			collect_artifact_paths_for_kind(&path, kind, artifact_paths)?;
 			continue;
-		};
-		if name.starts_with("monochange.v") && name.ends_with(".json") {
+		}
+		let parent_name = path
+			.parent()
+			.and_then(Path::file_name)
+			.and_then(|name| name.to_str());
+		let extension = path.extension().and_then(|extension| extension.to_str());
+		if parent_name == Some(kind) && extension == Some("json") {
 			artifact_paths.push(path);
 		}
 	}
-	artifact_paths.sort();
-	if artifact_paths.is_empty() {
-		return Err(test_error("no config artifact fixtures were found"));
-	}
-	for artifact_path in &artifact_paths {
-		if !artifact_path.exists() {
-			return Err(test_error(format!(
-				"missing config artifact fixture: {}",
-				artifact_path.display()
-			)));
-		}
-	}
-	Ok(artifact_paths)
+	Ok(())
+}
+
+fn artifact_file_names(paths: &[PathBuf]) -> Result<Vec<String>, Box<dyn Error>> {
+	let mut names = paths
+		.iter()
+		.map(|path| file_name(path))
+		.collect::<Result<Vec<_>, _>>()?;
+	names.sort();
+	Ok(names)
+}
+
+fn expected_current_artifact_file_names() -> Vec<String> {
+	let mut names = (1..=10)
+		.map(|index| format!("{index}.json"))
+		.collect::<Vec<_>>();
+	names.sort();
+	names
 }
 
 fn file_name(path: &Path) -> Result<String, Box<dyn Error>> {

@@ -13,6 +13,7 @@ clap = { workspace = true, features = ["std"] }
 monochange_config = { workspace = true, features = ["schema"] }
 monochange_core = { workspace = true, features = ["schema"] }
 monochange_schema = { workspace = true }
+proptest = { workspace = true, features = ["std"] }
 schemars = { workspace = true }
 semver = { workspace = true }
 serde_json = { workspace = true }
