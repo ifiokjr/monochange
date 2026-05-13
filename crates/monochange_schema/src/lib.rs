@@ -271,8 +271,6 @@ pub mod release_record {
 		let release_version = format!("{version}.0");
 		let tag_name = format!("v{release_version}");
 		let schema_tag_name = format!("monochange_schema/v{release_version}");
-		let versioned_artifact =
-			format!("crates/monochange_schema/schemas/artifacts/release-record.v{version}.json");
 		let artifact = serde_json::json!({
 			"schemaVersion": version,
 			"kind": KIND,
@@ -309,8 +307,7 @@ pub mod release_record {
 			"changedFiles": [
 				"Cargo.toml",
 				"crates/monochange_schema/Cargo.toml",
-				"crates/monochange_schema/schemas/artifacts/release-record.current.json",
-				versioned_artifact
+				"crates/monochange_schema/schemas/artifacts/current/release-record/01.json"
 			],
 			"updatedChangelogs": ["changelog.md"],
 			"deletedChangesets": [".changeset/release-record-schema-compat.md"],
@@ -445,6 +442,23 @@ pub mod release_record {
 			from: migration_source_version(edge.from),
 			to: edge.to,
 		})
+	}
+}
+
+/// Configuration schema artifact support.
+pub mod config {
+	/// Render a deterministic populated workspace-configuration artifact.
+	#[must_use]
+	pub fn populated_artifact_json() -> String {
+		let artifact = serde_json::json!({
+			"source": {
+				"owner": "monochange",
+				"repo": "monochange",
+				"provider": "github"
+			}
+		});
+		serde_json::to_string_pretty(&artifact)
+			.unwrap_or_else(|error| panic!("serialize config artifact fixture: {error}"))
 	}
 }
 

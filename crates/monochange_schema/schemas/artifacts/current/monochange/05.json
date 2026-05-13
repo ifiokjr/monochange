@@ -1,0 +1,18 @@
+{
+	"defaults": {
+		"package_type": "cargo"
+	},
+	"package": {
+		"monochange": {
+			"path": "crates/monochange"
+		},
+		"monochange_core": {
+			"path": "crates/monochange_core"
+		}
+	},
+	"source": {
+		"owner": "release-tools",
+		"provider": "github",
+		"repo": "monochange"
+	}
+}

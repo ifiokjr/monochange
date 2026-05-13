@@ -445,7 +445,7 @@ jobs:
       - name: validate release record discovery
         if: steps.release_commit.outputs.created == 'true'
         run: |
-          schema:check
+          schema:release:check
           cargo test -p monochange_integration_tests release_record_artifact_fixtures_load_through_parser
           is_release_commit="$(cargo run --quiet --package monochange --bin monochange -- step:release-record --from HEAD --format json --jq '.resolvedCommit == .recordCommit')"
           if [ "$is_release_commit" != "true" ]; then
@@ -524,9 +524,9 @@ jobs:
         run: lint:monochange
         shell: devenv shell -- bash -e {0}
 
-      - name: schema check
+      - name: schema release check
         if: steps.release_commit.outputs.created == 'true'
-        run: schema:check
+        run: schema:release:check
         shell: devenv shell -- bash -e {0}
 
       - name: skip release lints when no release commit is created

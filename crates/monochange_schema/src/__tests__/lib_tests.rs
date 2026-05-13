@@ -5,6 +5,7 @@ use crate::CURRENT_SCHEMA_VERSION_TEXT;
 use crate::SchemaError;
 use crate::SchemaVersion;
 use crate::SchemaVersionParseError;
+use crate::config;
 use crate::current_schema_version;
 use crate::migration_changelog;
 use crate::release_record;
@@ -92,11 +93,33 @@ fn populated_release_record_artifact_uses_current_schema_version() {
 			.iter()
 			.any(|entry| {
 				entry
-					== &json!(format!(
-						"crates/monochange_schema/schemas/artifacts/release-record.v{version}.json"
-					))
+					== &json!(
+						"crates/monochange_schema/schemas/artifacts/current/release-record/01.json"
+					)
 			})
 	);
+	assert!(
+		!value["changedFiles"]
+			.as_array()
+			.unwrap()
+			.iter()
+			.any(|entry| {
+				entry
+					.as_str()
+					.is_some_and(|entry| entry.contains("release-record.v"))
+			})
+	);
+}
+
+#[test]
+fn populated_config_artifact_is_deterministic() {
+	let first = config::populated_artifact_json();
+	let second = config::populated_artifact_json();
+	assert_eq!(first, second);
+	let value: Value = serde_json::from_str(&first)
+		.unwrap_or_else(|error| panic!("parse populated config artifact: {error}"));
+	assert_eq!(value["source"]["owner"], "monochange");
+	assert_eq!(value["source"]["repo"], "monochange");
 }
 
 #[test]

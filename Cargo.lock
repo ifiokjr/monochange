@@ -5388,6 +5388,7 @@ dependencies = [
  "monochange_config",
  "monochange_core",
  "monochange_schema",
+ "proptest",
  "schemars",
  "semver",
  "serde_json",

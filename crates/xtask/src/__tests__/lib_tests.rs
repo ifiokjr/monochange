@@ -1,14 +1,18 @@
 use std::fs;
 use std::path::PathBuf;
 
+use crate::SchemaMode;
 use crate::check_schemas;
 use crate::command_literals_from_cli_source;
+use crate::current_schema_version;
 use crate::expected_schema_version;
 use crate::post_process;
 use crate::post_process_config;
 use crate::post_process_release;
 use crate::render_commands_inventory;
 use crate::replace_commands_inventory;
+use crate::run;
+use crate::run_release;
 use crate::run_with_paths;
 use crate::schema_version_file_contents;
 
@@ -246,28 +250,150 @@ fn run_cli_round_trip() {
 	fs::create_dir_all(&schemas).unwrap();
 	fs::create_dir_all(&docs).unwrap();
 
-	assert!(run_with_paths(true, &schemas, &docs, &schema_version_path, version).is_ok());
-	assert!(run_with_paths(false, &schemas, &docs, &schema_version_path, version).is_ok());
+	assert!(
+		run_with_paths(
+			true,
+			SchemaMode::Current,
+			&schemas,
+			&docs,
+			&schema_version_path,
+			version,
+		)
+		.is_ok()
+	);
+	assert!(
+		run_with_paths(
+			false,
+			SchemaMode::Current,
+			&schemas,
+			&docs,
+			&schema_version_path,
+			version,
+		)
+		.is_ok()
+	);
 	assert_eq!(
 		fs::read_to_string(&schema_version_path).unwrap(),
 		schema_version_file_contents(version)
 	);
 
 	let artifacts = schemas.join("artifacts");
-	assert!(artifacts.join("release-record.current.json").exists());
+	let current_artifacts = artifacts.join("current");
+	assert!(current_artifacts.join("release-record/01.json").exists());
+	assert!(current_artifacts.join("release-record/10.json").exists());
+	assert!(current_artifacts.join("monochange/01.json").exists());
+	assert!(current_artifacts.join("monochange/10.json").exists());
+	assert!(!artifacts.join("release-record.current.json").exists());
+	assert!(!artifacts.join("monochange.current.json").exists());
 	assert!(
-		artifacts
+		!artifacts
 			.join(format!("release-record.v{version}.json"))
 			.exists()
 	);
 	assert!(
-		docs.join(format!("release-record.v{version}.schema.json"))
+		!artifacts
+			.join(format!("monochange.v{version}.json"))
+			.exists()
+	);
+	assert!(docs.join("release-record.schema.json").exists());
+	assert!(docs.join("monochange.schema.json").exists());
+	assert!(
+		!docs
+			.join(format!("release-record.v{version}.schema.json"))
+			.exists()
+	);
+	assert!(
+		!docs
+			.join(format!("monochange.v{version}.schema.json"))
 			.exists()
 	);
 
 	let _ = fs::remove_dir_all(&schemas);
 	let _ = fs::remove_dir_all(&docs);
 	let _ = fs::remove_file(&schema_version_path);
+	fs::create_dir_all(&schemas).unwrap();
+	fs::create_dir_all(&docs).unwrap();
+
+	assert!(
+		run_with_paths(
+			true,
+			SchemaMode::Release,
+			&schemas,
+			&docs,
+			&schema_version_path,
+			version,
+		)
+		.is_ok()
+	);
+	assert!(
+		run_with_paths(
+			false,
+			SchemaMode::Release,
+			&schemas,
+			&docs,
+			&schema_version_path,
+			version,
+		)
+		.is_ok()
+	);
+	assert!(current_artifacts.join("release-record/01.json").exists());
+	assert!(current_artifacts.join("release-record/10.json").exists());
+	assert!(current_artifacts.join("monochange/01.json").exists());
+	assert!(current_artifacts.join("monochange/10.json").exists());
+	assert!(
+		!artifacts
+			.join(format!("release-record.v{version}.json"))
+			.exists()
+	);
+	assert!(
+		!artifacts
+			.join(format!("monochange.v{version}.json"))
+			.exists()
+	);
+	assert!(
+		docs.join(format!("release-record.v{version}.schema.json"))
+			.exists()
+	);
+	assert!(
+		docs.join(format!("monochange.v{version}.schema.json"))
+			.exists()
+	);
+
+	let _ = fs::remove_dir_all(&schemas);
+	let _ = fs::remove_dir_all(&docs);
+	let _ = fs::remove_file(&schema_version_path);
+}
+
+#[test]
+fn current_schema_version_reads_current_file() {
+	let temp_path = std::env::temp_dir().join("xtask-current-schema-version");
+	fs::write(&temp_path, "7.8\n").unwrap();
+	let version = current_schema_version(&temp_path).unwrap();
+	fs::remove_file(&temp_path).unwrap();
+	assert_eq!(version, "7.8");
+}
+
+#[test]
+fn current_schema_version_rejects_empty_file() {
+	let temp_path = std::env::temp_dir().join("xtask-current-schema-version-empty");
+	fs::write(&temp_path, "\n").unwrap();
+	let error = current_schema_version(&temp_path).unwrap_err();
+	fs::remove_file(&temp_path).unwrap();
+	assert!(error.contains("Current schema version file is empty"));
+}
+
+#[test]
+fn current_schema_version_reports_read_errors() {
+	let temp_path = std::env::temp_dir().join("xtask-current-schema-version-missing");
+	let _ = fs::remove_file(&temp_path);
+	let error = current_schema_version(&temp_path).unwrap_err();
+	assert!(error.contains("Could not read current schema version"));
+}
+
+#[test]
+fn committed_schema_modes_are_up_to_date() {
+	assert!(run(false).is_ok());
+	assert!(run_release(false).is_ok());
 }
 
 #[test]
@@ -325,7 +451,7 @@ fn expected_schema_version_uses_largest_schema_changeset_bump() {
 fn check_schemas_mismatch() {
 	let temp_path = PathBuf::from("/tmp/test-schema-mismatch.json");
 	fs::write(&temp_path, r#"{"a": 1}"#).unwrap();
-	let paths = [(&temp_path, r#"{"a": 2}"#)];
+	let paths = [(temp_path.as_path(), r#"{"a": 2}"#)];
 	let result = check_schemas(&paths);
 	fs::remove_file(&temp_path).unwrap();
 	assert!(result.is_err());
@@ -336,7 +462,7 @@ fn check_schemas_mismatch() {
 fn check_schemas_invalid_json() {
 	let temp_path = PathBuf::from("/tmp/test-schema-invalid.json");
 	fs::write(&temp_path, "not json").unwrap();
-	let paths = [(&temp_path, r#"{}"#)];
+	let paths = [(temp_path.as_path(), r#"{}"#)];
 	let result = check_schemas(&paths);
 	fs::remove_file(&temp_path).unwrap();
 	assert!(result.is_err());
@@ -349,7 +475,7 @@ fn check_schemas_invalid_json() {
 fn check_schemas_formatting_difference_ok() {
 	let temp_path = PathBuf::from("/tmp/test-schema-formatting.json");
 	fs::write(&temp_path, "{\"a\":1}").unwrap();
-	let paths = [(&temp_path, r#"{"a": 1}"#)];
+	let paths = [(temp_path.as_path(), r#"{"a": 1}"#)];
 	let result = check_schemas(&paths);
 	fs::remove_file(&temp_path).unwrap();
 	assert!(result.is_ok());
@@ -359,7 +485,7 @@ fn check_schemas_formatting_difference_ok() {
 fn check_schemas_missing() {
 	let temp_path = PathBuf::from("/tmp/test-schema-missing.json");
 	let _ = fs::remove_file(&temp_path);
-	let paths = [(&temp_path, "expected content")];
+	let paths = [(temp_path.as_path(), "expected content")];
 	let result = check_schemas(&paths);
 	assert!(result.is_err());
 	assert!(result.unwrap_err().contains("missing"));
@@ -369,7 +495,7 @@ fn check_schemas_missing() {
 fn check_schemas_expected_invalid_json() {
 	let temp_path = PathBuf::from("/tmp/test-schema-expected-invalid.json");
 	fs::write(&temp_path, r#"{"a": 1}"#).unwrap();
-	let paths = [(&temp_path, "not json")];
+	let paths = [(temp_path.as_path(), "not json")];
 	let result = check_schemas(&paths);
 	fs::remove_file(&temp_path).unwrap();
 	assert!(result.is_err());
