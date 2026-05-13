@@ -713,10 +713,14 @@ pub(crate) fn resolve_config_path(root: &Path, path: &Path) -> PathBuf {
 }
 
 pub(crate) fn default_change_path(root: &Path, package_refs: &[String]) -> PathBuf {
+	default_change_path_for_ref(root, package_refs.first().map(String::as_str))
+}
+
+pub(crate) fn default_change_path_for_ref(root: &Path, package_ref: Option<&str>) -> PathBuf {
 	let timestamp = SystemTime::now()
 		.duration_since(UNIX_EPOCH)
 		.map_or(0, |duration| duration.as_secs());
-	let slug_source = package_refs.first().map_or("change", String::as_str);
+	let slug_source = package_ref.unwrap_or("change");
 	let mut slug = String::with_capacity(slug_source.len());
 	for character in slug_source.chars() {
 		if character.is_ascii_alphanumeric() {

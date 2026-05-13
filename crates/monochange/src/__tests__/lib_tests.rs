@@ -2703,6 +2703,29 @@ fn add_interactive_change_file_renders_caused_by_context_for_none_bumps() {
 }
 
 #[test]
+fn add_interactive_change_file_rejects_none_bump_without_metadata() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	copy_fixture("changeset-target-metadata/render-workspace", tempdir.path());
+	let result = InteractiveChangeResult {
+		targets: vec![InteractiveTarget {
+			id: "core".to_string(),
+			bump: BumpSeverity::None,
+			version: None,
+			change_type: None,
+		}],
+		caused_by: Vec::new(),
+		reason: "invalid none bump".to_string(),
+		details: None,
+	};
+
+	let error = add_interactive_change_file(tempdir.path(), &result, None)
+		.expect_err("none bump without metadata should fail");
+	assert!(error.to_string().contains(
+		"must not use a `none` bump without also declaring `type`, `version`, or `caused_by`"
+	));
+}
+
+#[test]
 fn add_change_file_rejects_unknown_change_type() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	copy_fixture("changeset-target-metadata/render-workspace", tempdir.path());

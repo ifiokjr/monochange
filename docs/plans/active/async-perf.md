@@ -53,6 +53,7 @@
   - Replaced eager version `to_string()` allocation for JSON with streaming `Display` serialization, and render text output directly into one buffer instead of building a temporary `Vec<String>`.
   - Kept a diagnostics fallback regression test for explicit-version changesets so the optimized config-only fast path remains covered without regressing patch coverage.
   - Streamed non-interactive and interactive changeset markdown rendering directly into one buffer, including inline YAML quoting for target keys and `caused_by`, to avoid temporary line vectors, escaped-string vectors, and joins.
+  - Avoided cloning interactive target ids into a temporary vector when only the first target is needed for the default changeset file slug.
 
 ## Current benchmark summary
 

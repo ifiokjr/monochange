@@ -1054,14 +1054,13 @@ pub(crate) fn add_interactive_change_file(
 	result: &interactive::InteractiveChangeResult,
 	output: Option<&Path>,
 ) -> MonochangeResult<PathBuf> {
-	let package_refs = result
-		.targets
-		.iter()
-		.map(|target| target.id.clone())
-		.collect::<Vec<_>>();
-
 	let output_path = output.map_or_else(
-		|| default_change_path(root, &package_refs),
+		|| {
+			default_change_path_for_ref(
+				root,
+				result.targets.first().map(|target| target.id.as_str()),
+			)
+		},
 		Path::to_path_buf,
 	);
 
