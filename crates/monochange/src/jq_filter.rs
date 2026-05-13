@@ -1,3 +1,5 @@
+use std::fmt::Write as _;
+
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use serde_json::Value;
@@ -318,20 +320,25 @@ fn render_values(values: &[Value]) -> String {
 		if index > 0 {
 			rendered.push('\n');
 		}
-		rendered.push_str(&render_value(value));
+		write_value(&mut rendered, value);
 	}
 	rendered
 }
 
-fn render_value(value: &Value) -> String {
+fn write_value(output: &mut String, value: &Value) {
 	match value {
-		Value::Null => "null".to_string(),
-		Value::Bool(value) => value.to_string(),
-		Value::Number(value) => value.to_string(),
-		Value::String(value) => value.clone(),
+		Value::Null => output.push_str("null"),
+		Value::Bool(value) => {
+			let _ = write!(output, "{value}");
+		}
+		Value::Number(value) => {
+			let _ = write!(output, "{value}");
+		}
+		Value::String(value) => output.push_str(value),
 		Value::Array(_) | Value::Object(_) => {
-			serde_json::to_string(value)
-				.unwrap_or_else(|error| panic!("serializing filtered JSON should succeed: {error}"))
+			output.push_str(&serde_json::to_string(value).unwrap_or_else(|error| {
+				panic!("serializing filtered JSON should succeed: {error}")
+			}));
 		}
 	}
 }
