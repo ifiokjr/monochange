@@ -75,6 +75,21 @@ fn read_cached_document_handles_go_text_and_invalid_utf8() {
 }
 
 #[test]
+fn read_cached_document_reports_deno_lock_invalid_utf8_as_text_parse_error() {
+	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let deno_lock = tempdir.path().join("deno.lock");
+	std::fs::write(&deno_lock, [0xff, 0xfe])
+		.unwrap_or_else(|error| panic!("write invalid deno.lock: {error}"));
+	let mut updates = BTreeMap::new();
+
+	let error = read_cached_document(&mut updates, &deno_lock, EcosystemType::Deno)
+		.expect_err("invalid deno.lock should fail");
+	let message = error.to_string();
+	assert!(message.contains("failed to parse"));
+	assert!(message.contains("as text"));
+}
+
+#[test]
 fn read_cached_document_reports_go_for_unsupported_go_versioned_file() {
 	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let notes = tempdir.path().join("notes.txt");

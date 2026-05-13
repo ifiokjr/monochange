@@ -1073,6 +1073,51 @@ fn load_dedup_index_skips_empty_and_invalid_lines() {
 }
 
 #[test]
+fn load_dedup_index_from_reader_returns_none_on_read_error() {
+	struct BrokenBufRead {
+		line: &'static [u8],
+		read_error: bool,
+	}
+
+	impl std::io::Read for BrokenBufRead {
+		fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+			let available = self.fill_buf()?;
+			if available.is_empty() {
+				return Ok(0);
+			}
+			let length = available.len().min(buffer.len());
+			buffer[..length].copy_from_slice(&available[..length]);
+			self.consume(length);
+			Ok(length)
+		}
+	}
+
+	impl std::io::BufRead for BrokenBufRead {
+		fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+			if self.read_error {
+				return Err(std::io::Error::other("broken reader"));
+			}
+			Ok(self.line)
+		}
+
+		fn consume(&mut self, amount: usize) {
+			if amount >= self.line.len() {
+				self.line = b"";
+				self.read_error = true;
+				return;
+			}
+			self.line = &self.line[amount..];
+		}
+	}
+
+	let index = load_dedup_index_from_reader(BrokenBufRead {
+		line: b"{\"hash\":\"valid\"}\n",
+		read_error: false,
+	});
+	assert!(index.is_none());
+}
+
+#[test]
 fn atomic_write_writes_content_through_temp_file() {
 	let tmp = tempdir().unwrap();
 	let path = tmp.path().join("artifact.txt");

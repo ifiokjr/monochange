@@ -33,10 +33,14 @@ fn load_dedup_index(root: &Path) -> std::collections::HashSet<String> {
 		return std::collections::HashSet::new();
 	};
 	let reader = BufReader::new(file);
+	load_dedup_index_from_reader(reader).unwrap_or_default()
+}
+
+fn load_dedup_index_from_reader(reader: impl BufRead) -> Option<std::collections::HashSet<String>> {
 	let mut index = std::collections::HashSet::new();
 	for line in reader.lines() {
 		let Ok(line) = line else {
-			return std::collections::HashSet::new();
+			return None;
 		};
 		let line = line.trim();
 		if line.is_empty() {
@@ -46,7 +50,7 @@ fn load_dedup_index(root: &Path) -> std::collections::HashSet<String> {
 			index.insert(hash.to_owned());
 		}
 	}
-	index
+	Some(index)
 }
 
 fn parse_dedup_index_hash(line: &str) -> Option<&str> {

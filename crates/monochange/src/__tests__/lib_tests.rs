@@ -10470,7 +10470,7 @@ fn apply_versioned_file_definition_updates_regex_versioned_files_from_cached_tex
 		&definition,
 		"2.0.0",
 		None,
-		&[],
+		&[] as &[&str],
 		&context,
 	)
 	.unwrap_or_else(|error| panic!("regex versioned file update: {error}"));
@@ -10510,7 +10510,7 @@ fn apply_versioned_file_definition_reports_invalid_regex_patterns() {
 		&definition,
 		"2.0.0",
 		None,
-		&[],
+		&[] as &[&str],
 		&context,
 	)
 	.err()
@@ -13265,7 +13265,7 @@ fn apply_versioned_file_definition_reports_invalid_glob_pattern() {
 		&definition,
 		"2.0.0",
 		None,
-		&[],
+		&[] as &[&str],
 		&context,
 	)
 	.err()
@@ -13294,7 +13294,7 @@ fn apply_versioned_file_definition_reports_missing_ecosystem_type() {
 		&definition,
 		"2.0.0",
 		None,
-		&[],
+		&[] as &[&str],
 		&context,
 	)
 	.err()
