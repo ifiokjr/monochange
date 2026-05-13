@@ -12422,32 +12422,41 @@ fn diff_output_supports_color_respects_common_terminal_env_controls() {
 }
 
 #[test]
-fn colorize_diff_line_styles_unified_diff_markers() {
+fn colorize_diff_output_styles_unified_diff_markers() {
 	assert_eq!(
-		crate::colorize_diff_line("--- a/Cargo.toml"),
+		crate::colorize_diff_output("--- a/Cargo.toml"),
 		"\u{1b}[1;36m--- a/Cargo.toml\u{1b}[0m"
 	);
 	assert_eq!(
-		crate::colorize_diff_line("+++ b/Cargo.toml"),
+		crate::colorize_diff_output("+++ b/Cargo.toml"),
 		"\u{1b}[1;36m+++ b/Cargo.toml\u{1b}[0m"
 	);
 	assert_eq!(
-		crate::colorize_diff_line("@@ -1,1 +1,1 @@"),
+		crate::colorize_diff_output("@@ -1,1 +1,1 @@"),
 		"\u{1b}[36m@@ -1,1 +1,1 @@\u{1b}[0m"
 	);
 	assert_eq!(
-		crate::colorize_diff_line("-version = \"1.0.0\""),
+		crate::colorize_diff_output("-version = \"1.0.0\""),
 		"\u{1b}[31m-version = \"1.0.0\"\u{1b}[0m"
 	);
 	assert_eq!(
-		crate::colorize_diff_line("+version = \"1.1.0\""),
+		crate::colorize_diff_output("+version = \"1.1.0\""),
 		"\u{1b}[32m+version = \"1.1.0\"\u{1b}[0m"
 	);
 	assert_eq!(
-		crate::colorize_diff_line(r"\ No newline at end of file"),
+		crate::colorize_diff_output(r"\ No newline at end of file"),
 		"\u{1b}[33m\\ No newline at end of file\u{1b}[0m"
 	);
-	assert_eq!(crate::colorize_diff_line(" unchanged"), " unchanged");
+	assert_eq!(crate::colorize_diff_output(" unchanged"), " unchanged");
+}
+
+#[test]
+fn colorize_diff_output_streams_lines_with_separators() {
+	assert_eq!(crate::colorize_diff_output(""), "");
+	assert_eq!(
+		crate::colorize_diff_output("--- a/file\n unchanged\n+added"),
+		"\u{1b}[1;36m--- a/file\u{1b}[0m\n unchanged\n\u{1b}[32m+added\u{1b}[0m"
+	);
 }
 
 #[test]

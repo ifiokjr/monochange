@@ -954,31 +954,39 @@ pub(crate) fn diff_output_supports_color(stdout_is_terminal: bool) -> bool {
 	stdout_is_terminal
 }
 
-fn colorize_diff_output(diff: &str) -> String {
-	diff.lines()
-		.map(colorize_diff_line)
-		.collect::<Vec<_>>()
-		.join("\n")
+pub(crate) fn colorize_diff_output(diff: &str) -> String {
+	let mut output = String::with_capacity(diff.len());
+	for (index, line) in diff.lines().enumerate() {
+		if index > 0 {
+			output.push('\n');
+		}
+		push_colorized_diff_line(&mut output, line);
+	}
+	output
 }
 
-pub(crate) fn colorize_diff_line(line: &str) -> String {
+fn push_colorized_diff_line(output: &mut String, line: &str) {
 	if line.starts_with("--- ") || line.starts_with("+++ ") {
-		apply_ansi_style(line, "1;36")
+		push_ansi_style(output, line, "1;36");
 	} else if line.starts_with("@@ ") {
-		apply_ansi_style(line, "36")
+		push_ansi_style(output, line, "36");
 	} else if line.starts_with('+') && !line.starts_with("+++") {
-		apply_ansi_style(line, "32")
+		push_ansi_style(output, line, "32");
 	} else if line.starts_with('-') && !line.starts_with("---") {
-		apply_ansi_style(line, "31")
+		push_ansi_style(output, line, "31");
 	} else if line == r"\ No newline at end of file" {
-		apply_ansi_style(line, "33")
+		push_ansi_style(output, line, "33");
 	} else {
-		line.to_string()
+		output.push_str(line);
 	}
 }
 
-fn apply_ansi_style(line: &str, style: &str) -> String {
-	format!("\u{1b}[{style}m{line}\u{1b}[0m")
+fn push_ansi_style(output: &mut String, line: &str, style: &str) {
+	output.push_str("\u{1b}[");
+	output.push_str(style);
+	output.push('m');
+	output.push_str(line);
+	output.push_str("\u{1b}[0m");
 }
 
 pub(crate) fn shared_release_version(plan: &ReleasePlan) -> Option<String> {

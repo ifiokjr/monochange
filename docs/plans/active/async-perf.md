@@ -55,6 +55,7 @@
   - Streamed non-interactive and interactive changeset markdown rendering directly into one buffer, including inline YAML quoting for target keys and `caused_by`, to avoid temporary line vectors, escaped-string vectors, and joins.
   - Avoided cloning interactive target ids into a temporary vector when only the first target is needed for the default changeset file slug.
   - Streamed prepared-release artifact JSON through buffered readers/writers, serialized prepared releases and file diffs through borrowed views, filtered git status lines before allocating retained status strings, deduplicated tracked snapshot paths before cloning them, and filled tracked-path hashes in place.
+  - Streamed colorized diff rendering directly into one output buffer instead of allocating a temporary vector of per-line strings before joining.
 
 ## Current benchmark summary
 
