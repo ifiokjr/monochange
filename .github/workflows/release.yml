@@ -94,6 +94,8 @@ jobs:
 
       - name: install rust toolchain
         uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: stable
 
       - name: setup cross toolchain
         uses: taiki-e/setup-cross-toolchain-action@129361238c06ff2cc1c4ca5c5d2217af441ffdf6 # v1.40.1
