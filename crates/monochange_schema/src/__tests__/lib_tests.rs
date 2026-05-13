@@ -94,7 +94,7 @@ fn populated_release_record_artifact_uses_current_schema_version() {
 			.any(|entry| {
 				entry
 					== &json!(
-						"crates/monochange_schema/schemas/artifacts/current/release-record/1.json"
+						"crates/monochange_schema/schemas/artifacts/current/release-record/01.json"
 					)
 			})
 	);

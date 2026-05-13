@@ -8,15 +8,11 @@
 		},
 		"monochange_core": {
 			"path": "crates/monochange_core"
-		},
-		"monochange_schema": {
-			"path": "crates/monochange_schema"
 		}
 	},
 	"source": {
-		"host": "github.com",
-		"owner": "schema-lab",
+		"owner": "release-tools",
 		"provider": "github",
-		"repo": "workspace"
+		"repo": "monochange"
 	}
 }

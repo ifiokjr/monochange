@@ -664,7 +664,7 @@ fn artifact_file_names(paths: &[PathBuf]) -> Result<Vec<String>, Box<dyn Error>>
 
 fn expected_current_artifact_file_names() -> Vec<String> {
 	let mut names = (1..=10)
-		.map(|index| format!("{index}.json"))
+		.map(|index| format!("{index:02}.json"))
 		.collect::<Vec<_>>();
 	names.sort();
 	names

@@ -1,7 +1,0 @@
-{
-	"source": {
-		"owner": "release-tools",
-		"provider": "github",
-		"repo": "monochange"
-	}
-}

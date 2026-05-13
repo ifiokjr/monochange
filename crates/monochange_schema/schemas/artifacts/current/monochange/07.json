@@ -14,9 +14,8 @@
 		}
 	},
 	"source": {
-		"host": "github.com",
 		"owner": "schema-lab",
 		"provider": "github",
-		"repo": "workspace"
+		"repo": "schema-fixtures"
 	}
 }

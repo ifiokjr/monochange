@@ -1,0 +1,15 @@
+{
+	"defaults": {
+		"package_type": "cargo"
+	},
+	"package": {
+		"monochange": {
+			"path": "crates/monochange"
+		}
+	},
+	"source": {
+		"owner": "aipi",
+		"provider": "github",
+		"repo": "schema-fixtures"
+	}
+}

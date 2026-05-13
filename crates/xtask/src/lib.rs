@@ -311,14 +311,14 @@ fn current_artifact_files(current_artifacts_dir: &Path, version: &str) -> Vec<Ge
 	let variants = current_artifact_variants();
 	let mut files = Vec::with_capacity(CURRENT_ARTIFACT_FIXTURE_COUNT * 2);
 	for (index, variant) in variants.iter().enumerate() {
-		let name = format!("{}.json", index + 1);
+		let name = format!("{:02}.json", index + 1);
 		files.push(GeneratedFile {
 			path: current_artifacts_dir.join("release-record").join(&name),
 			contents: release_record_artifact_fixture(version, index + 1, variant),
 		});
 		files.push(GeneratedFile {
 			path: current_artifacts_dir.join("monochange").join(name),
-			contents: config_artifact_fixture(variant),
+			contents: config_artifact_fixture(index + 1, variant),
 		});
 	}
 	files
@@ -369,6 +369,7 @@ fn release_record_artifact_fixture(
 	)
 	.unwrap_or_else(|error| panic!("parse release-record artifact fixture template: {error}"));
 	let release_version = format!("{version}.{fixture_index}");
+	let changed_file_name = format!("{fixture_index:02}.json");
 	let command = if variant.dry_run {
 		"mc release --dry-run"
 	} else {
@@ -396,7 +397,7 @@ fn release_record_artifact_fixture(
 			"Cargo.toml",
 			"crates/monochange_schema/Cargo.toml",
 			format!(
-				"crates/monochange_schema/schemas/artifacts/current/release-record/{fixture_index}.json"
+				"crates/monochange_schema/schemas/artifacts/current/release-record/{changed_file_name}"
 			),
 		]),
 	);
@@ -466,7 +467,7 @@ fn release_record_artifact_fixture(
 		.unwrap_or_else(|error| panic!("serialize release-record artifact fixture: {error}"))
 }
 
-fn config_artifact_fixture(variant: &ArtifactVariant) -> String {
+fn config_artifact_fixture(_fixture_index: usize, variant: &ArtifactVariant) -> String {
 	let mut source = serde_json::Map::new();
 	source.insert("provider".to_string(), json!("github"));
 	source.insert("owner".to_string(), json!(variant.owner));
@@ -474,11 +475,21 @@ fn config_artifact_fixture(variant: &ArtifactVariant) -> String {
 	if variant.with_host {
 		source.insert("host".to_string(), json!("github.com"));
 	}
-	let value = json!({
-		"source": Value::Object(source)
-	});
-	serde_json::to_string_pretty(&value)
-		.unwrap_or_else(|error| panic!("serialize config artifact fixture: {error}"))
+	let mut defaults = serde_json::Map::new();
+	defaults.insert("package_type".to_string(), json!("cargo"));
+	let mut packages = serde_json::Map::new();
+	let package_names = ["monochange", "monochange_core", "monochange_schema"];
+	for pkg_name in package_names.iter().take(variant.package_count) {
+		let mut pkg = serde_json::Map::new();
+		pkg.insert("path".to_string(), json!(format!("crates/{pkg_name}")));
+		packages.insert(pkg_name.to_string(), json!(pkg));
+	}
+	serde_json::to_string_pretty(&json!({
+		"source": Value::Object(source),
+		"defaults": Value::Object(defaults),
+		"package": Value::Object(packages),
+	}))
+	.unwrap_or_else(|error| panic!("serialize config artifact fixture: {error}"))
 }
 
 fn write_generated_file(generated_file: &GeneratedFile) -> Result<(), String> {
@@ -542,6 +553,27 @@ fn stale_artifact_files(schemas_dir: &Path) -> Result<Vec<PathBuf>, String> {
 			&& name.ends_with(".json")
 		{
 			paths.push(path);
+		}
+	}
+	for kind in ["release-record", "monochange"] {
+		let kind_dir = current_artifacts_dir.join(kind);
+		if kind_dir.exists() {
+			for entry in fs::read_dir(&kind_dir)
+				.map_err(|error| format!("Could not read {}: {error}", kind_dir.display()))?
+			{
+				let path = entry
+					.map_err(|error| format!("Could not read {}: {error}", kind_dir.display()))?
+					.path();
+				let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+					continue;
+				};
+				if let Some(stem) = name.strip_suffix(".json")
+					&& stem.len() < 2
+					&& stem.parse::<usize>().is_ok()
+				{
+					paths.push(path);
+				}
+			}
 		}
 	}
 	Ok(paths)

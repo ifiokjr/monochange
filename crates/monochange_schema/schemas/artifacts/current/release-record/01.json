@@ -2,13 +2,13 @@
 	"changedFiles": [
 		"Cargo.toml",
 		"crates/monochange_schema/Cargo.toml",
-		"crates/monochange_schema/schemas/artifacts/current/release-record/6.json"
+		"crates/monochange_schema/schemas/artifacts/current/release-record/01.json"
 	],
 	"changesets": [
 		{
-			"details": "Generated from deterministic proptest seed 60.",
-			"path": ".changeset/schema-artifact-6.md",
-			"summary": "Exercise schema artifact fixture 6",
+			"details": "Generated from deterministic proptest seed 117.",
+			"path": ".changeset/schema-artifact-1.md",
+			"summary": "Exercise schema artifact fixture 1",
 			"targets": [
 				{
 					"bump": "major",
@@ -26,17 +26,17 @@
 			]
 		}
 	],
-	"command": "mc release --dry-run",
-	"createdAt": "2026-01-06T00:00:00Z",
+	"command": "mc release --commit",
+	"createdAt": "2026-01-01T00:00:00Z",
 	"deletedChangesets": [
-		".changeset/schema-artifact-6.md"
+		".changeset/schema-artifact-1.md"
 	],
 	"kind": "monochange.releaseRecord",
 	"provider": {
 		"host": "github.com",
 		"kind": "github",
 		"owner": "monochange",
-		"repo": "schema-fixtures"
+		"repo": "release-kit"
 	},
 	"releaseTargets": [
 		{
@@ -48,8 +48,8 @@
 			],
 			"release": true,
 			"tag": true,
-			"tagName": "v0.2.6",
-			"version": "0.2.6",
+			"tagName": "v0.2.1",
+			"version": "0.2.1",
 			"versionFormat": "primary"
 		},
 		{
@@ -58,23 +58,22 @@
 			"members": [],
 			"release": false,
 			"tag": false,
-			"tagName": "monochange_schema/v0.2.6",
-			"version": "0.2.6",
+			"tagName": "monochange_schema/v0.2.1",
+			"version": "0.2.1",
 			"versionFormat": "namespaced"
 		}
 	],
 	"releasedPackages": [
 		"monochange",
-		"monochange_core",
-		"monochange_schema"
+		"monochange_core"
 	],
 	"schemaVersion": "0.2",
 	"updatedChangelogs": [
-		"fixtures/changelog-6.md"
+		"fixtures/changelog-1.md"
 	],
-	"version": "0.2.6",
+	"version": "0.2.1",
 	"versions": {
-		"main": "0.2.6",
-		"monochange_schema": "0.2.6"
+		"main": "0.2.1",
+		"monochange_schema": "0.2.1"
 	}
 }

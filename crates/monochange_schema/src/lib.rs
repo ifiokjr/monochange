@@ -307,7 +307,7 @@ pub mod release_record {
 			"changedFiles": [
 				"Cargo.toml",
 				"crates/monochange_schema/Cargo.toml",
-				"crates/monochange_schema/schemas/artifacts/current/release-record/1.json"
+				"crates/monochange_schema/schemas/artifacts/current/release-record/01.json"
 			],
 			"updatedChangelogs": ["changelog.md"],
 			"deletedChangesets": [".changeset/release-record-schema-compat.md"],

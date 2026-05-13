@@ -1,8 +1,0 @@
-{
-	"source": {
-		"host": "github.com",
-		"owner": "release-tools",
-		"provider": "github",
-		"repo": "release-kit"
-	}
-}

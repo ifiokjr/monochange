@@ -2,13 +2,13 @@
 	"changedFiles": [
 		"Cargo.toml",
 		"crates/monochange_schema/Cargo.toml",
-		"crates/monochange_schema/schemas/artifacts/current/release-record/9.json"
+		"crates/monochange_schema/schemas/artifacts/current/release-record/07.json"
 	],
 	"changesets": [
 		{
-			"details": "Generated from deterministic proptest seed 118.",
-			"path": ".changeset/schema-artifact-9.md",
-			"summary": "Exercise schema artifact fixture 9",
+			"details": "Generated from deterministic proptest seed 55.",
+			"path": ".changeset/schema-artifact-7.md",
+			"summary": "Exercise schema artifact fixture 7",
 			"targets": [
 				{
 					"bump": "major",
@@ -26,17 +26,17 @@
 			]
 		}
 	],
-	"command": "mc release --commit",
-	"createdAt": "2026-01-09T00:00:00Z",
+	"command": "mc release --dry-run",
+	"createdAt": "2026-01-07T00:00:00Z",
 	"deletedChangesets": [
-		".changeset/schema-artifact-9.md"
+		".changeset/schema-artifact-7.md"
 	],
 	"kind": "monochange.releaseRecord",
 	"provider": {
 		"host": "github.com",
 		"kind": "github",
-		"owner": "release-tools",
-		"repo": "release-kit"
+		"owner": "schema-lab",
+		"repo": "schema-fixtures"
 	},
 	"releaseTargets": [
 		{
@@ -48,8 +48,8 @@
 			],
 			"release": true,
 			"tag": true,
-			"tagName": "v0.2.9",
-			"version": "0.2.9",
+			"tagName": "v0.2.7",
+			"version": "0.2.7",
 			"versionFormat": "primary"
 		},
 		{
@@ -58,22 +58,23 @@
 			"members": [],
 			"release": false,
 			"tag": false,
-			"tagName": "monochange_schema/v0.2.9",
-			"version": "0.2.9",
+			"tagName": "monochange_schema/v0.2.7",
+			"version": "0.2.7",
 			"versionFormat": "namespaced"
 		}
 	],
 	"releasedPackages": [
 		"monochange",
-		"monochange_core"
+		"monochange_core",
+		"monochange_schema"
 	],
 	"schemaVersion": "0.2",
 	"updatedChangelogs": [
-		"fixtures/changelog-9.md"
+		"fixtures/changelog-7.md"
 	],
-	"version": "0.2.9",
+	"version": "0.2.7",
 	"versions": {
-		"main": "0.2.9",
-		"monochange_schema": "0.2.9"
+		"main": "0.2.7",
+		"monochange_schema": "0.2.7"
 	}
 }
