@@ -338,6 +338,32 @@ async fn release_target_and_title_helpers_cover_provider_and_skip_paths() {
 			&& target.members == ["pkg-a".to_string()]
 	}));
 
+	let mut missing_config_package = sample_package(root, "pkg-ghost", PackageType::Cargo);
+	missing_config_package
+		.metadata
+		.insert("config_id".to_string(), "ghost".to_string());
+	let mut missing_config_plan = plan.clone();
+	missing_config_plan.groups.clear();
+	missing_config_plan.decisions = vec![ReleaseDecision {
+		package_id: missing_config_package.id.clone(),
+		trigger_type: "changeset".to_string(),
+		recommended_bump: BumpSeverity::Patch,
+		planned_version: Some(Version::new(1, 0, 0)),
+		group_id: None,
+		reasons: Vec::new(),
+		upstream_sources: Vec::new(),
+		warnings: Vec::new(),
+	}];
+	let missing_config_packages = vec![missing_config_package];
+	let missing_config_targets = build_release_targets(
+		&configuration,
+		&missing_config_packages,
+		&missing_config_plan,
+		&changeset_paths,
+	)
+	.await;
+	assert!(missing_config_targets.is_empty());
+
 	assert_eq!(
 		effective_title_template(Some("specific"), Some("default"), "builtin"),
 		"specific"
@@ -884,6 +910,8 @@ fn dedup_index_roundtrip() {
 	set.insert("abc123".to_string());
 	set.insert("def456".to_string());
 	save_dedup_index(root, &set).unwrap();
+	let content = fs::read_to_string(root.join(DEDUP_INDEX_PATH)).unwrap();
+	assert_eq!(content, "{\"hash\":\"abc123\"}\n{\"hash\":\"def456\"}");
 
 	let loaded = load_dedup_index(root);
 	assert_eq!(loaded.len(), 2);
@@ -1042,6 +1070,60 @@ fn load_dedup_index_skips_empty_and_invalid_lines() {
 	let index = load_dedup_index(root);
 	assert_eq!(index.len(), 1);
 	assert!(index.contains("valid"));
+}
+
+#[test]
+fn atomic_write_writes_content_through_temp_file() {
+	let tmp = tempdir().unwrap();
+	let path = tmp.path().join("artifact.txt");
+
+	atomic_write(&path, b"hello").unwrap();
+
+	assert_eq!(fs::read(&path).unwrap(), b"hello");
+}
+
+#[test]
+fn atomic_write_reports_temp_creation_errors() {
+	let tmp = tempdir().unwrap();
+	let path = tmp.path().join("missing/artifact.txt");
+
+	let result = atomic_write(&path, b"hello");
+	let error = result.unwrap_err().to_string();
+
+	assert!(error.contains("failed to create temp file in"));
+}
+
+#[test]
+fn write_temp_file_reports_write_errors() {
+	struct BrokenWriter;
+
+	impl std::io::Write for BrokenWriter {
+		fn write(&mut self, _buffer: &[u8]) -> std::io::Result<usize> {
+			Err(std::io::Error::other("broken writer"))
+		}
+
+		fn flush(&mut self) -> std::io::Result<()> {
+			Ok(())
+		}
+	}
+
+	let mut writer = BrokenWriter;
+	let result = write_temp_file(&mut writer, std::path::Path::new("artifact.txt"), b"hello");
+	let error = result.unwrap_err().to_string();
+
+	assert!(error.contains("failed to write temp file for artifact.txt: broken writer"));
+}
+
+#[test]
+fn persist_temp_file_reports_rename_errors() {
+	let tmp = tempdir().unwrap();
+	let named_temp = tempfile::NamedTempFile::new_in(tmp.path()).unwrap();
+	let path = tmp.path().join("missing/artifact.txt");
+
+	let result = persist_temp_file(named_temp, &path);
+	let error = result.unwrap_err().to_string();
+
+	assert!(error.contains("failed to rename temp file to"));
 }
 
 #[test]

@@ -1,5 +1,8 @@
 #[cfg(test)]
 use std::cell::Cell;
+use std::io::BufRead;
+use std::io::BufReader;
+use std::io::BufWriter;
 use std::io::IsTerminal;
 
 use similar::TextDiff;
@@ -26,21 +29,36 @@ const DEDUP_INDEX_PATH: &str = ".monochange/local/release-index.jsonl";
 /// are treated as empty indices.
 fn load_dedup_index(root: &Path) -> std::collections::HashSet<String> {
 	let path = root.join(DEDUP_INDEX_PATH);
-	let Ok(content) = fs::read_to_string(&path) else {
+	let Ok(file) = fs::File::open(&path) else {
 		return std::collections::HashSet::new();
 	};
-	content
-		.lines()
-		.filter_map(|line| {
-			let line = line.trim();
-			if line.is_empty() {
-				return None;
-			}
-			serde_json::from_str::<serde_json::Value>(line)
-				.ok()
-				.and_then(|v| v.get("hash").and_then(|h| h.as_str().map(String::from)))
-		})
-		.collect()
+	let reader = BufReader::new(file);
+	let mut index = std::collections::HashSet::new();
+	for line in reader.lines() {
+		let Ok(line) = line else {
+			return std::collections::HashSet::new();
+		};
+		let line = line.trim();
+		if line.is_empty() {
+			continue;
+		}
+		if let Some(hash) = parse_dedup_index_hash(line) {
+			index.insert(hash.to_owned());
+		}
+	}
+	index
+}
+
+fn parse_dedup_index_hash(line: &str) -> Option<&str> {
+	#[derive(serde::Deserialize)]
+	struct DedupIndexEntry<'a> {
+		#[serde(borrow)]
+		hash: &'a str,
+	}
+
+	serde_json::from_str::<DedupIndexEntry<'_>>(line)
+		.ok()
+		.map(|entry| entry.hash)
 }
 
 /// Save the persistent deduplication index atomically.
@@ -55,13 +73,21 @@ fn save_dedup_index(
 	let parent = path.parent().unwrap_or(root);
 	fs::create_dir_all(parent)
 		.map_err(|error| MonochangeError::Io(format!("create dedup index dir: {error}")))?;
-	let mut lines = Vec::with_capacity(index.len());
-	for hash in index {
-		lines.push(format!(r#"{{"hash":"{hash}"}}"#));
-	}
-	lines.sort();
+	let mut hashes = index.iter().map(String::as_str).collect::<Vec<_>>();
+	hashes.sort_unstable();
 	let temp = path.with_extension("tmp");
-	fs::write(&temp, lines.join("\n"))
+	let file = fs::File::create(&temp)
+		.map_err(|error| MonochangeError::Io(format!("write dedup index: {error}")))?;
+	let mut writer = BufWriter::new(file);
+	for (position, hash) in hashes.iter().enumerate() {
+		if position > 0 {
+			std::io::Write::write_all(&mut writer, b"\n")
+				.map_err(|error| MonochangeError::Io(format!("write dedup index: {error}")))?;
+		}
+		std::io::Write::write_fmt(&mut writer, format_args!(r#"{{"hash":"{hash}"}}"#))
+			.map_err(|error| MonochangeError::Io(format!("write dedup index: {error}")))?;
+	}
+	std::io::Write::flush(&mut writer)
 		.map_err(|error| MonochangeError::Io(format!("write dedup index: {error}")))?;
 	fs::rename(&temp, &path)
 		.map_err(|error| MonochangeError::Io(format!("rename dedup index: {error}")))?;
@@ -840,18 +866,8 @@ fn atomic_write(path: &Path, content: &[u8]) -> MonochangeResult<()> {
 			parent.display()
 		))
 	})?;
-	std::io::Write::write_all(&mut temp, content).map_err(|error| {
-		MonochangeError::Io(format!(
-			"failed to write temp file for {}: {error}",
-			path.display()
-		))
-	})?;
-	temp.persist(path).map_err(|error| {
-		MonochangeError::Io(format!(
-			"failed to rename temp file to {}: {error}",
-			path.display()
-		))
-	})?;
+	write_temp_file(&mut temp, path, content)?;
+	persist_temp_file(temp, path)?;
 	// Restore original permissions after rename.
 	if let Some(permissions) = original_permissions {
 		fs::set_permissions(path, permissions).map_err(|error| {
@@ -862,6 +878,34 @@ fn atomic_write(path: &Path, content: &[u8]) -> MonochangeResult<()> {
 		})?;
 	}
 	Ok(())
+}
+
+fn write_temp_file(
+	writer: &mut impl std::io::Write,
+	path: &Path,
+	content: &[u8],
+) -> MonochangeResult<()> {
+	std::io::Write::write_all(writer, content).map_err(|error| temp_file_write_error(path, &error))
+}
+
+fn persist_temp_file(temp: tempfile::NamedTempFile, path: &Path) -> MonochangeResult<()> {
+	temp.persist(path)
+		.map(|_| ())
+		.map_err(|error| temp_file_persist_error(path, &error))
+}
+
+fn temp_file_write_error(path: &Path, error: &std::io::Error) -> MonochangeError {
+	MonochangeError::Io(format!(
+		"failed to write temp file for {}: {error}",
+		path.display()
+	))
+}
+
+fn temp_file_persist_error(path: &Path, error: &tempfile::PersistError) -> MonochangeError {
+	MonochangeError::Io(format!(
+		"failed to rename temp file to {}: {error}",
+		path.display()
+	))
 }
 
 #[tracing::instrument(skip_all)]
