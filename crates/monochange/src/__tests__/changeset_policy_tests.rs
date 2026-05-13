@@ -335,6 +335,41 @@ async fn affected_packages_uses_configuration_index_for_attached_changesets() {
 	assert!(evaluation.errors.is_empty());
 }
 
+#[test]
+fn configuration_package_records_use_config_ids_without_extra_metadata() {
+	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::create_dir_all(tempdir.path().join("crates/core"))
+		.unwrap_or_else(|error| panic!("create package directory: {error}"));
+	fs::write(
+		tempdir.path().join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\nedition = \"2021\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write package manifest: {error}"));
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		"[defaults]\n\
+		package_type = \"cargo\"\n\
+		\n\
+		[package.core]\n\
+		path = \"crates/core\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+	let configuration = monochange_config::load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("load workspace configuration: {error}"));
+
+	let records = configuration_package_records(&configuration);
+
+	assert_eq!(records.len(), 1);
+	assert_eq!(records[0].id, "core");
+	assert_eq!(records[0].name, "core");
+	assert!(records[0].metadata.is_empty());
+	assert!(
+		records[0]
+			.manifest_path
+			.ends_with("crates/core/.monochange-config-package")
+	);
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn affected_packages_reports_missing_and_invalid_changeset_inputs() {
 	let fixture = setup_fixture("monochange/changeset-policy-base");

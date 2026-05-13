@@ -50,6 +50,48 @@ async fn diagnose_changesets_loads_multiple_files_with_shared_context() {
 	}));
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn diagnose_changesets_uses_configuration_index_before_workspace_discovery() {
+	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::create_dir_all(tempdir.path().join(".changeset"))
+		.unwrap_or_else(|error| panic!("create changeset directory: {error}"));
+	fs::create_dir_all(tempdir.path().join("crates/core/src"))
+		.unwrap_or_else(|error| panic!("create source tree: {error}"));
+	fs::write(tempdir.path().join("crates/core/Cargo.toml"), "not toml\n")
+		.unwrap_or_else(|error| panic!("write package manifest: {error}"));
+	fs::write(
+		tempdir.path().join("crates/core/src/lib.rs"),
+		"pub fn core() {}\n",
+	)
+	.unwrap_or_else(|error| panic!("write source file: {error}"));
+	fs::write(
+		tempdir.path().join(".changeset/core.md"),
+		"---\ncore: patch\n---\n\nFix core.\n",
+	)
+	.unwrap_or_else(|error| panic!("write changeset: {error}"));
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		"[defaults]\n\
+		package_type = \"cargo\"\n\
+		\n\
+		[package.core]\n\
+		path = \"crates/core\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+
+	let report = diagnose_changesets(tempdir.path(), &[])
+		.await
+		.unwrap_or_else(|error| panic!("diagnose changesets: {error}"));
+
+	assert_eq!(report.changesets.len(), 1);
+	assert!(
+		report.changesets[0]
+			.targets
+			.iter()
+			.any(|target| { target.id == "core" && target.kind == ChangesetTargetKind::Package })
+	);
+}
+
 #[test]
 fn batch_git_log_returns_empty_maps_for_empty_paths() {
 	let (introduced, last_updated) = batch_git_log(Path::new("."), &[]);

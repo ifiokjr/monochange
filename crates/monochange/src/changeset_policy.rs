@@ -5,7 +5,6 @@ use std::process::Command as ProcessCommand;
 
 use glob::Pattern;
 use monochange_config::load_workspace_configuration;
-use monochange_config::resolve_package_reference;
 use monochange_core::ChangesetAffectedSettings;
 use monochange_core::ChangesetPolicyEvaluation;
 use monochange_core::ChangesetPolicyStatus;
@@ -16,8 +15,6 @@ use monochange_core::PublishState;
 use monochange_core::SourceConfiguration;
 use monochange_core::WorkspaceConfiguration;
 use monochange_core::git::git_current_branch;
-
-use crate::discover_workspace;
 
 /// Evaluate pull-request changeset coverage for the supplied changed paths.
 ///
@@ -144,45 +141,17 @@ pub async fn affected_packages(
 	let mut errors = Vec::new();
 	if !changeset_paths.is_empty() {
 		let config_packages = configuration_package_records(&configuration);
-		let config_ids_by_package_id = config_packages
-			.iter()
-			.map(|package| (package.id.clone(), package.id.clone()))
-			.collect::<BTreeMap<_, _>>();
-		if let Ok(config_covered_package_ids) = covered_package_ids_from_changesets(
+		match covered_package_ids_from_changesets(
 			root,
 			&configuration,
 			&changeset_paths,
 			&config_packages,
-			&config_ids_by_package_id,
 		) {
-			covered_package_ids = config_covered_package_ids;
-		} else {
-			let discovery = discover_workspace(root)?;
-			let config_ids_by_package_id = configuration
-				.packages
-				.iter()
-				.map(|package| {
-					resolve_package_reference(
-						&package.id,
-						&configuration.root_path,
-						&discovery.packages,
-					)
-					.map(|package_id| (package_id, package.id.clone()))
-				})
-				.collect::<MonochangeResult<BTreeMap<_, _>>>()?;
-			match covered_package_ids_from_changesets(
-				root,
-				&configuration,
-				&changeset_paths,
-				&discovery.packages,
-				&config_ids_by_package_id,
-			) {
-				Ok(discovered_covered_package_ids) => {
-					covered_package_ids = discovered_covered_package_ids;
-				}
-				Err(discovered_errors) => {
-					errors.extend(discovered_errors);
-				}
+			Ok(config_covered_package_ids) => {
+				covered_package_ids = config_covered_package_ids;
+			}
+			Err(policy_errors) => {
+				errors.extend(policy_errors);
 			}
 		}
 	}
@@ -444,7 +413,6 @@ fn covered_package_ids_from_changesets(
 	configuration: &WorkspaceConfiguration,
 	changeset_paths: &[String],
 	packages: &[PackageRecord],
-	config_ids_by_package_id: &BTreeMap<String, String>,
 ) -> Result<BTreeSet<String>, Vec<String>> {
 	let changeset_load_context =
 		monochange_config::build_changeset_load_context(configuration, packages);
@@ -465,12 +433,7 @@ fn covered_package_ids_from_changesets(
 		) {
 			Ok(loaded) => {
 				for signal in loaded.signals {
-					covered_package_ids.insert(
-						config_ids_by_package_id
-							.get(&signal.package_id)
-							.cloned()
-							.unwrap_or(signal.package_id),
-					);
+					covered_package_ids.insert(signal.package_id);
 				}
 			}
 			Err(error) => errors.push(error.render()),
@@ -484,14 +447,13 @@ fn covered_package_ids_from_changesets(
 	}
 }
 
-fn configuration_package_records(configuration: &WorkspaceConfiguration) -> Vec<PackageRecord> {
+pub(crate) fn configuration_package_records(
+	configuration: &WorkspaceConfiguration,
+) -> Vec<PackageRecord> {
 	configuration
 		.packages
 		.iter()
 		.map(|package| {
-			let mut metadata = BTreeMap::new();
-			metadata.insert("config_id".to_string(), package.id.clone());
-
 			PackageRecord {
 				id: package.id.clone(),
 				name: package.id.clone(),
@@ -504,7 +466,7 @@ fn configuration_package_records(configuration: &WorkspaceConfiguration) -> Vec<
 				current_version: None,
 				publish_state: PublishState::Unpublished,
 				version_group_id: None,
-				metadata,
+				metadata: BTreeMap::new(),
 				declared_dependencies: Vec::new(),
 			}
 		})

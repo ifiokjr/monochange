@@ -1845,7 +1845,8 @@ async fn execute_cli_command_with_options_covers_final_artifact_save_call() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn execute_cli_command_with_options_plans_publish_rate_limits_from_prepared_release_artifact() {
+async fn execute_cli_command_with_options_plans_publish_rate_limits_from_prepared_release_artifact()
+{
 	let workspace_dir = prepared_release_git_workspace();
 	let root = workspace_dir.path();
 	let configuration = sample_configuration(root);

@@ -1,13 +1,13 @@
 use std::collections::BTreeMap;
 
 use super::*;
+use crate::changeset_policy::configuration_package_records;
 
 pub(crate) async fn diagnose_changesets(
 	root: &Path,
 	requested: &[String],
 ) -> MonochangeResult<ChangesetDiagnosticsReport> {
 	let configuration = load_workspace_configuration(root)?;
-	let discovery = discover_workspace(root)?;
 
 	let changeset_paths = if requested.is_empty() {
 		discover_changeset_paths(root, false)?
@@ -26,14 +26,7 @@ pub(crate) async fn diagnose_changesets(
 		resolved
 	};
 
-	let changeset_load_context =
-		monochange_config::build_changeset_load_context(&configuration, &discovery.packages);
-	let loaded_changesets = changeset_paths
-		.iter()
-		.map(|path| {
-			monochange_config::load_changeset_file_with_context(path, &changeset_load_context)
-		})
-		.collect::<MonochangeResult<Vec<_>>>()?;
+	let loaded_changesets = load_diagnostic_changesets(root, &configuration, &changeset_paths)?;
 
 	let mut changesets = build_prepared_changesets(root, &loaded_changesets);
 
@@ -51,6 +44,58 @@ pub(crate) async fn diagnose_changesets(
 	Ok(ChangesetDiagnosticsReport {
 		requested_changesets,
 		changesets,
+	})
+}
+
+fn load_diagnostic_changesets(
+	root: &Path,
+	configuration: &monochange_core::WorkspaceConfiguration,
+	changeset_paths: &[PathBuf],
+) -> MonochangeResult<Vec<monochange_config::LoadedChangesetFile>> {
+	match load_diagnostic_changesets_with_packages(
+		configuration,
+		changeset_paths,
+		&configuration_package_records(configuration),
+	) {
+		Ok(loaded_changesets)
+			if !diagnostics_need_discovered_package_versions(&loaded_changesets) =>
+		{
+			Ok(loaded_changesets)
+		}
+		Ok(_) | Err(_) => {
+			let discovery = discover_workspace(root)?;
+			load_diagnostic_changesets_with_packages(
+				configuration,
+				changeset_paths,
+				&discovery.packages,
+			)
+		}
+	}
+}
+
+fn load_diagnostic_changesets_with_packages(
+	configuration: &monochange_core::WorkspaceConfiguration,
+	changeset_paths: &[PathBuf],
+	packages: &[PackageRecord],
+) -> MonochangeResult<Vec<monochange_config::LoadedChangesetFile>> {
+	let changeset_load_context =
+		monochange_config::build_changeset_load_context(configuration, packages);
+	changeset_paths
+		.iter()
+		.map(|path| {
+			monochange_config::load_changeset_file_with_context(path, &changeset_load_context)
+		})
+		.collect()
+}
+
+fn diagnostics_need_discovered_package_versions(
+	loaded_changesets: &[monochange_config::LoadedChangesetFile],
+) -> bool {
+	loaded_changesets.iter().any(|changeset| {
+		changeset
+			.signals
+			.iter()
+			.any(|signal| signal.explicit_version.is_some() && signal.requested_bump.is_none())
 	})
 }
 
