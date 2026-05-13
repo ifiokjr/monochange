@@ -57,7 +57,7 @@
   - Streamed prepared-release artifact JSON through buffered readers/writers, serialized prepared releases and file diffs through borrowed views, filtered git status lines before allocating retained status strings, deduplicated tracked snapshot paths before cloning them, and filled tracked-path hashes in place.
   - Streamed colorized diff rendering directly into one output buffer instead of allocating a temporary vector of per-line strings before joining.
   - Streamed release deduplication index reads/writes through buffered files, parsed JSONL entries into borrowed structs, and wrote sorted borrowed hashes instead of allocating formatted line strings and a joined file body.
-  - Reduced versioned-file update allocations by deduplicating borrowed definitions, passing dependency names as borrowed strings, streaming glob matches, and rendering cached JSON directly into bytes.
+  - Reduced versioned-file update allocations by deduplicating borrowed definitions, passing dependency names as borrowed strings, streaming glob matches, rendering cached JSON directly into bytes, borrowing package release versions by config id, and bypassing UTF-8 conversion for binary Bun lockfiles.
 
 ## Current benchmark summary
 

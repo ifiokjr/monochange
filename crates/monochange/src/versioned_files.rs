@@ -140,7 +140,7 @@ pub(crate) fn build_versioned_file_updates(
 			package.metadata.get("config_id").and_then(|config_id| {
 				released_versions_by_record_id
 					.get(&package.id)
-					.map(|version| (config_id.as_str(), version.clone()))
+					.map(|version| (config_id.as_str(), version.as_str()))
 			})
 		})
 		.collect::<BTreeMap<_, _>>();
@@ -469,6 +469,14 @@ pub(crate) fn read_cached_document(
 	let contents = fs::read(path).map_err(|error| {
 		MonochangeError::Io(format!("failed to read {}: {error}", path.display()))
 	})?;
+
+	#[cfg(feature = "npm")]
+	if matches!(
+		kind,
+		VersionedFileKind::Npm(monochange_npm::NpmVersionedFileKind::BunLockBinary)
+	) {
+		return Ok(CachedDocument::Bytes(contents));
+	}
 
 	let text_contents = String::from_utf8(contents.clone())
 		.map_err(|error| {

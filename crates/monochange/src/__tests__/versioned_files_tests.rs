@@ -76,6 +76,22 @@ fn read_cached_document_handles_go_text_and_invalid_utf8() {
 }
 
 #[test]
+#[cfg(feature = "npm")]
+fn read_cached_document_preserves_bun_lock_binary_without_utf8_parse() {
+	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let bun_lock = tempdir.path().join("bun.lockb");
+	let binary_contents = vec![0xff, 0xfe, 0x00, 0x01];
+	std::fs::write(&bun_lock, &binary_contents)
+		.unwrap_or_else(|error| panic!("write bun.lockb: {error}"));
+	let mut updates = BTreeMap::new();
+
+	let document = read_cached_document(&mut updates, &bun_lock, EcosystemType::Npm)
+		.unwrap_or_else(|error| panic!("bun lock binary document: {error}"));
+
+	assert!(matches!(document, CachedDocument::Bytes(contents) if contents == binary_contents));
+}
+
+#[test]
 fn read_cached_document_reports_deno_lock_invalid_utf8_as_text_parse_error() {
 	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let deno_lock = tempdir.path().join("deno.lock");
