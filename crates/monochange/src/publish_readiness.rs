@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -610,14 +611,18 @@ fn package_identities(
 }
 
 fn package_set_fingerprint(packages: &[PublishReadinessPackage]) -> String {
-	packages
+	let identities = packages
 		.iter()
 		.map(package_identity)
-		.collect::<BTreeSet<_>>()
-		.iter()
-		.map(render_package_identity)
-		.collect::<Vec<_>>()
-		.join("\n")
+		.collect::<BTreeSet<_>>();
+	let mut fingerprint = String::new();
+	for identity in identities {
+		if !fingerprint.is_empty() {
+			fingerprint.push('\n');
+		}
+		write_package_identity(&mut fingerprint, &identity);
+	}
+	fingerprint
 }
 
 fn package_identity(package: &PublishReadinessPackage) -> PackageIdentity {
@@ -630,10 +635,17 @@ fn package_identity(package: &PublishReadinessPackage) -> PackageIdentity {
 }
 
 fn render_package_identity(identity: &PackageIdentity) -> String {
-	format!(
+	let mut rendered = String::new();
+	write_package_identity(&mut rendered, identity);
+	rendered
+}
+
+fn write_package_identity(output: &mut String, identity: &PackageIdentity) {
+	let _ = write!(
+		output,
 		"{} {:?} {} {}",
 		identity.package, identity.ecosystem, identity.registry, identity.version
-	)
+	);
 }
 
 fn render_package_identity_list(identities: &[String]) -> String {
@@ -663,7 +675,10 @@ fn render_report(
 	match format {
 		OutputFormat::Json => {
 			serde_json::to_string_pretty(report)
-				.map(|body| format!("{body}\n"))
+				.map(|mut body| {
+					body.push('\n');
+					body
+				})
 				.map_err(publish_readiness_json_error)
 		}
 		OutputFormat::Markdown => Ok(render_markdown_report(report)),
@@ -671,59 +686,63 @@ fn render_report(
 	}
 }
 fn render_text_report(report: &PublishReadinessReport) -> String {
-	let mut lines = vec![format!(
+	let mut output = String::new();
+	let _ = writeln!(
+		output,
 		"publish readiness: {}",
 		readiness_global_status_label(report.status)
-	)];
-	lines.push(format!("release ref: {}", report.from));
-	lines.push(format!("release record: {}", report.record_commit));
+	);
+	let _ = writeln!(output, "release ref: {}", report.from);
+	let _ = writeln!(output, "release record: {}", report.record_commit);
 	if report.packages.is_empty() {
-		lines.push("packages: none".to_string());
+		output.push_str("packages: none\n");
 	} else {
-		lines.push("packages:".to_string());
+		output.push_str("packages:\n");
 		for package in &report.packages {
-			lines.push(format!(
+			let _ = writeln!(
+				output,
 				"- {} {} {} [{}]: {}",
 				package.package,
 				package.version,
 				package.registry,
 				readiness_package_status_label(package.status),
 				package.message
-			));
+			);
 		}
 	}
-	format!("{}\n", lines.join("\n"))
+	output
 }
 
 fn render_markdown_report(report: &PublishReadinessReport) -> String {
-	let mut lines = vec![
-		"## Publish readiness".to_string(),
-		String::new(),
-		format!(
-			"- Status: `{}`",
-			readiness_global_status_label(report.status)
-		),
-		format!("- Release ref: `{}`", report.from),
-		format!("- Release record: `{}`", report.record_commit),
-		String::new(),
-	];
+	let mut output = String::new();
+	let _ = writeln!(output, "## Publish readiness");
+	output.push('\n');
+	let _ = writeln!(
+		output,
+		"- Status: `{}`",
+		readiness_global_status_label(report.status)
+	);
+	let _ = writeln!(output, "- Release ref: `{}`", report.from);
+	let _ = writeln!(output, "- Release record: `{}`", report.record_commit);
+	output.push('\n');
 	if report.packages.is_empty() {
-		lines.push("No packages selected for publishing.".to_string());
+		output.push_str("No packages selected for publishing.\n");
 	} else {
-		lines.push("| Package | Version | Registry | Status | Message |".to_string());
-		lines.push("| --- | --- | --- | --- | --- |".to_string());
+		output.push_str("| Package | Version | Registry | Status | Message |\n");
+		output.push_str("| --- | --- | --- | --- | --- |\n");
 		for package in &report.packages {
-			lines.push(format!(
+			let _ = writeln!(
+				output,
 				"| `{}` | `{}` | `{}` | `{}` | {} |",
 				package.package,
 				package.version,
 				package.registry,
 				readiness_package_status_label(package.status),
 				package.message.replace('|', "\\|")
-			));
+			);
 		}
 	}
-	format!("{}\n", lines.join("\n"))
+	output
 }
 
 fn readiness_global_status_label(status: PublishReadinessGlobalStatus) -> &'static str {

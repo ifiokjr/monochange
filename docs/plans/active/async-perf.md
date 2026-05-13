@@ -58,6 +58,7 @@
   - Streamed colorized diff rendering directly into one output buffer instead of allocating a temporary vector of per-line strings before joining.
   - Streamed release deduplication index reads/writes through buffered files, parsed JSONL entries into borrowed structs, and wrote sorted borrowed hashes instead of allocating formatted line strings and a joined file body.
   - Reduced versioned-file update allocations by deduplicating borrowed definitions, passing dependency names as borrowed strings, streaming glob matches, rendering cached JSON directly into bytes, borrowing package release versions by config id, and bypassing UTF-8 conversion for binary Bun lockfiles.
+  - Streamed publish-readiness text, Markdown, JSON newline, and package-fingerprint rendering directly into output buffers instead of allocating temporary line or identity-render vectors before joining.
 
 ## Current benchmark summary
 
