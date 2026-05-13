@@ -98,6 +98,19 @@ fn reporter_helpers_cover_color_and_spinner_paths() {
 }
 
 #[test]
+fn summary_count_line_streams_present_counts() {
+	assert_eq!(summary_count_line(0, 0, "x", "!"), None);
+	assert_eq!(
+		summary_count_line(1, 0, "x", "!"),
+		Some("x 1 error".to_string())
+	);
+	assert_eq!(
+		summary_count_line(2, 3, "x", "!"),
+		Some("x 2 errors, ! 3 warnings".to_string())
+	);
+}
+
+#[test]
 fn reporter_summary_renders_counts() {
 	let reporter = reporter();
 	// Should not panic and should produce no output when there are no issues.
