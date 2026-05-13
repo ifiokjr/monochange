@@ -351,7 +351,9 @@ fn current_artifact_variants() -> Vec<ArtifactVariant> {
 		.map(|_| {
 			strategy
 				.new_tree(&mut runner)
-				.expect("generate current artifact fixture variant")
+				.unwrap_or_else(|error| {
+					panic!("generate current artifact fixture variant: {error}")
+				})
 				.current()
 		})
 		.collect()
@@ -365,7 +367,7 @@ fn release_record_artifact_fixture(
 	let mut value: Value = serde_json::from_str(
 		&monochange_schema::release_record::populated_artifact_json(version),
 	)
-	.expect("parse release-record artifact fixture template");
+	.unwrap_or_else(|error| panic!("parse release-record artifact fixture template: {error}"));
 	let release_version = format!("{version}.{fixture_index}");
 	let command = if variant.dry_run {
 		"mc release --dry-run"
@@ -460,7 +462,8 @@ fn release_record_artifact_fixture(
 		provider.insert("owner".to_string(), json!(variant.owner));
 		provider.insert("repo".to_string(), json!(variant.repo));
 	}
-	serde_json::to_string_pretty(&value).expect("serialize release-record artifact fixture")
+	serde_json::to_string_pretty(&value)
+		.unwrap_or_else(|error| panic!("serialize release-record artifact fixture: {error}"))
 }
 
 fn config_artifact_fixture(variant: &ArtifactVariant) -> String {
@@ -474,7 +477,8 @@ fn config_artifact_fixture(variant: &ArtifactVariant) -> String {
 	let value = json!({
 		"source": Value::Object(source)
 	});
-	serde_json::to_string_pretty(&value).expect("serialize config artifact fixture")
+	serde_json::to_string_pretty(&value)
+		.unwrap_or_else(|error| panic!("serialize config artifact fixture: {error}"))
 }
 
 fn write_generated_file(generated_file: &GeneratedFile) -> Result<(), String> {
