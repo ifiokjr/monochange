@@ -256,7 +256,7 @@ pub use workspace_ops::plan_release;
 use workspace_ops::populate_workspace;
 pub use workspace_ops::prepare_release;
 pub(crate) use workspace_ops::prepare_release_execution_with_file_diffs;
-pub(crate) use workspace_ops::render_change_target_markdown;
+pub(crate) use workspace_ops::push_change_target_markdown;
 #[cfg(feature = "cargo")]
 pub(crate) use workspace_ops::validate_cargo_workspace_version_groups;
 

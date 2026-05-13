@@ -744,17 +744,15 @@ pub(crate) fn render_changeset_markdown(
 ) -> MonochangeResult<String> {
 	let mut rendered = String::from("---\n");
 	for package in package_refs {
-		push_markdown_lines(
+		push_change_target_markdown(
 			&mut rendered,
-			render_change_target_markdown(
-				configuration,
-				package,
-				bump,
-				version,
-				change_type,
-				caused_by,
-			)?,
-		);
+			configuration,
+			package,
+			bump,
+			version,
+			change_type,
+			caused_by,
+		)?;
 	}
 
 	rendered.push_str("---\n\n# ");
@@ -766,13 +764,6 @@ pub(crate) fn render_changeset_markdown(
 		rendered.push('\n');
 	}
 	Ok(rendered)
-}
-
-fn push_markdown_lines(rendered: &mut String, lines: Vec<String>) {
-	for line in lines {
-		rendered.push_str(&line);
-		rendered.push('\n');
-	}
 }
 
 #[cfg(test)]

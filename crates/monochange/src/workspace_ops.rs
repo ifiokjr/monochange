@@ -1093,28 +1093,61 @@ pub(crate) fn change_type_default_bump(
 	changelog.types.get(change_type).map(|typ| typ.bump)
 }
 
-fn render_changeset_target_key(target_id: &str) -> String {
-	if target_id
+fn is_plain_changeset_target_key(target_id: &str) -> bool {
+	target_id
 		.chars()
 		.all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.'))
-	{
-		target_id.to_string()
+}
+
+fn push_double_quoted_yaml_string(rendered: &mut String, value: &str) {
+	rendered.push('"');
+	for character in value.chars() {
+		match character {
+			'\\' => rendered.push_str("\\\\"),
+			'"' => rendered.push_str("\\\""),
+			_ => rendered.push(character),
+		}
+	}
+	rendered.push('"');
+}
+
+fn push_changeset_target_key(rendered: &mut String, target_id: &str) {
+	if is_plain_changeset_target_key(target_id) {
+		rendered.push_str(target_id);
 	} else {
-		format!(
-			"\"{}\"",
-			target_id.replace('\\', "\\\\").replace('"', "\\\"")
-		)
+		push_double_quoted_yaml_string(rendered, target_id);
 	}
 }
 
-pub(crate) fn render_change_target_markdown(
+fn push_caused_by_list(rendered: &mut String, caused_by: &[String]) {
+	for (index, reference) in caused_by.iter().enumerate() {
+		if index > 0 {
+			rendered.push_str(", ");
+		}
+		push_double_quoted_yaml_string(rendered, reference);
+	}
+}
+
+fn push_caused_by_line(rendered: &mut String, caused_by: &[String]) {
+	rendered.push_str("  caused_by: [");
+	push_caused_by_list(rendered, caused_by);
+	rendered.push_str("]\n");
+}
+
+fn push_target_object_start(rendered: &mut String, target_id: &str) {
+	push_changeset_target_key(rendered, target_id);
+	rendered.push_str(":\n");
+}
+
+pub(crate) fn push_change_target_markdown(
+	rendered: &mut String,
 	configuration: &monochange_core::WorkspaceConfiguration,
 	target_id: &str,
 	bump: BumpSeverity,
 	version: Option<&str>,
 	change_type: Option<&str>,
 	caused_by: &[String],
-) -> MonochangeResult<Vec<String>> {
+) -> MonochangeResult<()> {
 	if change_type.is_none()
 		&& version.is_none()
 		&& bump == BumpSeverity::None
@@ -1125,17 +1158,6 @@ pub(crate) fn render_change_target_markdown(
 		)));
 	}
 
-	let mut lines = Vec::new();
-	let target_key = render_changeset_target_key(target_id);
-	let caused_by = caused_by
-		.iter()
-		.map(|reference| {
-			format!(
-				"\"{}\"",
-				reference.replace('\\', "\\\\").replace('"', "\\\"")
-			)
-		})
-		.collect::<Vec<_>>();
 	let forced_object_syntax = !caused_by.is_empty();
 
 	// Handle explicit change type
@@ -1148,91 +1170,87 @@ pub(crate) fn render_change_target_markdown(
 			})?;
 
 		if !forced_object_syntax && version.is_none() && bump == default_bump {
-			lines.push(format!("{target_key}: {change_type}"));
-			return Ok(lines);
+			push_changeset_target_key(rendered, target_id);
+			rendered.push_str(": ");
+			rendered.push_str(change_type);
+			rendered.push('\n');
+			return Ok(());
 		}
 
-		lines.push(format!("{target_key}:"));
+		push_target_object_start(rendered, target_id);
 		if bump != BumpSeverity::None {
-			lines.push(format!("  bump: {bump}"));
+			let _ = writeln!(rendered, "  bump: {bump}");
 		}
-		lines.push(format!("  type: {change_type}"));
+		let _ = writeln!(rendered, "  type: {change_type}");
 		if let Some(version) = version {
-			lines.push(format!("  version: \"{version}\""));
+			let _ = writeln!(rendered, "  version: \"{version}\"");
 		}
-		if !caused_by.is_empty() {
-			lines.push(format!("  caused_by: [{}]", caused_by.join(", ")));
+		if forced_object_syntax {
+			push_caused_by_line(rendered, caused_by);
 		}
-		return Ok(lines);
+		return Ok(());
 	}
 
 	if let Some(version) = version {
-		lines.push(format!("{target_key}:"));
+		push_target_object_start(rendered, target_id);
 		if bump != BumpSeverity::None {
-			lines.push(format!("  bump: {bump}"));
+			let _ = writeln!(rendered, "  bump: {bump}");
 		}
-		lines.push(format!("  version: \"{version}\""));
-		if !caused_by.is_empty() {
-			lines.push(format!("  caused_by: [{}]", caused_by.join(", ")));
+		let _ = writeln!(rendered, "  version: \"{version}\"");
+		if forced_object_syntax {
+			push_caused_by_line(rendered, caused_by);
 		}
-		return Ok(lines);
+		return Ok(());
 	}
 
-	if !caused_by.is_empty() {
-		lines.push(format!("{target_key}:"));
-		lines.push(format!("  bump: {bump}"));
-		lines.push(format!("  caused_by: [{}]", caused_by.join(", ")));
-		return Ok(lines);
+	if forced_object_syntax {
+		push_target_object_start(rendered, target_id);
+		let _ = writeln!(rendered, "  bump: {bump}");
+		push_caused_by_line(rendered, caused_by);
+		return Ok(());
 	}
 
-	lines.push(format!("{target_key}: {bump}"));
+	push_changeset_target_key(rendered, target_id);
+	rendered.push_str(": ");
+	let _ = writeln!(rendered, "{bump}");
 
-	Ok(lines)
-}
-
-fn render_interactive_target_markdown(
-	configuration: &monochange_core::WorkspaceConfiguration,
-	target: &interactive::InteractiveTarget,
-	caused_by: &[String],
-) -> MonochangeResult<Vec<String>> {
-	render_change_target_markdown(
-		configuration,
-		&target.id,
-		target.bump,
-		target.version.as_deref(),
-		target.change_type.as_deref(),
-		caused_by,
-	)
+	Ok(())
 }
 
 pub(crate) fn render_interactive_changeset_markdown(
 	configuration: &monochange_core::WorkspaceConfiguration,
 	result: &interactive::InteractiveChangeResult,
 ) -> MonochangeResult<String> {
-	let mut lines = vec!["---".to_string()];
+	let mut rendered = String::from("---\n");
 
 	for target in &result.targets {
-		let target_lines =
-			render_interactive_target_markdown(configuration, target, &result.caused_by)?;
-		lines.extend(target_lines);
+		push_change_target_markdown(
+			&mut rendered,
+			configuration,
+			&target.id,
+			target.bump,
+			target.version.as_deref(),
+			target.change_type.as_deref(),
+			&result.caused_by,
+		)?;
 	}
 
-	lines.push("---".to_string());
-	lines.push(String::new());
-	lines.push(format!("# {}", result.reason));
+	rendered.push_str("---\n\n# ");
+	rendered.push_str(&result.reason);
+	rendered.push('\n');
 
 	if let Some(details) = result
 		.details
 		.as_deref()
-		.filter(|value| !value.trim().is_empty())
+		.map(str::trim)
+		.filter(|value| !value.is_empty())
 	{
-		lines.push(String::new());
-		lines.push(details.trim().to_string());
+		rendered.push('\n');
+		rendered.push_str(details);
+		rendered.push('\n');
 	}
 
-	lines.push(String::new());
-
-	Ok(lines.join("\n"))
+	Ok(rendered)
 }
 
 /// Build a release plan from a single changeset file.

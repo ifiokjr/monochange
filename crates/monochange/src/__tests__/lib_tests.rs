@@ -80,9 +80,9 @@ use crate::interactive::InteractiveChangeResult;
 use crate::interactive::InteractiveTarget;
 use crate::plan_release;
 use crate::prepare_release_execution_with_file_diffs;
+use crate::push_change_target_markdown;
 use crate::release_artifacts::validate_release_record_file;
 use crate::release_artifacts::write_release_record_file;
-use crate::render_change_target_markdown;
 use crate::run_with_args;
 use crate::run_with_args_in_dir;
 use crate::workspace_ops::build_lockfile_command_executions;
@@ -90,6 +90,27 @@ use crate::workspace_ops::change_type_default_bump;
 use crate::workspace_ops::prepare_release_execution;
 use crate::workspace_ops::render_cli_commands_toml;
 use crate::workspace_ops::render_interactive_changeset_markdown;
+
+fn render_change_target_markdown(
+	configuration: &monochange_core::WorkspaceConfiguration,
+	target_id: &str,
+	bump: BumpSeverity,
+	version: Option<&str>,
+	change_type: Option<&str>,
+	caused_by: &[String],
+) -> monochange_core::MonochangeResult<Vec<String>> {
+	let mut rendered = String::new();
+	push_change_target_markdown(
+		&mut rendered,
+		configuration,
+		target_id,
+		bump,
+		version,
+		change_type,
+		caused_by,
+	)?;
+	Ok(rendered.lines().map(str::to_string).collect())
+}
 
 fn clear_dedup_cache() {
 	crate::release_artifacts::DEDUPLICATED_CACHE.with(|cache| cache.borrow_mut().clear());

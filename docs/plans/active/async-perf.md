@@ -52,6 +52,7 @@
   - Reworked `step:display-versions` summary rendering to borrow sorted package/group version-plan entries instead of cloning them into owned maps.
   - Replaced eager version `to_string()` allocation for JSON with streaming `Display` serialization, and render text output directly into one buffer instead of building a temporary `Vec<String>`.
   - Kept a diagnostics fallback regression test for explicit-version changesets so the optimized config-only fast path remains covered without regressing patch coverage.
+  - Streamed non-interactive and interactive changeset markdown rendering directly into one buffer, including inline YAML quoting for target keys and `caused_by`, to avoid temporary line vectors, escaped-string vectors, and joins.
 
 ## Current benchmark summary
 
