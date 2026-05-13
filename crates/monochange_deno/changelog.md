@@ -4,22 +4,6 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
-## [0.5.0](https://github.com/monochange/monochange/releases/tag/v0.5.0) (2026-05-13)
-
-### Added
-
-#### Configurable publish-order dependency fields
-
-Add configurable ecosystem-specific dependency fields for package publish ordering across npm, Cargo, Deno, Dart/Flutter, Python, and Go.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #472](https://github.com/monochange/monochange/pull/472) _Introduced in:_ [`0d9cf46`](https://github.com/monochange/monochange/commit/0d9cf461a05057b61efa987d361ebd27d800dbdb) _Last updated in:_ [`4cf0b03`](https://github.com/monochange/monochange/commit/4cf0b0349fc4aa5f5775d6a6db624c6cd18b7a39) _Closed issues:_ [#465](https://github.com/monochange/monochange/issues/465) _Related issues:_ [#489](https://github.com/monochange/monochange/issues/489)
-
-#### Publish all configured packages
-
-Add a `--all` flag to the PublishPackages CLI step so migration workflows can publish every configured package, including packages that were not part of the prepared release record.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #461](https://github.com/monochange/monochange/pull/461) _Introduced in:_ [`3d956cd`](https://github.com/monochange/monochange/commit/3d956cd3e34747e088add98fe0358251f388782f) _Last updated in:_ [`4cf0b03`](https://github.com/monochange/monochange/commit/4cf0b0349fc4aa5f5775d6a6db624c6cd18b7a39) _Related issues:_ [#489](https://github.com/monochange/monochange/issues/489)
-
 ## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)
 
 ### Added
