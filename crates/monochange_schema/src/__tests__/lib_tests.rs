@@ -211,6 +211,30 @@ fn release_record_rust_migration_edges_are_explicit_and_ordered() {
 }
 
 #[test]
+fn release_record_rust_migration_edges_reject_missing_paths() {
+	let mut value = json!({
+		"kind": release_record::KIND,
+		"schemaVersion": "0.2"
+	});
+	let error = migrations::apply_release_record_edges(
+		&mut value,
+		SchemaVersion::new(0, 2),
+		SchemaVersion::new(0, 3),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected missing migration path error"));
+
+	assert!(matches!(
+		error,
+		SchemaError::MissingMigrationPath {
+			artifact: release_record::KIND,
+			from: SchemaVersion { major: 0, minor: 2 },
+			to: SchemaVersion { major: 0, minor: 3 },
+		}
+	));
+}
+
+#[test]
 fn release_record_rust_migration_helpers_reject_non_object_values() {
 	let mut value = json!(null);
 	let error = migrations::rename_top_level_field(&mut value, "oldName", "newName")

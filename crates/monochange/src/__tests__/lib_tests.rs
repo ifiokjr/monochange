@@ -314,6 +314,97 @@ fn migrate_release_records_rewrites_legacy_records() {
 }
 
 #[test]
+fn migrate_release_records_reports_dry_run_and_current_records() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("create tempdir: {error}"));
+	let root = tempdir.path();
+	let empty_report = crate::migration_audit::migrate_release_records(root, true)
+		.unwrap_or_else(|error| panic!("migrate empty records: {error}"));
+	assert_eq!(empty_report.scanned, 0);
+	assert_eq!(empty_report.migrated, 0);
+	assert_eq!(empty_report.unchanged, 0);
+
+	write_blank_monochange_config(root);
+	let current_record_path = root.join(".monochange/releases/current/release.json");
+	let legacy_record_path = root.join(".monochange/releases/legacy/release.json");
+	fs::create_dir_all(
+		current_record_path
+			.parent()
+			.expect("current record has parent"),
+	)
+	.unwrap_or_else(|error| panic!("create current record dir: {error}"));
+	fs::create_dir_all(
+		legacy_record_path
+			.parent()
+			.expect("legacy record has parent"),
+	)
+	.unwrap_or_else(|error| panic!("create legacy record dir: {error}"));
+	fs::write(
+		&current_record_path,
+		format!(
+			r#"{{
+  "schemaVersion": "{}",
+  "kind": "monochange.releaseRecord",
+  "createdAt": "2026-04-06T12:00:00Z",
+  "command": "release-pr",
+  "releaseTargets": [],
+  "changedFiles": []
+}}"#,
+			monochange_core::RELEASE_RECORD_SCHEMA_VERSION
+		),
+	)
+	.unwrap_or_else(|error| panic!("write current release record: {error}"));
+	fs::write(
+		&legacy_record_path,
+		r#"{
+  "v": "0.0",
+  "kind": "monochange.releaseRecord",
+  "createdAt": "2026-04-06T12:00:00Z",
+  "command": "release-pr",
+  "releaseTargets": [],
+  "releasedPackages": [],
+  "changedFiles": []
+}"#,
+	)
+	.unwrap_or_else(|error| panic!("write legacy release record: {error}"));
+
+	let output = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("migrate"),
+			OsString::from("release-records"),
+			OsString::from("--dry-run"),
+			OsString::from("--format"),
+			OsString::from("markdown"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("dry-run release-record migration: {error}"));
+
+	assert!(output.contains("release-record migrations: would migrate 1/2 record(s)"));
+	assert!(output.contains("unchanged: 1"));
+	assert!(output.contains("would migrate"));
+	assert!(output.contains("current"));
+	let legacy_after = fs::read_to_string(&legacy_record_path)
+		.unwrap_or_else(|error| panic!("read dry-run legacy release record: {error}"));
+	assert!(legacy_after.contains(r#""v": "0.0""#));
+}
+
+#[test]
+fn migrate_release_records_reports_invalid_record_json() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("create tempdir: {error}"));
+	let root = tempdir.path();
+	let record_path = root.join(".monochange/releases/bad/release.json");
+	fs::create_dir_all(record_path.parent().expect("record has parent"))
+		.unwrap_or_else(|error| panic!("create release record dir: {error}"));
+	fs::write(&record_path, "null")
+		.unwrap_or_else(|error| panic!("write invalid release record: {error}"));
+
+	let error = crate::migration_audit::migrate_release_records(root, false).unwrap_err();
+	let message = error.to_string();
+	assert!(message.contains("release record json root must be an object"));
+}
+
+#[test]
 fn migrate_audit_reports_ready_workspace_and_quiet_mode() {
 	let tempdir = setup_fixture("migration-audit/ready-monochange");
 	let output = run_cli(
