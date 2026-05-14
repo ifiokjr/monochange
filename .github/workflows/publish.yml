@@ -31,8 +31,11 @@ jobs:
         run: |
           TAG='${{ inputs.tag }}'
 
-          # Validate the tag exists on the remote before proceeding
-          if ! git ls-remote --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+          repo_url="https://github.com/${GITHUB_REPOSITORY}.git"
+
+          # Validate the tag exists on the remote before proceeding. This step
+          # runs before checkout, so use the repository URL instead of `origin`.
+          if ! git ls-remote --exit-code --tags "$repo_url" "refs/tags/$TAG" >/dev/null 2>&1; then
             echo "::error::Tag '$TAG' does not exist on the remote" >&2
             exit 1
           fi
