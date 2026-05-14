@@ -73,6 +73,7 @@
   - Avoided redundant `BTreeSet` round-trips while deriving interactive configured change-type choices, and streamed group target display labels without joining package ids.
   - Streamed workspace-populate added command lists directly into the CLI result message, avoiding a temporary joined command string.
   - Streamed CLI help bordered-header rendering directly into the output buffer, avoiding a temporary line vector, joined header body, and repeated border strings.
+  - Streamed CLI help option and see-also rendering directly into the output buffer, avoiding temporary label strings, padding strings, linked-command vectors, and joins.
 
 ## Current benchmark summary
 

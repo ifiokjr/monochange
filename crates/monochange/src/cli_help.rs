@@ -1591,6 +1591,15 @@ fn render_single_command_help(bin_name: &str, help: &CommandHelp) -> String {
 	render_owned_command_help(bin_name, &OwnedCommandHelp::from(help))
 }
 
+fn option_label_width(flag: &str, type_name: &str) -> usize {
+	flag.len()
+		+ if type_name.is_empty() {
+			0
+		} else {
+			1 + type_name.len()
+		}
+}
+
 fn render_owned_command_help(bin_name: &str, help: &OwnedCommandHelp) -> String {
 	let mut out = String::new();
 
@@ -1626,23 +1635,26 @@ fn render_owned_command_help(bin_name: &str, help: &OwnedCommandHelp) -> String 
 		let flag_width = help
 			.options
 			.iter()
-			.map(|(f, t, _)| format!("{f} {t}").len())
+			.map(|(flag, type_name, _)| option_label_width(flag, type_name))
 			.max()
 			.unwrap_or(20);
 		for (flag, type_name, desc) in &help.options {
 			let flag_part = paint(flag, flag_style());
-			let type_part = if type_name.is_empty() {
-				String::new()
-			} else {
-				format!(" {}", paint(type_name, value_style()))
-			};
-			let padded_len = format!("{flag} {type_name}").len();
-			let padding = flag_width.saturating_sub(padded_len);
-			out.push_str(&format!(
-				"  {flag_part}{type_part}{}  {}\n",
-				" ".repeat(padding),
-				paint(desc, muted()),
-			));
+			let label_width = option_label_width(flag, type_name);
+			let padding = flag_width.saturating_sub(label_width);
+
+			out.push_str("  ");
+			out.push_str(&flag_part);
+			if !type_name.is_empty() {
+				out.push(' ');
+				out.push_str(&paint(type_name, value_style()));
+			}
+			for _ in 0..padding {
+				out.push(' ');
+			}
+			out.push_str("  ");
+			out.push_str(&paint(desc, muted()));
+			out.push('\n');
 		}
 		out.push('\n');
 	}
@@ -1675,12 +1687,14 @@ fn render_owned_command_help(bin_name: &str, help: &OwnedCommandHelp) -> String 
 	if !help.see_also.is_empty() {
 		out.push_str(&section_heading("See Also"));
 		out.push_str("\n\n");
-		let linked: Vec<String> = help
-			.see_also
-			.iter()
-			.map(|name| paint(&format!("mc help {name}"), accent()))
-			.collect();
-		out.push_str(&format!("  {}\n", linked.join("  ")));
+		out.push_str("  ");
+		for (index, name) in help.see_also.iter().enumerate() {
+			if index > 0 {
+				out.push_str("  ");
+			}
+			out.push_str(&paint(&format!("mc help {name}"), accent()));
+		}
+		out.push('\n');
 	}
 
 	out
