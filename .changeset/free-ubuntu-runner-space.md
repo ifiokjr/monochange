@@ -1,5 +1,5 @@
 ---
-"monochange": patch
+"monochange": security
 ---
 
 # Refresh Ubuntu runner space
