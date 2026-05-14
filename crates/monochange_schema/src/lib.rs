@@ -10,6 +10,8 @@ use thiserror::Error;
 
 include!(concat!(env!("OUT_DIR"), "/schema_version.rs"));
 
+mod migrations;
+
 /// A durable schema version written as `major.minor`.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SchemaVersion {
@@ -244,14 +246,15 @@ pub mod release_record {
 	use crate::SchemaError;
 	use crate::SchemaVersion;
 	use crate::current_schema_version_for_error;
+	use crate::migrations;
 	use crate::object_mut;
 	use crate::parse_current_version;
 	use crate::validate_kind;
 
 	/// Durable artifact kind for commit-embedded release records.
 	pub const KIND: &str = "monochange.releaseRecord";
-	const SCHEMA_VERSION_FIELD: &str = "schemaVersion";
-	const LEGACY_VERSION_FIELD: &str = "v";
+	pub(crate) const SCHEMA_VERSION_FIELD: &str = "schemaVersion";
+	pub(crate) const LEGACY_VERSION_FIELD: &str = "v";
 
 	/// Return the current release-record schema version.
 	pub fn current_version() -> Result<SchemaVersion, SchemaError> {
@@ -346,7 +349,7 @@ pub mod release_record {
 	pub fn render_current_value(mut value: Value) -> Result<Value, SchemaError> {
 		let object = object_mut(&mut value)?;
 		validate_kind(object, KIND)?;
-		remove_top_level_field(&mut value, LEGACY_VERSION_FIELD)?;
+		migrations::remove_top_level_field(&mut value, LEGACY_VERSION_FIELD)?;
 		let object = object_mut(&mut value)?;
 		object.insert(
 			SCHEMA_VERSION_FIELD.to_string(),
@@ -378,103 +381,15 @@ pub mod release_record {
 				current,
 			});
 		}
-		migrate_edges(&mut value, version, current)?;
+		migrations::apply_release_record_edges(&mut value, version, current)?;
 
-		remove_top_level_field(&mut value, LEGACY_VERSION_FIELD)?;
+		migrations::remove_top_level_field(&mut value, LEGACY_VERSION_FIELD)?;
 		let object = object_mut(&mut value)?;
 		object.insert(
 			SCHEMA_VERSION_FIELD.to_string(),
 			Value::String(CURRENT_SCHEMA_VERSION_TEXT.to_string()),
 		);
 		Ok(value)
-	}
-
-	fn migrate_edges(
-		value: &mut Value,
-		from: SchemaVersion,
-		to: SchemaVersion,
-	) -> Result<(), SchemaError> {
-		let mut cursor = from;
-		while cursor != to {
-			let Some(edge) = migration_edge_from(cursor) else {
-				return Err(SchemaError::MissingMigrationPath {
-					artifact: KIND,
-					from: cursor,
-					to,
-				});
-			};
-			if edge.to > to {
-				return Err(SchemaError::MissingMigrationPath {
-					artifact: KIND,
-					from: cursor,
-					to,
-				});
-			}
-			(edge.apply)(value)?;
-			cursor = edge.to;
-		}
-		Ok(())
-	}
-
-	fn migration_edge_from(version: SchemaVersion) -> Option<&'static MigrationEdge> {
-		debug_assert_eq!(MIGRATION_EDGES.len(), migration_edge_versions().len());
-		MIGRATION_EDGES.iter().find(|edge| edge.from == version)
-	}
-
-	struct MigrationEdge {
-		from: SchemaVersion,
-		to: SchemaVersion,
-		apply: fn(&mut Value) -> Result<(), SchemaError>,
-	}
-
-	const MIGRATION_EDGES: &[MigrationEdge] = &[
-		MigrationEdge {
-			from: SchemaVersion::new(0, 0),
-			to: SchemaVersion::new(0, 1),
-			apply: migrate_0_0_to_0_1,
-		},
-		MigrationEdge {
-			from: SchemaVersion::new(0, 1),
-			to: SchemaVersion::new(0, 2),
-			apply: migrate_0_1_to_0_2,
-		},
-	];
-
-	fn migrate_0_0_to_0_1(value: &mut Value) -> Result<(), SchemaError> {
-		rename_top_level_field(value, LEGACY_VERSION_FIELD, SCHEMA_VERSION_FIELD)
-	}
-
-	fn migrate_0_1_to_0_2(value: &mut Value) -> Result<(), SchemaError> {
-		object_mut(value)?;
-		Ok(())
-	}
-
-	pub(crate) fn rename_top_level_field(
-		value: &mut Value,
-		source: &str,
-		destination: &str,
-	) -> Result<(), SchemaError> {
-		let object = object_mut(value)?;
-		if let Some(field_value) = object.remove(source) {
-			object.insert(destination.to_string(), field_value);
-		}
-		Ok(())
-	}
-
-	pub(crate) fn remove_top_level_field(
-		value: &mut Value,
-		field: &str,
-	) -> Result<(), SchemaError> {
-		object_mut(value)?.remove(field);
-		Ok(())
-	}
-
-	pub(crate) fn migration_edge_versions() -> &'static [(SchemaVersion, SchemaVersion)] {
-		const VERSIONS: &[(SchemaVersion, SchemaVersion)] = &[
-			(SchemaVersion::new(0, 0), SchemaVersion::new(0, 1)),
-			(SchemaVersion::new(0, 1), SchemaVersion::new(0, 2)),
-		];
-		VERSIONS
 	}
 }
 

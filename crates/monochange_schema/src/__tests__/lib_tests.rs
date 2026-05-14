@@ -7,6 +7,7 @@ use crate::SchemaVersion;
 use crate::SchemaVersionParseError;
 use crate::config;
 use crate::current_schema_version;
+use crate::migrations;
 use crate::release_record;
 
 #[test]
@@ -187,9 +188,9 @@ fn release_record_rust_migration_helpers_apply_supported_changes() {
 		"other": "stable"
 	});
 
-	release_record::rename_top_level_field(&mut value, "oldName", "newName")
+	migrations::rename_top_level_field(&mut value, "oldName", "newName")
 		.unwrap_or_else(|error| panic!("rename field: {error}"));
-	release_record::remove_top_level_field(&mut value, "removed")
+	migrations::remove_top_level_field(&mut value, "removed")
 		.unwrap_or_else(|error| panic!("remove field: {error}"));
 
 	assert_eq!(value.get("newName"), Some(&json!("kept")));
@@ -201,7 +202,7 @@ fn release_record_rust_migration_helpers_apply_supported_changes() {
 #[test]
 fn release_record_rust_migration_edges_are_explicit_and_ordered() {
 	assert_eq!(
-		release_record::migration_edge_versions(),
+		migrations::release_record_edge_versions(),
 		&[
 			(SchemaVersion::new(0, 0), SchemaVersion::new(0, 1)),
 			(SchemaVersion::new(0, 1), SchemaVersion::new(0, 2)),
@@ -212,12 +213,12 @@ fn release_record_rust_migration_edges_are_explicit_and_ordered() {
 #[test]
 fn release_record_rust_migration_helpers_reject_non_object_values() {
 	let mut value = json!(null);
-	let error = release_record::rename_top_level_field(&mut value, "oldName", "newName")
+	let error = migrations::rename_top_level_field(&mut value, "oldName", "newName")
 		.err()
 		.unwrap_or_else(|| panic!("expected non-object rename error"));
 	assert!(matches!(error, SchemaError::NotObject));
 
-	let error = release_record::remove_top_level_field(&mut value, "removed")
+	let error = migrations::remove_top_level_field(&mut value, "removed")
 		.err()
 		.unwrap_or_else(|| panic!("expected non-object remove error"));
 	assert!(matches!(error, SchemaError::NotObject));

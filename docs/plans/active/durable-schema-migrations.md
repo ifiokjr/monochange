@@ -47,7 +47,7 @@ MigrationEdge {
 
 For no-op compatibility releases, the edge still exists and points at a validating no-op function. That keeps every older durable schema version covered by the same CI path as migrations that rewrite fields.
 
-Implementation note: `crates/monochange_schema/src/lib.rs` exposes explicit release-record migration edges. User-facing migration context belongs in changesets rather than a separate generated schema-migration asset.
+Implementation note: `crates/monochange_schema/src/migrations/` exposes explicit release-record migration edges. User-facing migration context belongs in changesets rather than a separate generated schema-migration asset.
 
 ## Durable schema inventory
 
