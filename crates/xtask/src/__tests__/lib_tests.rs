@@ -287,14 +287,11 @@ fn run_cli_round_trip() {
 	assert!(!artifacts.join("monochange.current.json").exists());
 	assert!(
 		!artifacts
-			.join(format!("release-record.v{version}.json"))
+			.join(version)
+			.join("release-record/01.json")
 			.exists()
 	);
-	assert!(
-		!artifacts
-			.join(format!("monochange.v{version}.json"))
-			.exists()
-	);
+	assert!(!artifacts.join(version).join("monochange/01.json").exists());
 	assert!(docs.join("release-record.schema.json").exists());
 	assert!(docs.join("monochange.schema.json").exists());
 	assert!(
@@ -317,7 +314,9 @@ fn run_cli_round_trip() {
 	assert!(
 		run_with_paths(
 			true,
-			SchemaMode::Release,
+			SchemaMode::Release {
+				include_versioned: true,
+			},
 			&schemas,
 			&docs,
 			&schema_version_path,
@@ -328,7 +327,9 @@ fn run_cli_round_trip() {
 	assert!(
 		run_with_paths(
 			false,
-			SchemaMode::Release,
+			SchemaMode::Release {
+				include_versioned: true,
+			},
 			&schemas,
 			&docs,
 			&schema_version_path,
@@ -336,20 +337,15 @@ fn run_cli_round_trip() {
 		)
 		.is_ok()
 	);
+	let versioned_artifacts = artifacts.join(version);
 	assert!(current_artifacts.join("release-record/01.json").exists());
 	assert!(current_artifacts.join("release-record/10.json").exists());
 	assert!(current_artifacts.join("monochange/01.json").exists());
 	assert!(current_artifacts.join("monochange/10.json").exists());
-	assert!(
-		!artifacts
-			.join(format!("release-record.v{version}.json"))
-			.exists()
-	);
-	assert!(
-		!artifacts
-			.join(format!("monochange.v{version}.json"))
-			.exists()
-	);
+	assert!(versioned_artifacts.join("release-record/01.json").exists());
+	assert!(versioned_artifacts.join("release-record/10.json").exists());
+	assert!(versioned_artifacts.join("monochange/01.json").exists());
+	assert!(versioned_artifacts.join("monochange/10.json").exists());
 	assert!(
 		docs.join(format!("release-record.v{version}.schema.json"))
 			.exists()
@@ -393,7 +389,7 @@ fn current_schema_version_reports_read_errors() {
 #[test]
 fn committed_schema_modes_are_up_to_date() {
 	assert!(run(false).is_ok());
-	assert!(run_release(false).is_ok());
+	assert!(run_release(false, false).is_ok());
 }
 
 #[test]

@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::path::Path;
 use std::path::PathBuf;
@@ -30,9 +31,7 @@ fn committed_schema_assets_are_json_and_hosted_copy_is_current() -> Result<(), B
 fn release_record_artifact_fixtures_load_through_parser() -> Result<(), Box<dyn Error>> {
 	let paths = schema_asset_paths()?;
 	let artifact_paths = release_record_artifact_paths(&paths)?;
-	let names = artifact_file_names(&artifact_paths)?;
-
-	assert_eq!(names, expected_current_artifact_file_names());
+	assert_artifact_file_names_by_schema_dir(&paths, &artifact_paths)?;
 
 	for artifact_path in artifact_paths {
 		let name = file_name(&artifact_path)?;
@@ -41,10 +40,7 @@ fn release_record_artifact_fixtures_load_through_parser() -> Result<(), Box<dyn 
 		let raw_schema_version = json_str(&raw, "/schemaVersion")?;
 		let record = monochange_core::parse_release_record_json(&text)?;
 
-		assert_eq!(
-			raw_schema_version,
-			monochange_schema::CURRENT_SCHEMA_VERSION_TEXT
-		);
+		assert_artifact_schema_version_matches_path(&paths, &artifact_path, raw_schema_version)?;
 		assert_eq!(
 			record.schema_version,
 			monochange_schema::CURRENT_SCHEMA_VERSION_TEXT,
@@ -76,9 +72,7 @@ fn release_record_artifact_fixtures_load_through_parser() -> Result<(), Box<dyn 
 fn config_artifact_fixtures_are_valid_json() -> Result<(), Box<dyn Error>> {
 	let paths = schema_asset_paths()?;
 	let artifact_paths = config_artifact_paths(&paths)?;
-	let names = artifact_file_names(&artifact_paths)?;
-
-	assert_eq!(names, expected_current_artifact_file_names());
+	assert_artifact_file_names_by_schema_dir(&paths, &artifact_paths)?;
 
 	for artifact_path in artifact_paths {
 		let name = file_name(&artifact_path)?;
@@ -216,14 +210,8 @@ fn current_artifact_fixtures_are_colocated() -> Result<(), Box<dyn Error>> {
 	names.sort();
 
 	assert_eq!(names, vec!["monochange", "release-record"]);
-	assert_eq!(
-		artifact_file_names(&config_artifact_paths(&paths)?)?,
-		expected_current_artifact_file_names()
-	);
-	assert_eq!(
-		artifact_file_names(&release_record_artifact_paths(&paths)?)?,
-		expected_current_artifact_file_names()
-	);
+	assert_artifact_file_names_by_schema_dir(&paths, &config_artifact_paths(&paths)?)?;
+	assert_artifact_file_names_by_schema_dir(&paths, &release_record_artifact_paths(&paths)?)?;
 	assert!(!paths.current_artifacts_dir.join("monochange.json").exists());
 	assert!(
 		!paths
@@ -744,16 +732,72 @@ fn collect_artifact_paths_for_kind(
 	Ok(())
 }
 
-fn artifact_file_names(paths: &[PathBuf]) -> Result<Vec<String>, Box<dyn Error>> {
-	let mut names = paths
-		.iter()
-		.map(|path| file_name(path))
-		.collect::<Result<Vec<_>, _>>()?;
-	names.sort();
-	Ok(names)
+fn assert_artifact_file_names_by_schema_dir(
+	paths: &SchemaAssetPaths,
+	artifact_paths: &[PathBuf],
+) -> Result<(), Box<dyn Error>> {
+	let mut names_by_schema_dir = BTreeMap::<String, Vec<String>>::new();
+	for artifact_path in artifact_paths {
+		let schema_dir = artifact_schema_dir(paths, artifact_path)?;
+		names_by_schema_dir
+			.entry(schema_dir)
+			.or_default()
+			.push(file_name(artifact_path)?);
+	}
+
+	if names_by_schema_dir.is_empty() {
+		return Err(test_error("no artifact fixture paths were collected"));
+	}
+
+	let expected = expected_artifact_file_names();
+	for (schema_dir, names) in &mut names_by_schema_dir {
+		names.sort();
+		assert_eq!(
+			names, &expected,
+			"artifact fixtures in {schema_dir} should include the full fixture set"
+		);
+	}
+
+	Ok(())
 }
 
-fn expected_current_artifact_file_names() -> Vec<String> {
+fn assert_artifact_schema_version_matches_path(
+	paths: &SchemaAssetPaths,
+	artifact_path: &Path,
+	raw_schema_version: &str,
+) -> Result<(), Box<dyn Error>> {
+	let schema_dir = artifact_schema_dir(paths, artifact_path)?;
+	let expected_schema_version = if schema_dir == "current" {
+		monochange_schema::CURRENT_SCHEMA_VERSION_TEXT
+	} else {
+		&schema_dir
+	};
+
+	assert_eq!(
+		raw_schema_version,
+		expected_schema_version,
+		"{} should declare the schema version from its artifact directory",
+		artifact_path.display()
+	);
+	Ok(())
+}
+
+fn artifact_schema_dir(
+	paths: &SchemaAssetPaths,
+	artifact_path: &Path,
+) -> Result<String, Box<dyn Error>> {
+	let relative_path = artifact_path.strip_prefix(&paths.artifacts_dir)?;
+	let Some(schema_dir) = relative_path.components().next() else {
+		return Err(test_error(format!(
+			"artifact path {} is not inside a schema-version directory",
+			artifact_path.display()
+		)));
+	};
+
+	Ok(schema_dir.as_os_str().to_string_lossy().into_owned())
+}
+
+fn expected_artifact_file_names() -> Vec<String> {
 	let mut names = (1..=10)
 		.map(|index| format!("{index:02}.json"))
 		.collect::<Vec<_>>();

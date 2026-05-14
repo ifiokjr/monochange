@@ -69,9 +69,17 @@ enum SchemaCommands {
 #[derive(Subcommand)]
 enum SchemaReleaseCommands {
 	/// Write (update) release schema files to disk
-	Update,
+	Update {
+		/// Include immutable versioned schema files and artifact fixtures.
+		#[arg(long)]
+		versioned: bool,
+	},
 	/// Check committed release schema files are up to date
-	Check,
+	Check {
+		/// Include immutable versioned schema files and artifact fixtures.
+		#[arg(long)]
+		versioned: bool,
+	},
 }
 
 #[coverage(off)]
@@ -84,8 +92,12 @@ fn main() {
 				SchemaCommands::Check => xtask::run(false),
 				SchemaCommands::Release(release_args) => {
 					match release_args.command {
-						SchemaReleaseCommands::Update => xtask::run_release(true),
-						SchemaReleaseCommands::Check => xtask::run_release(false),
+						SchemaReleaseCommands::Update { versioned } => {
+							xtask::run_release(true, versioned)
+						}
+						SchemaReleaseCommands::Check { versioned } => {
+							xtask::run_release(false, versioned)
+						}
 					}
 				}
 			}
