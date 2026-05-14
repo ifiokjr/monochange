@@ -4,6 +4,40 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.5.0](https://github.com/monochange/monochange/releases/tag/v0.5.0) (2026-05-14)
+
+### Added
+
+#### Configurable publish-order dependency fields
+
+Add configurable ecosystem-specific dependency fields for package publish ordering across npm, Cargo, Deno, Dart/Flutter, Python, and Go.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #472](https://github.com/monochange/monochange/pull/472) _Introduced in:_ [`0d9cf46`](https://github.com/monochange/monochange/commit/0d9cf461a05057b61efa987d361ebd27d800dbdb) _Last updated in:_ [`61254db`](https://github.com/monochange/monochange/commit/61254dbe1caf0d50030c544f10a5676a280e8d16) _Closed issues:_ [#465](https://github.com/monochange/monochange/issues/465)
+
+#### Publish all configured packages
+
+Add a `--all` flag to the PublishPackages CLI step so migration workflows can publish every configured package, including packages that were not part of the prepared release record.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #461](https://github.com/monochange/monochange/pull/461) _Introduced in:_ [`3d956cd`](https://github.com/monochange/monochange/commit/3d956cd3e34747e088add98fe0358251f388782f) _Last updated in:_ [`61254db`](https://github.com/monochange/monochange/commit/61254dbe1caf0d50030c544f10a5676a280e8d16)
+
+#### Remove automated npm trust configuration during publish
+
+Removed the `npm trust` command execution from the publish loop. Trust configuration for npm packages must now be done manually or via separate tooling — `mc publish` no longer runs `npm trust github` or `npm trust list` automatically.
+
+When trusted publishing is enabled for npm packages, the publish command now uses `npm` directly instead of `pnpm` (already the case via `npm_publish_program`). An environment variable override for forcing pnpm during trusted publishing can be added in a future release.
+
+Removed `PublishTrustHandler::configure_successful_publish_trust` from the trait and its `CliPublishTrustHandler` implementation. Removed `configure_npm_trusted_publishing` from `package_publish`. Removed `build_npm_trust_list_command` from `monochange_npm`. The `trust_outcome_for_skip` and `planned_trust_outcome` methods remain, showing informational messages about how to manually configure trust.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #456](https://github.com/monochange/monochange/pull/456) _Introduced in:_ [`628a1ea`](https://github.com/monochange/monochange/commit/628a1ea18b62b60551c7648e16405a685cacb5f4) _Last updated in:_ [`61254db`](https://github.com/monochange/monochange/commit/61254dbe1caf0d50030c544f10a5676a280e8d16)
+
+### Fixed
+
+#### Move lint testing helpers into shared test helpers
+
+The private `monochange_lint_testing` crate has been removed. Its stable lint report and autofix formatting helpers now live in `monochange_test_helpers::lint_testing`, so publishable crates no longer depend on an unpublished workspace crate during Cargo package verification.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #468](https://github.com/monochange/monochange/pull/468) _Introduced in:_ [`00847e5`](https://github.com/monochange/monochange/commit/00847e502bfb3805a846e0363f1d6ae176f38e47) _Last updated in:_ [`61254db`](https://github.com/monochange/monochange/commit/61254dbe1caf0d50030c544f10a5676a280e8d16)
+
 ## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)
 
 ### Added
