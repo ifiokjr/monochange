@@ -150,6 +150,23 @@ in
       description = "Check that publication is valid for this project";
       binary = "bash";
     };
+    "package:check" = {
+      exec = ''
+        set -euo pipefail
+        echo "=== Verifying crate packages with cargo package ==="
+        cargo package --workspace --all-features 2>&1 || {
+          echo "\\nERROR: cargo package failed."
+          echo "This means at least one crate cannot be published because its packaged source fails to compile."
+          echo "Common causes:"
+          echo "  - build.rs not included in package.include (OUT_DIR not set during publish verification)"
+          echo "  - files referenced via include_str! not included in package.include"
+          echo "  - path dependencies that don't exist in the tarball"
+          exit 1
+        }
+      '';
+      description = "Verify all workspace crates can be packaged and built from their tarballs (catches publish failures before they happen)";
+      binary = "bash";
+    };
     "test:all" = {
       exec = ''
         set -euo pipefail
