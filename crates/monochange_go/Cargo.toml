@@ -7,7 +7,7 @@ edition = { workspace = true }
 include = ["src/**/*.rs", "Cargo.toml", "readme.md"]
 keywords = ["cli", "changelog", "releases", "versioning", "monorepo"]
 license = { workspace = true }
-readme = { workspace = true }
+readme = "readme.md"
 repository = { workspace = true }
 rust-version = { workspace = true }
 description = "Go ecosystem adapter for monochange — discovers Go modules and resolves versions from git tags"
