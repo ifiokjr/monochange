@@ -236,6 +236,24 @@ jobs:
     steps:
       - name: trigger publish workflow
         run: |
+          set -euo pipefail
+
+          repo_url="https://github.com/${GITHUB_REPOSITORY}.git"
+          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            if git ls-remote --exit-code --tags "$repo_url" "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+              echo "Release tag ${RELEASE_TAG} is visible on the remote."
+              break
+            fi
+
+            if [ "$attempt" -eq 12 ]; then
+              echo "::error::Tag ${RELEASE_TAG} was not visible on the remote after waiting." >&2
+              exit 1
+            fi
+
+            echo "Tag ${RELEASE_TAG} is not visible on the remote yet; retrying in 5 seconds..."
+            sleep 5
+          done
+
           gh workflow run publish.yml \
             --repo "${{ github.repository }}" \
             --ref "${{ env.RELEASE_TAG }}" \
