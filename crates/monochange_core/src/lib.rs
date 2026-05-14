@@ -3793,9 +3793,11 @@ pub fn render_release_record_block(record: &ReleaseRecord) -> ReleaseRecordResul
 	))
 }
 
-/// Parse a `ReleaseRecord` from a full commit message body.
-#[must_use = "the parsed record result must be checked"]
-pub fn parse_release_record_json(json_text: &str) -> ReleaseRecordResult<ReleaseRecord> {
+/// Migrate release-record JSON text into the current durable wire shape.
+#[must_use = "the migrated release-record value must be checked"]
+pub fn migrate_release_record_json_value(
+	json_text: &str,
+) -> ReleaseRecordResult<serde_json::Value> {
 	let mut raw = serde_json::from_str::<serde_json::Value>(json_text)
 		.map_err(ReleaseRecordError::InvalidJson)?;
 	normalize_legacy_schema_version(&mut raw);
@@ -3806,8 +3808,14 @@ pub fn parse_release_record_json(json_text: &str) -> ReleaseRecordResult<Release
 	if kind != RELEASE_RECORD_KIND {
 		return Err(ReleaseRecordError::UnsupportedKind(kind.to_string()));
 	}
-	let current = monochange_schema::release_record::migrate_value(raw)
-		.map_err(release_record_schema_error_to_error)?;
+	monochange_schema::release_record::migrate_value(raw)
+		.map_err(release_record_schema_error_to_error)
+}
+
+/// Parse a `ReleaseRecord` from JSON text.
+#[must_use = "the parsed record result must be checked"]
+pub fn parse_release_record_json(json_text: &str) -> ReleaseRecordResult<ReleaseRecord> {
+	let current = migrate_release_record_json_value(json_text)?;
 	serde_json::from_value(current).map_err(ReleaseRecordError::InvalidJson)
 }
 

@@ -205,7 +205,7 @@ in
         set -euo pipefail
         mkdir -p target/coverage
         cargo llvm-cov clean --workspace
-        cargo llvm-cov test --workspace --exclude xtask --all-features --all-targets --no-report
+        cargo llvm-cov test --workspace --exclude xtask --all-features --lib --tests --no-report
         cargo llvm-cov report --ignore-filename-regex 'crates/xtask/' --summary-only --fail-under-lines 70
         cargo llvm-cov report --ignore-filename-regex 'crates/xtask/' --lcov --output-path target/coverage/lcov.info
       '';
@@ -462,11 +462,27 @@ in
       description = "Bundle JS/TS entry points with tsdown.";
       binary = "bash";
     };
+    "skill:commands:check" = {
+      exec = ''
+        set -euo pipefail
+        cargo xtask skill commands check
+      '';
+      description = "Check that the generated monochange skill command inventory is up to date.";
+      binary = "bash";
+    };
+    "skill:commands:update" = {
+      exec = ''
+        set -euo pipefail
+        cargo xtask skill commands update
+      '';
+      description = "Regenerate the monochange skill command inventory.";
+      binary = "bash";
+    };
     "docs:check" = {
       exec = ''
         set -euo pipefail
         mdt check
-        cargo xtask skill commands check
+        skill:commands:check
         pnpm node scripts/check-agent-surface.mjs
       '';
       description = "Check that shared documentation blocks are synchronized and agent-facing docs stay aligned with the repo surface.";
@@ -476,8 +492,9 @@ in
       exec = ''
         set -euo pipefail
         mdt update
+        skill:commands:update
       '';
-      description = "Update shared documentation blocks across markdown and source files.";
+      description = "Update shared documentation blocks and generated skill command inventory.";
       binary = "bash";
     };
     "snapshot:review" = {

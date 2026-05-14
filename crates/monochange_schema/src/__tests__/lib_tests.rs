@@ -7,7 +7,7 @@ use crate::SchemaVersion;
 use crate::SchemaVersionParseError;
 use crate::config;
 use crate::current_schema_version;
-use crate::migration_changelog;
+use crate::migrations;
 use crate::release_record;
 
 #[test]
@@ -161,9 +161,9 @@ fn release_record_migrates_older_schema_versions() {
 }
 
 #[test]
-fn release_record_rejects_older_schema_without_explicit_migration_edge() {
-	let error = release_record::migrate_value(json!({
-		"schemaVersion": "0.0",
+fn release_record_migrates_legacy_v_only_schema_version() {
+	let migrated = release_record::migrate_value(json!({
+		"v": "0.0",
 		"kind": release_record::KIND,
 		"createdAt": "2026-04-06T12:00:00Z",
 		"command": "release-pr",
@@ -171,14 +171,105 @@ fn release_record_rejects_older_schema_without_explicit_migration_edge() {
 		"releasedPackages": [],
 		"changedFiles": []
 	}))
+	.unwrap_or_else(|error| panic!("migrate legacy release record: {error}"));
+
+	assert_eq!(
+		migrated.get("schemaVersion"),
+		Some(&json!(CURRENT_SCHEMA_VERSION_TEXT))
+	);
+	assert!(migrated.get("v").is_none());
+}
+
+#[test]
+fn release_record_rust_migration_helpers_apply_supported_changes() {
+	let mut value = json!({
+		"oldName": "kept",
+		"removed": true,
+		"other": "stable"
+	});
+
+	migrations::rename_top_level_field(&mut value, "oldName", "newName")
+		.unwrap_or_else(|error| panic!("rename field: {error}"));
+	migrations::remove_top_level_field(&mut value, "removed")
+		.unwrap_or_else(|error| panic!("remove field: {error}"));
+
+	assert_eq!(value.get("newName"), Some(&json!("kept")));
+	assert!(value.get("oldName").is_none());
+	assert!(value.get("removed").is_none());
+	assert_eq!(value.get("other"), Some(&json!("stable")));
+}
+
+#[test]
+fn release_record_rust_migration_edges_are_explicit_and_ordered() {
+	assert_eq!(
+		migrations::release_record_edge_versions(),
+		&[
+			(SchemaVersion::new(0, 0), SchemaVersion::new(0, 1)),
+			(SchemaVersion::new(0, 1), SchemaVersion::new(0, 2)),
+		]
+	);
+}
+
+#[test]
+fn release_record_rust_migration_edges_reject_missing_paths() {
+	let mut value = json!({
+		"kind": release_record::KIND,
+		"schemaVersion": "0.2"
+	});
+	let error = migrations::apply_release_record_edges(
+		&mut value,
+		SchemaVersion::new(0, 2),
+		SchemaVersion::new(0, 3),
+	)
 	.err()
 	.unwrap_or_else(|| panic!("expected missing migration path error"));
 
 	assert!(matches!(
 		error,
-		SchemaError::MissingMigrationPath { from, to, .. }
-			if from == SchemaVersion::new(0, 0) && to == release_record::current_version().unwrap()
+		SchemaError::MissingMigrationPath {
+			artifact: release_record::KIND,
+			from: SchemaVersion { major: 0, minor: 2 },
+			to: SchemaVersion { major: 0, minor: 3 },
+		}
 	));
+}
+
+#[test]
+fn release_record_rust_migration_edges_reject_overshooting_paths() {
+	let mut value = json!({
+		"kind": release_record::KIND,
+		"schemaVersion": "0.1"
+	});
+	let error = migrations::apply_release_record_edges(
+		&mut value,
+		SchemaVersion::new(0, 1),
+		SchemaVersion::new(0, 0),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected overshooting migration path error"));
+
+	assert!(matches!(
+		error,
+		SchemaError::MissingMigrationPath {
+			artifact: release_record::KIND,
+			from: SchemaVersion { major: 0, minor: 1 },
+			to: SchemaVersion { major: 0, minor: 0 },
+		}
+	));
+}
+
+#[test]
+fn release_record_rust_migration_helpers_reject_non_object_values() {
+	let mut value = json!(null);
+	let error = migrations::rename_top_level_field(&mut value, "oldName", "newName")
+		.err()
+		.unwrap_or_else(|| panic!("expected non-object rename error"));
+	assert!(matches!(error, SchemaError::NotObject));
+
+	let error = migrations::remove_top_level_field(&mut value, "removed")
+		.err()
+		.unwrap_or_else(|| panic!("expected non-object remove error"));
+	assert!(matches!(error, SchemaError::NotObject));
 }
 
 #[test]
@@ -314,25 +405,6 @@ fn release_record_rejects_future_version() {
 }
 
 #[test]
-fn migration_changelog_is_machine_readable_json() {
-	let json = migration_changelog::to_json_pretty()
-		.unwrap_or_else(|error| panic!("migration changelog json: {error}"));
-	let value = serde_json::from_str::<Value>(&json)
-		.unwrap_or_else(|error| panic!("migration changelog json should parse: {error}"));
-	let entries = migration_changelog::entries_for_artifact(release_record::KIND);
-	assert_eq!(entries.len(), 1);
-	assert_eq!(entries[0].to, SchemaVersion::new(0, 2));
-	assert_eq!(
-		value.pointer("/0/artifact"),
-		Some(&json!(release_record::KIND))
-	);
-	assert_eq!(value.pointer("/0/from/schemaVersion"), Some(&json!("0.1")));
-	assert_eq!(value.pointer("/0/to"), Some(&json!("0.2")));
-	assert_eq!(value.pointer("/0/operation"), Some(&json!("noop")));
-	assert_eq!(value.pointer("/0/noop"), Some(&json!(true)));
-}
-
-#[test]
 fn committed_release_record_schema_tracks_current_wire_constants() {
 	let release_record_schema = include_str!("../../schemas/release-record.schema.json");
 	let schema = serde_json::from_str::<Value>(release_record_schema)
@@ -361,29 +433,6 @@ fn committed_release_record_schema_tracks_current_wire_constants() {
 #[test]
 fn committed_json_schema_files_parse() {
 	let release_record_schema = include_str!("../../schemas/release-record.schema.json");
-	let changelog = include_str!("../../schemas/migration-changelog.json");
-
 	serde_json::from_str::<Value>(release_record_schema)
 		.unwrap_or_else(|error| panic!("release record schema json: {error}"));
-	serde_json::from_str::<Value>(changelog)
-		.unwrap_or_else(|error| panic!("migration changelog json: {error}"));
-}
-
-#[test]
-fn committed_migration_changelog_is_current() {
-	let generated = migration_changelog::to_json_pretty()
-		.unwrap_or_else(|error| panic!("migration changelog json: {error}"));
-	let committed_path =
-		std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("schemas/migration-changelog.json");
-	let committed_result = std::fs::read_to_string(&committed_path);
-	assert!(
-		committed_result.is_ok(),
-		"read committed migration changelog"
-	);
-	let committed = committed_result.unwrap_or_default();
-	let committed_value = serde_json::from_str::<Value>(&committed)
-		.unwrap_or_else(|error| panic!("committed migration changelog json: {error}"));
-	let generated_value = serde_json::from_str::<Value>(&generated)
-		.unwrap_or_else(|error| panic!("generated migration changelog json: {error}"));
-	assert_eq!(committed_value, generated_value);
 }

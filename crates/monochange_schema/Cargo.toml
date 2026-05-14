@@ -10,7 +10,7 @@ license = { workspace = true }
 readme = "readme.md"
 repository = { workspace = true }
 rust-version = { workspace = true }
-description = "Durable JSON schemas and migration metadata for monochange artifacts"
+description = "Durable JSON schemas and migration helpers for monochange artifacts"
 
 [dependencies]
 serde = { workspace = true, default-features = true }

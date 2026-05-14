@@ -2,7 +2,7 @@
 
 ## Status
 
-Implementation in `refactor/durable-release-migrations`: `monochange_schema` now owns version parsing, release-record current-version validation, and an initially empty machine-readable migration changelog registry.
+Implementation in `refactor/durable-release-migrations`: `monochange_schema` now owns version parsing, release-record current-version validation, and a Rust-based release-record migration pipeline.
 
 ## Problem statement
 
@@ -33,38 +33,21 @@ That JSON is useful for automation, but it is different from persisted artifacts
 
 If a command both renders JSON to stdout and writes the same object to an artifact file, the artifact shape is covered. The stdout rendering can reuse the schema type, but migration compatibility is guaranteed for the persisted artifact path.
 
-## Machine-readable migration changelog
+## Rust migration pipeline
 
-By “machine-readable migration changelog”, I mean a structured registry that documents migration edges in data as well as code. For example:
+Migration edges live in Rust so the code that documents a schema transition is also the code that applies it. A release-record migration declares its source and destination schema versions plus the function that mutates the JSON payload.
 
-```json
-{
-	"artifact": "monochange.releaseRecord",
-	"from": "0.1",
-	"to": "0.2",
-	"operation": "rename_field",
-	"path": "/targets/*/changelogPath",
-	"replacement": "/targets/*/changelog/path",
-	"noop": false
+```rust
+MigrationEdge {
+	from: SchemaVersion::new(0, 0),
+	to: SchemaVersion::new(0, 1),
+	apply: migrate_0_0_to_0_1,
 }
 ```
 
-For no-op compatibility releases:
+For no-op compatibility releases, the edge still exists and points at a validating no-op function. That keeps every older durable schema version covered by the same CI path as migrations that rewrite fields.
 
-```json
-{
-	"artifact": "monochange.publishReadiness",
-	"from": "0.2",
-	"to": "0.3",
-	"operation": "noop",
-	"reason": "schema crate minor release did not change this artifact",
-	"noop": true
-}
-```
-
-This is not required for runtime correctness; migration functions and fixture tests can be enough. The benefit is that docs, generated migration reports, and tests can all verify that every older `v` has an intentional path to the current version, including no-op paths.
-
-Initial implementation note: `crates/monochange_schema/src/lib.rs` exposes `migration_changelog::ENTRIES` and `migration_changelog::to_json_pretty()`. Because `0.1` is the first public schema, `ENTRIES` is currently empty and the committed output at `crates/monochange_schema/schemas/migration-changelog.json` is `[]`, with a stale-file test in the schema crate.
+Implementation note: `crates/monochange_schema/src/migrations/` exposes explicit release-record migration edges. User-facing migration context belongs in changesets rather than a separate generated schema-migration asset.
 
 ## Durable schema inventory
 
@@ -186,7 +169,7 @@ Rules:
 - `v` must match `^\d+\.\d+$`
 - `0.0.0` development crate version still writes the first public durable schema version `"0.1"`
 - crate patch releases do not change `v`
-- future durable breaking changes update `CURRENT_SCHEMA_VERSION_TEXT` explicitly and add migration changelog entries
+- future durable breaking changes update `CURRENT_SCHEMA_VERSION_TEXT` explicitly and add Rust migration edges
 - exact current `major.minor`: deserialize current DTO
 - older `major.minor` after `0.1`: run every migration edge to current, including no-op edges
 - newer `major.minor`: hard-fail with “unsupported schema version; upgrade monochange” guidance
@@ -349,4 +332,4 @@ lint:all
 
 - Should package publish resume/result artifacts be explicitly included now? This plan recommends yes because they are persisted and read back by monochange.
 - Should release manifest cache files be excluded from forever compatibility until monochange consumes them as input? This plan recommends excluding them for now.
-- Should migration changelog data be required in v1 of the crate, or should fixture-backed migration functions land first and add structured changelog generation later?
+- Should fixture-backed migration functions be required before each durable schema version bump?

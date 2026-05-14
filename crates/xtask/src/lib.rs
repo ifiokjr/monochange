@@ -243,10 +243,6 @@ fn schema_files(
 
 	let release_json = serde_json::to_string_pretty(&release_value).unwrap();
 	let config_json = serde_json::to_string_pretty(&config_value).unwrap();
-	let migration_changelog_json = format!(
-		"{}\n",
-		monochange_schema::migration_changelog::to_json_pretty().unwrap()
-	);
 
 	let artifacts_dir = schemas_dir.join("artifacts");
 	let current_artifacts_dir = artifacts_dir.join("current");
@@ -258,10 +254,6 @@ fn schema_files(
 		GeneratedFile {
 			path: schemas_dir.join("monochange.schema.json"),
 			contents: config_json.clone(),
-		},
-		GeneratedFile {
-			path: schemas_dir.join("migration-changelog.json"),
-			contents: migration_changelog_json,
 		},
 		GeneratedFile {
 			path: docs_schemas_dir.join("release-record.schema.json"),

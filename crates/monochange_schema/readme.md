@@ -17,9 +17,9 @@ Reach for this crate when you need to render, validate, or migrate public artifa
 ## Why use it?
 
 - keep durable wire schemas separate from internal Rust structs
-- parse schema versions in the public `major.minor` format written as `v`
+- parse schema versions in the public `major.minor` format written as `schemaVersion`
 - validate commit-embedded release records before the CLI deserializes them into domain types
-- publish machine-readable migration changelog metadata next to the schema assets
+- migrate older durable release-record shapes through explicit Rust migration edges
 
 ## Version policy
 
@@ -27,8 +27,8 @@ The crate package version and durable artifact schema version are intentionally 
 
 - The crate starts at `0.0.0` on development branches so release planning can explicitly publish the first crate release.
 - Durable release records already use public schema version `0.1` because `0.1` is the first supported wire contract.
-- Patch releases of this crate do not change a durable `v` value.
-- Future breaking durable schema changes add a new `major.minor` value plus migration changelog entries.
+- Patch releases of this crate do not change a durable `schemaVersion` value.
+- Future breaking durable schema changes add a new `major.minor` value plus Rust migration edges.
 
 ## Public schema assets
 
@@ -65,14 +65,13 @@ let durable = release_record::render_current_value(json!({
     "changedFiles": []
 }))?;
 
-assert_eq!(durable["v"], CURRENT_SCHEMA_VERSION_TEXT);
-assert!(durable.get("schemaVersion").is_none());
+assert_eq!(durable["schemaVersion"], CURRENT_SCHEMA_VERSION_TEXT);
+assert!(durable.get("v").is_none());
 # Ok::<(), monochange_schema::SchemaError>(())
 ```
 
 ## Scope
 
 - `SchemaVersion` parsing and rendering
-- `release_record` durable wire validation and rendering helpers
-- `migration_changelog` structured migration metadata
-- committed JSON Schema and migration changelog assets under `schemas/`
+- `release_record` durable wire validation, rendering, and migration helpers
+- committed JSON Schema assets under `schemas/`

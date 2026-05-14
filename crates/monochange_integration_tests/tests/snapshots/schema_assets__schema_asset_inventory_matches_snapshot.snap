@@ -1,6 +1,6 @@
 ---
 source: crates/monochange_integration_tests/tests/schema_assets.rs
-assertion_line: 287
+assertion_line: 440
 expression: inventory
 ---
 {
@@ -14,20 +14,6 @@ expression: inventory
     "schemaId": "https://monochange.github.io/monochange/schemas/monochange.schema.json"
   },
   "currentSchemaVersion": "[schema version]",
-  "migrationChangelog": [
-    {
-      "artifact": "monochange.releaseRecord",
-      "changes": [],
-      "from": {
-        "schemaVersion": "0.1",
-        "type": "version"
-      },
-      "noop": true,
-      "operation": "noop",
-      "reason": "Release-record schema 0.2 preserves the 0.1 wire shape; the explicit edge keeps older artifact readability covered by CI.",
-      "to": "0.2"
-    }
-  ],
   "releaseRecord": {
     "additionalProperties": false,
     "kind": "monochange.releaseRecord",
