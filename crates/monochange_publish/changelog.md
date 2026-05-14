@@ -4,68 +4,6 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
-## [0.5.0](https://github.com/monochange/monochange/releases/tag/v0.5.0) (2026-05-14)
-
-### Added
-
-#### Configurable publish-order dependency fields
-
-Add configurable ecosystem-specific dependency fields for package publish ordering across npm, Cargo, Deno, Dart/Flutter, Python, and Go.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #472](https://github.com/monochange/monochange/pull/472) _Introduced in:_ [`0d9cf46`](https://github.com/monochange/monochange/commit/0d9cf461a05057b61efa987d361ebd27d800dbdb) _Last updated in:_ [`61254db`](https://github.com/monochange/monochange/commit/61254dbe1caf0d50030c544f10a5676a280e8d16) _Closed issues:_ [#465](https://github.com/monochange/monochange/issues/465)
-
-#### Publish all configured packages
-
-Add a `--all` flag to the PublishPackages CLI step so migration workflows can publish every configured package, including packages that were not part of the prepared release record.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #461](https://github.com/monochange/monochange/pull/461) _Introduced in:_ [`3d956cd`](https://github.com/monochange/monochange/commit/3d956cd3e34747e088add98fe0358251f388782f) _Last updated in:_ [`61254db`](https://github.com/monochange/monochange/commit/61254dbe1caf0d50030c544f10a5676a280e8d16)
-
-#### Add progress logging to `mc publish`
-
-When running `mc publish`, each package being processed is now logged via `tracing::info!` so users can observe progress in real time. Use `--log-level info` or set `RUST_LOG=info` to see these messages. When `--quiet` is set, no tracing subscriber is initialized so the log messages are silently discarded (zero overhead).
-
-Log events emitted during the publish loop:
-
-- **`publishing package`** — at the start of processing each package, with `package_name`, `version`, `registry`, `dry_run`, and `mode` fields
-- **`skipping external package`** — when a package opts out of built-in publishing
-- **`skipping already-published version`** — when the version already exists on the registry
-- **`would publish package (dry run)`** — when `--dry-run` would publish the package
-- **`published package`** — on successful publish
-- **`publish command failed to execute`** (`tracing::error`) — when the publish command cannot run
-- **`publish command returned non-zero exit`** (`tracing::error`) — when the publish command fails
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #453](https://github.com/monochange/monochange/pull/453) _Introduced in:_ [`586ffb6`](https://github.com/monochange/monochange/commit/586ffb6b61c7f61b0a6bbcafc8dc2dbfa66d7203) _Last updated in:_ [`61254db`](https://github.com/monochange/monochange/commit/61254dbe1caf0d50030c544f10a5676a280e8d16)
-
-#### Remove automated npm trust configuration during publish
-
-Removed the `npm trust` command execution from the publish loop. Trust configuration for npm packages must now be done manually or via separate tooling — `mc publish` no longer runs `npm trust github` or `npm trust list` automatically.
-
-When trusted publishing is enabled for npm packages, the publish command now uses `npm` directly instead of `pnpm` (already the case via `npm_publish_program`). An environment variable override for forcing pnpm during trusted publishing can be added in a future release.
-
-Removed `PublishTrustHandler::configure_successful_publish_trust` from the trait and its `CliPublishTrustHandler` implementation. Removed `configure_npm_trusted_publishing` from `package_publish`. Removed `build_npm_trust_list_command` from `monochange_npm`. The `trust_outcome_for_skip` and `planned_trust_outcome` methods remain, showing informational messages about how to manually configure trust.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #456](https://github.com/monochange/monochange/pull/456) _Introduced in:_ [`628a1ea`](https://github.com/monochange/monochange/commit/628a1ea18b62b60551c7648e16405a685cacb5f4) _Last updated in:_ [`61254db`](https://github.com/monochange/monochange/commit/61254dbe1caf0d50030c544f10a5676a280e8d16)
-
-### Fixed
-
-#### Include Cargo development dependencies in publish ordering
-
-Cargo package publishing now orders runtime, build, and development dependencies before dependents. This prevents a crate from being published before an unpublished workspace crate referenced through `dev-dependencies` or `build-dependencies`.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #466](https://github.com/monochange/monochange/pull/466) _Introduced in:_ [`add0671`](https://github.com/monochange/monochange/commit/add0671b798d2dd4ab6e142801b1b5cac6842a1a) _Last updated in:_ [`61254db`](https://github.com/monochange/monochange/commit/61254dbe1caf0d50030c544f10a5676a280e8d16)
-
-#### Validate Cargo private dependency publishing hazards
-
-Cargo linting now reports publishable packages that depend on private workspace packages through `dependencies`, `dev-dependencies`, or `build-dependencies`. Package publish dry runs now execute the registry dry-run command and preserve its stdout and stderr in the publish report instead of only planning the command.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #470](https://github.com/monochange/monochange/pull/470) _Introduced in:_ [`66ffdf7`](https://github.com/monochange/monochange/commit/66ffdf734129fb267fe61dd821e55c292dab5c0e) _Last updated in:_ [`61254db`](https://github.com/monochange/monochange/commit/61254dbe1caf0d50030c544f10a5676a280e8d16)
-
-#### Publish progress output
-
-Add emoji-based publish progress reporting on stderr with deterministic CI-friendly output and terminal-aware loading markers.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #469](https://github.com/monochange/monochange/pull/469) _Introduced in:_ [`603c731`](https://github.com/monochange/monochange/commit/603c731a60d66f49b876a14467909efd4585408a) _Last updated in:_ [`61254db`](https://github.com/monochange/monochange/commit/61254dbe1caf0d50030c544f10a5676a280e8d16)
-
 ## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)
 
 ### Added
