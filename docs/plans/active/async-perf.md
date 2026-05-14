@@ -66,6 +66,7 @@
   - Streamed publish-readiness package identity lists directly into one string instead of joining cloned identity strings.
   - Streamed lint progress summary counts directly into one line, avoiding a temporary parts vector and comma-join path.
   - Streamed workspace operation TOML array and inline-table rendering directly into output strings instead of collecting temporary fragments before joining.
+  - Streamed subagent overwrite-conflict errors directly into one message instead of collecting path strings before joining.
 
 ## Current benchmark summary
 

@@ -144,18 +144,24 @@ fn classify_generated_file(
 }
 
 fn write_subagent_plan(root: &Path, plan: &SubagentPlan, force: bool) -> MonochangeResult<()> {
-	let conflicts = plan
-		.files
-		.iter()
-		.filter(|file| !force && file.operation == GeneratedFileOperation::Overwrite)
-		.map(|file| file.path.display().to_string())
-		.collect::<Vec<_>>();
-
-	if !conflicts.is_empty() {
-		return Err(MonochangeError::Config(format!(
-			"refusing to overwrite existing subagent files without --force: {}",
-			conflicts.join(", ")
-		)));
+	if !force {
+		let mut conflict_message = String::new();
+		for file in plan
+			.files
+			.iter()
+			.filter(|file| file.operation == GeneratedFileOperation::Overwrite)
+		{
+			if conflict_message.is_empty() {
+				conflict_message
+					.push_str("refusing to overwrite existing subagent files without --force: ");
+			} else {
+				conflict_message.push_str(", ");
+			}
+			let _ = write!(conflict_message, "{}", file.path.display());
+		}
+		if !conflict_message.is_empty() {
+			return Err(MonochangeError::Config(conflict_message));
+		}
 	}
 
 	for file in &plan.files {

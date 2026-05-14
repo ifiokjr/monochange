@@ -95,22 +95,29 @@ fn write_subagent_plan_reports_conflicts_and_io_failures() {
 	let contents = fixture_readme_contents();
 	let plan = SubagentPlan {
 		targets: vec![SubagentTarget::Claude],
-		files: vec![GeneratedFile {
-			path: PathBuf::from("README.md"),
-			description: "README".to_string(),
-			operation: GeneratedFileOperation::Overwrite,
-			contents: contents.clone(),
-		}],
+		files: vec![
+			GeneratedFile {
+				path: PathBuf::from("README.md"),
+				description: "README".to_string(),
+				operation: GeneratedFileOperation::Overwrite,
+				contents: contents.clone(),
+			},
+			GeneratedFile {
+				path: PathBuf::from(".mcp.json"),
+				description: "MCP".to_string(),
+				operation: GeneratedFileOperation::Overwrite,
+				contents: contents.clone(),
+			},
+		],
 		notes: Vec::new(),
 		dry_run: false,
 	};
 	let error = write_subagent_plan(workspace.path(), &plan, false)
 		.err()
 		.unwrap_or_else(|| panic!("expected overwrite conflict"));
-	assert!(
-		error
-			.to_string()
-			.contains("refusing to overwrite existing subagent files without --force")
+	assert_eq!(
+		error.to_string(),
+		"config error: refusing to overwrite existing subagent files without --force: README.md, .mcp.json"
 	);
 
 	let parent_file_path = workspace.path().join("parent-file");
