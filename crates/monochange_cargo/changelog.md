@@ -4,36 +4,6 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
-## [0.5.0](https://github.com/monochange/monochange/releases/tag/v0.5.0) (2026-05-14)
-
-### Added
-
-#### Configurable publish-order dependency fields
-
-Add configurable ecosystem-specific dependency fields for package publish ordering across npm, Cargo, Deno, Dart/Flutter, Python, and Go.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #472](https://github.com/monochange/monochange/pull/472) _Introduced in:_ [`0d9cf46`](https://github.com/monochange/monochange/commit/0d9cf461a05057b61efa987d361ebd27d800dbdb) _Last updated in:_ [`61254db`](https://github.com/monochange/monochange/commit/61254dbe1caf0d50030c544f10a5676a280e8d16) _Closed issues:_ [#465](https://github.com/monochange/monochange/issues/465)
-
-#### Publish all configured packages
-
-Add a `--all` flag to the PublishPackages CLI step so migration workflows can publish every configured package, including packages that were not part of the prepared release record.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #461](https://github.com/monochange/monochange/pull/461) _Introduced in:_ [`3d956cd`](https://github.com/monochange/monochange/commit/3d956cd3e34747e088add98fe0358251f388782f) _Last updated in:_ [`61254db`](https://github.com/monochange/monochange/commit/61254dbe1caf0d50030c544f10a5676a280e8d16)
-
-### Fixed
-
-#### Validate Cargo private dependency publishing hazards
-
-Cargo linting now reports publishable packages that depend on private workspace packages through `dependencies`, `dev-dependencies`, or `build-dependencies`. Package publish dry runs now execute the registry dry-run command and preserve its stdout and stderr in the publish report instead of only planning the command.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #470](https://github.com/monochange/monochange/pull/470) _Introduced in:_ [`66ffdf7`](https://github.com/monochange/monochange/commit/66ffdf734129fb267fe61dd821e55c292dab5c0e) _Last updated in:_ [`61254db`](https://github.com/monochange/monochange/commit/61254dbe1caf0d50030c544f10a5676a280e8d16)
-
-#### Move lint testing helpers into shared test helpers
-
-The private `monochange_lint_testing` crate has been removed. Its stable lint report and autofix formatting helpers now live in `monochange_test_helpers::lint_testing`, so publishable crates no longer depend on an unpublished workspace crate during Cargo package verification.
-
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #468](https://github.com/monochange/monochange/pull/468) _Introduced in:_ [`00847e5`](https://github.com/monochange/monochange/commit/00847e502bfb3805a846e0363f1d6ae176f38e47) _Last updated in:_ [`61254db`](https://github.com/monochange/monochange/commit/61254dbe1caf0d50030c544f10a5676a280e8d16)
-
 ## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)
 
 ### Added
