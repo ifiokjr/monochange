@@ -127,14 +127,9 @@ pub(crate) fn migrate_release_records(
 				path.display()
 			))
 		})?;
-		let migrated = serde_json::to_string_pretty(&migrated_value)
-			.map(|json| format!("{json}\n"))
-			.map_err(|error| {
-				MonochangeError::Config(format!(
-					"serialize migrated release record at {}: {error}",
-					path.display()
-				))
-			})?;
+		let mut migrated = serde_json::to_string_pretty(&migrated_value)
+			.expect("serde_json::Value serializes to JSON text");
+		migrated.push('\n');
 		let is_current =
 			!schema_version.legacy && from_schema_version == RELEASE_RECORD_SCHEMA_VERSION;
 		let status = if is_current {
@@ -189,10 +184,8 @@ fn release_record_paths(root: &Path) -> MonochangeResult<Vec<PathBuf>> {
 	let mut paths = Vec::new();
 	for entry in fs::read_dir(&releases_dir)
 		.map_err(|error| MonochangeError::Io(format!("read release records dir: {error}")))?
+		.flatten()
 	{
-		let entry = entry.map_err(|error| {
-			MonochangeError::Io(format!("read release records dir entry: {error}"))
-		})?;
 		let path = entry.path().join("release.json");
 		if path.is_file() {
 			paths.push(path);

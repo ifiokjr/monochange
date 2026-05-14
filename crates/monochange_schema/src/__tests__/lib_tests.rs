@@ -235,6 +235,30 @@ fn release_record_rust_migration_edges_reject_missing_paths() {
 }
 
 #[test]
+fn release_record_rust_migration_edges_reject_overshooting_paths() {
+	let mut value = json!({
+		"kind": release_record::KIND,
+		"schemaVersion": "0.1"
+	});
+	let error = migrations::apply_release_record_edges(
+		&mut value,
+		SchemaVersion::new(0, 1),
+		SchemaVersion::new(0, 0),
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected overshooting migration path error"));
+
+	assert!(matches!(
+		error,
+		SchemaError::MissingMigrationPath {
+			artifact: release_record::KIND,
+			from: SchemaVersion { major: 0, minor: 1 },
+			to: SchemaVersion { major: 0, minor: 0 },
+		}
+	));
+}
+
+#[test]
 fn release_record_rust_migration_helpers_reject_non_object_values() {
 	let mut value = json!(null);
 	let error = migrations::rename_top_level_field(&mut value, "oldName", "newName")

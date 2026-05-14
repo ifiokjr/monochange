@@ -405,6 +405,178 @@ fn migrate_release_records_reports_invalid_record_json() {
 }
 
 #[test]
+fn migrate_release_records_reports_schema_version_errors() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("create tempdir: {error}"));
+	let root = tempdir.path();
+	let record_path = root.join(".monochange/releases/bad/release.json");
+	fs::create_dir_all(record_path.parent().expect("record has parent"))
+		.unwrap_or_else(|error| panic!("create release record dir: {error}"));
+
+	fs::write(&record_path, "{")
+		.unwrap_or_else(|error| panic!("write malformed release record: {error}"));
+	let error = crate::migration_audit::migrate_release_records(root, false).unwrap_err();
+	assert!(
+		error
+			.to_string()
+			.contains("parse release record json before migration")
+	);
+
+	fs::write(
+		&record_path,
+		r#"{
+  "kind": "monochange.releaseRecord",
+  "createdAt": "2026-04-06T12:00:00Z",
+  "command": "release-pr",
+  "releaseTargets": [],
+  "changedFiles": []
+}"#,
+	)
+	.unwrap_or_else(|error| panic!("write missing-version release record: {error}"));
+	let error = crate::migration_audit::migrate_release_records(root, false).unwrap_err();
+	assert!(
+		error
+			.to_string()
+			.contains("release record is missing `schemaVersion` or legacy `v`")
+	);
+}
+
+#[test]
+fn migrate_release_records_reports_migration_and_rendering_branches() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("create tempdir: {error}"));
+	let root = tempdir.path();
+	let record_path = root.join(".monochange/releases/legacy/release.json");
+	fs::create_dir_all(record_path.parent().expect("record has parent"))
+		.unwrap_or_else(|error| panic!("create release record dir: {error}"));
+	fs::write(
+		&record_path,
+		r#"{
+  "v": "0.0",
+  "kind": "monochange.releaseRecord",
+  "createdAt": "2026-04-06T12:00:00Z",
+  "command": "release-pr",
+  "releaseTargets": [],
+  "releasedPackages": [],
+  "changedFiles": []
+}"#,
+	)
+	.unwrap_or_else(|error| panic!("write legacy release record: {error}"));
+
+	let output = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("migrate"),
+			OsString::from("release-records"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("migrate release records text: {error}"));
+	assert!(output.contains("release-record migrations: migrated 1/1 record(s)"));
+	assert!(output.contains("migrated"));
+
+	let default_output =
+		crate::migration_audit::run_migration_command(root, false, &clap::ArgMatches::default())
+			.unwrap_or_else(|error| panic!("default migration audit: {error}"));
+	assert!(default_output.contains("migration audit:"));
+}
+
+#[test]
+fn migrate_release_records_reports_migration_errors() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("create tempdir: {error}"));
+	let root = tempdir.path();
+	let record_path = root.join(".monochange/releases/bad-kind/release.json");
+	fs::create_dir_all(record_path.parent().expect("record has parent"))
+		.unwrap_or_else(|error| panic!("create release record dir: {error}"));
+	fs::write(
+		&record_path,
+		r#"{
+  "schemaVersion": "0.0",
+  "kind": "example.other",
+  "createdAt": "2026-04-06T12:00:00Z",
+  "command": "release-pr",
+  "releaseTargets": [],
+  "changedFiles": []
+}"#,
+	)
+	.unwrap_or_else(|error| panic!("write unsupported release record: {error}"));
+
+	let error = crate::migration_audit::migrate_release_records(root, false).unwrap_err();
+	let message = error.to_string();
+	assert!(message.contains("migrate release record at"));
+	assert!(message.contains("example.other"));
+}
+
+#[cfg(unix)]
+#[test]
+fn migrate_release_records_reports_file_io_errors() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("create tempdir: {error}"));
+	let root = tempdir.path();
+	let record_path = root.join(".monochange/releases/unreadable/release.json");
+	fs::create_dir_all(record_path.parent().expect("record has parent"))
+		.unwrap_or_else(|error| panic!("create release record dir: {error}"));
+	fs::write(&record_path, "{}")
+		.unwrap_or_else(|error| panic!("write unreadable release record: {error}"));
+	let mut permissions = fs::metadata(&record_path)
+		.unwrap_or_else(|error| panic!("read release record metadata: {error}"))
+		.permissions();
+	permissions.set_mode(0o000);
+	fs::set_permissions(&record_path, permissions)
+		.unwrap_or_else(|error| panic!("make release record unreadable: {error}"));
+
+	let error = crate::migration_audit::migrate_release_records(root, false).unwrap_err();
+	assert!(error.to_string().contains("read release record at"));
+
+	let mut permissions = fs::metadata(&record_path)
+		.unwrap_or_else(|error| panic!("read release record metadata after error: {error}"))
+		.permissions();
+	permissions.set_mode(0o600);
+	fs::set_permissions(&record_path, permissions)
+		.unwrap_or_else(|error| panic!("restore release record permissions: {error}"));
+}
+
+#[cfg(unix)]
+#[test]
+fn migrate_release_records_reports_file_write_errors() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("create tempdir: {error}"));
+	let root = tempdir.path();
+	let record_path = root.join(".monochange/releases/readonly/release.json");
+	fs::create_dir_all(record_path.parent().expect("record has parent"))
+		.unwrap_or_else(|error| panic!("create release record dir: {error}"));
+	fs::write(
+		&record_path,
+		r#"{
+  "v": "0.0",
+  "kind": "monochange.releaseRecord",
+  "createdAt": "2026-04-06T12:00:00Z",
+  "command": "release-pr",
+  "releaseTargets": [],
+  "releasedPackages": [],
+  "changedFiles": []
+}"#,
+	)
+	.unwrap_or_else(|error| panic!("write readonly release record: {error}"));
+	let mut permissions = fs::metadata(&record_path)
+		.unwrap_or_else(|error| panic!("read release record metadata: {error}"))
+		.permissions();
+	permissions.set_mode(0o400);
+	fs::set_permissions(&record_path, permissions)
+		.unwrap_or_else(|error| panic!("make release record readonly: {error}"));
+
+	let error = crate::migration_audit::migrate_release_records(root, false).unwrap_err();
+	assert!(
+		error
+			.to_string()
+			.contains("write migrated release record at")
+	);
+
+	let mut permissions = fs::metadata(&record_path)
+		.unwrap_or_else(|error| panic!("read release record metadata after error: {error}"))
+		.permissions();
+	permissions.set_mode(0o600);
+	fs::set_permissions(&record_path, permissions)
+		.unwrap_or_else(|error| panic!("restore release record permissions: {error}"));
+}
+
+#[test]
 fn migrate_audit_reports_ready_workspace_and_quiet_mode() {
 	let tempdir = setup_fixture("migration-audit/ready-monochange");
 	let output = run_cli(
