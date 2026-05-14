@@ -5766,6 +5766,59 @@ fn find_release_record_files_at_commit_reports_git_errors() {
 }
 
 #[test]
+fn find_release_record_files_at_commit_falls_back_to_tree_when_parent_is_missing() {
+	let source = tempdir().unwrap_or_else(|error| panic!("source tempdir: {error}"));
+	let source_root = source.path();
+	git_in_temp_repo(source_root, &["init"]);
+	git_in_temp_repo(source_root, &["config", "user.name", "monochange Tests"]);
+	git_in_temp_repo(
+		source_root,
+		&["config", "user.email", "monochange-tests@example.com"],
+	);
+	fs::write(source_root.join("readme.md"), "initial\n")
+		.unwrap_or_else(|error| panic!("write readme: {error}"));
+	git_in_temp_repo(source_root, &["add", "readme.md"]);
+	git_in_temp_repo(source_root, &["commit", "-m", "initial"]);
+
+	let release_dir = source_root.join(".monochange/releases/0000000000000000");
+	fs::create_dir_all(&release_dir).unwrap_or_else(|error| panic!("create release dir: {error}"));
+	fs::write(release_dir.join("release.json"), "{}\n")
+		.unwrap_or_else(|error| panic!("write release record: {error}"));
+	git_in_temp_repo(
+		source_root,
+		&["add", ".monochange/releases/0000000000000000/release.json"],
+	);
+	git_in_temp_repo(source_root, &["commit", "-m", "release"]);
+
+	let clone = tempdir().unwrap_or_else(|error| panic!("clone tempdir: {error}"));
+	let clone_root = clone.path();
+	let source_url = format!("file://{}", source_root.display());
+	let clone_path = clone_root
+		.to_str()
+		.unwrap_or_else(|| panic!("clone path is not utf-8: {}", clone_root.display()));
+	let status = sanitized_git_command()
+		.args([
+			"clone",
+			"--depth",
+			"1",
+			"--no-local",
+			&source_url,
+			clone_path,
+		])
+		.current_dir(source_root)
+		.status()
+		.unwrap_or_else(|error| panic!("git clone shallow: {error}"));
+	assert!(status.success(), "git clone shallow failed");
+
+	let files = crate::git_support::find_release_record_files_at_commit(clone_root, "HEAD")
+		.unwrap_or_else(|error| panic!("find release record files: {error}"));
+	assert_eq!(
+		files,
+		vec![".monochange/releases/0000000000000000/release.json"]
+	);
+}
+
+#[test]
 #[cfg(unix)]
 fn write_release_record_file_reports_error_when_releases_dir_unreadable() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));

@@ -111,6 +111,8 @@ jobs:
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: setup devenv
         if: runner.os != 'Windows'
@@ -191,7 +193,11 @@ jobs:
           free-runner-space: "true"
 
       - name: run coverage
-        run: CARGO_BUILD_JOBS=1 coverage:all
+        run: |
+          CARGO_BUILD_JOBS=1 coverage:all || {
+            rm -rf target/llvm-cov-target
+            CARGO_BUILD_JOBS=1 coverage:all
+          }
         shell: devenv shell -- bash -e {0}
 
       - name: verify 100% patch coverage
