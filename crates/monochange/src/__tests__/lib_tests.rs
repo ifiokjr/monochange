@@ -33,6 +33,7 @@ use monochange_core::ChangesetTargetKind;
 use monochange_core::CliCommandDefinition;
 use monochange_core::CliInputDefinition;
 use monochange_core::CliInputKind;
+use monochange_core::CliStepDefinition;
 use monochange_core::Ecosystem;
 use monochange_core::GroupChangelogInclude;
 use monochange_core::PreparedChangesetTarget;
@@ -1493,6 +1494,28 @@ fn cli_command_usage_lists_configured_options() {
 	assert_eq!(
 		crate::cli::cli_command_usage(&cli_command),
 		"mc publish [--dry-run] [--package <PACKAGE>] [--output <PATH>] [--all]"
+	);
+}
+
+#[test]
+fn cli_command_usage_lists_release_diff_preview_options() {
+	let cli_command = CliCommandDefinition {
+		name: "release".to_string(),
+		help_text: None,
+		inputs: Vec::new(),
+		steps: vec![CliStepDefinition::PrepareRelease {
+			name: None,
+			when: None,
+			always_run: false,
+			inputs: BTreeMap::new(),
+			allow_empty_changesets: false,
+		}],
+		dry_run: false,
+	};
+
+	assert_eq!(
+		crate::cli::cli_command_usage(&cli_command),
+		"mc release [--dry-run] [--diff] [--prepared-release <PATH>]"
 	);
 }
 

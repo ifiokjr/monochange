@@ -845,19 +845,21 @@ Tagging notes:
 }
 
 pub(crate) fn cli_command_usage(cli_command: &CliCommandDefinition) -> String {
-	let mut parts = vec![
-		"mc".to_string(),
-		cli_command.name.clone(),
-		"[--dry-run]".to_string(),
-	];
+	let mut usage = String::with_capacity(32 + cli_command.name.len());
+	usage.push_str("mc ");
+	usage.push_str(&cli_command.name);
+	usage.push_str(" [--dry-run]");
 
 	if command_supports_release_diff_preview(cli_command) {
-		parts.push("[--diff]".to_string());
-		parts.push("[--prepared-release <PATH>]".to_string());
+		usage.push_str(" [--diff] [--prepared-release <PATH>]");
 	}
 
-	parts.extend(cli_command.inputs.iter().map(cli_input_usage));
-	parts.join(" ")
+	for input in &cli_command.inputs {
+		usage.push(' ');
+		usage.push_str(&cli_input_usage(input));
+	}
+
+	usage
 }
 
 pub(crate) fn cli_input_usage(input: &CliInputDefinition) -> String {
