@@ -4,7 +4,14 @@ version = { workspace = true }
 categories = { workspace = true }
 documentation = "https://docs.rs/monochange"
 edition = { workspace = true }
-include = ["src/**/*.rs", "src/**/*.yml", "src/**/*.toml", "Cargo.toml", "readme.md"]
+include = [
+	"src/**/*.rs",
+	"src/**/*.yml",
+	"src/**/*.toml",
+	"src/**/*.template",
+	"Cargo.toml",
+	"readme.md",
+]
 keywords = ["cli", "changelog", "releases", "versioning", "monorepo"]
 license = { workspace = true }
 readme = "readme.md"
