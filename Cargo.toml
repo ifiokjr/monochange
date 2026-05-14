@@ -18,6 +18,7 @@ anstyle = { version = "1.0", default-features = false }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 clap = { version = "4", default-features = false, features = ["derive"] }
 criterion = { version = "0.8.2", default-features = false }
+doc-comment = { version = "0.3", default-features = false }
 etest = { version = "0.3", default-features = false }
 glob = { version = "0.3", default-features = false }
 httpmock = { version = "0.8.3", default-features = false }
