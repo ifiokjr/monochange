@@ -432,7 +432,7 @@ Analysis notes:
 
 pub(crate) fn build_migrate_subcommand() -> Command {
 	Command::new("migrate")
-		.about("Audit release automation before migrating to monochange")
+		.about("Audit or migrate release metadata for monochange repositories")
 		.subcommand_required(true)
 		.arg_required_else_help(true)
 		.subcommand(
@@ -454,12 +454,34 @@ Audit notes:
 						.help("Output format")
 						.default_value("text")
 						.value_parser(["text", "json", "markdown", "md"]),
+				),
 		)
-		.arg(
-			Arg::new("sha")
-				.long("sha")
-				.help("Output only the commit SHA of the discovered release record")
-				.action(ArgAction::SetTrue),
+		.subcommand(
+			Command::new("release-records")
+				.about("Migrate committed .monochange release records to the latest schema version")
+				.after_help(
+					r"Examples:
+  mc migrate release-records --dry-run
+  mc migrate release-records
+  mc migrate release-records --format json
+
+Migration notes:
+  - Scans .monochange/releases/*/release.json.
+  - Rewrites only records whose schemaVersion is older than this monochange binary.
+  - Use --dry-run to preview which records would change.",
+				)
+				.arg(
+					Arg::new("dry-run")
+						.long("dry-run")
+						.help("Preview release-record migrations without writing files")
+						.action(ArgAction::SetTrue),
+				)
+				.arg(
+					Arg::new("format")
+						.long("format")
+						.help("Output format")
+						.default_value("text")
+						.value_parser(["text", "json", "markdown", "md"]),
 				),
 		)
 }

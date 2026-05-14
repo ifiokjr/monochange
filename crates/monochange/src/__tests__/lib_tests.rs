@@ -259,6 +259,61 @@ fn migrate_audit_reports_legacy_release_tooling() {
 }
 
 #[test]
+fn migrate_release_records_rewrites_legacy_records() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("create tempdir: {error}"));
+	let root = tempdir.path();
+	write_blank_monochange_config(root);
+	let record_path = root.join(".monochange/releases/abc123/release.json");
+	fs::create_dir_all(record_path.parent().expect("record has parent"))
+		.unwrap_or_else(|error| panic!("create release record dir: {error}"));
+	fs::write(
+		&record_path,
+		r#"{
+  "schemaVersion": 1,
+  "kind": "monochange.releaseRecord",
+  "createdAt": "2026-04-06T12:00:00Z",
+  "command": "release-pr",
+  "releaseTargets": [],
+  "changedFiles": []
+}"#,
+	)
+	.unwrap_or_else(|error| panic!("write legacy release record: {error}"));
+
+	let output = run_cli(
+		root,
+		[
+			OsString::from("mc"),
+			OsString::from("migrate"),
+			OsString::from("release-records"),
+			OsString::from("--format"),
+			OsString::from("json"),
+		],
+	)
+	.unwrap_or_else(|error| panic!("migrate release records: {error}"));
+	let parsed: serde_json::Value = serde_json::from_str(&output)
+		.unwrap_or_else(|error| panic!("parse migration report: {error}"));
+
+	assert_eq!(parsed["scanned"], serde_json::json!(1));
+	assert_eq!(parsed["migrated"], serde_json::json!(1));
+	assert_eq!(
+		parsed["records"][0]["status"],
+		serde_json::json!("migrated")
+	);
+	assert_eq!(
+		parsed["records"][0]["fromSchemaVersion"],
+		serde_json::json!("legacy-1")
+	);
+
+	let migrated = fs::read_to_string(&record_path)
+		.unwrap_or_else(|error| panic!("read migrated release record: {error}"));
+	assert!(migrated.contains(&format!(
+		r#""schemaVersion": "{}""#,
+		monochange_core::RELEASE_RECORD_SCHEMA_VERSION
+	)));
+	assert!(!migrated.contains(r#""schemaVersion": 1"#));
+}
+
+#[test]
 fn migrate_audit_reports_ready_workspace_and_quiet_mode() {
 	let tempdir = setup_fixture("migration-audit/ready-monochange");
 	let output = run_cli(

@@ -2,10 +2,13 @@ use std::fmt::Write as _;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::Path;
+use std::path::PathBuf;
 
 use clap::ArgMatches;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
+use monochange_core::RELEASE_RECORD_SCHEMA_VERSION;
+use monochange_core::migrate_release_record_json_value;
 use serde::Serialize;
 
 use crate::OutputFormat;
@@ -45,6 +48,34 @@ pub(crate) struct MigrationAuditRecommendation {
 	pub detail: String,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum ReleaseRecordMigrationStatus {
+	Current,
+	Migrated,
+	WouldMigrate,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ReleaseRecordMigrationEntry {
+	pub path: String,
+	pub status: ReleaseRecordMigrationStatus,
+	pub from_schema_version: String,
+	pub to_schema_version: String,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ReleaseRecordMigrationReport {
+	pub dry_run: bool,
+	pub current_schema_version: String,
+	pub scanned: usize,
+	pub migrated: usize,
+	pub unchanged: usize,
+	pub records: Vec<ReleaseRecordMigrationEntry>,
+}
+
 pub(crate) fn run_migration_command(
 	root: &Path,
 	quiet: bool,
@@ -53,18 +84,213 @@ pub(crate) fn run_migration_command(
 	if quiet {
 		return Ok(String::new());
 	}
-	let audit_matches = migrate_matches
-		.subcommand_matches("audit")
-		.unwrap_or(migrate_matches);
-	let format = audit_matches
-		.get_one::<String>("format")
-		.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
-	run_migration_audit(root, format)
+	match migrate_matches.subcommand() {
+		Some(("release-records", record_matches)) => {
+			let format = record_matches
+				.get_one::<String>("format")
+				.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
+			let report = migrate_release_records(root, record_matches.get_flag("dry-run"))?;
+			Ok(render_release_record_migration_report(&report, format))
+		}
+		Some(("audit", audit_matches)) => {
+			let format = audit_matches
+				.get_one::<String>("format")
+				.map_or(Ok(OutputFormat::Text), |value| parse_output_format(value))?;
+			run_migration_audit(root, format)
+		}
+		_ => run_migration_audit(root, OutputFormat::Text),
+	}
 }
 
 pub(crate) fn run_migration_audit(root: &Path, format: OutputFormat) -> MonochangeResult<String> {
 	let report = audit_migration(root)?;
 	Ok(render_migration_audit_report(&report, format))
+}
+
+pub(crate) fn migrate_release_records(
+	root: &Path,
+	dry_run: bool,
+) -> MonochangeResult<ReleaseRecordMigrationReport> {
+	let mut records = Vec::new();
+	for path in release_record_paths(root)? {
+		let original = fs::read_to_string(&path).map_err(|error| {
+			MonochangeError::Io(format!(
+				"read release record at {}: {error}",
+				path.display()
+			))
+		})?;
+		let schema_version = release_record_schema_version(&original)?;
+		let from_schema_version = schema_version.version;
+		let migrated_value = migrate_release_record_json_value(&original).map_err(|error| {
+			MonochangeError::Config(format!(
+				"migrate release record at {}: {error}",
+				path.display()
+			))
+		})?;
+		let migrated = serde_json::to_string_pretty(&migrated_value)
+			.map(|json| format!("{json}\n"))
+			.map_err(|error| {
+				MonochangeError::Config(format!(
+					"serialize migrated release record at {}: {error}",
+					path.display()
+				))
+			})?;
+		let is_current =
+			!schema_version.legacy && from_schema_version == RELEASE_RECORD_SCHEMA_VERSION;
+		let status = if is_current {
+			ReleaseRecordMigrationStatus::Current
+		} else if dry_run {
+			ReleaseRecordMigrationStatus::WouldMigrate
+		} else {
+			fs::write(&path, migrated).map_err(|error| {
+				MonochangeError::Io(format!(
+					"write migrated release record at {}: {error}",
+					path.display()
+				))
+			})?;
+			ReleaseRecordMigrationStatus::Migrated
+		};
+		records.push(ReleaseRecordMigrationEntry {
+			path: root_relative_string(root, &path),
+			status,
+			from_schema_version,
+			to_schema_version: RELEASE_RECORD_SCHEMA_VERSION.to_string(),
+		});
+	}
+
+	let migrated = records
+		.iter()
+		.filter(|record| {
+			matches!(
+				record.status,
+				ReleaseRecordMigrationStatus::Migrated | ReleaseRecordMigrationStatus::WouldMigrate
+			)
+		})
+		.count();
+	let unchanged = records
+		.iter()
+		.filter(|record| matches!(record.status, ReleaseRecordMigrationStatus::Current))
+		.count();
+	Ok(ReleaseRecordMigrationReport {
+		dry_run,
+		current_schema_version: RELEASE_RECORD_SCHEMA_VERSION.to_string(),
+		scanned: records.len(),
+		migrated,
+		unchanged,
+		records,
+	})
+}
+
+fn release_record_paths(root: &Path) -> MonochangeResult<Vec<PathBuf>> {
+	let releases_dir = root.join(".monochange/releases");
+	if !releases_dir.exists() {
+		return Ok(Vec::new());
+	}
+	let mut paths = Vec::new();
+	for entry in fs::read_dir(&releases_dir)
+		.map_err(|error| MonochangeError::Io(format!("read release records dir: {error}")))?
+	{
+		let entry = entry.map_err(|error| {
+			MonochangeError::Io(format!("read release records dir entry: {error}"))
+		})?;
+		let path = entry.path().join("release.json");
+		if path.is_file() {
+			paths.push(path);
+		}
+	}
+	paths.sort();
+	Ok(paths)
+}
+
+struct ReleaseRecordSchemaVersion {
+	version: String,
+	legacy: bool,
+}
+
+fn release_record_schema_version(json_text: &str) -> MonochangeResult<ReleaseRecordSchemaVersion> {
+	let value = serde_json::from_str::<serde_json::Value>(json_text).map_err(|error| {
+		MonochangeError::Config(format!(
+			"parse release record json before migration: {error}"
+		))
+	})?;
+	let Some(object) = value.as_object() else {
+		return Err(MonochangeError::Config(
+			"release record json root must be an object".to_string(),
+		));
+	};
+	if let Some(version) = object
+		.get("schemaVersion")
+		.and_then(serde_json::Value::as_str)
+	{
+		return Ok(ReleaseRecordSchemaVersion {
+			version: version.to_string(),
+			legacy: false,
+		});
+	}
+	if object
+		.get("schemaVersion")
+		.and_then(serde_json::Value::as_u64)
+		== Some(1)
+	{
+		return Ok(ReleaseRecordSchemaVersion {
+			version: "legacy-1".to_string(),
+			legacy: true,
+		});
+	}
+	if let Some(version) = object.get("v").and_then(serde_json::Value::as_str) {
+		return Ok(ReleaseRecordSchemaVersion {
+			version: version.to_string(),
+			legacy: true,
+		});
+	}
+	Err(MonochangeError::Config(
+		"release record is missing `schemaVersion` or legacy `v`".to_string(),
+	))
+}
+
+fn root_relative_string(root: &Path, path: &Path) -> String {
+	path.strip_prefix(root)
+		.unwrap_or(path)
+		.to_string_lossy()
+		.into_owned()
+}
+
+fn render_release_record_migration_report(
+	report: &ReleaseRecordMigrationReport,
+	format: OutputFormat,
+) -> String {
+	match format {
+		OutputFormat::Json => serde_json::to_string_pretty(report).unwrap_or_default(),
+		OutputFormat::Markdown | OutputFormat::Text => text_release_record_migration_report(report),
+	}
+}
+
+fn text_release_record_migration_report(report: &ReleaseRecordMigrationReport) -> String {
+	let mut output = String::new();
+	let action = if report.dry_run {
+		"would migrate"
+	} else {
+		"migrated"
+	};
+	let _ = writeln!(
+		output,
+		"release-record migrations: {action} {}/{} record(s) to schema {}",
+		report.migrated, report.scanned, report.current_schema_version
+	);
+	let _ = writeln!(output, "  unchanged: {}", report.unchanged);
+	for record in &report.records {
+		let status = match record.status {
+			ReleaseRecordMigrationStatus::Current => "current",
+			ReleaseRecordMigrationStatus::Migrated => "migrated",
+			ReleaseRecordMigrationStatus::WouldMigrate => "would migrate",
+		};
+		let _ = writeln!(
+			output,
+			"  - {}: {} ({} -> {})",
+			record.path, status, record.from_schema_version, record.to_schema_version
+		);
+	}
+	output.trim_end().to_string()
 }
 
 pub(crate) fn audit_migration(root: &Path) -> MonochangeResult<MigrationAuditReport> {
