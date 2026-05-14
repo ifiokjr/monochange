@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
@@ -146,15 +147,32 @@ pub(crate) fn find_release_record_files_at_commit(
 	let suffix = "/release.json";
 	let filter = |line: &&str| line.starts_with(prefix) && line.ends_with(suffix);
 
-	let has_parent = run_git_capture(
+	let first_parent = run_git_capture(
 		root,
 		&["cat-file", "-p", commit],
 		"failed to inspect commit",
 	)?
 	.lines()
-	.any(|line| line.starts_with("parent "));
+	.find_map(|line| line.strip_prefix("parent ").map(str::to_string));
 
-	if has_parent {
+	let resolved_commit =
+		run_git_capture(root, &["rev-parse", commit], "failed to resolve commit")?;
+	let shallow_file = run_git_capture(
+		root,
+		&["rev-parse", "--git-path", "shallow"],
+		"failed to resolve shallow boundary path",
+	)
+	.unwrap_or_else(|_| String::from(".git/shallow"));
+	let shallow_file = root.join(PathBuf::from(shallow_file.trim()));
+	let is_shallow_boundary = fs::read_to_string(shallow_file)
+		.is_ok_and(|contents| contents.lines().any(|line| line == resolved_commit.trim()));
+	let has_available_parent = if let Some(parent) = first_parent.as_deref() {
+		git_command_output(root, &["cat-file", "-e", &format!("{parent}^{{commit}}")]).is_ok()
+	} else {
+		false
+	};
+
+	if has_available_parent && !is_shallow_boundary {
 		let args = [
 			"diff-tree",
 			"-m",
