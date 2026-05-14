@@ -1334,8 +1334,13 @@ async fn run_changeset_context_enrichment_with_timeout_reports_completion() {
 	assert!(completed);
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test(flavor = "current_thread")]
 async fn run_changeset_context_enrichment_with_timeout_returns_false_on_elapsed_timeout() {
+	let subscriber = tracing_subscriber::fmt()
+		.with_max_level(tracing::Level::WARN)
+		.with_writer(std::io::sink)
+		.finish();
+	let _default_subscriber = tracing::subscriber::set_default(subscriber);
 	let source = sample_source(SourceProvider::GitHub);
 	let completed = run_changeset_context_enrichment_with_timeout(
 		&source,

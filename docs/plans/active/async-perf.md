@@ -123,6 +123,34 @@ Measured with `hyperfine --warmup 1 --runs 3` against `origin/main` at `b79accfd
 
 The two previously noisy or regressed direct step commands are now both faster than `main`; the full direct step-command rerun reported `0` regressions in `/tmp/monochange-step-current-thread-violations.txt`.
 
+## Async value review plan
+
+The async migration is most valuable when it is framed as bounded orchestration around external work rather than broad `async` signature churn. The branch narrative should stay focused on latency hiding, cancellation, timeouts, and deterministic merge-back at I/O boundaries.
+
+### Feedback incorporated
+
+- Hosted-source enrichment is the clearest async win: keep the timeout and abort-on-drop guard, then evolve toward bounded provider concurrency, retry/backoff, duplicate request coalescing, provider-level timeout configuration, and deterministic merge-back of enriched context.
+- Release/prepare work should overlap only where phases are independent: local release planning, package-publication target construction, lockfile command materialization, artifact preparation, and hosted-source enrichment.
+- Git subprocess async work should be bounded and used to overlap a small number of independent queries; avoid unbounded process fanout.
+- Keep pure planning, CPU-bound parsing/serialization, and formatting helpers synchronous unless profiling proves async orchestration helps.
+- Prefer allocation/caching/streaming fixes for CPU-local hot paths; use `tokio::fs` only when it unlocks concurrency rather than replacing `std::fs` mechanically.
+- PR language should be honest: async enables orchestration and cancellation for external work, while benchmark gains also come from removing repeated work and allocations.
+
+### Follow-up checklist
+
+- [x] Document the async-value framing in this plan.
+- [x] Keep hosted-source timeout and abort-on-drop guard in the branch.
+- [x] Use Tokio current-thread runtime for `monochange` and `xtask` to avoid multi-thread startup overhead in short CLI commands.
+- [x] Diagnose the latest `ci / coverage` failure: CI patch coverage used the pull-request merge SHA and reported the timeout warning field in `workspace_ops.rs` as uncovered.
+- [x] Fix the CI coverage failure locally and rerun patch coverage against the branch.
+  - The timeout warning path now installs a WARN subscriber in its focused test so CI's merge-commit patch coverage observes the structured timeout field.
+- [x] Add or document one async-value benchmark/test that demonstrates hosted-source work being bounded or cancelled rather than just converted to `async`.
+  - Existing focused tests cover timeout completion, elapsed timeout, abort-on-drop cancellation, and background panic handling for hosted-source enrichment.
+- [x] Audit this iteration for broad async churn.
+  - No additional pure formatting/planning helper was converted to async; the new code stays on timeout/cancellation test coverage and plan documentation.
+- [x] Add a PR-facing note summarizing current-thread runtime rationale and the honest async/orchestration performance story.
+  - Updated PR #440 with the current-thread runtime rationale, async orchestration boundaries, benchmark notes, and validation status.
+
 ## Latest targeted optimization results
 
 Measured on the 200-package / 500-changeset / 500-commit profiling fixture after rebuilding the current branch release binary.

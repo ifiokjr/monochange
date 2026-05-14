@@ -2026,11 +2026,8 @@ async fn run_changeset_context_enrichment_with_timeout(
 		return true;
 	}
 
-	tracing::warn!(
-		provider = %source.provider,
-		timeout_ms = timeout_after.as_millis(),
-		"timed out enriching changeset context"
-	);
+	let timeout_ms = timeout_after.as_millis();
+	tracing::warn!(provider = %source.provider, timeout_ms, "timed out enriching changeset context");
 	false
 }
 
