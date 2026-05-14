@@ -114,7 +114,7 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
         run: |
-          "$RUNNER_TEMP/bin/mc" publish-readiness \
+          "$RUNNER_TEMP/bin/mc" step:publish-readiness \
             --from HEAD \
             --output "$RUNNER_TEMP/publish-readiness.json" \
             --format json
