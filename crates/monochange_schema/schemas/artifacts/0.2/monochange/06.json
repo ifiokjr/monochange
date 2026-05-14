@@ -1,0 +1,21 @@
+{
+	"defaults": {
+		"package_type": "cargo"
+	},
+	"package": {
+		"monochange": {
+			"path": "crates/monochange"
+		},
+		"monochange_core": {
+			"path": "crates/monochange_core"
+		},
+		"monochange_schema": {
+			"path": "crates/monochange_schema"
+		}
+	},
+	"source": {
+		"owner": "monochange",
+		"provider": "github",
+		"repo": "schema-fixtures"
+	}
+}

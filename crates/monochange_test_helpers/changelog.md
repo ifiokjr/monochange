@@ -86,6 +86,32 @@ Also adds `lints` field to `EcosystemSettings` for per-ecosystem lint configurat
 
 - No package-specific changes were recorded; `monochange_test_helpers` was updated to 0.0.3.
 
+## [0.5.0](https://github.com/monochange/monochange/releases/tag/v0.5.0) (2026-05-14)
+
+### Added
+
+#### Publish all configured packages
+
+Add a `--all` flag to the PublishPackages CLI step so migration workflows can publish every configured package, including packages that were not part of the prepared release record.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #461](https://github.com/monochange/monochange/pull/461) _Introduced in:_ [`3d956cd`](https://github.com/monochange/monochange/commit/3d956cd3e34747e088add98fe0358251f388782f) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
+### Fixed
+
+#### Move lint testing helpers into shared test helpers
+
+The private `monochange_lint_testing` crate has been removed. Its stable lint report and autofix formatting helpers now live in `monochange_test_helpers::lint_testing`, so publishable crates no longer depend on an unpublished workspace crate during Cargo package verification.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #468](https://github.com/monochange/monochange/pull/468) _Introduced in:_ [`00847e5`](https://github.com/monochange/monochange/commit/00847e502bfb3805a846e0363f1d6ae176f38e47) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
+### Testing
+
+#### Redact schema versions in snapshot helpers
+
+Shared snapshot settings now redact release-record schema versions in JSON fields and diagnostics so release PR tests do not fail when the schema crate version changes.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #473](https://github.com/monochange/monochange/pull/473) _Introduced in:_ [`1beb6f0`](https://github.com/monochange/monochange/commit/1beb6f0085ec2d0d2cd6258d6f52de7de6da5a4e) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
 ## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)
 
 ### Added

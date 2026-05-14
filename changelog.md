@@ -4,6 +4,92 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.5.0](https://github.com/monochange/monochange/releases/tag/v0.5.0) (2026-05-14)
+
+Grouped release for `main`.
+
+### Added
+
+> [!NOTE]
+> _main_
+
+#### Publish all configured packages
+
+Add a `--all` flag to the PublishPackages CLI step so migration workflows can publish every configured package, including packages that were not part of the prepared release record.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #461](https://github.com/monochange/monochange/pull/461) _Introduced in:_ [`3d956cd`](https://github.com/monochange/monochange/commit/3d956cd3e34747e088add98fe0358251f388782f) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
+### Fixed
+
+> [!NOTE]
+> _monochange_
+
+#### Group CLI help options by source
+
+Command help now separates generated release flags, configured command inputs, and global flags into distinct headings so users can see where each option originates.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #480](https://github.com/monochange/monochange/pull/480) _Introduced in:_ [`dd01099`](https://github.com/monochange/monochange/commit/dd010996124d8af507ca6bfebb8c32486783fc19) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8) _Closed issues:_ [#475](https://github.com/monochange/monochange/issues/475)
+
+> [!NOTE]
+> _monochange_
+
+#### Enable readable multi-step command progress output in CI
+
+This is done while disabling animated spinners in CI logs.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #487](https://github.com/monochange/monochange/pull/487) _Introduced in:_ [`e845d1e`](https://github.com/monochange/monochange/commit/e845d1e5212e0d4c1cd3f58d8e4ab9c09cd3fff5) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
+> [!NOTE]
+> _monochange_
+
+#### Improve custom command argument errors
+
+Unexpected arguments passed to configured CLI commands now show a focused diagnostic with the explicit usage, the `monochange.toml` section to edit, and an example input definition.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #464](https://github.com/monochange/monochange/pull/464) _Introduced in:_ [`b869604`](https://github.com/monochange/monochange/commit/b86960446661884e9732616249232a4aa5e929b3) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
+> [!NOTE]
+> _monochange_
+
+#### Support release records in shallow checkouts
+
+Fix release record discovery for shallow checkouts when the parent commit is unavailable.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #504](https://github.com/monochange/monochange/pull/504) _Introduced in:_ [`b79accf`](https://github.com/monochange/monochange/commit/b79accfd3d11bbaab94fa8c8b508421615d9029e)
+
+> [!NOTE]
+> _monochange_
+
+#### Fix command input references in CLI step conditions
+
+Allow `when` conditions to read command-level inputs while preserving step-level input overrides, so release automation can gate commit and pull request steps on `--commit` and `--create-pr`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #488](https://github.com/monochange/monochange/pull/488) _Introduced in:_ [`f4d96b0`](https://github.com/monochange/monochange/commit/f4d96b0d9eddf21745088a5a95f5c3c69f41b1f5) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
+### Security
+
+> [!NOTE]
+> _monochange_
+
+#### Refresh Ubuntu runner space
+
+Refresh the Ubuntu devenv cache namespace and reclaim runner disk space before the highest-space CI jobs install Nix dependencies.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #506](https://github.com/monochange/monochange/pull/506) _Introduced in:_ [`4a7ad19`](https://github.com/monochange/monochange/commit/4a7ad19c93cba4ba53930ad7a2b216bebc9f9a0b)
+
+### Testing
+
+> [!NOTE]
+> _monochange_
+
+#### Fix flaky `reuses_prepared_release_artifact_for_versions` test
+
+The `execute_cli_command_with_options_reuses_prepared_release_artifact_for_versions` test (and the related `plans_publish_rate_limits_from_prepared_release_artifact` and `reports_invalid_versions_output_formats` tests) operated on the real repository workspace root without holding the `TEST_ENV_LOCK`. When other test threads modified workspace files concurrently, the `git status` snapshot captured at artifact save time could differ from the snapshot taken at validation time, causing an intermittent "workspace status no longer matches the saved prepared release" error.
+
+All three tests now acquire `TEST_ENV_LOCK` before reading the workspace, serialising them against other tests that modify git state.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #458](https://github.com/monochange/monochange/pull/458) _Introduced in:_ [`a78046a`](https://github.com/monochange/monochange/commit/a78046a1803c136426770d4fb2e6a8928e844e19) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
 ## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)
 
 Grouped release for `main`.

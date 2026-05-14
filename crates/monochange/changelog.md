@@ -4,6 +4,214 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.5.0](https://github.com/monochange/monochange/releases/tag/v0.5.0) (2026-05-14)
+
+### Breaking Change
+
+#### require CLI steps to opt in to inherited command inputs
+
+> **Breaking change** — CLI step inputs are now explicit. Command-level inputs no longer automatically appear in every configured CLI step.
+
+A configured step now receives only the inputs listed in that step's `inputs` field. This removes ambiguous behavior where a command-level flag could unexpectedly shadow a step-specific input with the same name.
+
+**Before:** every step implicitly saw all command inputs, even with no step-level `inputs` entry:
+
+```toml
+[cli.release]
+inputs = [{ name = "format", type = "choice", choices = ["text", "json"], default = "text" }]
+steps = [{ type = "PrepareRelease" }]
+```
+
+**After:** inherit command inputs explicitly with the array shorthand:
+
+```toml
+[cli.release]
+inputs = [{ name = "format", type = "choice", choices = ["text", "json"], default = "text" }]
+steps = [{ type = "PrepareRelease", inputs = ["format"] }]
+```
+
+Map overrides still work for fixed or templated step values:
+
+```toml
+steps = [
+	{ type = "PrepareRelease", inputs = ["format"] },
+	{ type = "PublishRelease", inputs = { format = "json", draft = "{{ inputs.draft }}" } },
+]
+```
+
+Migration path: review custom `[cli.<command>]` definitions and add `inputs = ["name"]` to every step that needs a command-level input. Built-in default CLI commands and generated templates have been updated to declare their inherited inputs explicitly.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #467](https://github.com/monochange/monochange/pull/467) _Introduced in:_ [`ce4712f`](https://github.com/monochange/monochange/commit/ce4712f2890e0636c368b056db756df32f4cf769) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
+#### generate built-in release and validation step commands
+
+> **Breaking change** — several hardcoded top-level commands now live under generated immutable `mc step:*` command names.
+
+The release-record, publish-readiness, tag-release, placeholder-publish, and validation operations now share the generated step-command path used by the rest of the CLI step catalog. This keeps their help, schema metadata, docs, and automation examples consistent with configured workflow steps while preserving the distinction between binary commands, generated step commands, and optional user-defined `[cli.*]` workflow aliases.
+
+**Before:** scripts could call these hardcoded top-level commands directly:
+
+```bash
+mc validate
+mc release-record --from HEAD --format json
+mc publish-readiness --from HEAD --output .monochange/readiness.json
+mc tag-release --from HEAD
+mc publish-bootstrap --from HEAD --output .monochange/bootstrap-result.json
+```
+
+**After:** call the generated step command names instead:
+
+```bash
+mc step:validate
+mc step:release-record --from HEAD --format json
+mc step:publish-readiness --from HEAD --output .monochange/readiness.json
+mc step:tag-release --from HEAD
+mc step:placeholder-publish --from HEAD --output .monochange/bootstrap-result.json
+```
+
+`mc init` also writes a smaller starter configuration. It no longer seeds redundant generated `[cli.*]` aliases for commands that already exist as immutable step commands.
+
+**Before:** starter configs included workflow aliases for generated behavior:
+
+```toml
+[cli.validate]
+steps = [{ type = "Validate" }]
+```
+
+**After:** starter configs rely on the generated command directly and reserve `[cli.*]` for repository-specific chains, custom inputs, or shell `Command` steps:
+
+```bash
+mc step:validate
+```
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #479](https://github.com/monochange/monochange/pull/479) _Introduced in:_ [`d9adff8`](https://github.com/monochange/monochange/commit/d9adff8fb396df908e335d2a6688aa729abb5f4d) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8) _Closed issues:_ [#476](https://github.com/monochange/monochange/issues/476)
+
+### Added
+
+#### add release-record migration command
+
+Add `mc migrate release-records` to rewrite persisted release records to the latest schema version, expose the release-record migration helper from core, and update the generated skill command inventory.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #500](https://github.com/monochange/monochange/pull/500) _Introduced in:_ [`bd56420`](https://github.com/monochange/monochange/commit/bd564204b786961371b0ac1bad21071ebe5fe90c) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
+#### Configurable publish-order dependency fields
+
+Add configurable ecosystem-specific dependency fields for package publish ordering across npm, Cargo, Deno, Dart/Flutter, Python, and Go.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #472](https://github.com/monochange/monochange/pull/472) _Introduced in:_ [`0d9cf46`](https://github.com/monochange/monochange/commit/0d9cf461a05057b61efa987d361ebd27d800dbdb) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8) _Closed issues:_ [#465](https://github.com/monochange/monochange/issues/465)
+
+#### Publish all configured packages
+
+Add a `--all` flag to the PublishPackages CLI step so migration workflows can publish every configured package, including packages that were not part of the prepared release record.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #461](https://github.com/monochange/monochange/pull/461) _Introduced in:_ [`3d956cd`](https://github.com/monochange/monochange/commit/3d956cd3e34747e088add98fe0358251f388782f) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
+#### Remove automated npm trust configuration during publish
+
+Removed the `npm trust` command execution from the publish loop. Trust configuration for npm packages must now be done manually or via separate tooling — `mc publish` no longer runs `npm trust github` or `npm trust list` automatically.
+
+When trusted publishing is enabled for npm packages, the publish command now uses `npm` directly instead of `pnpm` (already the case via `npm_publish_program`). An environment variable override for forcing pnpm during trusted publishing can be added in a future release.
+
+Removed `PublishTrustHandler::configure_successful_publish_trust` from the trait and its `CliPublishTrustHandler` implementation. Removed `configure_npm_trusted_publishing` from `package_publish`. Removed `build_npm_trust_list_command` from `monochange_npm`. The `trust_outcome_for_skip` and `planned_trust_outcome` methods remain, showing informational messages about how to manually configure trust.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #456](https://github.com/monochange/monochange/pull/456) _Introduced in:_ [`628a1ea`](https://github.com/monochange/monochange/commit/628a1ea18b62b60551c7648e16405a685cacb5f4) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
+### Fixed
+
+#### Include Cargo development dependencies in publish ordering
+
+Cargo package publishing now orders runtime, build, and development dependencies before dependents. This prevents a crate from being published before an unpublished workspace crate referenced through `dev-dependencies` or `build-dependencies`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #466](https://github.com/monochange/monochange/pull/466) _Introduced in:_ [`add0671`](https://github.com/monochange/monochange/commit/add0671b798d2dd4ab6e142801b1b5cac6842a1a) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
+#### Validate Cargo private dependency publishing hazards
+
+Cargo linting now reports publishable packages that depend on private workspace packages through `dependencies`, `dev-dependencies`, or `build-dependencies`. Package publish dry runs now execute the registry dry-run command and preserve its stdout and stderr in the publish report instead of only planning the command.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #470](https://github.com/monochange/monochange/pull/470) _Introduced in:_ [`66ffdf7`](https://github.com/monochange/monochange/commit/66ffdf734129fb267fe61dd821e55c292dab5c0e) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
+#### Group CLI help options by source
+
+Command help now separates generated release flags, configured command inputs, and global flags into distinct headings so users can see where each option originates.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #480](https://github.com/monochange/monochange/pull/480) _Introduced in:_ [`dd01099`](https://github.com/monochange/monochange/commit/dd010996124d8af507ca6bfebb8c32486783fc19) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8) _Closed issues:_ [#475](https://github.com/monochange/monochange/issues/475)
+
+#### Enable readable multi-step command progress output in CI
+
+This is done while disabling animated spinners in CI logs.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #487](https://github.com/monochange/monochange/pull/487) _Introduced in:_ [`e845d1e`](https://github.com/monochange/monochange/commit/e845d1e5212e0d4c1cd3f58d8e4ab9c09cd3fff5) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
+#### Improve custom command argument errors
+
+Unexpected arguments passed to configured CLI commands now show a focused diagnostic with the explicit usage, the `monochange.toml` section to edit, and an example input definition.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #464](https://github.com/monochange/monochange/pull/464) _Introduced in:_ [`b869604`](https://github.com/monochange/monochange/commit/b86960446661884e9732616249232a4aa5e929b3) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
+#### Add interactive CLI command wizard
+
+Added `mc command`, an interactive dashboard for adding and editing `[cli.<name>]` commands in `monochange.toml`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #471](https://github.com/monochange/monochange/pull/471) _Introduced in:_ [`fea471c`](https://github.com/monochange/monochange/commit/fea471c4b67b618cde51eaacfd4e30742cfb0dc1) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
+#### Publish progress output
+
+Add emoji-based publish progress reporting on stderr with deterministic CI-friendly output and terminal-aware loading markers.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #469](https://github.com/monochange/monochange/pull/469) _Introduced in:_ [`603c731`](https://github.com/monochange/monochange/commit/603c731a60d66f49b876a14467909efd4585408a) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
+#### keep release-record discovery compatible across schema upgrades
+
+Merged release commits that embed an older public release-record `schemaVersion` can now be read by newer monochange binaries. This lets commands such as:
+
+```bash
+mc step:release-record --from HEAD --format json
+```
+
+recognize an existing release commit after monochange itself has moved to a newer schema version, instead of reporting the older record as unsupported.
+
+The GitHub Actions CI workflow now also includes a pull-request `release-records` preflight. For normal PRs, it creates the same local release commit used by the release test/lint preflights and verifies that `mc step:release-record` can read it and confirm that the generated commit is the resolved release-record commit.
+
+Generated current and versioned release-record artifact fixtures are also checked into the schema crate. Schema checks ensure the current fixtures are regenerated during release planning, and integration tests load every checked-in release-record artifact through the real parser/migration path.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #491](https://github.com/monochange/monochange/pull/491) _Introduced in:_ [`914a6e8`](https://github.com/monochange/monochange/commit/914a6e88d4bcf31249d467914f0a3a3b240d931a) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
+#### Support release records in shallow checkouts
+
+Fix release record discovery for shallow checkouts when the parent commit is unavailable.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #504](https://github.com/monochange/monochange/pull/504) _Introduced in:_ [`b79accf`](https://github.com/monochange/monochange/commit/b79accfd3d11bbaab94fa8c8b508421615d9029e)
+
+#### Fix command input references in CLI step conditions
+
+Allow `when` conditions to read command-level inputs while preserving step-level input overrides, so release automation can gate commit and pull request steps on `--commit` and `--create-pr`.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #488](https://github.com/monochange/monochange/pull/488) _Introduced in:_ [`f4d96b0`](https://github.com/monochange/monochange/commit/f4d96b0d9eddf21745088a5a95f5c3c69f41b1f5) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
+### Security
+
+#### Refresh Ubuntu runner space
+
+Refresh the Ubuntu devenv cache namespace and reclaim runner disk space before the highest-space CI jobs install Nix dependencies.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #506](https://github.com/monochange/monochange/pull/506) _Introduced in:_ [`4a7ad19`](https://github.com/monochange/monochange/commit/4a7ad19c93cba4ba53930ad7a2b216bebc9f9a0b)
+
+### Testing
+
+#### Fix flaky `reuses_prepared_release_artifact_for_versions` test
+
+The `execute_cli_command_with_options_reuses_prepared_release_artifact_for_versions` test (and the related `plans_publish_rate_limits_from_prepared_release_artifact` and `reports_invalid_versions_output_formats` tests) operated on the real repository workspace root without holding the `TEST_ENV_LOCK`. When other test threads modified workspace files concurrently, the `git status` snapshot captured at artifact save time could differ from the snapshot taken at validation time, causing an intermittent "workspace status no longer matches the saved prepared release" error.
+
+All three tests now acquire `TEST_ENV_LOCK` before reading the workspace, serialising them against other tests that modify git state.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #458](https://github.com/monochange/monochange/pull/458) _Introduced in:_ [`a78046a`](https://github.com/monochange/monochange/commit/a78046a1803c136426770d4fb2e6a8928e844e19) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
+#### Validate generated release commits in PR CI
+
+Pull requests now run release-state test and lint preflights after creating a local release commit, while generated release PRs skip those extra preflights.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #477](https://github.com/monochange/monochange/pull/477) _Introduced in:_ [`a09020f`](https://github.com/monochange/monochange/commit/a09020f9282be207ace6f641b716c3c4004886af) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
 ## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)
 
 ### Added
