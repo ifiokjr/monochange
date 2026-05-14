@@ -181,6 +181,120 @@ fn release_record_migrates_legacy_v_only_schema_version() {
 }
 
 #[test]
+fn release_record_field_migration_helpers_apply_supported_changes() {
+	let edge = test_release_record_migration_edge();
+	let mut value = json!({
+		"oldName": "kept",
+		"removed": true,
+		"other": "stable"
+	});
+	let rename = test_migration_change(
+		migration_changelog::MigrationOperation::RenameField,
+		"/oldName",
+		Some("/newName"),
+	);
+	let remove = test_migration_change(
+		migration_changelog::MigrationOperation::RemoveField,
+		"/removed",
+		None,
+	);
+	let noop = test_migration_change(
+		migration_changelog::MigrationOperation::Noop,
+		"/ignored",
+		None,
+	);
+
+	release_record::apply_migration_change(&mut value, &edge, &rename)
+		.unwrap_or_else(|error| panic!("rename field: {error}"));
+	release_record::apply_migration_change(&mut value, &edge, &remove)
+		.unwrap_or_else(|error| panic!("remove field: {error}"));
+	release_record::apply_migration_change(&mut value, &edge, &noop)
+		.unwrap_or_else(|error| panic!("noop field migration: {error}"));
+
+	assert_eq!(value.get("newName"), Some(&json!("kept")));
+	assert!(value.get("oldName").is_none());
+	assert!(value.get("removed").is_none());
+	assert_eq!(value.get("other"), Some(&json!("stable")));
+}
+
+#[test]
+fn release_record_field_migration_helpers_reject_unsupported_changes() {
+	let edge = test_release_record_migration_edge();
+	let mut value = json!({ "field": "value" });
+	let cases = [
+		(
+			test_migration_change(
+				migration_changelog::MigrationOperation::RenameField,
+				"field",
+				Some("/renamed"),
+			),
+			"migration change path must be an absolute JSON pointer",
+		),
+		(
+			test_migration_change(
+				migration_changelog::MigrationOperation::RenameField,
+				"/field",
+				None,
+			),
+			"rename field migration is missing a replacement path",
+		),
+		(
+			test_migration_change(
+				migration_changelog::MigrationOperation::RenameField,
+				"/nested/field",
+				Some("/renamed"),
+			),
+			"only top-level field migrations are supported",
+		),
+		(
+			test_migration_change(
+				migration_changelog::MigrationOperation::AddField,
+				"/added",
+				None,
+			),
+			"add field migrations need an explicit value executor",
+		),
+	];
+
+	for (change, reason) in cases {
+		let error = release_record::apply_migration_change(&mut value, &edge, &change)
+			.err()
+			.unwrap_or_else(|| panic!("expected invalid migration operation for {reason}"));
+		assert!(matches!(
+			error,
+			SchemaError::InvalidMigrationOperation { reason: actual, .. } if actual == reason
+		));
+	}
+}
+
+fn test_release_record_migration_edge() -> migration_changelog::MigrationChangelogEntry {
+	migration_changelog::MigrationChangelogEntry {
+		artifact: release_record::KIND,
+		from: migration_changelog::MigrationSource::Version {
+			schema_version: SchemaVersion::new(0, 0),
+		},
+		to: SchemaVersion::new(0, 1),
+		operation: migration_changelog::MigrationOperation::RenameField,
+		changes: &[],
+		noop: false,
+		reason: None,
+	}
+}
+
+fn test_migration_change(
+	operation: migration_changelog::MigrationOperation,
+	path: &'static str,
+	replacement: Option<&'static str>,
+) -> migration_changelog::MigrationChange {
+	migration_changelog::MigrationChange {
+		operation,
+		path,
+		replacement,
+		reason: None,
+	}
+}
+
+#[test]
 fn release_record_render_current_value_writes_public_version_only() {
 	let rendered = release_record::render_current_value(json!({
 		"schemaVersion": 1,

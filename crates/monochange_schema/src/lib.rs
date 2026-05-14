@@ -457,7 +457,7 @@ pub mod release_record {
 		Ok(())
 	}
 
-	fn apply_migration_change(
+	pub(crate) fn apply_migration_change(
 		value: &mut Value,
 		edge: &migration_changelog::MigrationChangelogEntry,
 		change: &migration_changelog::MigrationChange,
@@ -490,7 +490,7 @@ pub mod release_record {
 		}
 	}
 
-	fn top_level_field<'a>(
+	pub(crate) fn top_level_field<'a>(
 		path: &'a str,
 		edge: &migration_changelog::MigrationChangelogEntry,
 	) -> Result<&'a str, SchemaError> {
