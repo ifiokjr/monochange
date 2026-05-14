@@ -1345,7 +1345,7 @@ async fn enforce_publish_rate_limits_blocks_multi_batch_runs_when_enabled() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_sort_requests_by_dependencies_orders_dependencies_first() {
-	let helper = monochange_core::PackageRecord::new(
+	let mut helper = monochange_core::PackageRecord::new(
 		monochange_core::Ecosystem::Cargo,
 		"helper",
 		Path::new("/ws/helper/Cargo.toml").to_path_buf(),
@@ -1382,6 +1382,15 @@ async fn test_sort_requests_by_dependencies_orders_dependencies_first() {
 		.declared_dependencies
 		.push(monochange_core::PackageDependency {
 			name: "helper".into(),
+			kind: DependencyKind::Development,
+			version_constraint: None,
+			optional: false,
+			source_field: None,
+		});
+	helper
+		.declared_dependencies
+		.push(monochange_core::PackageDependency {
+			name: "extra".into(),
 			kind: DependencyKind::Development,
 			version_constraint: None,
 			optional: false,

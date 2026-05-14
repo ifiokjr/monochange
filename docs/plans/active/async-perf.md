@@ -67,6 +67,7 @@
   - Streamed lint progress summary counts directly into one line, avoiding a temporary parts vector and comma-join path.
   - Streamed workspace operation TOML array and inline-table rendering directly into output strings instead of collecting temporary fragments before joining.
   - Streamed subagent overwrite-conflict errors directly into one message instead of collecting path strings before joining.
+  - Reused the publish dependency-order edge stream directly while building graph state, avoiding an intermediate remapped edge vector.
 
 ## Current benchmark summary
 

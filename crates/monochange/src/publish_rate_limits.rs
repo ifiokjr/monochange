@@ -148,15 +148,6 @@ pub(super) fn sort_requests_by_dependencies(
 			request_ids_by_record_id.insert(package.id.clone(), request.package_id.clone());
 		}
 	}
-	let edges = materialize_dependency_edges(packages)
-		.into_iter()
-		.filter_map(|mut edge| {
-			edge.from_package_id = request_ids_by_record_id.get(&edge.from_package_id)?.clone();
-			edge.to_package_id = request_ids_by_record_id.get(&edge.to_package_id)?.clone();
-			Some(edge)
-		})
-		.collect::<Vec<_>>();
-
 	// Build graph: dependency_id -> list of dependent_ids
 	let mut dependents: BTreeMap<String, Vec<String>> = BTreeMap::new();
 	let mut in_degree: BTreeMap<String, usize> = BTreeMap::new();
@@ -166,19 +157,26 @@ pub(super) fn sort_requests_by_dependencies(
 		in_degree.insert(id.clone(), 0);
 	}
 
-	// Build dependents for all edges where the target is in the request list,
-	// so we can discover unselected dependents later.
-	for edge in &edges {
+	for mut edge in materialize_dependency_edges(packages) {
+		let Some(from_package_id) = request_ids_by_record_id.get(&edge.from_package_id) else {
+			continue;
+		};
+		edge.from_package_id.clone_from(from_package_id);
+		let Some(to_package_id) = request_ids_by_record_id.get(&edge.to_package_id) else {
+			continue;
+		};
+		edge.to_package_id.clone_from(to_package_id);
+
+		// Build dependents for all edges where the target is in the request list,
+		// so we can discover unselected dependents later.
 		if request_ids.contains(&edge.to_package_id) {
 			dependents
 				.entry(edge.to_package_id.clone())
 				.or_default()
 				.push(edge.from_package_id.clone());
 		}
-	}
 
-	// Build in-degree only for edges between selected packages.
-	for edge in &edges {
+		// Build in-degree only for edges between selected packages.
 		if request_ids.contains(&edge.from_package_id) && request_ids.contains(&edge.to_package_id)
 		{
 			*in_degree.get_mut(&edge.from_package_id).unwrap() += 1;
