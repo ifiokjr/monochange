@@ -1,6 +1,7 @@
 ---
 monochange_schema: fix
 monochange: fix
+monochange_config: fix
 monochange_core: fix
 monochange_github: fix
 monochange_go: fix

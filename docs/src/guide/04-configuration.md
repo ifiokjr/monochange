@@ -338,7 +338,7 @@ The built-in package publishing flow is intentionally narrow for now:
 
 - no private or custom registry support in `mode = "builtin"`
 - rate-limit planning can batch work and enforce single-window safety, but monochange still does not sleep across windows or requeue later batches automatically
-- manual trusted-publishing setup is still required for `crates.io`, `jsr`, `pub.dev`, and PyPI
+- manual trusted-publishing setup is still required for `crates.io`, `jsr`, `pub.dev`, and `PyPI`
 
 If your workflow needs any of those today, keep the package on `mode = "external"` and let your own CI or scripts own publication.
 
