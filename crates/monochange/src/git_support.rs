@@ -176,18 +176,21 @@ pub(crate) async fn find_release_record_files_at_commit(
 	.find_map(|line| line.strip_prefix("parent ").map(str::to_string));
 
 	let resolved_commit =
-		run_git_capture(root, &["rev-parse", commit], "failed to resolve commit")?;
+		run_git_capture(root, &["rev-parse", commit], "failed to resolve commit").await?;
 	let shallow_file = run_git_capture(
 		root,
 		&["rev-parse", "--git-path", "shallow"],
 		"failed to resolve shallow boundary path",
 	)
+	.await
 	.unwrap_or_else(|_| String::from(".git/shallow"));
 	let shallow_file = root.join(PathBuf::from(shallow_file.trim()));
 	let is_shallow_boundary = fs::read_to_string(shallow_file)
 		.is_ok_and(|contents| contents.lines().any(|line| line == resolved_commit.trim()));
 	let has_available_parent = if let Some(parent) = first_parent.as_deref() {
-		git_command_output(root, &["cat-file", "-e", &format!("{parent}^{{commit}}")]).is_ok()
+		git_command_output(root, &["cat-file", "-e", &format!("{parent}^{{commit}}")])
+			.await
+			.is_ok()
 	} else {
 		false
 	};

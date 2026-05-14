@@ -6,6 +6,7 @@ use std::future::Future;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
+use std::time::Duration;
 use std::time::Instant;
 
 #[cfg(feature = "cargo")]
@@ -39,10 +40,13 @@ use monochange_npm::NpmAdapter;
 use monochange_python::PythonAdapter;
 use serde_json::json;
 use tokio::task::JoinHandle;
+use tokio::time::timeout;
 use typed_builder::TypedBuilder;
 
 use crate::interactive;
 use crate::*;
+
+const HOSTED_SOURCE_ENRICHMENT_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Result of initializing a workspace with `mc init`.
 ///
@@ -1949,12 +1953,28 @@ async fn apply_source_changeset_context_with_timing(
 	record_prepare_phase_timing(phase_timings, label, started_at);
 }
 
+struct SourceChangesetContextTask {
+	handle: JoinHandle<(Vec<PreparedChangeset>, StepPhaseTiming)>,
+}
+
+impl SourceChangesetContextTask {
+	fn new(handle: JoinHandle<(Vec<PreparedChangeset>, StepPhaseTiming)>) -> Self {
+		Self { handle }
+	}
+}
+
+impl Drop for SourceChangesetContextTask {
+	fn drop(&mut self) {
+		self.handle.abort();
+	}
+}
+
 fn spawn_source_changeset_context_task(
 	source: SourceConfiguration,
 	dry_run: bool,
 	mut changesets: Vec<PreparedChangeset>,
-) -> JoinHandle<(Vec<PreparedChangeset>, StepPhaseTiming)> {
-	tokio::spawn(async move {
+) -> SourceChangesetContextTask {
+	SourceChangesetContextTask::new(tokio::spawn(async move {
 		let label = changeset_context_phase_label(&source, dry_run);
 		let started_at = Instant::now();
 		apply_source_changeset_context(&source, dry_run, &mut changesets).await;
@@ -1965,14 +1985,14 @@ fn spawn_source_changeset_context_task(
 				duration: started_at.elapsed(),
 			},
 		)
-	})
+	}))
 }
 
 async fn join_source_changeset_context_task(
 	phase_timings: &mut Vec<StepPhaseTiming>,
-	handle: JoinHandle<(Vec<PreparedChangeset>, StepPhaseTiming)>,
+	mut task: SourceChangesetContextTask,
 ) -> MonochangeResult<Vec<PreparedChangeset>> {
-	let (changesets, timing) = handle.await.map_err(|_| {
+	let (changesets, timing) = (&mut task.handle).await.map_err(|_| {
 		MonochangeError::Io("background changeset context enrichment panicked".to_string())
 	})?;
 	phase_timings.push(timing);
@@ -1988,8 +2008,30 @@ async fn apply_source_changeset_context(
 	if dry_run {
 		adapter.annotate_changeset_context(source, changesets);
 	} else {
-		adapter.enrich_changeset_context(source, changesets).await;
+		run_changeset_context_enrichment_with_timeout(
+			source,
+			HOSTED_SOURCE_ENRICHMENT_TIMEOUT,
+			adapter.enrich_changeset_context(source, changesets),
+		)
+		.await;
 	}
+}
+
+async fn run_changeset_context_enrichment_with_timeout(
+	source: &SourceConfiguration,
+	timeout_after: Duration,
+	enrichment: impl Future<Output = ()>,
+) -> bool {
+	if timeout(timeout_after, enrichment).await.is_ok() {
+		return true;
+	}
+
+	tracing::warn!(
+		provider = %source.provider,
+		timeout_ms = timeout_after.as_millis(),
+		"timed out enriching changeset context"
+	);
+	false
 }
 
 fn materialize_lockfile_command_updates_with_timing(

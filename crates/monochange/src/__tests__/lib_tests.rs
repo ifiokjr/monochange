@@ -5858,8 +5858,8 @@ async fn find_release_record_files_at_commit_reports_git_errors() {
 	);
 }
 
-#[test]
-fn find_release_record_files_at_commit_falls_back_to_tree_when_parent_is_missing() {
+#[tokio::test(flavor = "multi_thread")]
+async fn find_release_record_files_at_commit_falls_back_to_tree_when_parent_is_missing() {
 	let source = tempdir().unwrap_or_else(|error| panic!("source tempdir: {error}"));
 	let source_root = source.path();
 	git_in_temp_repo(source_root, &["init"]);
@@ -5904,6 +5904,7 @@ fn find_release_record_files_at_commit_falls_back_to_tree_when_parent_is_missing
 	assert!(status.success(), "git clone shallow failed");
 
 	let files = crate::git_support::find_release_record_files_at_commit(clone_root, "HEAD")
+		.await
 		.unwrap_or_else(|error| panic!("find release record files: {error}"));
 	assert_eq!(
 		files,

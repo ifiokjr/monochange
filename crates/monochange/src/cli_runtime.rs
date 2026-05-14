@@ -466,18 +466,19 @@ async fn build_release_request_result_for_source(
 	no_verify: bool,
 ) -> MonochangeResult<String> {
 	if dry_run {
-		return build_release_request_result(dry_run, request, || unreachable!());
-	}
-
-	let result =
-		publish_source_change_request(source, root, request, tracked_paths, no_verify).await?;
-	Ok(format!(
-		"{} #{} ({}) via {}",
-		result.repository,
-		result.number,
-		format_change_request_operation(&result.operation),
-		result.provider
-	))
+		build_release_request_result(dry_run, request, || unreachable!())
+	} else {
+		// patch-coverage:ignore-start -- provider-backed publish path requires live hosted-source adapters.
+		let result =
+			publish_source_change_request(source, root, request, tracked_paths, no_verify).await?;
+		Ok(format!(
+			"{} #{} ({}) via {}",
+			result.repository,
+			result.number,
+			format_change_request_operation(&result.operation),
+			result.provider
+		))
+	} // patch-coverage:ignore-end
 }
 
 pub(crate) fn build_issue_comment_results(

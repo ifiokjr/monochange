@@ -79,6 +79,43 @@ fn sample_source_configuration() -> SourceConfiguration {
 	}
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn build_release_request_result_for_source_dry_run_delegates_to_formatter() {
+	let source = sample_source_configuration();
+	let request = monochange_core::SourceChangeRequest {
+		provider: source.provider,
+		repository: "monochange/monochange".to_string(),
+		owner: "monochange".to_string(),
+		repo: "monochange".to_string(),
+		base_branch: "main".to_string(),
+		head_branch: "release/monochange".to_string(),
+		title: "Release monochange".to_string(),
+		body: "Release notes".to_string(),
+		labels: Vec::new(),
+		auto_merge: false,
+		commit_message: monochange_core::CommitMessage {
+			subject: "chore(release): prepare release".to_string(),
+			body: None,
+		},
+	};
+
+	let result = build_release_request_result_for_source(
+		true,
+		&source,
+		Path::new("."),
+		&request,
+		&[],
+		false,
+	)
+	.await
+	.unwrap_or_else(|error| panic!("build release request result: {error}"));
+
+	assert_eq!(
+		result,
+		"dry-run monochange/monochange release/monochange -> main via github"
+	);
+}
+
 #[test]
 fn publish_release_source_configuration_preserves_configured_draft_default() {
 	let mut source = sample_source_configuration();

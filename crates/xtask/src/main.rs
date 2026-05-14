@@ -83,9 +83,19 @@ enum SchemaReleaseCommands {
 }
 
 #[coverage(off)]
-fn main() {
+#[allow(clippy::disallowed_methods)]
+#[tokio::main(flavor = "current_thread")]
+async fn main() {
 	let cli = Cli::parse();
-	let result = match cli.command {
+	let result = execute(cli).await;
+	if let Err(msg) = result {
+		eprintln!("{msg}");
+		std::process::exit(1);
+	}
+}
+
+async fn execute(cli: Cli) -> Result<(), String> {
+	match cli.command {
 		Commands::Schema(args) => {
 			match args.command {
 				SchemaCommands::Update => xtask::run(true),
@@ -112,9 +122,5 @@ fn main() {
 				}
 			}
 		}
-	};
-	if let Err(msg) = result {
-		eprintln!("{msg}");
-		std::process::exit(1);
 	}
 }

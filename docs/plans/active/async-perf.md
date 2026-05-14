@@ -74,6 +74,7 @@
   - Streamed workspace-populate added command lists directly into the CLI result message, avoiding a temporary joined command string.
   - Streamed CLI help bordered-header rendering directly into the output buffer, avoiding a temporary line vector, joined header body, and repeated border strings.
   - Streamed CLI help option and see-also rendering directly into the output buffer, avoiding temporary label strings, padding strings, linked-command vectors, and joins.
+  - Switched `monochange` and `xtask` entrypoints to a Tokio current-thread runtime to keep the CLI universally async while avoiding multi-thread runtime startup overhead for short direct step commands.
 
 ## Current benchmark summary
 
@@ -111,6 +112,17 @@ Measured with `hyperfine --warmup 1 --runs 6` on 200 packages, 500 changesets, 5
 
 Step-command benchmark violations: `0`.
 
+### Low-gain follow-up after rebase
+
+Measured with `hyperfine --warmup 1 --runs 3` against `origin/main` at `b79accfd3d11bbaab94fa8c8b508421615d9029e` after switching the CLI runtime to Tokio current-thread mode.
+
+| Command                                            |      main |       PR | PR/main | Status   |
+| :------------------------------------------------- | --------: | -------: | ------: | :------- |
+| `mc step:config --dry-run`                         |  146.3 ms | 115.9 ms |   0.79× | improved |
+| `mc step:display-versions --dry-run --format json` | 1037.8 ms | 970.1 ms |   0.93× | improved |
+
+The two previously noisy or regressed direct step commands are now both faster than `main`; the full direct step-command rerun reported `0` regressions in `/tmp/monochange-step-current-thread-violations.txt`.
+
 ## Latest targeted optimization results
 
 Measured on the 200-package / 500-changeset / 500-commit profiling fixture after rebuilding the current branch release binary.
@@ -139,7 +151,7 @@ Peak memory sampling with `/usr/bin/time -l` for `step:diagnose-changesets` impr
    - Remaining work: rerun the full step-command matrix and look for non-policy affected-package cases that still fall back to full discovery.
 3. `step:display-versions` now avoids cloning package/group ids and formatted versions while rendering its version summary.
    - JSON output streams version display values directly and text output writes into one buffer.
-   - Next work: rerun the full step-command matrix and isolate any remaining prepare-release or serialization costs.
+   - The low-gain follow-up rerun now shows this command faster than `main`; remaining work is to isolate prepare-release and serialization costs for additional headroom.
 4. Large-fixture `mc step:validate` still spends roughly `0.49 s` on the PR branch.
    - Next work: identify whether validation repeatedly loads manifests or performs serial registry/source checks that can be cached or batched.
 5. Release phase timings do not fully explain the wall-clock `mc release` / `mc release --dry-run` durations.

@@ -1325,13 +1325,70 @@ repo = "monochange"
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn run_changeset_context_enrichment_with_timeout_reports_completion() {
+	let source = sample_source(SourceProvider::GitHub);
+	let completed =
+		run_changeset_context_enrichment_with_timeout(&source, Duration::from_secs(1), async {})
+			.await;
+
+	assert!(completed);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn run_changeset_context_enrichment_with_timeout_returns_false_on_elapsed_timeout() {
+	let source = sample_source(SourceProvider::GitHub);
+	let completed = run_changeset_context_enrichment_with_timeout(
+		&source,
+		Duration::from_millis(1),
+		std::future::pending::<()>(),
+	)
+	.await;
+
+	assert!(!completed);
+}
+
+struct DropSignal(Option<tokio::sync::oneshot::Sender<()>>);
+
+impl Drop for DropSignal {
+	fn drop(&mut self) {
+		if let Some(sender) = self.0.take() {
+			let _ = sender.send(());
+		}
+	}
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn source_changeset_context_task_aborts_background_work_when_dropped() {
+	let (started_sender, started_receiver) = tokio::sync::oneshot::channel();
+	let (dropped_sender, dropped_receiver) = tokio::sync::oneshot::channel();
+	let handle = tokio::spawn(async move {
+		let _ = started_sender.send(());
+		let _drop_signal = DropSignal(Some(dropped_sender));
+		std::future::pending::<(Vec<PreparedChangeset>, StepPhaseTiming)>().await
+	});
+	let task = SourceChangesetContextTask::new(handle);
+
+	started_receiver
+		.await
+		.unwrap_or_else(|error| panic!("background task did not start: {error}"));
+	drop(task);
+	let drop_result = tokio::time::timeout(Duration::from_secs(1), dropped_receiver).await;
+
+	assert!(
+		matches!(drop_result, Ok(Ok(()))),
+		"background task was not dropped: {drop_result:?}"
+	);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn join_source_changeset_context_task_reports_background_panic() {
 	let mut phase_timings = Vec::new();
 	let handle = tokio::spawn(async {
 		panic!("boom");
 	});
+	let task = SourceChangesetContextTask::new(handle);
 
-	let error = join_source_changeset_context_task(&mut phase_timings, handle)
+	let error = join_source_changeset_context_task(&mut phase_timings, task)
 		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected join error"));
