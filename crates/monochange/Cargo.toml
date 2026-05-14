@@ -9,6 +9,8 @@ include = [
 	"src/**/*.yml",
 	"src/**/*.toml",
 	"src/**/*.template",
+	"tests/**/*.rs",
+	"benches/**/*.rs",
 	"Cargo.toml",
 	"readme.md",
 ]

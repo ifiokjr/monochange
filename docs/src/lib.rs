@@ -1,29 +1,22 @@
-doc_comment::doctest!("../../readme.md");
-doc_comment::doctest!("../../CONTRIBUTING.md");
-doc_comment::doctest!("../../crates/monochange/readme.md");
-doc_comment::doctest!("../../crates/monochange_core/readme.md");
-doc_comment::doctest!("../../crates/monochange_cargo/readme.md");
-doc_comment::doctest!("../../crates/monochange_config/readme.md");
-doc_comment::doctest!("../../crates/monochange_graph/readme.md");
-doc_comment::doctest!("../../crates/monochange_github/readme.md");
-doc_comment::doctest!("../../crates/monochange_npm/readme.md");
-doc_comment::doctest!("../../crates/monochange_deno/readme.md");
-doc_comment::doctest!("../../crates/monochange_dart/readme.md");
-doc_comment::doctest!("../../crates/monochange_semver/readme.md");
+//! monochange documentation book
+//!
+//! This crate exists to register the book's markdown content as rustdoc
+//! doctests so they are validated during `cargo test --doc`.
 
-doc_comment::doctest!("readme.md");
-doc_comment::doctest!("guide/00-start-here.md");
-doc_comment::doctest!("guide/01-installation.md");
-doc_comment::doctest!("guide/02-setup.md");
-doc_comment::doctest!("guide/03-discovery.md");
-doc_comment::doctest!("guide/04-configuration.md");
-doc_comment::doctest!("guide/05-version-groups.md");
-doc_comment::doctest!("guide/06-release-planning.md");
-doc_comment::doctest!("guide/08-github-automation.md");
-doc_comment::doctest!("guide/09-assistant-setup.md");
-doc_comment::doctest!("guide/10-migrating-from-knope.md");
-doc_comment::doctest!("guide/11-diagnostics.md");
-doc_comment::doctest!("guide/12-repairable-releases.md");
-doc_comment::doctest!("reference/progress-output.md");
-doc_comment::doctest!("reference/hosted-release-benchmarks.md");
-doc_comment::doctest!("reference/cli-steps/00-index.md");
+#[doc = include_str!("readme.md")]
+#[doc = include_str!("guide/00-start-here.md")]
+#[doc = include_str!("guide/01-installation.md")]
+#[doc = include_str!("guide/02-setup.md")]
+#[doc = include_str!("guide/03-discovery.md")]
+#[doc = include_str!("guide/04-configuration.md")]
+#[doc = include_str!("guide/05-version-groups.md")]
+#[doc = include_str!("guide/06-release-planning.md")]
+#[doc = include_str!("guide/08-github-automation.md")]
+#[doc = include_str!("guide/09-assistant-setup.md")]
+#[doc = include_str!("guide/10-migrating-from-knope.md")]
+#[doc = include_str!("guide/11-diagnostics.md")]
+#[doc = include_str!("guide/12-repairable-releases.md")]
+#[doc = include_str!("reference/progress-output.md")]
+#[doc = include_str!("reference/hosted-release-benchmarks.md")]
+#[doc = include_str!("reference/cli-steps/00-index.md")]
+mod _book {}

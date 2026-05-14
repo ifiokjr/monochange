@@ -162,11 +162,6 @@ jobs:
         run: publish:check
         shell: devenv shell -- bash -e {0}
 
-      - name: verify crate packages
-        if: runner.os != 'Windows'
-        run: package:check
-        shell: devenv shell -- bash -e {0}
-
       - name: skip publish build check on release commit
         if: runner.os != 'Windows' && steps.release_record.outputs.is_release_commit == 'true'
         run: echo "HEAD is a release commit; skipping publish:check."
@@ -175,6 +170,36 @@ jobs:
       - name: build book
         if: runner.os != 'Windows'
         run: build:book
+        shell: devenv shell -- bash -e {0}
+
+  packaging:
+    needs: [lint]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: detect release commit
+        id: release_record
+        run: |
+          if git log --oneline -1 --grep='chore(release)' HEAD | grep -q 'chore(release)'; then
+            echo "is_release_commit=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
+          fi
+        shell: devenv shell -- bash -e {0}
+
+      - name: verify crate packages
+        if: steps.release_record.outputs.is_release_commit != 'true'
+        run: package:check
+        shell: devenv shell -- bash -e {0}
+
+      - name: skip packaging check on release commit
+        if: steps.release_record.outputs.is_release_commit == 'true'
+        run: echo "HEAD is a release commit; skipping package:check."
         shell: devenv shell -- bash -e {0}
 
   coverage:

@@ -154,7 +154,10 @@ in
       exec = ''
         set -euo pipefail
         echo "=== Verifying crate packages with cargo package ==="
-        cargo package --workspace --all-features 2>&1 || {
+        cargo package --workspace --all-features \
+          --exclude monochange_book \
+          --exclude monochange_integration_tests \
+          --exclude xtask 2>&1 || {
           echo "\\nERROR: cargo package failed."
           echo "This means at least one crate cannot be published because its packaged source fails to compile."
           echo "Common causes:"
@@ -164,7 +167,7 @@ in
           exit 1
         }
       '';
-      description = "Verify all workspace crates can be packaged and built from their tarballs (catches publish failures before they happen)";
+      description = "Verify all publishable workspace crates can be packaged and built from their tarballs (catches publish failures before they happen)";
       binary = "bash";
     };
     "test:all" = {

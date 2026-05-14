@@ -16,7 +16,6 @@ description = "Configuration parsing and validation for monochange"
 schema = ["dep:schemars", "monochange_core/schema"]
 
 [dependencies]
-doc-comment = { workspace = true, default-features = true }
 glob = { workspace = true, default-features = true }
 miette = { workspace = true, default-features = true }
 monochange_core = { workspace = true }
