@@ -7,7 +7,6 @@ use crate::SchemaVersion;
 use crate::SchemaVersionParseError;
 use crate::config;
 use crate::current_schema_version;
-use crate::migration_changelog;
 use crate::release_record;
 
 #[test]
@@ -181,35 +180,17 @@ fn release_record_migrates_legacy_v_only_schema_version() {
 }
 
 #[test]
-fn release_record_field_migration_helpers_apply_supported_changes() {
-	let edge = test_release_record_migration_edge();
+fn release_record_rust_migration_helpers_apply_supported_changes() {
 	let mut value = json!({
 		"oldName": "kept",
 		"removed": true,
 		"other": "stable"
 	});
-	let rename = test_migration_change(
-		migration_changelog::MigrationOperation::RenameField,
-		"/oldName",
-		Some("/newName"),
-	);
-	let remove = test_migration_change(
-		migration_changelog::MigrationOperation::RemoveField,
-		"/removed",
-		None,
-	);
-	let noop = test_migration_change(
-		migration_changelog::MigrationOperation::Noop,
-		"/ignored",
-		None,
-	);
 
-	release_record::apply_migration_change(&mut value, &edge, &rename)
+	release_record::rename_top_level_field(&mut value, "oldName", "newName")
 		.unwrap_or_else(|error| panic!("rename field: {error}"));
-	release_record::apply_migration_change(&mut value, &edge, &remove)
+	release_record::remove_top_level_field(&mut value, "removed")
 		.unwrap_or_else(|error| panic!("remove field: {error}"));
-	release_record::apply_migration_change(&mut value, &edge, &noop)
-		.unwrap_or_else(|error| panic!("noop field migration: {error}"));
 
 	assert_eq!(value.get("newName"), Some(&json!("kept")));
 	assert!(value.get("oldName").is_none());
@@ -218,80 +199,28 @@ fn release_record_field_migration_helpers_apply_supported_changes() {
 }
 
 #[test]
-fn release_record_field_migration_helpers_reject_unsupported_changes() {
-	let edge = test_release_record_migration_edge();
-	let mut value = json!({ "field": "value" });
-	let cases = [
-		(
-			test_migration_change(
-				migration_changelog::MigrationOperation::RenameField,
-				"field",
-				Some("/renamed"),
-			),
-			"migration change path must be an absolute JSON pointer",
-		),
-		(
-			test_migration_change(
-				migration_changelog::MigrationOperation::RenameField,
-				"/field",
-				None,
-			),
-			"rename field migration is missing a replacement path",
-		),
-		(
-			test_migration_change(
-				migration_changelog::MigrationOperation::RenameField,
-				"/nested/field",
-				Some("/renamed"),
-			),
-			"only top-level field migrations are supported",
-		),
-		(
-			test_migration_change(
-				migration_changelog::MigrationOperation::AddField,
-				"/added",
-				None,
-			),
-			"add field migrations need an explicit value executor",
-		),
-	];
-
-	for (change, reason) in cases {
-		let error = release_record::apply_migration_change(&mut value, &edge, &change)
-			.err()
-			.unwrap_or_else(|| panic!("expected invalid migration operation for {reason}"));
-		assert!(matches!(
-			error,
-			SchemaError::InvalidMigrationOperation { reason: actual, .. } if actual == reason
-		));
-	}
+fn release_record_rust_migration_edges_are_explicit_and_ordered() {
+	assert_eq!(
+		release_record::migration_edge_versions(),
+		&[
+			(SchemaVersion::new(0, 0), SchemaVersion::new(0, 1)),
+			(SchemaVersion::new(0, 1), SchemaVersion::new(0, 2)),
+		]
+	);
 }
 
-fn test_release_record_migration_edge() -> migration_changelog::MigrationChangelogEntry {
-	migration_changelog::MigrationChangelogEntry {
-		artifact: release_record::KIND,
-		from: migration_changelog::MigrationSource::Version {
-			schema_version: SchemaVersion::new(0, 0),
-		},
-		to: SchemaVersion::new(0, 1),
-		operation: migration_changelog::MigrationOperation::RenameField,
-		changes: &[],
-		noop: false,
-		reason: None,
-	}
-}
+#[test]
+fn release_record_rust_migration_helpers_reject_non_object_values() {
+	let mut value = json!(null);
+	let error = release_record::rename_top_level_field(&mut value, "oldName", "newName")
+		.err()
+		.unwrap_or_else(|| panic!("expected non-object rename error"));
+	assert!(matches!(error, SchemaError::NotObject));
 
-fn test_migration_change(
-	operation: migration_changelog::MigrationOperation,
-	path: &'static str,
-	replacement: Option<&'static str>,
-) -> migration_changelog::MigrationChange {
-	migration_changelog::MigrationChange {
-		operation,
-		path,
-		replacement,
-		reason: None,
-	}
+	let error = release_record::remove_top_level_field(&mut value, "removed")
+		.err()
+		.unwrap_or_else(|| panic!("expected non-object remove error"));
+	assert!(matches!(error, SchemaError::NotObject));
 }
 
 #[test]
@@ -427,29 +356,6 @@ fn release_record_rejects_future_version() {
 }
 
 #[test]
-fn migration_changelog_is_machine_readable_json() {
-	let json = migration_changelog::to_json_pretty()
-		.unwrap_or_else(|error| panic!("migration changelog json: {error}"));
-	let value = serde_json::from_str::<Value>(&json)
-		.unwrap_or_else(|error| panic!("migration changelog json should parse: {error}"));
-	let entries = migration_changelog::entries_for_artifact(release_record::KIND);
-	assert_eq!(entries.len(), 2);
-	assert_eq!(entries[0].to, SchemaVersion::new(0, 1));
-	assert_eq!(entries[1].to, SchemaVersion::new(0, 2));
-	assert_eq!(
-		value.pointer("/0/artifact"),
-		Some(&json!(release_record::KIND))
-	);
-	assert_eq!(value.pointer("/0/from/schemaVersion"), Some(&json!("0.0")));
-	assert_eq!(value.pointer("/0/to"), Some(&json!("0.1")));
-	assert_eq!(value.pointer("/0/operation"), Some(&json!("rename_field")));
-	assert_eq!(value.pointer("/0/noop"), Some(&json!(false)));
-	assert_eq!(value.pointer("/1/from/schemaVersion"), Some(&json!("0.1")));
-	assert_eq!(value.pointer("/1/to"), Some(&json!("0.2")));
-	assert_eq!(value.pointer("/1/operation"), Some(&json!("noop")));
-}
-
-#[test]
 fn committed_release_record_schema_tracks_current_wire_constants() {
 	let release_record_schema = include_str!("../../schemas/release-record.schema.json");
 	let schema = serde_json::from_str::<Value>(release_record_schema)
@@ -478,29 +384,6 @@ fn committed_release_record_schema_tracks_current_wire_constants() {
 #[test]
 fn committed_json_schema_files_parse() {
 	let release_record_schema = include_str!("../../schemas/release-record.schema.json");
-	let changelog = include_str!("../../schemas/migration-changelog.json");
-
 	serde_json::from_str::<Value>(release_record_schema)
 		.unwrap_or_else(|error| panic!("release record schema json: {error}"));
-	serde_json::from_str::<Value>(changelog)
-		.unwrap_or_else(|error| panic!("migration changelog json: {error}"));
-}
-
-#[test]
-fn committed_migration_changelog_is_current() {
-	let generated = migration_changelog::to_json_pretty()
-		.unwrap_or_else(|error| panic!("migration changelog json: {error}"));
-	let committed_path =
-		std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("schemas/migration-changelog.json");
-	let committed_result = std::fs::read_to_string(&committed_path);
-	assert!(
-		committed_result.is_ok(),
-		"read committed migration changelog"
-	);
-	let committed = committed_result.unwrap_or_default();
-	let committed_value = serde_json::from_str::<Value>(&committed)
-		.unwrap_or_else(|error| panic!("committed migration changelog json: {error}"));
-	let generated_value = serde_json::from_str::<Value>(&generated)
-		.unwrap_or_else(|error| panic!("generated migration changelog json: {error}"));
-	assert_eq!(committed_value, generated_value);
 }

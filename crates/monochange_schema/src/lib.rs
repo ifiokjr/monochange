@@ -1,4 +1,4 @@
-//! Durable JSON schema versions and migration metadata for monochange artifacts.
+//! Durable JSON schema versions and migration pipelines for monochange artifacts.
 
 use std::fmt;
 use std::str::FromStr;
@@ -200,20 +200,6 @@ pub enum SchemaError {
 		/// Current supported version.
 		to: SchemaVersion,
 	},
-	/// A declared migration edge could not be applied to the payload.
-	#[error(
-		"artifact `{artifact}` migration edge from schema version `{from}` to `{to}` could not be applied: {reason}"
-	)]
-	InvalidMigrationOperation {
-		/// Durable artifact kind.
-		artifact: &'static str,
-		/// Source schema version for the failed edge.
-		from: SchemaVersion,
-		/// Destination schema version for the failed edge.
-		to: SchemaVersion,
-		/// Static failure reason.
-		reason: &'static str,
-	},
 	/// JSON conversion failure.
 	#[error("artifact json error: {0}")]
 	Json(#[from] serde_json::Error),
@@ -258,7 +244,6 @@ pub mod release_record {
 	use crate::SchemaError;
 	use crate::SchemaVersion;
 	use crate::current_schema_version_for_error;
-	use crate::migration_changelog;
 	use crate::object_mut;
 	use crate::parse_current_version;
 	use crate::validate_kind;
@@ -361,7 +346,8 @@ pub mod release_record {
 	pub fn render_current_value(mut value: Value) -> Result<Value, SchemaError> {
 		let object = object_mut(&mut value)?;
 		validate_kind(object, KIND)?;
-		object.remove(LEGACY_VERSION_FIELD);
+		remove_top_level_field(&mut value, LEGACY_VERSION_FIELD)?;
+		let object = object_mut(&mut value)?;
 		object.insert(
 			SCHEMA_VERSION_FIELD.to_string(),
 			Value::String(CURRENT_SCHEMA_VERSION_TEXT.to_string()),
@@ -394,8 +380,8 @@ pub mod release_record {
 		}
 		migrate_edges(&mut value, version, current)?;
 
+		remove_top_level_field(&mut value, LEGACY_VERSION_FIELD)?;
 		let object = object_mut(&mut value)?;
-		object.remove(LEGACY_VERSION_FIELD);
 		object.insert(
 			SCHEMA_VERSION_FIELD.to_string(),
 			Value::String(CURRENT_SCHEMA_VERSION_TEXT.to_string()),
@@ -424,98 +410,71 @@ pub mod release_record {
 					to,
 				});
 			}
-			apply_migration_edge(value, edge)?;
+			(edge.apply)(value)?;
 			cursor = edge.to;
 		}
 		Ok(())
 	}
 
-	fn migration_edge_from(
-		version: SchemaVersion,
-	) -> Option<&'static migration_changelog::MigrationChangelogEntry> {
-		migration_changelog::entries_for_artifact(KIND)
-			.into_iter()
-			.find(|entry| migration_source_version(entry.from) == version)
+	fn migration_edge_from(version: SchemaVersion) -> Option<&'static MigrationEdge> {
+		debug_assert_eq!(MIGRATION_EDGES.len(), migration_edge_versions().len());
+		MIGRATION_EDGES.iter().find(|edge| edge.from == version)
 	}
 
-	fn migration_source_version(source: migration_changelog::MigrationSource) -> SchemaVersion {
-		match source {
-			migration_changelog::MigrationSource::Version { schema_version } => schema_version,
-		}
+	struct MigrationEdge {
+		from: SchemaVersion,
+		to: SchemaVersion,
+		apply: fn(&mut Value) -> Result<(), SchemaError>,
 	}
 
-	fn apply_migration_edge(
+	const MIGRATION_EDGES: &[MigrationEdge] = &[
+		MigrationEdge {
+			from: SchemaVersion::new(0, 0),
+			to: SchemaVersion::new(0, 1),
+			apply: migrate_0_0_to_0_1,
+		},
+		MigrationEdge {
+			from: SchemaVersion::new(0, 1),
+			to: SchemaVersion::new(0, 2),
+			apply: migrate_0_1_to_0_2,
+		},
+	];
+
+	fn migrate_0_0_to_0_1(value: &mut Value) -> Result<(), SchemaError> {
+		rename_top_level_field(value, LEGACY_VERSION_FIELD, SCHEMA_VERSION_FIELD)
+	}
+
+	fn migrate_0_1_to_0_2(value: &mut Value) -> Result<(), SchemaError> {
+		object_mut(value)?;
+		Ok(())
+	}
+
+	pub(crate) fn rename_top_level_field(
 		value: &mut Value,
-		edge: &migration_changelog::MigrationChangelogEntry,
+		source: &str,
+		destination: &str,
 	) -> Result<(), SchemaError> {
-		if edge.operation == migration_changelog::MigrationOperation::Noop && edge.noop {
-			return Ok(());
-		}
-		for change in edge.changes {
-			apply_migration_change(value, edge, change)?;
+		let object = object_mut(value)?;
+		if let Some(field_value) = object.remove(source) {
+			object.insert(destination.to_string(), field_value);
 		}
 		Ok(())
 	}
 
-	pub(crate) fn apply_migration_change(
+	pub(crate) fn remove_top_level_field(
 		value: &mut Value,
-		edge: &migration_changelog::MigrationChangelogEntry,
-		change: &migration_changelog::MigrationChange,
+		field: &str,
 	) -> Result<(), SchemaError> {
-		match change.operation {
-			migration_changelog::MigrationOperation::RenameField => {
-				let source = top_level_field(change.path, edge)?;
-				let Some(replacement) = change.replacement else {
-					return invalid_operation(
-						edge,
-						"rename field migration is missing a replacement path",
-					);
-				};
-				let destination = top_level_field(replacement, edge)?;
-				let object = object_mut(value)?;
-				if let Some(field_value) = object.remove(source) {
-					object.insert(destination.to_string(), field_value);
-				}
-				Ok(())
-			}
-			migration_changelog::MigrationOperation::RemoveField => {
-				let field = top_level_field(change.path, edge)?;
-				object_mut(value)?.remove(field);
-				Ok(())
-			}
-			migration_changelog::MigrationOperation::AddField => {
-				invalid_operation(edge, "add field migrations need an explicit value executor")
-			}
-			migration_changelog::MigrationOperation::Noop => Ok(()),
-		}
+		object_mut(value)?.remove(field);
+		Ok(())
 	}
 
-	pub(crate) fn top_level_field<'a>(
-		path: &'a str,
-		edge: &migration_changelog::MigrationChangelogEntry,
-	) -> Result<&'a str, SchemaError> {
-		let Some(field) = path.strip_prefix('/') else {
-			return invalid_operation(
-				edge,
-				"migration change path must be an absolute JSON pointer",
-			);
-		};
-		if field.is_empty() || field.contains('/') {
-			return invalid_operation(edge, "only top-level field migrations are supported");
-		}
-		Ok(field)
-	}
-
-	fn invalid_operation<T>(
-		edge: &migration_changelog::MigrationChangelogEntry,
-		reason: &'static str,
-	) -> Result<T, SchemaError> {
-		Err(SchemaError::InvalidMigrationOperation {
-			artifact: KIND,
-			from: migration_source_version(edge.from),
-			to: edge.to,
-			reason,
-		})
+	pub(crate) fn migration_edge_versions() -> &'static [(SchemaVersion, SchemaVersion)] {
+		const VERSIONS: &[(SchemaVersion, SchemaVersion)] = &[
+			(SchemaVersion::new(0, 0), SchemaVersion::new(0, 1)),
+			(SchemaVersion::new(0, 1), SchemaVersion::new(0, 2)),
+		];
+		VERSIONS
 	}
 }
 
@@ -533,124 +492,6 @@ pub mod config {
 		});
 		serde_json::to_string_pretty(&artifact)
 			.unwrap_or_else(|error| panic!("serialize config artifact fixture: {error}"))
-	}
-}
-
-/// Machine-readable migration changelog entries.
-pub mod migration_changelog {
-	use serde::Serialize;
-
-	use crate::SchemaVersion;
-
-	/// All known durable migration changelog entries.
-	pub const ENTRIES: &[MigrationChangelogEntry] = &[
-		MigrationChangelogEntry {
-			artifact: crate::release_record::KIND,
-			from: MigrationSource::Version {
-				schema_version: SchemaVersion::new(0, 0),
-			},
-			to: SchemaVersion::new(0, 1),
-			operation: MigrationOperation::RenameField,
-			changes: &[MigrationChange {
-				operation: MigrationOperation::RenameField,
-				path: "/v",
-				replacement: Some("/schemaVersion"),
-				reason: Some(
-					"Schema 0.0 used the legacy `v` field before `schemaVersion` became the public durable version field.",
-				),
-			}],
-			noop: false,
-			reason: Some(
-				"Release-record schema 0.0 is supported as the legacy `v`-only artifact shape and is normalized onto the public `schemaVersion` field before later migrations run.",
-			),
-		},
-		MigrationChangelogEntry {
-			artifact: crate::release_record::KIND,
-			from: MigrationSource::Version {
-				schema_version: SchemaVersion::new(0, 1),
-			},
-			to: SchemaVersion::new(0, 2),
-			operation: MigrationOperation::Noop,
-			changes: &[],
-			noop: true,
-			reason: Some(
-				"Release-record schema 0.2 preserves the 0.1 wire shape; the explicit edge keeps older artifact readability covered by CI.",
-			),
-		},
-	];
-
-	/// A structured migration changelog entry.
-	#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
-	#[serde(rename_all = "camelCase")]
-	pub struct MigrationChangelogEntry {
-		/// Artifact kind this migration applies to.
-		pub artifact: &'static str,
-		/// Source version for the migration edge.
-		pub from: MigrationSource,
-		/// Destination `schemaVersion` after migration.
-		pub to: SchemaVersion,
-		/// Summary operation for the edge.
-		pub operation: MigrationOperation,
-		/// Machine-readable field changes performed by this edge.
-		pub changes: &'static [MigrationChange],
-		/// Whether this edge intentionally leaves the payload unchanged.
-		pub noop: bool,
-		/// Human-readable reason for this edge.
-		pub reason: Option<&'static str>,
-	}
-
-	/// A source schema version.
-	#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
-	#[serde(tag = "type", rename_all = "camelCase")]
-	pub enum MigrationSource {
-		/// Current string schema version field.
-		Version {
-			/// Source `schemaVersion` value.
-			#[serde(rename = "schemaVersion")]
-			schema_version: SchemaVersion,
-		},
-	}
-
-	/// Machine-readable migration operation names.
-	#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
-	#[serde(rename_all = "snake_case")]
-	pub enum MigrationOperation {
-		/// Rename a field.
-		RenameField,
-		/// Add a field.
-		AddField,
-		/// Remove a field.
-		RemoveField,
-		/// Explicit no-op edge.
-		Noop,
-	}
-
-	/// A single field-level migration change.
-	#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
-	#[serde(rename_all = "camelCase")]
-	pub struct MigrationChange {
-		/// Operation performed on this path.
-		pub operation: MigrationOperation,
-		/// JSON Pointer-like path affected by this change.
-		pub path: &'static str,
-		/// Replacement path/value, if applicable.
-		pub replacement: Option<&'static str>,
-		/// Explanation for this change.
-		pub reason: Option<&'static str>,
-	}
-
-	/// Return migration entries for an artifact kind.
-	#[must_use]
-	pub fn entries_for_artifact(artifact: &str) -> Vec<&'static MigrationChangelogEntry> {
-		ENTRIES
-			.iter()
-			.filter(|entry| entry.artifact == artifact)
-			.collect()
-	}
-
-	/// Render the migration changelog as deterministic pretty JSON.
-	pub fn to_json_pretty() -> Result<String, serde_json::Error> {
-		serde_json::to_string_pretty(ENTRIES)
 	}
 }
 

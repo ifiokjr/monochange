@@ -20,4 +20,4 @@ For example, callers can continue to load a legacy record like:
 }
 ```
 
-and receive the current `schemaVersion` field after migration. The release schema preflight now also checks committed schema assets, migration metadata, generated docs copies, and active schema changesets so release PRs fail before publishing inconsistent schema artifacts.
+and receive the current `schemaVersion` field after migration. The release schema preflight now also checks committed schema assets, Rust migration edges, generated docs copies, and active schema changesets so release PRs fail before publishing inconsistent schema artifacts.

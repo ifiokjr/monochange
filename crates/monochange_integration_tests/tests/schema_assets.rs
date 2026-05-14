@@ -17,7 +17,6 @@ fn committed_schema_assets_are_json_and_hosted_copy_is_current() -> Result<(), B
 	parse_json(&paths.hosted_release_schema)?;
 	parse_json(&paths.versioned_release_schema)?;
 	parse_json(&paths.canonical_release_schema)?;
-	parse_json(&paths.migration_changelog)?;
 
 	assert_eq!(
 		std::fs::read_to_string(&paths.canonical_release_schema)?,
@@ -184,10 +183,6 @@ fn release_preflight_schema_assets_are_aligned() -> Result<(), Box<dyn Error>> {
 	);
 	assert!(paths.versioned_release_schema.is_file());
 	assert!(paths.versioned_config_schema.is_file());
-	assert_eq!(
-		parse_json(&paths.migration_changelog)?,
-		serde_json::from_str::<Value>(&monochange_schema::migration_changelog::to_json_pretty()?)?
-	);
 
 	Ok(())
 }
@@ -426,8 +421,6 @@ fn schema_asset_inventory_matches_snapshot() -> Result<(), Box<dyn Error>> {
 	let paths = schema_asset_paths()?;
 	let release_schema = parse_json(&paths.canonical_release_schema)?;
 	let config_schema = parse_json(&paths.config_schema)?;
-	let changelog = parse_json(&paths.migration_changelog)?;
-
 	let inventory = json!({
 		"currentSchemaVersion": monochange_schema::CURRENT_SCHEMA_VERSION_TEXT,
 		"schemaCrateVersion": schema_crate_version(&paths)?,
@@ -442,7 +435,6 @@ fn schema_asset_inventory_matches_snapshot() -> Result<(), Box<dyn Error>> {
 			"dynamicTables": ["package", "group", "cli"],
 			"additionalProperties": json_bool(&config_schema, "/additionalProperties")?,
 		},
-		"migrationChangelog": changelog,
 	});
 
 	assert_json_snapshot!(inventory, {
@@ -459,8 +451,6 @@ fn release_record_schema_multiline_fields_are_snapshot_individually() -> Result<
 	let paths = schema_asset_paths()?;
 	let release_schema = parse_json(&paths.canonical_release_schema)?;
 	let config_schema = parse_json(&paths.config_schema)?;
-	let changelog = parse_json(&paths.migration_changelog)?;
-
 	let description = json_str(&release_schema, "/description")?;
 	// The committed schema description can lag or lead the crate's current schema
 	// version while release PRs regenerate assets. Redact any artifact-version
@@ -476,7 +466,6 @@ fn release_record_schema_multiline_fields_are_snapshot_individually() -> Result<
 		"config_schema_description",
 		json_str(&config_schema, "/description")?
 	);
-	assert_json_snapshot!("migration_changelog_entries", changelog);
 
 	Ok(())
 }
@@ -681,7 +670,6 @@ struct SchemaAssetPaths {
 	hosted_release_schema: PathBuf,
 	versioned_release_schema: PathBuf,
 	canonical_release_schema: PathBuf,
-	migration_changelog: PathBuf,
 	schema_crate_manifest: PathBuf,
 	artifacts_dir: PathBuf,
 	current_artifacts_dir: PathBuf,
@@ -703,7 +691,6 @@ fn schema_asset_paths() -> Result<SchemaAssetPaths, Box<dyn Error>> {
 		)),
 		canonical_release_schema: root
 			.join("crates/monochange_schema/schemas/release-record.schema.json"),
-		migration_changelog: root.join("crates/monochange_schema/schemas/migration-changelog.json"),
 		schema_crate_manifest: root.join("crates/monochange_schema/Cargo.toml"),
 		artifacts_dir: root.join("crates/monochange_schema/schemas/artifacts"),
 		current_artifacts_dir: root.join("crates/monochange_schema/schemas/artifacts/current"),
