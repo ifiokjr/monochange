@@ -176,9 +176,9 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "aws-lc-rs"
-version = "1.16.3"
+version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ec6fb3fe69024a75fa7e1bfb48aa6cf59706a101658ea01bfd33b2b248a038f"
+checksum = "5ec2f1fc3ec205783a5da9a7e6c1509cc69dedf09a1949e412c1e18469326d00"
 dependencies = [
  "aws-lc-sys",
  "zeroize",
@@ -186,9 +186,9 @@ dependencies = [
 
 [[package]]
 name = "aws-lc-sys"
-version = "0.40.0"
+version = "0.41.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f50037ee5e1e41e7b8f9d161680a725bd1626cb6f8c7e901f91f942850852fe7"
+checksum = "1a2f9779ce85b93ab6170dd940ad0169b5766ff848247aff13bb788b832fe3f4"
 dependencies = [
  "cc",
  "cmake",
@@ -1951,9 +1951,9 @@ dependencies = [
 
 [[package]]
 name = "jsonwebtoken"
-version = "10.3.0"
+version = "10.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0529410abe238729a60b108898784df8984c87f6054c9c4fcacc47e4803c1ce1"
+checksum = "eba32bfb4ffdeaca3e34431072faf01745c9b26d25504aa7a6cf5684334fc4fc"
 dependencies = [
  "base64",
  "ed25519-dalek",
@@ -1970,6 +1970,7 @@ dependencies = [
  "sha2",
  "signature",
  "simple_asn1",
+ "zeroize",
 ]
 
 [[package]]
@@ -2149,7 +2150,7 @@ dependencies = [
 
 [[package]]
 name = "monochange"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "anstyle",
  "chrono",
@@ -2210,7 +2211,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_analysis"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "insta",
  "monochange_cargo",
@@ -2231,7 +2232,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_book"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "doc-comment",
  "monochange",
@@ -2249,7 +2250,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_cargo"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "glob",
  "insta",
@@ -2276,7 +2277,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_changelog"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "minijinja",
  "monochange_core",
@@ -2290,7 +2291,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_config"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "doc-comment",
  "glob",
@@ -2315,7 +2316,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_core"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "ignore",
  "insta",
@@ -2335,7 +2336,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_dart"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "glob",
  "insta",
@@ -2357,7 +2358,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_deno"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "glob",
  "insta",
@@ -2377,7 +2378,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_ecmascript"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "monochange_core",
  "oxc_allocator",
@@ -2388,7 +2389,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_forgejo"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "etest",
  "httpmock",
@@ -2408,7 +2409,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_gitea"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "etest",
  "httpmock",
@@ -2427,7 +2428,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_github"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "etest",
  "httpmock",
@@ -2450,7 +2451,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_gitlab"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "etest",
  "httpmock",
@@ -2469,7 +2470,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_go"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "glob",
  "insta",
@@ -2487,7 +2488,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_graph"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "insta",
  "monochange_core",
@@ -2501,7 +2502,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_hosting"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "httpmock",
  "monochange_core",
@@ -2528,7 +2529,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_lint"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "glob",
  "ignore",
@@ -2541,14 +2542,14 @@ dependencies = [
 
 [[package]]
 name = "monochange_linting"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "monochange_core",
 ]
 
 [[package]]
 name = "monochange_npm"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "glob",
  "insta",
@@ -2573,7 +2574,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_publish"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "monochange_core",
  "reqwest",
@@ -2586,7 +2587,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_python"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "glob",
  "insta",
@@ -2606,7 +2607,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_schema"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "insta",
  "serde",
@@ -2616,7 +2617,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_semver"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "insta",
  "monochange_core",
@@ -2628,7 +2629,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_telemetry"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "monochange_core",
  "reqwest",
@@ -2641,7 +2642,7 @@ dependencies = [
 
 [[package]]
 name = "monochange_test_helpers"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "insta",
  "monochange_core",
@@ -3252,18 +3253,18 @@ dependencies = [
 
 [[package]]
 name = "pin-project"
-version = "1.1.12"
+version = "1.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cbf0d9e68100b3a7989b4901972f265cd542e560a3a8a724e1e20322f4d06ce9"
+checksum = "2466b2336ed02bcdca6b294417127b90ec92038d1d5c4fbeac971a922e0e0924"
 dependencies = [
  "pin-project-internal",
 ]
 
 [[package]]
 name = "pin-project-internal"
-version = "1.1.12"
+version = "1.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a990e22f43e84855daf260dded30524ef4a9021cc7541c26540500a50b624389"
+checksum = "c96395f0a926bc13b1c17622aaddda1ecb55d49c8f1bf9777e4d877800a43f8b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3746,9 +3747,9 @@ dependencies = [
 
 [[package]]
 name = "rmcp"
-version = "1.6.0"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e12ca9067b5ebfbd5b3fcdc4acfceb81aa7d5ab2a879dff7cb75d22434276aad"
+checksum = "0810a9f717d9828f475fe1f629f4c305c8464b7f496c3a854b58d29e65f4058e"
 dependencies = [
  "async-trait",
  "base64",
@@ -3768,9 +3769,9 @@ dependencies = [
 
 [[package]]
 name = "rmcp-macros"
-version = "1.6.0"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7caa6743cc0888e433105fe1bc551a7f607940b126a37bc97b478e86064627eb"
+checksum = "6aefac48c364756e97f04c0401ba3231e8607882c7c1d92da0437dc16307904d"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -4179,13 +4180,13 @@ dependencies = [
 
 [[package]]
 name = "serial2"
-version = "0.2.36"
+version = "0.2.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcdbc46aa3882ec3d48ec2b5abcb4f0d863a13d7599265f3faa6d851f23c12f3"
+checksum = "9eb6ea5562eeaed6936b8b54e086aa0f88b9e5b1bef45beb038e2519fa1185b1"
 dependencies = [
  "cfg-if",
  "libc",
- "winapi",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5591,7 +5592,7 @@ checksum = "1ffae5123b2d3fc086436f8834ae3ab053a283cfac8fe0a0b8eaae044768a4c4"
 
 [[package]]
 name = "xtask"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "clap",
  "monochange_config",
@@ -5648,9 +5649,9 @@ dependencies = [
 
 [[package]]
 name = "zerofrom"
-version = "0.1.7"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69faa1f2a1ea75661980b013019ed6687ed0e83d069bc1114e2cc74c6c04c4df"
+checksum = "0ec05a11813ea801ff6d75110ad09cd0824ddba17dfe17128ea0d5f68e6c5272"
 dependencies = [
  "zerofrom-derive",
 ]
@@ -5672,6 +5673,20 @@ name = "zeroize"
 version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b97154e67e32c85465826e8bcc1c59429aaaf107c1e4a9e53c8d8ccd5eff88d0"
+dependencies = [
+ "zeroize_derive",
+]
+
+[[package]]
+name = "zeroize_derive"
+version = "1.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85a5b4158499876c763cb03bc4e49185d3cccbabb15b33c627f7884f43db852e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "zerotrie"
