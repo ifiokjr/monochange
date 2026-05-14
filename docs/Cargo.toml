@@ -8,6 +8,7 @@ repository = { workspace = true }
 description = "Book and documentation for monochange"
 
 [dependencies]
+doc-comment = { workspace = true, default-features = true }
 monochange = { workspace = true }
 monochange_cargo = { workspace = true }
 monochange_config = { workspace = true }
