@@ -128,7 +128,7 @@ pub(crate) fn migrate_release_records(
 			))
 		})?;
 		let mut migrated = serde_json::to_string_pretty(&migrated_value)
-			.expect("serde_json::Value serializes to JSON text");
+			.unwrap_or_else(|error| panic!("serde_json::Value serializes to JSON text: {error}"));
 		migrated.push('\n');
 		let is_current =
 			!schema_version.legacy && from_schema_version == RELEASE_RECORD_SCHEMA_VERSION;
