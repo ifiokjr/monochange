@@ -2215,6 +2215,32 @@ impl<'de> Deserialize<'de> for ShellConfig {
 
 /// Built-in execution units for `[[cli.<command>.steps]]`.
 ///
+/// Selects where a `CommitRelease` step creates the release commit.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CommitReleaseBackend {
+	/// Create the release commit in the local checkout.
+	#[default]
+	Local,
+	/// Delegate release commit creation to the hosted monochange app.
+	Hosted,
+}
+
+/// Selects how hosted release commit requests authenticate to monochange.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HostedCommitAuth {
+	/// Prefer GitHub Actions OIDC when available, with token auth as an explicit fallback.
+	#[default]
+	Auto,
+	/// Use GitHub Actions OIDC.
+	Oidc,
+	/// Use a long-lived monochange API token.
+	Token,
+}
+
 /// `monochange` runs steps in order and lets later steps consume state created by
 /// earlier ones. Use standalone steps such as `Validate`, `Discover`,
 /// `AffectedPackages`, `DiagnoseChangesets`, and `RetargetRelease` when you want
@@ -2333,9 +2359,12 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		allow_empty_changesets: bool,
 	},
-	/// Create a local release commit with an embedded durable `ReleaseRecord`.
+	/// Create a release commit with an embedded durable `ReleaseRecord`.
 	///
-	/// Requires a previous `PrepareRelease` step.
+	/// Requires a previous `PrepareRelease` step. The default backend creates the
+	/// commit in the local checkout; hosted mode delegates commit creation to the
+	/// monochange app and should authenticate with GitHub Actions OIDC when
+	/// available.
 	CommitRelease {
 		#[serde(default)]
 		name: Option<String>,
@@ -2348,7 +2377,13 @@ pub enum CliStepDefinition {
 		#[serde(default)]
 		update_release_json: bool,
 		#[serde(default)]
-		stage_all: bool,
+		commit_backend: CommitReleaseBackend,
+		#[serde(default)]
+		hosted_auth: HostedCommitAuth,
+		#[serde(default)]
+		hosted_url: Option<String>,
+		#[serde(default)]
+		oidc_audience: Option<String>,
 		#[serde(
 			default,
 			deserialize_with = "deserialize_cli_step_inputs",
@@ -2453,8 +2488,6 @@ pub enum CliStepDefinition {
 		always_run: bool,
 		#[serde(default)]
 		no_verify: bool,
-		#[serde(default)]
-		stage_all: bool,
 		#[serde(
 			default,
 			deserialize_with = "deserialize_cli_step_inputs",
@@ -2818,7 +2851,16 @@ impl CliStepDefinition {
 		match self {
 			Self::Config { .. } => Some(&[]),
 			Self::Validate { .. } => Some(&["fix"]),
-			Self::CommitRelease { .. } => Some(&["no_verify", "update_release_json", "stage_all"]),
+			Self::CommitRelease { .. } => {
+				Some(&[
+					"no_verify",
+					"update_release_json",
+					"commit_backend",
+					"hosted_auth",
+					"hosted_url",
+					"oidc_audience",
+				])
+			}
 			Self::VerifyReleaseBranch { .. } => Some(&["from"]),
 			Self::Discover { .. } | Self::DisplayVersions { .. } | Self::PrepareRelease { .. } => {
 				Some(&["format"])
@@ -2827,7 +2869,7 @@ impl CliStepDefinition {
 				Some(&["format", "from-ref", "auto-close-issues"])
 			}
 			Self::PublishRelease { .. } => Some(&["format", "from-ref", "draft"]),
-			Self::OpenReleaseRequest { .. } => Some(&["format", "no_verify", "stage_all"]),
+			Self::OpenReleaseRequest { .. } => Some(&["format", "no_verify"]),
 			Self::PlaceholderPublish { .. } => Some(&["format", "package", "show-all"]),
 			Self::PublishPackages { .. } => {
 				Some(&[
@@ -2903,6 +2945,13 @@ impl CliStepDefinition {
 					_ => None,
 				}
 			}
+			Self::CommitRelease { .. } => {
+				match name {
+					"commit_backend" => Some(&["local", "hosted"]),
+					"hosted_auth" => Some(&["auto", "oidc", "token"]),
+					_ => None,
+				}
+			}
 			Self::RetargetRelease { .. } | _ => None,
 		}
 	}
@@ -2921,9 +2970,9 @@ impl CliStepDefinition {
 			}
 			Self::CommitRelease { .. } => {
 				match name {
-					"no_verify" | "update_release_json" | "stage_all" => {
-						Some(CliInputKind::Boolean)
-					}
+					"no_verify" | "update_release_json" => Some(CliInputKind::Boolean),
+					"commit_backend" | "hosted_auth" => Some(CliInputKind::Choice),
+					"hosted_url" | "oidc_audience" => Some(CliInputKind::String),
 					_ => None,
 				}
 			}
@@ -2956,7 +3005,7 @@ impl CliStepDefinition {
 			Self::OpenReleaseRequest { .. } => {
 				match name {
 					"format" => Some(CliInputKind::Choice),
-					"no_verify" | "stage_all" => Some(CliInputKind::Boolean),
+					"no_verify" => Some(CliInputKind::Boolean),
 					_ => None,
 				}
 			}
@@ -4765,7 +4814,10 @@ pub fn all_step_variants() -> Vec<CliStepDefinition> {
 			always_run: false,
 			no_verify: false,
 			update_release_json: false,
-			stage_all: false,
+			commit_backend: CommitReleaseBackend::default(),
+			hosted_auth: HostedCommitAuth::default(),
+			hosted_url: None,
+			oidc_audience: None,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::VerifyReleaseBranch {
@@ -4803,7 +4855,6 @@ pub fn all_step_variants() -> Vec<CliStepDefinition> {
 			when: None,
 			always_run: false,
 			no_verify: false,
-			stage_all: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::CommentReleasedIssues {

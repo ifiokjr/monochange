@@ -259,7 +259,7 @@
 			"type": "string"
 		},
 		"CliStepDefinition": {
-			"description": "Built-in execution units for `[[cli.<command>.steps]]`.\n\n`monochange` runs steps in order and lets later steps consume state created by\nearlier ones. Use standalone steps such as `Validate`, `Discover`,\n`AffectedPackages`, `DiagnoseChangesets`, and `RetargetRelease` when you want\ninspection or repair. Use `PrepareRelease` when later steps need structured\nrelease state.\n\nSee the CLI step reference in the book for full workflow guidance.",
+			"description": "`monochange` runs steps in order and lets later steps consume state created by\nearlier ones. Use standalone steps such as `Validate`, `Discover`,\n`AffectedPackages`, `DiagnoseChangesets`, and `RetargetRelease` when you want\ninspection or repair. Use `PrepareRelease` when later steps need structured\nrelease state.\n\nSee the CLI step reference in the book for full workflow guidance.",
 			"oneOf": [
 				{
 					"additionalProperties": false,
@@ -491,11 +491,26 @@
 				},
 				{
 					"additionalProperties": false,
-					"description": "Create a local release commit with an embedded durable `ReleaseRecord`.\n\nRequires a previous `PrepareRelease` step.",
+					"description": "Create a release commit with an embedded durable `ReleaseRecord`.\n\nRequires a previous `PrepareRelease` step. The default backend creates the\ncommit in the local checkout; hosted mode delegates commit creation to the\nmonochange app and should authenticate with GitHub Actions OIDC when\navailable.",
 					"properties": {
 						"always_run": {
 							"default": false,
 							"type": "boolean"
+						},
+						"commit_backend": {
+							"$ref": "#/$defs/CommitReleaseBackend",
+							"default": "local"
+						},
+						"hosted_auth": {
+							"$ref": "#/$defs/HostedCommitAuth",
+							"default": "auto"
+						},
+						"hosted_url": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
 						},
 						"inputs": {
 							"$ref": "#/$defs/CliStepInputsSchema",
@@ -512,9 +527,12 @@
 							"default": false,
 							"type": "boolean"
 						},
-						"stage_all": {
-							"default": false,
-							"type": "boolean"
+						"oidc_audience": {
+							"default": null,
+							"type": [
+								"string",
+								"null"
+							]
 						},
 						"type": {
 							"const": "CommitRelease",
@@ -737,10 +755,6 @@
 							]
 						},
 						"no_verify": {
-							"default": false,
-							"type": "boolean"
-						},
-						"stage_all": {
 							"default": false,
 							"type": "boolean"
 						},
@@ -1147,6 +1161,21 @@
 			],
 			"type": "string"
 		},
+		"CommitReleaseBackend": {
+			"description": "Built-in execution units for `[[cli.<command>.steps]]`.\n\nSelects where a `CommitRelease` step creates the release commit.",
+			"oneOf": [
+				{
+					"const": "local",
+					"description": "Create the release commit in the local checkout.",
+					"type": "string"
+				},
+				{
+					"const": "hosted",
+					"description": "Delegate release commit creation to the hosted monochange app.",
+					"type": "string"
+				}
+			]
+		},
 		"EcosystemType": {
 			"enum": [
 				"cargo",
@@ -1157,6 +1186,26 @@
 				"go"
 			],
 			"type": "string"
+		},
+		"HostedCommitAuth": {
+			"description": "Selects how hosted release commit requests authenticate to monochange.",
+			"oneOf": [
+				{
+					"const": "auto",
+					"description": "Prefer GitHub Actions OIDC when available, with token auth as an explicit fallback.",
+					"type": "string"
+				},
+				{
+					"const": "oidc",
+					"description": "Use GitHub Actions OIDC.",
+					"type": "string"
+				},
+				{
+					"const": "token",
+					"description": "Use a long-lived monochange API token.",
+					"type": "string"
+				}
+			]
 		},
 		"LockfileCommandDefinition": {
 			"additionalProperties": false,

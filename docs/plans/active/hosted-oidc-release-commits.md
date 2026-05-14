@@ -60,7 +60,7 @@ The generated commit should appear as the monochange app/bot and satisfy verifie
 
 | # | Decision                                  | Choice                                                                                       |
 | - | ----------------------------------------- | -------------------------------------------------------------------------------------------- |
-| 1 | Authentication from Actions to hosted app | GitHub Actions OIDC, not a long-lived `MONOCHANGE_TOKEN`                                     |
+| 1 | Authentication from Actions to hosted app | Support both GitHub Actions OIDC and `MONOCHANGE_TOKEN`; recommend OIDC                      |
 | 2 | GitHub commit identity                    | monochange GitHub App installation token                                                     |
 | 3 | Commit creation mechanism                 | GitHub Git Database API (`blobs`, `trees`, `commits`, `refs`)                                |
 | 4 | CLI surface                               | Add hosted mode to `CommitRelease` rather than a separate command                            |
@@ -102,7 +102,7 @@ oidc_audience = "monochange.dev"
 
 ### GitHub Actions workflow
 
-The workflow needs OIDC permission and normal read/write permissions for local preparation. It does **not** need a PAT or monochange API token.
+Recommended workflow: grant OIDC permission and normal read/write permissions for local preparation. This path does **not** need a PAT or monochange API token. For CI systems that cannot use OIDC yet, hosted mode may also accept `MONOCHANGE_TOKEN`, but docs should present that as a fallback.
 
 ```yaml
 permissions:
@@ -117,7 +117,7 @@ steps:
   - run: mc release-pr
 ```
 
-The monochange CLI will request an OIDC token from GitHub Actions when it reaches hosted `CommitRelease`.
+The monochange CLI will request an OIDC token from GitHub Actions when it reaches hosted `CommitRelease` unless `hosted_auth = "token"` is configured or OIDC is unavailable and token fallback is explicitly allowed.
 
 ---
 
@@ -131,7 +131,7 @@ When `CommitRelease(commit_backend = "hosted")` runs, the CLI:
 2. Requests an OIDC JWT with audience `monochange.dev` or a configurable audience.
 3. Sends the JWT to `monochange.dev` in the hosted commit request.
 
-The user should not need to create or rotate a long-lived `MONOCHANGE_TOKEN` for CI.
+GitHub Actions users should not need to create or rotate a long-lived `MONOCHANGE_TOKEN` for CI. `MONOCHANGE_TOKEN` remains available as a fallback for non-OIDC environments and emergency compatibility.
 
 ### In monochange.dev
 
@@ -244,11 +244,11 @@ Draft response:
 
 ### `monochange_core`
 
-- [ ] Add a `commit_backend` field to `CliStepDefinition::CommitRelease`.
-- [ ] Supported values: `local` and `hosted`.
-- [ ] Default: `local` for backwards compatibility.
+- [x] Add a `commit_backend` field to `CliStepDefinition::CommitRelease`.
+- [x] Supported values: `local` and `hosted`.
+- [x] Default: `local` for backwards compatibility.
 - [ ] Keep existing `no_verify` and `update_release_json` behavior for local mode.
-- [ ] Define expected input kind for `commit_backend`.
+- [x] Define expected input kind for `commit_backend`.
 - [ ] Update schema generation and snapshots.
 
 Possible enum:
@@ -266,7 +266,7 @@ pub enum CommitReleaseBackend {
   - local release file validation/preparation
   - local git commit implementation
   - hosted commit request builder
-- [ ] Add GitHub Actions OIDC token acquisition helper.
+- [x] Add GitHub Actions OIDC token acquisition helper.
 - [ ] Add hosted API client for `POST /api/release-commits`.
 - [ ] In hosted mode, do not run local `git commit`.
 - [ ] In hosted mode, still validate and optionally update release record JSON before packaging files.
@@ -332,7 +332,7 @@ POST /api/release-commits/github/{owner}/{repo}
 Authorization: Bearer <GitHub Actions OIDC JWT>
 ```
 
-- [ ] Authenticate with OIDC.
+- [x] Authenticate with OIDC.
 - [ ] Resolve repository and installation.
 - [ ] Enforce path allowlist.
 - [ ] Enforce expected branch SHA.
@@ -412,9 +412,9 @@ GitLab may not have the same verified-commit behavior as GitHub Apps. The generi
 
 ### Phase 1 — Design and schema
 
-- [ ] Add this plan.
+- [x] Add this plan.
 - [ ] Decide final config field name (`commit_backend`, `committer`, or `commit_mode`).
-- [ ] Add core enum/schema docs.
+- [x] Add core enum/schema docs.
 - [ ] Add CLI help text.
 
 ### Phase 2 — CLI hosted request builder
@@ -494,5 +494,9 @@ GitLab may not have the same verified-commit behavior as GitHub Apps. The generi
 
 Use this section to record implementation discoveries and decision changes as the plan is executed.
 
-- 2026-05-14: Decided to prioritize GitHub Actions OIDC immediately instead of starting with long-lived `MONOCHANGE_TOKEN`.
+- 2026-05-14: Decided to prioritize GitHub Actions OIDC immediately while still allowing `MONOCHANGE_TOKEN` as a fallback.
 - 2026-05-14: Hosted app secrets (`MONOCHANGE_GITHUB_APP_ID`, private key, webhook secret) are owned by monochange deployment, not by individual users.
+
+- 2026-05-14: Added core `CommitReleaseBackend` and `HostedCommitAuth` config fields. `local` remains default; hosted auth supports `auto`, `oidc`, and `token`, with OIDC recommended.
+
+- 2026-05-14: Added the CLI hosted commit client path: hosted mode now prepares release files locally, builds a provider-neutral request payload, authenticates with GitHub Actions OIDC or `MONOCHANGE_TOKEN`, and posts to `/api/release-commits`.
