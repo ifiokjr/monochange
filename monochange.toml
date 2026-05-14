@@ -1,4 +1,5 @@
 #:schema ./docs/src/schemas/monochange.schema.json
+
 # =============================================================================
 # monochange.toml — repository configuration for monochange
 # =============================================================================
@@ -275,6 +276,8 @@ path = "crates/monochange_graph"
 
 [package.monochange_schema]
 path = "crates/monochange_schema"
+release = true
+tag = true
 
 [package.monochange_semver]
 path = "crates/monochange_semver"
