@@ -122,7 +122,7 @@ pub fn run(update_mode: bool) -> Result<(), String> {
 }
 
 /// Generate release schema JSON strings, including immutable versioned files.
-pub fn run_release(update_mode: bool) -> Result<(), String> {
+pub fn run_release(update_mode: bool, include_versioned: bool) -> Result<(), String> {
 	let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 	let workspace_dir = crate_dir.parent().unwrap().parent().unwrap();
 	let schemas_dir = workspace_dir.join("crates/monochange_schema/schemas");
@@ -131,7 +131,7 @@ pub fn run_release(update_mode: bool) -> Result<(), String> {
 	let version = expected_schema_version(workspace_dir)?;
 	run_with_paths(
 		update_mode,
-		SchemaMode::Release,
+		SchemaMode::Release { include_versioned },
 		&schemas_dir,
 		&docs_schemas_dir,
 		&schema_version_path,
@@ -144,8 +144,8 @@ pub fn run_release(update_mode: bool) -> Result<(), String> {
 pub enum SchemaMode {
 	/// Maintain moving current aliases and deterministic current fixtures only.
 	Current,
-	/// Maintain current aliases plus immutable versioned release artifacts.
-	Release,
+	/// Maintain release schema assets.
+	Release { include_versioned: bool },
 }
 
 struct GeneratedFile {
@@ -245,7 +245,6 @@ fn schema_files(
 	let config_json = serde_json::to_string_pretty(&config_value).unwrap();
 
 	let artifacts_dir = schemas_dir.join("artifacts");
-	let current_artifacts_dir = artifacts_dir.join("current");
 	let mut files = vec![
 		GeneratedFile {
 			path: schemas_dir.join("release-record.schema.json"),
@@ -264,9 +263,13 @@ fn schema_files(
 			contents: config_json,
 		},
 	];
-	files.extend(current_artifact_files(&current_artifacts_dir, version));
+	files.extend(artifact_files(&artifacts_dir, "current", version));
 
-	if mode == SchemaMode::Release {
+	let include_versioned = match mode {
+		SchemaMode::Current => false,
+		SchemaMode::Release { include_versioned } => include_versioned,
+	};
+	if include_versioned {
 		let mut release_versioned_value = release_value.clone();
 		let mut config_versioned_value = config_value.clone();
 		post_process_release(
@@ -284,6 +287,7 @@ fn schema_files(
 			),
 			"monochange configuration",
 		);
+		files.extend(artifact_files(&artifacts_dir, version, version));
 		files.extend([
 			GeneratedFile {
 				path: docs_schemas_dir.join(format!("release-record.v{version}.schema.json")),
@@ -299,17 +303,22 @@ fn schema_files(
 	files
 }
 
-fn current_artifact_files(current_artifacts_dir: &Path, version: &str) -> Vec<GeneratedFile> {
+fn artifact_files(
+	artifacts_dir: &Path,
+	version_dir: &str,
+	schema_version: &str,
+) -> Vec<GeneratedFile> {
 	let variants = current_artifact_variants();
+	let artifacts_version_dir = artifacts_dir.join(version_dir);
 	let mut files = Vec::with_capacity(CURRENT_ARTIFACT_FIXTURE_COUNT * 2);
 	for (index, variant) in variants.iter().enumerate() {
 		let name = format!("{:02}.json", index + 1);
 		files.push(GeneratedFile {
-			path: current_artifacts_dir.join("release-record").join(&name),
-			contents: release_record_artifact_fixture(version, index + 1, variant),
+			path: artifacts_version_dir.join("release-record").join(&name),
+			contents: release_record_artifact_fixture(schema_version, index + 1, variant),
 		});
 		files.push(GeneratedFile {
-			path: current_artifacts_dir.join("monochange").join(name),
+			path: artifacts_version_dir.join("monochange").join(name),
 			contents: config_artifact_fixture(index + 1, variant),
 		});
 	}
