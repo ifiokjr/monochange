@@ -1592,12 +1592,7 @@ fn render_single_command_help(bin_name: &str, help: &CommandHelp) -> String {
 }
 
 fn option_label_width(flag: &str, type_name: &str) -> usize {
-	flag.len()
-		+ if type_name.is_empty() {
-			0
-		} else {
-			1 + type_name.len()
-		}
+	flag.len() + 1 + type_name.len()
 }
 
 fn render_owned_command_help(bin_name: &str, help: &OwnedCommandHelp) -> String {
