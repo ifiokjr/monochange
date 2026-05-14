@@ -69,6 +69,7 @@
   - Streamed subagent overwrite-conflict errors directly into one message instead of collecting path strings before joining.
   - Reused the publish dependency-order edge stream directly while building graph state, avoiding an intermediate remapped edge vector.
   - Streamed configured CLI command usage rendering directly into one buffer, avoiding a temporary parts vector and final join.
+  - Streamed MCP changeset validation text and semantic-item suggestions directly into strings, avoiding temporary cloned text and formatted example vectors.
 
 ## Current benchmark summary
 

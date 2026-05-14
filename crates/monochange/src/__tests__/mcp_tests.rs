@@ -871,6 +871,20 @@ fn validate_changeset_content_skips_warning_when_summary_mentions_detected_item(
 }
 
 #[test]
+fn validate_changeset_content_skips_warning_when_details_mentions_detected_item() {
+	let mut changeset = sample_changeset(Some("update public API"), "core");
+	changeset.details = Some("The changed item is `greet`.".to_string());
+	let analysis = sample_change_analysis(sample_package_analysis(
+		"core",
+		vec![sample_semantic_change("greet")],
+	));
+
+	let issues = super::validate_changeset_content(&changeset, &analysis);
+
+	assert!(issues.is_empty());
+}
+
+#[test]
 fn validate_changeset_content_suggests_detected_items_when_summary_is_generic() {
 	let changeset = sample_changeset(Some("update semantic analysis messaging"), "core");
 	let analysis = sample_change_analysis(sample_package_analysis(
