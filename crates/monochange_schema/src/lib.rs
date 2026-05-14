@@ -8,7 +8,10 @@ use serde::Serializer;
 use serde_json::Value;
 use thiserror::Error;
 
-include!(concat!(env!("OUT_DIR"), "/schema_version.rs"));
+/// Raw schema version text embedded at compile time from the `SCHEMA_VERSION` file.
+///
+/// Validated to `major.minor` format by [`current_schema_version`].
+pub const CURRENT_SCHEMA_VERSION_TEXT: &str = include_str!("../SCHEMA_VERSION").trim_ascii_end();
 
 mod migrations;
 
