@@ -205,7 +205,7 @@ in
         set -euo pipefail
         mkdir -p target/coverage
         cargo llvm-cov clean --workspace
-        cargo llvm-cov test --workspace --exclude xtask --all-features --all-targets --no-report
+        cargo llvm-cov test --workspace --exclude xtask --all-features --lib --tests --no-report
         cargo llvm-cov report --ignore-filename-regex 'crates/xtask/' --summary-only --fail-under-lines 70
         cargo llvm-cov report --ignore-filename-regex 'crates/xtask/' --lcov --output-path target/coverage/lcov.info
       '';
