@@ -200,6 +200,20 @@ pub enum SchemaError {
 		/// Current supported version.
 		to: SchemaVersion,
 	},
+	/// A declared migration edge could not be applied to the payload.
+	#[error(
+		"artifact `{artifact}` migration edge from schema version `{from}` to `{to}` could not be applied: {reason}"
+	)]
+	InvalidMigrationOperation {
+		/// Durable artifact kind.
+		artifact: &'static str,
+		/// Source schema version for the failed edge.
+		from: SchemaVersion,
+		/// Destination schema version for the failed edge.
+		to: SchemaVersion,
+		/// Static failure reason.
+		reason: &'static str,
+	},
 	/// JSON conversion failure.
 	#[error("artifact json error: {0}")]
 	Json(#[from] serde_json::Error),
@@ -431,16 +445,76 @@ pub mod release_record {
 	}
 
 	fn apply_migration_edge(
-		_value: &mut Value,
+		value: &mut Value,
 		edge: &migration_changelog::MigrationChangelogEntry,
 	) -> Result<(), SchemaError> {
 		if edge.operation == migration_changelog::MigrationOperation::Noop && edge.noop {
 			return Ok(());
 		}
-		Err(SchemaError::MissingMigrationPath {
+		for change in edge.changes {
+			apply_migration_change(value, edge, change)?;
+		}
+		Ok(())
+	}
+
+	fn apply_migration_change(
+		value: &mut Value,
+		edge: &migration_changelog::MigrationChangelogEntry,
+		change: &migration_changelog::MigrationChange,
+	) -> Result<(), SchemaError> {
+		match change.operation {
+			migration_changelog::MigrationOperation::RenameField => {
+				let source = top_level_field(change.path, edge)?;
+				let Some(replacement) = change.replacement else {
+					return invalid_operation(
+						edge,
+						"rename field migration is missing a replacement path",
+					);
+				};
+				let destination = top_level_field(replacement, edge)?;
+				let object = object_mut(value)?;
+				if let Some(field_value) = object.remove(source) {
+					object.insert(destination.to_string(), field_value);
+				}
+				Ok(())
+			}
+			migration_changelog::MigrationOperation::RemoveField => {
+				let field = top_level_field(change.path, edge)?;
+				object_mut(value)?.remove(field);
+				Ok(())
+			}
+			migration_changelog::MigrationOperation::AddField => {
+				invalid_operation(edge, "add field migrations need an explicit value executor")
+			}
+			migration_changelog::MigrationOperation::Noop => Ok(()),
+		}
+	}
+
+	fn top_level_field<'a>(
+		path: &'a str,
+		edge: &migration_changelog::MigrationChangelogEntry,
+	) -> Result<&'a str, SchemaError> {
+		let Some(field) = path.strip_prefix('/') else {
+			return invalid_operation(
+				edge,
+				"migration change path must be an absolute JSON pointer",
+			);
+		};
+		if field.is_empty() || field.contains('/') {
+			return invalid_operation(edge, "only top-level field migrations are supported");
+		}
+		Ok(field)
+	}
+
+	fn invalid_operation<T>(
+		edge: &migration_changelog::MigrationChangelogEntry,
+		reason: &'static str,
+	) -> Result<T, SchemaError> {
+		Err(SchemaError::InvalidMigrationOperation {
 			artifact: KIND,
 			from: migration_source_version(edge.from),
 			to: edge.to,
+			reason,
 		})
 	}
 }
@@ -469,19 +543,41 @@ pub mod migration_changelog {
 	use crate::SchemaVersion;
 
 	/// All known durable migration changelog entries.
-	pub const ENTRIES: &[MigrationChangelogEntry] = &[MigrationChangelogEntry {
-		artifact: crate::release_record::KIND,
-		from: MigrationSource::Version {
-			schema_version: SchemaVersion::new(0, 1),
+	pub const ENTRIES: &[MigrationChangelogEntry] = &[
+		MigrationChangelogEntry {
+			artifact: crate::release_record::KIND,
+			from: MigrationSource::Version {
+				schema_version: SchemaVersion::new(0, 0),
+			},
+			to: SchemaVersion::new(0, 1),
+			operation: MigrationOperation::RenameField,
+			changes: &[MigrationChange {
+				operation: MigrationOperation::RenameField,
+				path: "/v",
+				replacement: Some("/schemaVersion"),
+				reason: Some(
+					"Schema 0.0 used the legacy `v` field before `schemaVersion` became the public durable version field.",
+				),
+			}],
+			noop: false,
+			reason: Some(
+				"Release-record schema 0.0 is supported as the legacy `v`-only artifact shape and is normalized onto the public `schemaVersion` field before later migrations run.",
+			),
 		},
-		to: SchemaVersion::new(0, 2),
-		operation: MigrationOperation::Noop,
-		changes: &[],
-		noop: true,
-		reason: Some(
-			"Release-record schema 0.2 preserves the 0.1 wire shape; the explicit edge keeps older artifact readability covered by CI.",
-		),
-	}];
+		MigrationChangelogEntry {
+			artifact: crate::release_record::KIND,
+			from: MigrationSource::Version {
+				schema_version: SchemaVersion::new(0, 1),
+			},
+			to: SchemaVersion::new(0, 2),
+			operation: MigrationOperation::Noop,
+			changes: &[],
+			noop: true,
+			reason: Some(
+				"Release-record schema 0.2 preserves the 0.1 wire shape; the explicit edge keeps older artifact readability covered by CI.",
+			),
+		},
+	];
 
 	/// A structured migration changelog entry.
 	#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]

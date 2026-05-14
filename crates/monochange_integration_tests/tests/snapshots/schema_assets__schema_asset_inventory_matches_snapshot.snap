@@ -1,6 +1,6 @@
 ---
 source: crates/monochange_integration_tests/tests/schema_assets.rs
-assertion_line: 287
+assertion_line: 442
 expression: inventory
 ---
 {
@@ -15,6 +15,25 @@ expression: inventory
   },
   "currentSchemaVersion": "[schema version]",
   "migrationChangelog": [
+    {
+      "artifact": "monochange.releaseRecord",
+      "changes": [
+        {
+          "operation": "rename_field",
+          "path": "/v",
+          "reason": "Schema 0.0 used the legacy `v` field before `schemaVersion` became the public durable version field.",
+          "replacement": "/schemaVersion"
+        }
+      ],
+      "from": {
+        "schemaVersion": "0.0",
+        "type": "version"
+      },
+      "noop": false,
+      "operation": "rename_field",
+      "reason": "Release-record schema 0.0 is supported as the legacy `v`-only artifact shape and is normalized onto the public `schemaVersion` field before later migrations run.",
+      "to": "0.1"
+    },
     {
       "artifact": "monochange.releaseRecord",
       "changes": [],

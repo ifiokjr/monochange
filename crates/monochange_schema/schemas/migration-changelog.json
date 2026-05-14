@@ -3,6 +3,25 @@
 		"artifact": "monochange.releaseRecord",
 		"from": {
 			"type": "version",
+			"schemaVersion": "0.0"
+		},
+		"to": "0.1",
+		"operation": "rename_field",
+		"changes": [
+			{
+				"operation": "rename_field",
+				"path": "/v",
+				"replacement": "/schemaVersion",
+				"reason": "Schema 0.0 used the legacy `v` field before `schemaVersion` became the public durable version field."
+			}
+		],
+		"noop": false,
+		"reason": "Release-record schema 0.0 is supported as the legacy `v`-only artifact shape and is normalized onto the public `schemaVersion` field before later migrations run."
+	},
+	{
+		"artifact": "monochange.releaseRecord",
+		"from": {
+			"type": "version",
 			"schemaVersion": "0.1"
 		},
 		"to": "0.2",

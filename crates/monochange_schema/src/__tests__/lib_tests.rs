@@ -161,9 +161,9 @@ fn release_record_migrates_older_schema_versions() {
 }
 
 #[test]
-fn release_record_rejects_older_schema_without_explicit_migration_edge() {
-	let error = release_record::migrate_value(json!({
-		"schemaVersion": "0.0",
+fn release_record_migrates_legacy_v_only_schema_version() {
+	let migrated = release_record::migrate_value(json!({
+		"v": "0.0",
 		"kind": release_record::KIND,
 		"createdAt": "2026-04-06T12:00:00Z",
 		"command": "release-pr",
@@ -171,14 +171,13 @@ fn release_record_rejects_older_schema_without_explicit_migration_edge() {
 		"releasedPackages": [],
 		"changedFiles": []
 	}))
-	.err()
-	.unwrap_or_else(|| panic!("expected missing migration path error"));
+	.unwrap_or_else(|error| panic!("migrate legacy release record: {error}"));
 
-	assert!(matches!(
-		error,
-		SchemaError::MissingMigrationPath { from, to, .. }
-			if from == SchemaVersion::new(0, 0) && to == release_record::current_version().unwrap()
-	));
+	assert_eq!(
+		migrated.get("schemaVersion"),
+		Some(&json!(CURRENT_SCHEMA_VERSION_TEXT))
+	);
+	assert!(migrated.get("v").is_none());
 }
 
 #[test]
@@ -320,16 +319,20 @@ fn migration_changelog_is_machine_readable_json() {
 	let value = serde_json::from_str::<Value>(&json)
 		.unwrap_or_else(|error| panic!("migration changelog json should parse: {error}"));
 	let entries = migration_changelog::entries_for_artifact(release_record::KIND);
-	assert_eq!(entries.len(), 1);
-	assert_eq!(entries[0].to, SchemaVersion::new(0, 2));
+	assert_eq!(entries.len(), 2);
+	assert_eq!(entries[0].to, SchemaVersion::new(0, 1));
+	assert_eq!(entries[1].to, SchemaVersion::new(0, 2));
 	assert_eq!(
 		value.pointer("/0/artifact"),
 		Some(&json!(release_record::KIND))
 	);
-	assert_eq!(value.pointer("/0/from/schemaVersion"), Some(&json!("0.1")));
-	assert_eq!(value.pointer("/0/to"), Some(&json!("0.2")));
-	assert_eq!(value.pointer("/0/operation"), Some(&json!("noop")));
-	assert_eq!(value.pointer("/0/noop"), Some(&json!(true)));
+	assert_eq!(value.pointer("/0/from/schemaVersion"), Some(&json!("0.0")));
+	assert_eq!(value.pointer("/0/to"), Some(&json!("0.1")));
+	assert_eq!(value.pointer("/0/operation"), Some(&json!("rename_field")));
+	assert_eq!(value.pointer("/0/noop"), Some(&json!(false)));
+	assert_eq!(value.pointer("/1/from/schemaVersion"), Some(&json!("0.1")));
+	assert_eq!(value.pointer("/1/to"), Some(&json!("0.2")));
+	assert_eq!(value.pointer("/1/operation"), Some(&json!("noop")));
 }
 
 #[test]

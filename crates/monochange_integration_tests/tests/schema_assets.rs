@@ -105,6 +105,110 @@ fn config_artifact_fixtures_are_valid_json() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn committed_artifact_fixtures_validate_against_their_json_schemas() -> Result<(), Box<dyn Error>> {
+	let paths = schema_asset_paths()?;
+	let release_schema = parse_json(&paths.canonical_release_schema)?;
+	let config_schema = parse_json(&paths.config_schema)?;
+	let release_validator = jsonschema::validator_for(&release_schema)
+		.map_err(|error| test_error(format!("compile release-record schema: {error}")))?;
+	let config_validator = jsonschema::validator_for(&config_schema)
+		.map_err(|error| test_error(format!("compile config schema: {error}")))?;
+
+	for artifact_path in release_record_artifact_paths(&paths)? {
+		let artifact = parse_json(&artifact_path)?;
+		validate_json(&release_validator, &artifact, &artifact_path)?;
+	}
+	for artifact_path in config_artifact_paths(&paths)? {
+		let artifact = parse_json(&artifact_path)?;
+		validate_json(&config_validator, &artifact, &artifact_path)?;
+	}
+
+	Ok(())
+}
+
+#[test]
+fn published_release_record_schemas_have_migration_paths_to_current() -> Result<(), Box<dyn Error>>
+{
+	let paths = schema_asset_paths()?;
+	let mut versions = versioned_release_schema_versions(&paths)?;
+	versions.sort();
+	assert!(versions.iter().any(|version| version == "0.0"));
+	assert!(versions.iter().any(|version| version == "0.1"));
+	assert!(
+		versions
+			.iter()
+			.any(|version| version == monochange_schema::CURRENT_SCHEMA_VERSION_TEXT)
+	);
+
+	for version in versions {
+		let schema_path = versioned_release_schema_path(&paths, &version);
+		let schema = parse_json(&schema_path)?;
+		let validator = jsonschema::validator_for(&schema).map_err(|error| {
+			test_error(format!("compile release-record v{version} schema: {error}"))
+		})?;
+		let sample = sample_release_record_for_version(&version);
+		validate_json(&validator, &sample, &schema_path)?;
+
+		let migrated = monochange_schema::release_record::migrate_value(sample)?;
+		assert_eq!(
+			migrated.get("schemaVersion"),
+			Some(&json!(monochange_schema::CURRENT_SCHEMA_VERSION_TEXT)),
+			"release-record schema v{version} should migrate to current"
+		);
+		assert!(migrated.get("v").is_none());
+	}
+
+	Ok(())
+}
+
+#[test]
+fn release_preflight_schema_assets_are_aligned() -> Result<(), Box<dyn Error>> {
+	let paths = schema_asset_paths()?;
+	let schema_version_path = paths.root.join("crates/monochange_schema/SCHEMA_VERSION");
+	let schema_version = std::fs::read_to_string(&schema_version_path)?;
+	assert_eq!(
+		schema_version.trim(),
+		monochange_schema::CURRENT_SCHEMA_VERSION_TEXT
+	);
+	assert_eq!(
+		std::fs::read_to_string(&paths.canonical_release_schema)?,
+		std::fs::read_to_string(&paths.hosted_release_schema)?
+	);
+	assert_eq!(
+		std::fs::read_to_string(
+			paths
+				.root
+				.join("crates/monochange_schema/schemas/monochange.schema.json")
+		)?,
+		std::fs::read_to_string(&paths.config_schema)?
+	);
+	assert!(paths.versioned_release_schema.is_file());
+	assert!(paths.versioned_config_schema.is_file());
+	assert_eq!(
+		parse_json(&paths.migration_changelog)?,
+		serde_json::from_str::<Value>(&monochange_schema::migration_changelog::to_json_pretty()?)?
+	);
+
+	Ok(())
+}
+
+#[test]
+fn schema_version_ahead_of_crate_version_requires_schema_changeset() -> Result<(), Box<dyn Error>> {
+	let paths = schema_asset_paths()?;
+	let crate_version = schema_crate_version(&paths)?;
+	let manifest_schema = monochange_schema::SchemaVersion::from_package_version(&crate_version)?;
+	let current_schema = monochange_schema::current_schema_version()?;
+	if current_schema > manifest_schema {
+		assert!(
+			schema_crate_has_changeset(&paths)?,
+			"monochange_schema must have an active changeset when SCHEMA_VERSION {current_schema} is ahead of crate version {crate_version}"
+		);
+	}
+
+	Ok(())
+}
+
+#[test]
 fn current_artifact_fixtures_are_colocated() -> Result<(), Box<dyn Error>> {
 	let paths = schema_asset_paths()?;
 	let mut names = Vec::new();
@@ -727,6 +831,18 @@ fn sample_release_record() -> Value {
 	)
 }
 
+fn sample_release_record_for_version(version: &str) -> Value {
+	if version != "0.0" {
+		return sample_release_record_with(version, monochange_schema::release_record::KIND);
+	}
+	let mut record = sample_release_record_with("0.0", monochange_schema::release_record::KIND);
+	if let Some(object) = record.as_object_mut() {
+		object.remove("schemaVersion");
+		object.insert("v".to_string(), json!("0.0"));
+	}
+	record
+}
+
 fn sample_release_record_with(version: &str, kind: &str) -> Value {
 	sample_release_record_with_value(json!(version), json!(kind))
 }
@@ -772,6 +888,65 @@ fn json_bool(value: &Value, pointer: &str) -> Result<bool, Box<dyn Error>> {
 		return Err(test_error(format!("expected JSON boolean at `{pointer}`")));
 	};
 	Ok(boolean)
+}
+
+fn validate_json(
+	validator: &jsonschema::Validator,
+	value: &Value,
+	path: &Path,
+) -> Result<(), Box<dyn Error>> {
+	if let Err(error) = validator.validate(value) {
+		return Err(test_error(format!(
+			"{} does not validate against its schema: {error}",
+			path.display()
+		)));
+	}
+	Ok(())
+}
+
+fn versioned_release_schema_path(paths: &SchemaAssetPaths, version: &str) -> PathBuf {
+	paths.root.join(format!(
+		"docs/src/schemas/release-record.v{version}.schema.json"
+	))
+}
+
+fn versioned_release_schema_versions(
+	paths: &SchemaAssetPaths,
+) -> Result<Vec<String>, Box<dyn Error>> {
+	let mut versions = Vec::new();
+	let schemas_dir = paths.root.join("docs/src/schemas");
+	for entry in std::fs::read_dir(&schemas_dir)? {
+		let path = entry?.path();
+		let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+			continue;
+		};
+		let Some(version) = name
+			.strip_prefix("release-record.v")
+			.and_then(|name| name.strip_suffix(".schema.json"))
+		else {
+			continue;
+		};
+		versions.push(version.to_string());
+	}
+	Ok(versions)
+}
+
+fn schema_crate_has_changeset(paths: &SchemaAssetPaths) -> Result<bool, Box<dyn Error>> {
+	let changesets_dir = paths.root.join(".changeset");
+	for entry in std::fs::read_dir(&changesets_dir)? {
+		let path = entry?.path();
+		if path.extension().and_then(|extension| extension.to_str()) != Some("md") {
+			continue;
+		}
+		let text = std::fs::read_to_string(path)?;
+		if text
+			.lines()
+			.any(|line| line.trim_start().starts_with("monochange_schema:"))
+		{
+			return Ok(true);
+		}
+	}
+	Ok(false)
 }
 
 fn test_error(message: impl Into<String>) -> Box<dyn Error> {

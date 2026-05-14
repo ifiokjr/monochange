@@ -6,7 +6,7 @@
 	"type": "object",
 	"additionalProperties": false,
 	"required": [
-		"schemaVersion",
+		"v",
 		"kind",
 		"createdAt",
 		"command",
@@ -15,11 +15,6 @@
 		"changedFiles"
 	],
 	"properties": {
-		"schemaVersion": {
-			"type": "string",
-			"const": "0.1",
-			"description": "Public durable artifact schema version. Older CLIs reject missing, future, or non-current versions."
-		},
 		"kind": {
 			"type": "string",
 			"const": "monochange.releaseRecord"
@@ -89,7 +84,9 @@
 			]
 		},
 		"v": {
-			"const": "0.0"
+			"type": "string",
+			"const": "0.0",
+			"description": "Legacy release-record artifact schema version field used by schema 0.0 before schemaVersion was introduced."
 		}
 	},
 	"$defs": {
