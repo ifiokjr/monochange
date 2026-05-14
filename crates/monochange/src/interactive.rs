@@ -132,20 +132,17 @@ fn build_selectable_targets(configuration: &WorkspaceConfiguration) -> Vec<Selec
 
 	// Groups first
 	for group in &configuration.groups {
-		let members = group.packages.join(", ");
 		let configured_types = configuration
 			.changelog
 			.types
 			.keys()
 			.filter(|&key| !group.excluded_changelog_types.contains(key))
 			.cloned()
-			.collect::<BTreeSet<_>>()
-			.into_iter()
 			.collect();
 		targets.push(SelectableTarget {
 			id: group.id.clone(),
 			kind: TargetKind::Group,
-			display: format!("[group] {} ({})", group.id, members),
+			display: render_group_target_display(&group.id, &group.packages),
 
 			configured_types,
 		});
@@ -160,8 +157,6 @@ fn build_selectable_targets(configuration: &WorkspaceConfiguration) -> Vec<Selec
 				.keys()
 				.filter(|&key| !package.excluded_changelog_types.contains(key))
 				.cloned()
-				.collect::<BTreeSet<_>>()
-				.into_iter()
 				.collect();
 			targets.push(SelectableTarget {
 				id: package.id.clone(),
@@ -186,8 +181,6 @@ fn build_selectable_targets(configuration: &WorkspaceConfiguration) -> Vec<Selec
 				.keys()
 				.filter(|&key| !package.excluded_changelog_types.contains(key))
 				.cloned()
-				.collect::<BTreeSet<_>>()
-				.into_iter()
 				.collect();
 			targets.push(SelectableTarget {
 				id: package.id.clone(),
@@ -200,6 +193,18 @@ fn build_selectable_targets(configuration: &WorkspaceConfiguration) -> Vec<Selec
 	}
 
 	targets
+}
+
+fn render_group_target_display(group_id: &str, package_ids: &[String]) -> String {
+	let mut display = format!("[group] {group_id} (");
+	for (index, package_id) in package_ids.iter().enumerate() {
+		if index > 0 {
+			display.push_str(", ");
+		}
+		display.push_str(package_id);
+	}
+	display.push(')');
+	display
 }
 
 fn prompt_select_targets(targets: &[SelectableTarget]) -> MonochangeResult<Vec<SelectableTarget>> {
