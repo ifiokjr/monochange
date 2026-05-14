@@ -72,6 +72,7 @@
   - Streamed MCP changeset validation text and semantic-item suggestions directly into strings, avoiding temporary cloned text and formatted example vectors.
   - Avoided redundant `BTreeSet` round-trips while deriving interactive configured change-type choices, and streamed group target display labels without joining package ids.
   - Streamed workspace-populate added command lists directly into the CLI result message, avoiding a temporary joined command string.
+  - Streamed CLI help bordered-header rendering directly into the output buffer, avoiding a temporary line vector, joined header body, and repeated border strings.
 
 ## Current benchmark summary
 

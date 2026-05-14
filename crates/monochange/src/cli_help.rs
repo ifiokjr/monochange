@@ -105,14 +105,36 @@ fn bordered_header(command: &str, description: &str, width: usize) -> String {
 		description
 	};
 
-	let mut lines = Vec::new();
-	lines.push(format!("╭{}╮", "─".repeat(width.saturating_sub(2))));
-	let name_pad = width.saturating_sub(2).saturating_sub(name_line.len());
-	lines.push(format!("│{name_line}{}│", " ".repeat(name_pad)));
+	let border_width = width.saturating_sub(2);
+	let mut output = String::new();
+	output.push('╭');
+	for _ in 0..border_width {
+		output.push('─');
+	}
+	output.push_str("╮\n");
+
+	let name_pad = border_width.saturating_sub(name_line.len());
+	output.push('│');
+	output.push_str(&name_line);
+	for _ in 0..name_pad {
+		output.push(' ');
+	}
+	output.push_str("│\n");
+
 	let desc_pad = width.saturating_sub(4).saturating_sub(desc_line.len());
-	lines.push(format!("│  {desc_line}{}│", " ".repeat(desc_pad)));
-	lines.push(format!("╰{}╯", "─".repeat(width.saturating_sub(2))));
-	lines.join("\n")
+	output.push_str("│  ");
+	output.push_str(desc_line);
+	for _ in 0..desc_pad {
+		output.push(' ');
+	}
+	output.push_str("│\n");
+
+	output.push('╰');
+	for _ in 0..border_width {
+		output.push('─');
+	}
+	output.push('╯');
+	output
 }
 
 // ---------------------------------------------------------------------------
