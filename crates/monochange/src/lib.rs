@@ -765,12 +765,18 @@ fn format_populate_workspace_result(result: &PopulateWorkspaceResult) -> String 
 			result.path.display()
 		)
 	} else {
-		format!(
-			"updated {} and added {} default CLI commands: {}",
+		let mut message = format!(
+			"updated {} and added {} default CLI commands: ",
 			result.path.display(),
-			result.added_commands.len(),
-			result.added_commands.join(", ")
-		)
+			result.added_commands.len()
+		);
+		for (index, command) in result.added_commands.iter().enumerate() {
+			if index > 0 {
+				message.push_str(", ");
+			}
+			message.push_str(command);
+		}
+		message
 	}
 }
 
