@@ -483,6 +483,16 @@ where
 	S: AsRef<str>,
 {
 	let mut rendered = String::from("[");
+	write_toml_array_items(&mut rendered, values);
+	rendered.push(']');
+	rendered
+}
+
+fn write_toml_array_items<I, S>(rendered: &mut String, values: I)
+where
+	I: IntoIterator<Item = S>,
+	S: AsRef<str>,
+{
 	let mut first = true;
 	for value in values {
 		if first {
@@ -492,8 +502,6 @@ where
 		}
 		rendered.push_str(&render_toml_string(value.as_ref()));
 	}
-	rendered.push(']');
-	rendered
 }
 
 fn render_toml_string(value: &str) -> String {
@@ -566,7 +574,8 @@ fn render_annotated_init_config(
 	let has_python = packages.iter().any(|p| p.ecosystem == Ecosystem::Python);
 	let has_go = packages.iter().any(|p| p.ecosystem == Ecosystem::Go);
 
-	let package_ids_toml = render_toml_array(package_ids.iter());
+	let mut package_ids_toml = String::new();
+	write_toml_array_items(&mut package_ids_toml, package_ids.iter());
 
 	let context = json!({
 		"packages": template_packages,

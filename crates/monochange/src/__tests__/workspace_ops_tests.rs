@@ -53,6 +53,17 @@ fn render_step_inputs_toml_uses_array_for_inherited_and_map_for_mixed_inputs() {
 }
 
 #[test]
+fn write_toml_array_items_streams_values_without_outer_brackets() {
+	let mut rendered = String::new();
+	write_toml_array_items(
+		&mut rendered,
+		["core".to_string(), "web app".to_string()].iter(),
+	);
+
+	assert_eq!(rendered, "\"core\", \"web app\"");
+}
+
+#[test]
 fn render_command_variables_inline_table_streams_multiple_variables() {
 	let mut variables = BTreeMap::new();
 	variables.insert(
