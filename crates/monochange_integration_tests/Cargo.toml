@@ -8,14 +8,14 @@ repository.workspace = true
 description = "Internal integration tests for monochange crates"
 
 [dev-dependencies]
-insta = { workspace = true, features = ["redactions"] }
-insta-cmd = { workspace = true }
-jsonschema = { workspace = true }
+insta = { workspace = true, features = ["redactions"], default-features = true }
+insta-cmd = { workspace = true, default-features = true }
+jsonschema = { workspace = true, default-features = true }
 monochange_config = { workspace = true }
 monochange_core = { workspace = true }
 monochange_forgejo = { workspace = true }
 monochange_schema = { workspace = true }
 monochange_test_helpers = { workspace = true }
-serde_json = { workspace = true }
+serde_json = { workspace = true, default-features = true }
 tempfile = { workspace = true, default-features = true }
-toml = { workspace = true, features = ["parse", "serde"] }
+toml = { workspace = true, features = ["parse", "serde"], default-features = true }

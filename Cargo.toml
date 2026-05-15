@@ -31,10 +31,10 @@ jsonschema = { version = "0.46.5", default-features = false }
 miette = { version = "7", default-features = false }
 minijinja = { version = "2", default-features = false }
 octocrab = { version = "0.50.0", default-features = false, features = ["default-client", "follow-redirect", "jwt-rust-crypto", "retry", "rustls", "rustls-aws-lc-rs", "timeout", "tracing"] }
-oxc_allocator = { version = "0.129.0", default-features = false }
-oxc_ast = { version = "0.129.0", default-features = false }
-oxc_parser = { version = "0.129.0", default-features = false }
-oxc_span = { version = "0.129.0", default-features = false }
+oxc_allocator = { version = "0.131.0", default-features = false }
+oxc_ast = { version = "0.131.0", default-features = false }
+oxc_parser = { version = "0.131.0", default-features = false }
+oxc_span = { version = "0.131.0", default-features = false }
 portable-pty = { version = "0.9", default-features = false }
 proptest = { version = "1.6", default-features = false }
 quote = { version = "1", default-features = false }

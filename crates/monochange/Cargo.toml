@@ -85,7 +85,7 @@ termimad = { workspace = true, default-features = true }
 thiserror = { workspace = true, default-features = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "process"], default-features = true }
 toml = { workspace = true, default-features = true }
-toml_edit = { workspace = true }
+toml_edit = { workspace = true, default-features = true }
 tracing = { workspace = true, default-features = true }
 tracing-subscriber = { workspace = true, default-features = true }
 typed-builder = { workspace = true, default-features = true }

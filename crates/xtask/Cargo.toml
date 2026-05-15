@@ -9,15 +9,15 @@ description = "Development task runner for monochange"
 publish = false
 
 [dependencies]
-clap = { workspace = true, features = ["std"] }
+clap = { workspace = true, features = ["std"], default-features = true }
 monochange_config = { workspace = true, features = ["schema"] }
 monochange_core = { workspace = true, features = ["schema"] }
 monochange_schema = { workspace = true }
-proptest = { workspace = true, features = ["std"] }
-schemars = { workspace = true }
-semver = { workspace = true }
-serde_json = { workspace = true }
-tokio = { workspace = true }
+proptest = { workspace = true, features = ["std"], default-features = true }
+schemars = { workspace = true, default-features = true }
+semver = { workspace = true, default-features = true }
+serde_json = { workspace = true, default-features = true }
+tokio = { workspace = true, default-features = true }
 
 [features]
 schema = ["monochange_config/schema", "monochange_core/schema"]

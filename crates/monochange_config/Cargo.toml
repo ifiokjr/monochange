@@ -20,7 +20,7 @@ glob = { workspace = true, default-features = true }
 miette = { workspace = true, default-features = true }
 monochange_core = { workspace = true }
 regex = { workspace = true, default-features = true }
-schemars = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true, default-features = true }
 semver = { workspace = true, default-features = true }
 serde = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }
