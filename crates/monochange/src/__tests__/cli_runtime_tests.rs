@@ -2054,8 +2054,8 @@ async fn execute_cli_command_with_options_rejects_readiness_for_placeholder_publ
 	);
 }
 
-#[test]
-fn execute_cli_command_with_options_commit_release_uses_hosted_backend() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_with_options_commit_release_uses_hosted_backend() {
 	let workspace_dir = initialized_workspace_dir();
 	let root = workspace_dir.path();
 	let configuration = sample_configuration(root);
@@ -2085,41 +2085,51 @@ fn execute_cli_command_with_options_commit_release_uses_hosted_backend() {
 		&[],
 		Some(artifact_path.as_path()),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("save prepared release artifact: {error}"));
 
-	temp_env::with_var("GITHUB_REPOSITORY", Some("monochange/monochange"), || {
-		let output = execute_cli_command_with_options(
-			root,
-			&configuration,
-			&cli_command,
-			ExecuteCliCommandOptions {
-				dry_run: true,
-				quiet: false,
-				show_diff: false,
-				inputs: BTreeMap::new(),
-				prepared_release_path: Some(artifact_path),
-				progress_format: ProgressFormat::Auto,
-			},
-		)
-		.unwrap_or_else(|error| panic!("execute hosted commit command: {error}"));
+	temp_env::async_with_vars(
+		[("GITHUB_REPOSITORY", Some("monochange/monochange"))],
+		async {
+			let output = execute_cli_command_with_options(
+				root,
+				&configuration,
+				&cli_command,
+				ExecuteCliCommandOptions {
+					dry_run: true,
+					quiet: false,
+					show_diff: false,
+					inputs: BTreeMap::new(),
+					prepared_release_path: Some(artifact_path),
+					progress_format: ProgressFormat::Auto,
+				},
+			)
+			.await
+			.unwrap_or_else(|error| panic!("execute hosted commit command: {error}"));
 
-		assert!(output.contains("## Release commit"), "output was: {output}");
-		assert!(
-			output.contains("**Status:** dry-run"),
-			"output was: {output}"
-		);
-	});
+			assert!(output.contains("## Release commit"), "output was: {output}");
+			assert!(
+				output.contains("**Status:** dry-run"),
+				"output was: {output}"
+			);
+		},
+	)
+	.await;
 }
-
-
 
 #[test]
 fn parse_commit_release_hosted_inputs_accepts_values_and_rejects_bad_values() {
 	let mut inputs = BTreeMap::new();
 	inputs.insert("commit_backend".to_string(), vec!["hosted".to_string()]);
 	inputs.insert("hosted_auth".to_string(), vec!["oidc".to_string()]);
-	inputs.insert("hosted_url".to_string(), vec!["https://monochange.example".to_string()]);
-	inputs.insert("oidc_audience".to_string(), vec!["monochange.example".to_string()]);
+	inputs.insert(
+		"hosted_url".to_string(),
+		vec!["https://monochange.example".to_string()],
+	);
+	inputs.insert(
+		"oidc_audience".to_string(),
+		vec!["monochange.example".to_string()],
+	);
 
 	assert_eq!(
 		parse_commit_release_backend_input(&inputs).unwrap(),
@@ -2130,21 +2140,15 @@ fn parse_commit_release_hosted_inputs_accepts_values_and_rejects_bad_values() {
 		Some(HostedCommitAuth::Oidc)
 	);
 
-	inputs.insert("hosted_url".to_string(), vec!["one".to_string(), "two".to_string()]);
+	inputs.insert(
+		"hosted_url".to_string(),
+		vec!["one".to_string(), "two".to_string()],
+	);
 	let error = parse_string_step_input(&inputs, "hosted_url")
 		.expect_err("multi-value hosted url should fail")
 		.to_string();
 	assert!(error.contains("input `hosted_url` expects a single value"));
 }
-
-#[test]
-fn block_on_in_context_outside_runtime() {
-	use crate::cli_runtime::block_on_in_context;
-	// Verify block_on_in_context works outside any runtime
-	let result = block_on_in_context(async { 99 });
-	assert_eq!(result, 99);
-}
-
 
 #[tokio::test(flavor = "multi_thread")]
 async fn execute_cli_command_with_options_reuses_prepared_release_artifact_for_versions() {

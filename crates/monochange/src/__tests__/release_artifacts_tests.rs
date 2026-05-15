@@ -1335,8 +1335,8 @@ fn initialize_git_repo(root: &Path) {
 	);
 }
 
-#[test]
-fn build_hosted_commit_request_uses_github_context_and_release_files() {
+#[tokio::test(flavor = "multi_thread")]
+async fn build_hosted_commit_request_uses_github_context_and_release_files() {
 	let tmp = tempdir().unwrap();
 	let root = tmp.path();
 	initialize_git_repo(root);
@@ -1363,6 +1363,7 @@ fn build_hosted_commit_request_uses_github_context_and_release_files() {
 		Some("release/pr-1"),
 		None,
 	)
+	.await
 	.unwrap();
 
 	assert_eq!(request.provider, "github");
@@ -1381,8 +1382,8 @@ fn build_hosted_commit_request_uses_github_context_and_release_files() {
 	assert!(!request.dry_run);
 }
 
-#[test]
-fn build_hosted_commit_request_marks_deleted_release_files() {
+#[tokio::test(flavor = "multi_thread")]
+async fn build_hosted_commit_request_marks_deleted_release_files() {
 	let tmp = tempdir().unwrap();
 	let root = tmp.path();
 	initialize_git_repo(root);
@@ -1402,6 +1403,7 @@ fn build_hosted_commit_request_marks_deleted_release_files() {
 		None,
 		Some("release/fallback"),
 	)
+	.await
 	.unwrap();
 
 	assert_eq!(request.branch, "release/fallback");
@@ -1429,7 +1431,9 @@ fn build_hosted_commit_request_reports_missing_github_repository() {
 		.lock()
 		.unwrap_or_else(|error| panic!("test env lock poisoned: {error}"));
 	temp_env::with_var("GITHUB_REPOSITORY", None::<&str>, || {
-		let error = match build_hosted_commit_request(root, &prepared, true) {
+		let error = match crate::cli_runtime::block_on_in_context(build_hosted_commit_request(
+			root, &prepared, true,
+		)) {
 			Ok(_) => panic!("expected missing repository error"),
 			Err(error) => error.to_string(),
 		};
@@ -1437,8 +1441,8 @@ fn build_hosted_commit_request_reports_missing_github_repository() {
 	});
 }
 
-#[test]
-fn build_hosted_commit_request_reports_bad_repository_and_file_read_errors() {
+#[tokio::test(flavor = "multi_thread")]
+async fn build_hosted_commit_request_reports_bad_repository_and_file_read_errors() {
 	let tmp = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tmp.path();
 	initialize_git_repo(root);
@@ -1456,7 +1460,9 @@ fn build_hosted_commit_request_reports_bad_repository_and_file_read_errors() {
 		"monochange",
 		None,
 		Some("release/pr"),
-	) {
+	)
+	.await
+	{
 		Ok(_) => panic!("expected bad repository error"),
 		Err(error) => error.to_string(),
 	};
@@ -1478,7 +1484,9 @@ fn build_hosted_commit_request_reports_bad_repository_and_file_read_errors() {
 		"monochange/example-repo",
 		None,
 		Some("release/pr"),
-	) {
+	)
+	.await
+	{
 		Ok(_) => panic!("expected file read error"),
 		Err(error) => error.to_string(),
 	};
@@ -1502,8 +1510,8 @@ fn git_current_branch_reports_process_and_status_errors() {
 	assert_eq!(error, "config error: failed to resolve current branch");
 }
 
-#[test]
-fn build_hosted_commit_request_falls_back_to_current_branch() {
+#[tokio::test(flavor = "multi_thread")]
+async fn build_hosted_commit_request_falls_back_to_current_branch() {
 	let tmp = tempdir().unwrap();
 	let root = tmp.path();
 	initialize_git_repo(root);
@@ -1523,6 +1531,7 @@ fn build_hosted_commit_request_falls_back_to_current_branch() {
 		Some(""),
 		Some(""),
 	)
+	.await
 	.unwrap();
 
 	assert_eq!(request.branch, "release-branch");
@@ -1805,8 +1814,8 @@ fn github_actions_oidc_token_reports_missing_token_and_http_error() {
 		.unwrap_or_else(|error| panic!("mock server join: {error:?}"));
 }
 
-#[test]
-fn hosted_commit_release_returns_dry_run_report_without_posting() {
+#[tokio::test(flavor = "multi_thread")]
+async fn hosted_commit_release_returns_dry_run_report_without_posting() {
 	let tmp = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tmp.path();
 	initialize_git_repo(root);
@@ -1842,14 +1851,19 @@ fn hosted_commit_release_returns_dry_run_report_without_posting() {
 		oidc_audience: None,
 	};
 
-	temp_env::with_var("GITHUB_REPOSITORY", Some("monochange/monochange"), || {
-		let report = hosted_commit_release(root, &context, None, &manifest, true, &options)
-			.unwrap_or_else(|error| panic!("hosted dry run: {error}"));
-		assert_eq!(report.status, "dry_run");
-		assert!(report.commit.is_none());
-		assert!(report.dry_run);
-		assert!(report.subject.contains("chore(release): prepare release"));
-	});
+	temp_env::async_with_vars(
+		[("GITHUB_REPOSITORY", Some("monochange/monochange"))],
+		async {
+			let report = hosted_commit_release(root, &context, None, &manifest, true, &options)
+				.await
+				.unwrap_or_else(|error| panic!("hosted dry run: {error}"));
+			assert_eq!(report.status, "dry_run");
+			assert!(report.commit.is_none());
+			assert!(report.dry_run);
+			assert!(report.subject.contains("chore(release): prepare release"));
+		},
+	)
+	.await;
 }
 
 #[test]
@@ -2020,8 +2034,10 @@ fn hosted_commit_release_posts_in_non_dry_run_and_defaults_status() {
 			("MONOCHANGE_TOKEN", Some("monochange-secret")),
 		],
 		|| {
-			let report = hosted_commit_release(root, &context, None, &manifest, true, &options)
-				.unwrap_or_else(|error| panic!("hosted commit release: {error}"));
+			let report = crate::cli_runtime::block_on_in_context(hosted_commit_release(
+				root, &context, None, &manifest, true, &options,
+			))
+			.unwrap_or_else(|error| panic!("hosted commit release: {error}"));
 			assert_eq!(report.commit.as_deref(), Some("abc123"));
 			assert_eq!(report.status, "completed");
 			assert!(!report.dry_run);
