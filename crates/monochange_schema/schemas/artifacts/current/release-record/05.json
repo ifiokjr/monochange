@@ -39,17 +39,17 @@
 		{
 			"ecosystem": "cargo",
 			"package": "kogkellsnvmp_0",
-			"version": "0.2.5"
+			"version": "0.3.5"
 		},
 		{
 			"ecosystem": "cargo",
 			"package": "kogkellsnvmp_1",
-			"version": "0.2.5"
+			"version": "0.3.5"
 		},
 		{
 			"ecosystem": "cargo",
 			"package": "kogkellsnvmp_2",
-			"version": "0.2.5"
+			"version": "0.3.5"
 		}
 	],
 	"provider": {
@@ -65,8 +65,8 @@
 			"members": [],
 			"release": true,
 			"tag": true,
-			"tagName": "v0.2.5",
-			"version": "0.2.5",
+			"tagName": "v0.3.5",
+			"version": "0.3.5",
 			"versionFormat": "primary"
 		}
 	],
@@ -75,15 +75,15 @@
 		"kogkellsnvmp_1",
 		"kogkellsnvmp_2"
 	],
-	"schemaVersion": "0.2",
+	"schemaVersion": "0.3",
 	"updatedChangelogs": [
 		"fixtures/changelog-5.md"
 	],
-	"version": "0.2.5",
+	"version": "0.3.5",
 	"versions": {
-		"kogkellsnvmp_0": "0.2.5",
-		"kogkellsnvmp_1": "0.2.5",
-		"kogkellsnvmp_2": "0.2.5",
-		"main": "0.2.5"
+		"kogkellsnvmp_0": "0.3.5",
+		"kogkellsnvmp_1": "0.3.5",
+		"kogkellsnvmp_2": "0.3.5",
+		"main": "0.3.5"
 	}
 }

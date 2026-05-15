@@ -35,27 +35,27 @@
 		{
 			"ecosystem": "cargo",
 			"package": "ijpz_0",
-			"version": "0.2.10"
+			"version": "0.3.10"
 		},
 		{
 			"ecosystem": "cargo",
 			"package": "ijpz_1",
-			"version": "0.2.10"
+			"version": "0.3.10"
 		},
 		{
 			"ecosystem": "cargo",
 			"package": "ijpz_2",
-			"version": "0.2.10"
+			"version": "0.3.10"
 		},
 		{
 			"ecosystem": "cargo",
 			"package": "ijpz_3",
-			"version": "0.2.10"
+			"version": "0.3.10"
 		},
 		{
 			"ecosystem": "cargo",
 			"package": "ijpz_4",
-			"version": "0.2.10"
+			"version": "0.3.10"
 		}
 	],
 	"provider": {
@@ -71,8 +71,8 @@
 			"members": [],
 			"release": true,
 			"tag": true,
-			"tagName": "v0.2.10",
-			"version": "0.2.10",
+			"tagName": "v0.3.10",
+			"version": "0.3.10",
 			"versionFormat": "primary"
 		},
 		{
@@ -81,8 +81,8 @@
 			"members": [],
 			"release": true,
 			"tag": true,
-			"tagName": "ijpz_1/v0.2.10",
-			"version": "0.2.10",
+			"tagName": "ijpz_1/v0.3.10",
+			"version": "0.3.10",
 			"versionFormat": "namespaced"
 		},
 		{
@@ -91,8 +91,8 @@
 			"members": [],
 			"release": true,
 			"tag": true,
-			"tagName": "ijpz_2/v0.2.10",
-			"version": "0.2.10",
+			"tagName": "ijpz_2/v0.3.10",
+			"version": "0.3.10",
 			"versionFormat": "namespaced"
 		}
 	],
@@ -103,15 +103,15 @@
 		"ijpz_3",
 		"ijpz_4"
 	],
-	"schemaVersion": "0.2",
+	"schemaVersion": "0.3",
 	"updatedChangelogs": [
 		"fixtures/changelog-10.md"
 	],
-	"version": "0.2.10",
+	"version": "0.3.10",
 	"versions": {
-		"ijpz_0": "0.2.10",
-		"ijpz_1": "0.2.10",
-		"ijpz_2": "0.2.10",
-		"main": "0.2.10"
+		"ijpz_0": "0.3.10",
+		"ijpz_1": "0.3.10",
+		"ijpz_2": "0.3.10",
+		"main": "0.3.10"
 	}
 }

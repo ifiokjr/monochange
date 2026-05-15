@@ -21,7 +21,7 @@
 				"summary": [
 					"Release 7"
 				],
-				"title": "v0.2.7"
+				"title": "v0.3.7"
 			},
 			"ownerId": "main",
 			"ownerKind": "group",
@@ -64,17 +64,17 @@
 		{
 			"ecosystem": "cargo",
 			"package": "trsrzwekwunm_0",
-			"version": "0.2.7"
+			"version": "0.3.7"
 		},
 		{
 			"ecosystem": "cargo",
 			"package": "trsrzwekwunm_1",
-			"version": "0.2.7"
+			"version": "0.3.7"
 		},
 		{
 			"ecosystem": "cargo",
 			"package": "trsrzwekwunm_2",
-			"version": "0.2.7"
+			"version": "0.3.7"
 		}
 	],
 	"provider": {
@@ -90,8 +90,8 @@
 			"members": [],
 			"release": true,
 			"tag": true,
-			"tagName": "v0.2.7",
-			"version": "0.2.7",
+			"tagName": "v0.3.7",
+			"version": "0.3.7",
 			"versionFormat": "primary"
 		},
 		{
@@ -100,8 +100,8 @@
 			"members": [],
 			"release": true,
 			"tag": true,
-			"tagName": "trsrzwekwunm_1/v0.2.7",
-			"version": "0.2.7",
+			"tagName": "trsrzwekwunm_1/v0.3.7",
+			"version": "0.3.7",
 			"versionFormat": "namespaced"
 		}
 	],
@@ -110,15 +110,15 @@
 		"trsrzwekwunm_1",
 		"trsrzwekwunm_2"
 	],
-	"schemaVersion": "0.2",
+	"schemaVersion": "0.3",
 	"updatedChangelogs": [
 		"fixtures/changelog-7.md"
 	],
-	"version": "0.2.7",
+	"version": "0.3.7",
 	"versions": {
-		"main": "0.2.7",
-		"trsrzwekwunm_0": "0.2.7",
-		"trsrzwekwunm_1": "0.2.7",
-		"trsrzwekwunm_2": "0.2.7"
+		"main": "0.3.7",
+		"trsrzwekwunm_0": "0.3.7",
+		"trsrzwekwunm_1": "0.3.7",
+		"trsrzwekwunm_2": "0.3.7"
 	}
 }

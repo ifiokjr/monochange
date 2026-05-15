@@ -44,8 +44,8 @@
 			"members": [],
 			"release": true,
 			"tag": true,
-			"tagName": "v0.2.4",
-			"version": "0.2.4",
+			"tagName": "v0.3.4",
+			"version": "0.3.4",
 			"versionFormat": "primary"
 		},
 		{
@@ -54,8 +54,8 @@
 			"members": [],
 			"release": true,
 			"tag": true,
-			"tagName": "acydu_1/v0.2.4",
-			"version": "0.2.4",
+			"tagName": "acydu_1/v0.3.4",
+			"version": "0.3.4",
 			"versionFormat": "primary"
 		},
 		{
@@ -64,8 +64,8 @@
 			"members": [],
 			"release": true,
 			"tag": true,
-			"tagName": "acydu_2/v0.2.4",
-			"version": "0.2.4",
+			"tagName": "acydu_2/v0.3.4",
+			"version": "0.3.4",
 			"versionFormat": "primary"
 		}
 	],
@@ -75,15 +75,15 @@
 		"acydu_2",
 		"acydu_3"
 	],
-	"schemaVersion": "0.2",
+	"schemaVersion": "0.3",
 	"updatedChangelogs": [
 		"fixtures/changelog-4.md"
 	],
-	"version": "0.2.4",
+	"version": "0.3.4",
 	"versions": {
-		"acydu_0": "0.2.4",
-		"acydu_1": "0.2.4",
-		"acydu_2": "0.2.4",
-		"main": "0.2.4"
+		"acydu_0": "0.3.4",
+		"acydu_1": "0.3.4",
+		"acydu_2": "0.3.4",
+		"main": "0.3.4"
 	}
 }

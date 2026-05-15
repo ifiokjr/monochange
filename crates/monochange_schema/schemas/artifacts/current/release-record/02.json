@@ -19,7 +19,7 @@
 				"summary": [
 					"Release 2"
 				],
-				"title": "v0.2.2"
+				"title": "v0.3.2"
 			},
 			"ownerId": "main",
 			"ownerKind": "group",
@@ -64,8 +64,8 @@
 			"members": [],
 			"release": true,
 			"tag": true,
-			"tagName": "v0.2.2",
-			"version": "0.2.2",
+			"tagName": "v0.3.2",
+			"version": "0.3.2",
 			"versionFormat": "primary"
 		},
 		{
@@ -74,8 +74,8 @@
 			"members": [],
 			"release": true,
 			"tag": true,
-			"tagName": "zuvuuep_1/v0.2.2",
-			"version": "0.2.2",
+			"tagName": "zuvuuep_1/v0.3.2",
+			"version": "0.3.2",
 			"versionFormat": "primary"
 		}
 	],
@@ -86,15 +86,15 @@
 		"zuvuuep_3",
 		"zuvuuep_4"
 	],
-	"schemaVersion": "0.2",
+	"schemaVersion": "0.3",
 	"updatedChangelogs": [
 		"fixtures/changelog-2.md"
 	],
-	"version": "0.2.2",
+	"version": "0.3.2",
 	"versions": {
-		"main": "0.2.2",
-		"zuvuuep_0": "0.2.2",
-		"zuvuuep_1": "0.2.2",
-		"zuvuuep_2": "0.2.2"
+		"main": "0.3.2",
+		"zuvuuep_0": "0.3.2",
+		"zuvuuep_1": "0.3.2",
+		"zuvuuep_2": "0.3.2"
 	}
 }

@@ -48,8 +48,8 @@
 			"members": [],
 			"release": true,
 			"tag": true,
-			"tagName": "v0.2.3",
-			"version": "0.2.3",
+			"tagName": "v0.3.3",
+			"version": "0.3.3",
 			"versionFormat": "primary"
 		},
 		{
@@ -58,8 +58,8 @@
 			"members": [],
 			"release": true,
 			"tag": true,
-			"tagName": "ybmo_1/v0.2.3",
-			"version": "0.2.3",
+			"tagName": "ybmo_1/v0.3.3",
+			"version": "0.3.3",
 			"versionFormat": "namespaced"
 		},
 		{
@@ -68,8 +68,8 @@
 			"members": [],
 			"release": true,
 			"tag": true,
-			"tagName": "ybmo_2/v0.2.3",
-			"version": "0.2.3",
+			"tagName": "ybmo_2/v0.3.3",
+			"version": "0.3.3",
 			"versionFormat": "namespaced"
 		}
 	],
@@ -79,15 +79,15 @@
 		"ybmo_2",
 		"ybmo_3"
 	],
-	"schemaVersion": "0.2",
+	"schemaVersion": "0.3",
 	"updatedChangelogs": [
 		"fixtures/changelog-3.md"
 	],
-	"version": "0.2.3",
+	"version": "0.3.3",
 	"versions": {
-		"main": "0.2.3",
-		"ybmo_0": "0.2.3",
-		"ybmo_1": "0.2.3",
-		"ybmo_2": "0.2.3"
+		"main": "0.3.3",
+		"ybmo_0": "0.3.3",
+		"ybmo_1": "0.3.3",
+		"ybmo_2": "0.3.3"
 	}
 }

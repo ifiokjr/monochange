@@ -34,12 +34,12 @@
 		{
 			"ecosystem": "cargo",
 			"package": "fuolxbhry_0",
-			"version": "0.2.1"
+			"version": "0.3.1"
 		},
 		{
 			"ecosystem": "cargo",
 			"package": "fuolxbhry_1",
-			"version": "0.2.1"
+			"version": "0.3.1"
 		}
 	],
 	"provider": {
@@ -55,8 +55,8 @@
 			"members": [],
 			"release": true,
 			"tag": true,
-			"tagName": "v0.2.1",
-			"version": "0.2.1",
+			"tagName": "v0.3.1",
+			"version": "0.3.1",
 			"versionFormat": "primary"
 		},
 		{
@@ -65,8 +65,8 @@
 			"members": [],
 			"release": true,
 			"tag": true,
-			"tagName": "fuolxbhry_1/v0.2.1",
-			"version": "0.2.1",
+			"tagName": "fuolxbhry_1/v0.3.1",
+			"version": "0.3.1",
 			"versionFormat": "namespaced"
 		},
 		{
@@ -75,8 +75,8 @@
 			"members": [],
 			"release": true,
 			"tag": true,
-			"tagName": "fuolxbhry_2/v0.2.1",
-			"version": "0.2.1",
+			"tagName": "fuolxbhry_2/v0.3.1",
+			"version": "0.3.1",
 			"versionFormat": "namespaced"
 		}
 	],
@@ -84,14 +84,14 @@
 		"fuolxbhry_0",
 		"fuolxbhry_1"
 	],
-	"schemaVersion": "0.2",
+	"schemaVersion": "0.3",
 	"updatedChangelogs": [
 		"fixtures/changelog-1.md"
 	],
-	"version": "0.2.1",
+	"version": "0.3.1",
 	"versions": {
-		"fuolxbhry_0": "0.2.1",
-		"fuolxbhry_1": "0.2.1",
-		"main": "0.2.1"
+		"fuolxbhry_0": "0.3.1",
+		"fuolxbhry_1": "0.3.1",
+		"main": "0.3.1"
 	}
 }
