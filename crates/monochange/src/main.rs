@@ -1,16 +1,10 @@
+#![allow(unstable_features)]
 #![allow(clippy::large_futures)]
+#![feature(coverage_attribute)]
+
+#[coverage(off)]
 #[allow(clippy::disallowed_methods)]
 #[tokio::main(flavor = "current_thread")]
-async fn main() {
-	let quiet = std::env::args_os().any(|arg| matches!(arg.to_str(), Some("--quiet" | "-q")));
-
-	let Err(error) = monochange::run_from_env("monochange").await else {
-		return;
-	};
-
-	if !quiet {
-		eprintln!("{}", error.render());
-	}
-
-	std::process::exit(1);
+async fn main() -> std::process::ExitCode {
+	monochange::run_cli_binary_from_env("monochange").await
 }

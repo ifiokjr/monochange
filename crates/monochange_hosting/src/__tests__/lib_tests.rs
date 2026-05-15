@@ -74,6 +74,33 @@ fn minimal_target(id: &str) -> ReleaseManifestTarget {
 	}
 }
 
+#[tokio::test(flavor = "multi_thread")]
+#[allow(clippy::disallowed_methods)]
+async fn git_checkout_branch_creates_release_branch_from_detached_head() -> Result<(), String> {
+	let tempdir = tempfile::tempdir().map_err(|error| format!("tempdir: {error}"))?;
+	let root = tempdir.path();
+	monochange_test_helpers::git(root, &["init", "-b", "main"]);
+	monochange_test_helpers::git(root, &["config", "user.name", "monochange Tests"]);
+	monochange_test_helpers::git(root, &["config", "user.email", "monochange@example.com"]);
+	std::fs::write(root.join("README.md"), "initial\n")
+		.map_err(|error| format!("write readme: {error}"))?;
+	monochange_test_helpers::git(root, &["add", "README.md"]);
+	monochange_test_helpers::git(root, &["commit", "-m", "initial commit"]);
+	let head = monochange_test_helpers::git_output_trimmed(root, &["rev-parse", "HEAD"]);
+	monochange_test_helpers::git(root, &["checkout", "--detach", &head]);
+
+	git_checkout_branch(root, "monochange/release", "checkout release branch")
+		.await
+		.map_err(|error| format!("checkout release branch: {error}"))?;
+
+	let branch = monochange_test_helpers::git_output_trimmed(root, &["branch", "--show-current"]);
+	if branch != "monochange/release" {
+		return Err(format!("checked out branch: {branch}"));
+	}
+
+	Ok(())
+}
+
 #[test]
 fn push_body_entries_adds_dash_prefix_to_plain_entries() {
 	let mut lines = Vec::new();

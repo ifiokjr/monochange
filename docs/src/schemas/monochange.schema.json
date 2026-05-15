@@ -1302,6 +1302,12 @@
 					},
 					"type": "array"
 				},
+				"changeset_context_timeout_seconds": {
+					"default": 120,
+					"format": "uint64",
+					"minimum": 1,
+					"type": "integer"
+				},
 				"draft": {
 					"default": false,
 					"type": "boolean"
@@ -2192,6 +2198,7 @@
 						"branches": [
 							"main"
 						],
+						"changeset_context_timeout_seconds": 120,
 						"draft": false,
 						"enabled": true,
 						"enforce_for_commit": false,

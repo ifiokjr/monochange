@@ -1167,6 +1167,15 @@ fn changeset_context_phase_label_covers_annotate_and_enrich_modes() {
 }
 
 #[test]
+fn changeset_context_timeout_uses_configured_source_release_timeout() {
+	let mut source = sample_source(SourceProvider::GitHub);
+	assert_eq!(changeset_context_timeout(&source), Duration::from_secs(120));
+
+	source.releases.changeset_context_timeout_seconds = 7;
+	assert_eq!(changeset_context_timeout(&source), Duration::from_secs(7));
+}
+
+#[test]
 fn warn_about_incomplete_cargo_lockfiles_returns_early_when_commands_are_configured() {
 	let configuration = workspace_configuration_with_lockfile_commands();
 	warn_about_incomplete_cargo_lockfiles(Path::new("."), &configuration, &[], &BTreeMap::new());

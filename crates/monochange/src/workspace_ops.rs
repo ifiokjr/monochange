@@ -46,8 +46,6 @@ use typed_builder::TypedBuilder;
 use crate::interactive;
 use crate::*;
 
-const HOSTED_SOURCE_ENRICHMENT_TIMEOUT: Duration = Duration::from_secs(30);
-
 /// Result of initializing a workspace with `mc init`.
 ///
 /// Contains the paths to generated configuration and workflow files.
@@ -2010,11 +2008,15 @@ async fn apply_source_changeset_context(
 	} else {
 		run_changeset_context_enrichment_with_timeout(
 			source,
-			HOSTED_SOURCE_ENRICHMENT_TIMEOUT,
+			changeset_context_timeout(source),
 			adapter.enrich_changeset_context(source, changesets),
 		)
 		.await;
 	}
+}
+
+fn changeset_context_timeout(source: &SourceConfiguration) -> Duration {
+	Duration::from_secs(source.releases.changeset_context_timeout_seconds)
 }
 
 async fn run_changeset_context_enrichment_with_timeout(

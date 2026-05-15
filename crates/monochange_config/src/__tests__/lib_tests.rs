@@ -555,6 +555,7 @@ fn load_workspace_configuration_parses_github_release_settings() {
 	assert!(source.releases.draft);
 	assert!(source.releases.prerelease);
 	assert!(source.releases.generate_notes);
+	assert_eq!(source.releases.changeset_context_timeout_seconds, 120);
 	assert_eq!(
 		source.releases.source,
 		monochange_core::ProviderReleaseNotesSource::GitHubGenerated
@@ -589,6 +590,7 @@ branches = ["main", "release/*"]
 enforce_for_tags = true
 enforce_for_publish = true
 enforce_for_commit = true
+changeset_context_timeout_seconds = 9
 "#,
 	)
 	.unwrap_or_else(|error| panic!("write config: {error}"));
@@ -603,6 +605,35 @@ enforce_for_commit = true
 	assert!(source.releases.enforce_for_tags);
 	assert!(source.releases.enforce_for_publish);
 	assert!(source.releases.enforce_for_commit);
+	assert_eq!(source.releases.changeset_context_timeout_seconds, 9);
+}
+
+#[test]
+fn load_workspace_configuration_rejects_zero_changeset_context_timeout() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	std::fs::write(
+		tempdir.path().join("monochange.toml"),
+		r#"
+[source]
+provider = "github"
+owner = "monochange"
+repo = "monochange"
+
+[source.releases]
+changeset_context_timeout_seconds = 0
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write config: {error}"));
+
+	let error = load_workspace_configuration(tempdir.path())
+		.err()
+		.unwrap_or_else(|| panic!("expected timeout validation error"));
+
+	assert!(
+		error
+			.to_string()
+			.contains("[source.releases].changeset_context_timeout_seconds must be greater than 0")
+	);
 }
 
 #[test]

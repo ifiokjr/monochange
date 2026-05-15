@@ -379,8 +379,7 @@ where
 
 /// Check out or reset the local release branch used for provider requests.
 pub async fn git_checkout_branch(root: &Path, branch: &str, context: &str) -> MonochangeResult<()> {
-	let current = git_current_branch(root).await?;
-	if current == branch {
+	if matches!(git_current_branch(root).await.as_deref(), Ok(current) if current == branch) {
 		return Ok(());
 	}
 	run_command(git_checkout_branch_command(root, branch), context).await

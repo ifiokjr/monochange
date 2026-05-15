@@ -623,6 +623,7 @@ branches = ["main"]
 enforce_for_tags = true
 enforce_for_publish = true
 enforce_for_commit = false
+changeset_context_timeout_seconds = 120
 
 # [source.pull_requests] — release pull request settings
 #
@@ -661,6 +662,7 @@ auto_merge = false
 #   enforce_for_tags    — reject unsafe tag-release refs (default: true)
 #   enforce_for_publish — reject unsafe publish refs (default: true)
 #   enforce_for_commit  — reject unsafe commit-release refs (default: false)
+#   changeset_context_timeout_seconds — hosted-source enrichment timeout (default: 120)
 #
 # [source.releases]
 # enabled = true
@@ -671,6 +673,7 @@ auto_merge = false
 # enforce_for_tags = true
 # enforce_for_publish = true
 # enforce_for_commit = false
+# changeset_context_timeout_seconds = 120
 
 # [source.pull_requests] — release pull request settings
 #

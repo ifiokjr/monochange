@@ -56,6 +56,7 @@ use std::io::IsTerminal;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
+use std::process::ExitCode;
 use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
@@ -615,6 +616,26 @@ pub async fn run_from_env(bin_name: &'static str) -> MonochangeResult<()> {
 		}
 	}
 	Ok(())
+}
+
+/// Run a CLI binary from process arguments and return the process exit code.
+///
+/// Binary entrypoints choose the Tokio runtime before delegating here so `mc`
+/// and `monochange` share the same output and error handling.
+#[coverage(off)]
+#[must_use = "the process exit code must be returned"]
+pub async fn run_cli_binary_from_env(bin_name: &'static str) -> ExitCode {
+	let quiet = extract_quiet_from_args(std::env::args_os());
+	let result = Box::pin(run_from_env(bin_name)).await;
+	let Err(error) = result else {
+		return ExitCode::SUCCESS;
+	};
+
+	if !quiet {
+		eprintln!("{}", error.render());
+	}
+
+	ExitCode::FAILURE
 }
 
 pub(crate) fn detect_output_format_from_env_args(

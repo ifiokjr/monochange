@@ -3710,6 +3710,12 @@ fn validate_source_configuration(source: Option<&SourceConfiguration>) -> Monoch
 			"[source.releases].branches must not include empty values".to_string(),
 		));
 	}
+	if source.releases.changeset_context_timeout_seconds == 0 {
+		return Err(MonochangeError::Config(
+			"[source.releases].changeset_context_timeout_seconds must be greater than 0"
+				.to_string(),
+		));
+	}
 	if source
 		.releases
 		.attestations

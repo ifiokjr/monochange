@@ -4191,6 +4191,9 @@ pub struct ProviderReleaseSettings {
 	pub enforce_for_publish: bool,
 	#[serde(default)]
 	pub enforce_for_commit: bool,
+	#[serde(default = "default_changeset_context_timeout_seconds")]
+	#[cfg_attr(feature = "schema", schemars(range(min = 1)))]
+	pub changeset_context_timeout_seconds: u64,
 	#[serde(
 		default,
 		skip_serializing_if = "ReleaseAttestationSettings::is_default"
@@ -4210,6 +4213,7 @@ impl Default for ProviderReleaseSettings {
 			enforce_for_tags: true,
 			enforce_for_publish: true,
 			enforce_for_commit: false,
+			changeset_context_timeout_seconds: default_changeset_context_timeout_seconds(),
 			attestations: ReleaseAttestationSettings::default(),
 		}
 	}
@@ -4317,6 +4321,10 @@ impl fmt::Display for ChangesetPolicyStatus {
 
 fn default_release_branch_patterns() -> Vec<String> {
 	vec!["main".to_string()]
+}
+
+fn default_changeset_context_timeout_seconds() -> u64 {
+	120
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
