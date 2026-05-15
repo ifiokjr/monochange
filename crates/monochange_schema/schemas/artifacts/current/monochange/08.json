@@ -1,25 +1,72 @@
 {
 	"defaults": {
-		"package_type": "go"
+		"changelog_version_title": "v{{version}} — dhrxtrsrzw release",
+		"empty_update_message": "No significant changes for dhrxtrsrzw packages.",
+		"include_private": true,
+		"package_type": "deno",
+		"parent_bump": "patch",
+		"strict_version_conflicts": false,
+		"warn_on_group_mismatch": true
+	},
+	"ecosystems": {
+		"npm": {
+			"enabled": true,
+			"publish": {
+				"enabled": true
+			},
+			"roots": [
+				"crates/npm"
+			]
+		}
+	},
+	"group": {
+		"main": {
+			"packages": [
+				"dhrxtrsrzw_0",
+				"dhrxtrsrzw_1"
+			],
+			"release": false,
+			"tag": false,
+			"version_format": "namespaced"
+		}
+	},
+	"lints": {
+		"rules": {
+			"no-unnecessary-releases": "error"
+		},
+		"scopes": [
+			"crates/dhrxtrsrzw"
+		],
+		"use": [
+			"no-unnecessary-releases"
+		]
 	},
 	"package": {
-		"lngscapy_0": {
-			"path": "crates/lngscapy_0"
-		},
-		"lngscapy_1": {
-			"path": "crates/lngscapy_1"
-		},
-		"lngscapy_2": {
-			"path": "crates/lngscapy_2"
-		},
-		"lngscapy_3": {
-			"path": "crates/lngscapy_3"
+		"dhrxtrsrzw_0": {
+			"path": "crates/dhrxtrsrzw_0",
+			"release": true,
+			"tag": true,
+			"type": "deno",
+			"version_format": "namespaced"
 		}
 	},
 	"source": {
-		"host": "github.example.com",
-		"owner": "lngscapy",
-		"provider": "github",
-		"repo": "xfphohp"
+		"api_url": "api.gitea.example.com",
+		"host": "gitea.example.com",
+		"owner": "dhrxtrsrzw",
+		"provider": "gitea",
+		"pull_requests": {
+			"auto_merge": true,
+			"base": "main",
+			"branch_prefix": "dhrxtrsrzw/release",
+			"enabled": true,
+			"labels": [
+				"release",
+				"automated"
+			],
+			"title": "chore(release): prepare dhrxtrsrzw release",
+			"verified_commits": false
+		},
+		"repo": "knnscpqv"
 	}
 }

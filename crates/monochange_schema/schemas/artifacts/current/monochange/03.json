@@ -1,25 +1,74 @@
 {
 	"defaults": {
-		"package_type": "npm"
+		"changelog_version_title": "v{{version}} — xzaqasg release",
+		"empty_update_message": "No significant changes for xzaqasg packages.",
+		"include_private": false,
+		"package_type": "cargo",
+		"parent_bump": "none",
+		"strict_version_conflicts": true,
+		"warn_on_group_mismatch": false
+	},
+	"ecosystems": {
+		"python": {
+			"enabled": true,
+			"publish": {
+				"enabled": true
+			},
+			"roots": [
+				"crates/python"
+			]
+		}
+	},
+	"group": {
+		"main": {
+			"packages": [
+				"xzaqasg_0",
+				"xzaqasg_1"
+			],
+			"release": false,
+			"tag": false,
+			"version_format": "namespaced"
+		}
 	},
 	"package": {
-		"imwmkuepi_0": {
-			"path": "crates/imwmkuepi_0"
+		"xzaqasg_0": {
+			"path": "crates/xzaqasg_0",
+			"release": true,
+			"tag": true,
+			"type": "cargo",
+			"version_format": "namespaced"
 		},
-		"imwmkuepi_1": {
-			"path": "crates/imwmkuepi_1"
+		"xzaqasg_1": {
+			"path": "crates/xzaqasg_1",
+			"release": false,
+			"tag": false,
+			"type": "cargo",
+			"version_format": "namespaced"
 		},
-		"imwmkuepi_2": {
-			"path": "crates/imwmkuepi_2"
-		},
-		"imwmkuepi_3": {
-			"path": "crates/imwmkuepi_3"
+		"xzaqasg_2": {
+			"path": "crates/xzaqasg_2",
+			"release": false,
+			"tag": false,
+			"type": "cargo",
+			"version_format": "namespaced"
 		}
 	},
 	"source": {
 		"host": "gitlab.example.com",
-		"owner": "imwmkuepi",
+		"owner": "xzaqasg",
 		"provider": "gitlab",
-		"repo": "aza"
+		"pull_requests": {
+			"auto_merge": true,
+			"base": "main",
+			"branch_prefix": "xzaqasg/release",
+			"enabled": true,
+			"labels": [
+				"release",
+				"automated"
+			],
+			"title": "chore(release): prepare xzaqasg release",
+			"verified_commits": false
+		},
+		"repo": "wleh"
 	}
 }

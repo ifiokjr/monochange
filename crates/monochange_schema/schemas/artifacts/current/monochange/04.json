@@ -1,25 +1,86 @@
 {
+	"changesets": {
+		"affected": {
+			"changed_paths": [
+				"crates/ufqwzwx/"
+			],
+			"comment_on_failure": true,
+			"enabled": true,
+			"ignored_paths": [
+				"**/*.md"
+			],
+			"required": true,
+			"skip_labels": [
+				"skip-changeset"
+			]
+		}
+	},
 	"defaults": {
-		"package_type": "dart"
+		"empty_update_message": "No significant changes for ufqwzwx packages.",
+		"include_private": true,
+		"package_type": "cargo",
+		"parent_bump": "none",
+		"release_title": "ufqwzwx release",
+		"strict_version_conflicts": false,
+		"warn_on_group_mismatch": true
+	},
+	"ecosystems": {
+		"deno": {
+			"enabled": true,
+			"publish": {
+				"enabled": true
+			},
+			"roots": [
+				"crates/deno"
+			]
+		}
 	},
 	"package": {
-		"qgf_0": {
-			"path": "crates/qgf_0"
+		"ufqwzwx_0": {
+			"path": "crates/ufqwzwx_0",
+			"release": true,
+			"tag": true,
+			"type": "cargo",
+			"version_format": "namespaced"
 		},
-		"qgf_1": {
-			"path": "crates/qgf_1"
+		"ufqwzwx_1": {
+			"path": "crates/ufqwzwx_1",
+			"release": false,
+			"tag": false,
+			"type": "cargo",
+			"version_format": "namespaced"
 		},
-		"qgf_2": {
-			"path": "crates/qgf_2"
+		"ufqwzwx_2": {
+			"path": "crates/ufqwzwx_2",
+			"release": false,
+			"tag": false,
+			"type": "cargo",
+			"version_format": "namespaced"
 		},
-		"qgf_3": {
-			"path": "crates/qgf_3"
+		"ufqwzwx_3": {
+			"path": "crates/ufqwzwx_3",
+			"release": false,
+			"tag": false,
+			"type": "cargo",
+			"version_format": "namespaced"
 		}
 	},
 	"source": {
-		"host": "forgejo.example.com",
-		"owner": "qgf",
-		"provider": "forgejo",
-		"repo": "lehbmoagmuf"
+		"host": "gitlab.example.com",
+		"owner": "ufqwzwx",
+		"provider": "gitlab",
+		"pull_requests": {
+			"auto_merge": true,
+			"base": "main",
+			"branch_prefix": "ufqwzwx/release",
+			"enabled": true,
+			"labels": [
+				"release",
+				"automated"
+			],
+			"title": "chore(release): prepare ufqwzwx release",
+			"verified_commits": true
+		},
+		"repo": "uqchac"
 	}
 }

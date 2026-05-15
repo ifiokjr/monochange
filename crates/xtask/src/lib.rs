@@ -182,8 +182,27 @@ struct ConfigVariant {
 	owner: String,
 	repo: String,
 	with_host: bool,
-	ecosystem: String,
+	with_api_url: bool,
+	parent_bump: String,
+	include_private: bool,
+	warn_on_group_mismatch: bool,
+	with_changelog_version_title: bool,
+	with_empty_update_message: bool,
+	with_release_title: bool,
+	strict_version_conflicts: bool,
+	default_ecosystem: String,
 	package_count: usize,
+	with_group: bool,
+	group_release: bool,
+	with_changelog: bool,
+	changelog_style: String,
+	package_label_placement: String,
+	with_ecosystems: bool,
+	enabled_ecosystem: String,
+	with_changesets_affected: bool,
+	with_lints: bool,
+	auto_merge: bool,
+	verified_commits: bool,
 }
 
 /// Core schema generation logic with configurable output directories.
@@ -444,22 +463,92 @@ fn current_config_variants() -> Vec<ConfigVariant> {
 	let snake_case_id2 = prop::collection::vec(prop::char::range('a', 'z'), 3..=12)
 		.prop_map(|chars| chars.into_iter().collect::<String>());
 	let strategy = (
-		prop::sample::select(&["github", "gitlab", "gitea", "forgejo"][..]),
-		snake_case_id,
-		snake_case_id2,
-		any::<bool>(),
-		prop::sample::select(&["cargo", "npm", "deno", "dart", "flutter", "python", "go"][..]),
-		1_usize..=5,
+		(
+			prop::sample::select(&["github", "gitlab", "gitea", "forgejo"][..]),
+			snake_case_id,
+			snake_case_id2,
+			any::<bool>(),
+			any::<bool>(),
+		),
+		(
+			prop::sample::select(&["none", "patch", "minor", "major"][..]),
+			any::<bool>(),
+			any::<bool>(),
+			any::<bool>(),
+			any::<bool>(),
+			any::<bool>(),
+			any::<bool>(),
+			prop::sample::select(&["cargo", "npm", "deno", "dart", "python", "go"][..]),
+			1_usize..=5,
+		),
+		(
+			any::<bool>(),
+			any::<bool>(),
+			any::<bool>(),
+			prop::sample::select(&["plain", "details"][..]),
+			prop::sample::select(&["after_heading", "after_change"][..]),
+			any::<bool>(),
+			prop::sample::select(&["cargo", "npm", "deno", "dart", "python", "go"][..]),
+			any::<bool>(),
+			any::<bool>(),
+			any::<bool>(),
+			any::<bool>(),
+		),
 	)
 		.prop_map(
-			|(provider_kind, owner, repo, with_host, ecosystem, package_count)| {
+			|(
+				(provider_kind, owner, repo, with_host, with_api_url),
+				(
+					parent_bump,
+					include_private,
+					warn_on_group_mismatch,
+					with_changelog_version_title,
+					with_empty_update_message,
+					with_release_title,
+					strict_version_conflicts,
+					default_ecosystem,
+					package_count,
+				),
+				(
+					with_group,
+					group_release,
+					with_changelog,
+					changelog_style,
+					package_label_placement,
+					with_ecosystems,
+					enabled_ecosystem,
+					with_changesets_affected,
+					with_lints,
+					auto_merge,
+					verified_commits,
+				),
+			)| {
 				ConfigVariant {
 					provider_kind: provider_kind.to_string(),
 					owner,
 					repo,
 					with_host,
-					ecosystem: ecosystem.to_string(),
+					with_api_url,
+					parent_bump: parent_bump.to_string(),
+					include_private,
+					warn_on_group_mismatch,
+					with_changelog_version_title,
+					with_empty_update_message,
+					with_release_title,
+					strict_version_conflicts,
+					default_ecosystem: default_ecosystem.to_string(),
 					package_count,
+					with_group,
+					group_release,
+					with_changelog,
+					changelog_style: changelog_style.to_string(),
+					package_label_placement: package_label_placement.to_string(),
+					with_ecosystems,
+					enabled_ecosystem: enabled_ecosystem.to_string(),
+					with_changesets_affected,
+					with_lints,
+					auto_merge,
+					verified_commits,
 				}
 			},
 		);
@@ -704,6 +793,9 @@ fn release_record_artifact_fixture(
 }
 
 fn config_artifact_fixture(_fixture_index: usize, variant: &ConfigVariant) -> String {
+	let mut root = Map::new();
+
+	// === source ===
 	let mut source = Map::new();
 	source.insert("provider".to_string(), json!(&variant.provider_kind));
 	source.insert("owner".to_string(), json!(&variant.owner));
@@ -714,24 +806,204 @@ fn config_artifact_fixture(_fixture_index: usize, variant: &ConfigVariant) -> St
 			json!(format!("{}.example.com", variant.provider_kind)),
 		);
 	}
+	if variant.with_api_url {
+		source.insert(
+			"api_url".to_string(),
+			json!(format!("api.{}.example.com", variant.provider_kind)),
+		);
+	}
+	let mut pull_requests = Map::new();
+	pull_requests.insert("auto_merge".to_string(), json!(variant.auto_merge));
+	pull_requests.insert("base".to_string(), json!("main"));
+	pull_requests.insert(
+		"branch_prefix".to_string(),
+		json!(format!("{}/release", variant.owner)),
+	);
+	pull_requests.insert("enabled".to_string(), json!(true));
+	pull_requests.insert("labels".to_string(), json!(["release", "automated"]));
+	pull_requests.insert(
+		"title".to_string(),
+		json!(format!("chore(release): prepare {} release", variant.owner)),
+	);
+	pull_requests.insert(
+		"verified_commits".to_string(),
+		json!(variant.verified_commits),
+	);
+	source.insert("pull_requests".to_string(), Value::Object(pull_requests));
+	root.insert("source".to_string(), Value::Object(source));
 
+	// === defaults ===
 	let mut defaults = Map::new();
-	defaults.insert("package_type".to_string(), json!(&variant.ecosystem));
+	defaults.insert(
+		"package_type".to_string(),
+		json!(&variant.default_ecosystem),
+	);
+	defaults.insert("parent_bump".to_string(), json!(&variant.parent_bump));
+	defaults.insert(
+		"include_private".to_string(),
+		json!(variant.include_private),
+	);
+	defaults.insert(
+		"warn_on_group_mismatch".to_string(),
+		json!(variant.warn_on_group_mismatch),
+	);
+	defaults.insert(
+		"strict_version_conflicts".to_string(),
+		json!(variant.strict_version_conflicts),
+	);
+	if variant.with_changelog_version_title {
+		defaults.insert(
+			"changelog_version_title".to_string(),
+			json!(format!("v{{{{version}}}} — {} release", variant.owner)),
+		);
+	}
+	if variant.with_empty_update_message {
+		defaults.insert(
+			"empty_update_message".to_string(),
+			json!(format!(
+				"No significant changes for {} packages.",
+				variant.owner
+			)),
+		);
+	}
+	if variant.with_release_title {
+		defaults.insert(
+			"release_title".to_string(),
+			json!(format!("{} release", variant.owner)),
+		);
+	}
+	root.insert("defaults".to_string(), Value::Object(defaults));
 
+	// === changelog ===
+	if variant.with_changelog {
+		let mut changelog = Map::new();
+		let mut style = Map::new();
+		style.insert("sectionSeparator".to_string(), json!("thematic_break"));
+		style.insert(
+			"packageLabelPlacement".to_string(),
+			json!(&variant.package_label_placement),
+		);
+		style.insert(
+			"collapsedSectionStyle".to_string(),
+			json!(&variant.changelog_style),
+		);
+		style.insert("packageLabelStyle".to_string(), json!("badge"));
+		style.insert("metadataStyle".to_string(), json!("blockquote"));
+		changelog.insert("style".to_string(), Value::Object(style));
+
+		let mut types = Map::new();
+		let mut fix_type = Map::new();
+		fix_type.insert("bump".to_string(), json!("patch"));
+		fix_type.insert("description".to_string(), json!("Bug fixes"));
+		fix_type.insert("section".to_string(), json!("bug-fixes"));
+		types.insert("fix".to_string(), Value::Object(fix_type));
+		let mut feat_type = Map::new();
+		feat_type.insert("bump".to_string(), json!("minor"));
+		feat_type.insert("description".to_string(), json!("New features"));
+		feat_type.insert("section".to_string(), json!("features"));
+		types.insert("feature".to_string(), Value::Object(feat_type));
+		changelog.insert("types".to_string(), Value::Object(types));
+
+		let mut sections = Map::new();
+		let mut bug_section = Map::new();
+		bug_section.insert("heading".to_string(), json!("🐛 Bug Fixes"));
+		bug_section.insert("description".to_string(), json!("Resolved defects"));
+		bug_section.insert("priority".to_string(), json!(10));
+		sections.insert("bug-fixes".to_string(), Value::Object(bug_section));
+		let mut feat_section = Map::new();
+		feat_section.insert("heading".to_string(), json!("✨ Features"));
+		feat_section.insert("description".to_string(), json!("New capabilities"));
+		feat_section.insert("priority".to_string(), json!(20));
+		sections.insert("features".to_string(), Value::Object(feat_section));
+		changelog.insert("sections".to_string(), Value::Object(sections));
+
+		root.insert("changelog".to_string(), Value::Object(changelog));
+	}
+
+	// === changesets ===
+	if variant.with_changesets_affected {
+		let mut changesets = Map::new();
+		let mut affected = Map::new();
+		affected.insert("enabled".to_string(), json!(true));
+		affected.insert("required".to_string(), json!(true));
+		affected.insert("comment_on_failure".to_string(), json!(true));
+		affected.insert(
+			"changed_paths".to_string(),
+			json!([format!("crates/{}/", variant.owner)]),
+		);
+		affected.insert("ignored_paths".to_string(), json!(["**/*.md"]));
+		affected.insert("skip_labels".to_string(), json!(["skip-changeset"]));
+		changesets.insert("affected".to_string(), Value::Object(affected));
+		root.insert("changesets".to_string(), Value::Object(changesets));
+	}
+
+	// === ecosystems ===
+	if variant.with_ecosystems {
+		let mut ecosystems = Map::new();
+		let mut eco_settings = Map::new();
+		eco_settings.insert("enabled".to_string(), json!(true));
+		eco_settings.insert(
+			"roots".to_string(),
+			json!([format!("crates/{}", variant.enabled_ecosystem)]),
+		);
+		let mut pub_settings = Map::new();
+		pub_settings.insert("enabled".to_string(), json!(true));
+		eco_settings.insert("publish".to_string(), Value::Object(pub_settings));
+		ecosystems.insert(
+			variant.enabled_ecosystem.clone(),
+			Value::Object(eco_settings),
+		);
+		root.insert("ecosystems".to_string(), Value::Object(ecosystems));
+	}
+
+	// === group ===
+	if variant.with_group {
+		let mut group_entry = Map::new();
+		group_entry.insert(
+			"packages".to_string(),
+			json!([
+				format!("{}_0", variant.owner),
+				format!("{}_1", variant.owner)
+			]),
+		);
+		group_entry.insert("release".to_string(), json!(variant.group_release));
+		group_entry.insert("tag".to_string(), json!(variant.group_release));
+		group_entry.insert("version_format".to_string(), json!("namespaced"));
+		let mut group = Map::new();
+		group.insert("main".to_string(), Value::Object(group_entry));
+		root.insert("group".to_string(), Value::Object(group));
+	}
+
+	// === lints ===
+	if variant.with_lints {
+		let mut lints = Map::new();
+		let mut rules = Map::new();
+		rules.insert("no-unnecessary-releases".to_string(), json!("error"));
+		lints.insert("rules".to_string(), Value::Object(rules));
+		lints.insert(
+			"scopes".to_string(),
+			json!([format!("crates/{}", variant.owner)]),
+		);
+		lints.insert("use".to_string(), json!(["no-unnecessary-releases"]));
+		root.insert("lints".to_string(), Value::Object(lints));
+	}
+
+	// === package ===
 	let mut packages = Map::new();
 	for i in 0..variant.package_count {
 		let pkg_name = format!("{}_{}", variant.owner, i);
 		let mut pkg = Map::new();
 		pkg.insert("path".to_string(), json!(format!("crates/{pkg_name}")));
+		pkg.insert("type".to_string(), json!(&variant.default_ecosystem));
+		pkg.insert("version_format".to_string(), json!("namespaced"));
+		pkg.insert("release".to_string(), json!(i == 0)); // first package is released
+		pkg.insert("tag".to_string(), json!(i == 0)); // first package is tagged
 		packages.insert(pkg_name, Value::Object(pkg));
 	}
+	root.insert("package".to_string(), Value::Object(packages));
 
-	serde_json::to_string_pretty(&json!({
-		"source": Value::Object(source),
-		"defaults": Value::Object(defaults),
-		"package": Value::Object(packages),
-	}))
-	.unwrap_or_else(|error| panic!("serialize config artifact fixture: {error}"))
+	serde_json::to_string_pretty(&Value::Object(root))
+		.unwrap_or_else(|error| panic!("serialize config artifact fixture: {error}"))
 }
 
 fn write_generated_file(generated_file: &GeneratedFile) -> Result<(), String> {

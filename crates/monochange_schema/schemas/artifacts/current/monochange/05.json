@@ -1,25 +1,93 @@
 {
+	"changesets": {
+		"affected": {
+			"changed_paths": [
+				"crates/wbwwvct/"
+			],
+			"comment_on_failure": true,
+			"enabled": true,
+			"ignored_paths": [
+				"**/*.md"
+			],
+			"required": true,
+			"skip_labels": [
+				"skip-changeset"
+			]
+		}
+	},
 	"defaults": {
-		"package_type": "go"
+		"changelog_version_title": "v{{version}} — wbwwvct release",
+		"include_private": true,
+		"package_type": "cargo",
+		"parent_bump": "major",
+		"release_title": "wbwwvct release",
+		"strict_version_conflicts": true,
+		"warn_on_group_mismatch": true
+	},
+	"ecosystems": {
+		"dart": {
+			"enabled": true,
+			"publish": {
+				"enabled": true
+			},
+			"roots": [
+				"crates/dart"
+			]
+		}
 	},
 	"package": {
-		"mzwxlqcha_0": {
-			"path": "crates/mzwxlqcha_0"
+		"wbwwvct_0": {
+			"path": "crates/wbwwvct_0",
+			"release": true,
+			"tag": true,
+			"type": "cargo",
+			"version_format": "namespaced"
 		},
-		"mzwxlqcha_1": {
-			"path": "crates/mzwxlqcha_1"
+		"wbwwvct_1": {
+			"path": "crates/wbwwvct_1",
+			"release": false,
+			"tag": false,
+			"type": "cargo",
+			"version_format": "namespaced"
 		},
-		"mzwxlqcha_2": {
-			"path": "crates/mzwxlqcha_2"
+		"wbwwvct_2": {
+			"path": "crates/wbwwvct_2",
+			"release": false,
+			"tag": false,
+			"type": "cargo",
+			"version_format": "namespaced"
 		},
-		"mzwxlqcha_3": {
-			"path": "crates/mzwxlqcha_3"
+		"wbwwvct_3": {
+			"path": "crates/wbwwvct_3",
+			"release": false,
+			"tag": false,
+			"type": "cargo",
+			"version_format": "namespaced"
+		},
+		"wbwwvct_4": {
+			"path": "crates/wbwwvct_4",
+			"release": false,
+			"tag": false,
+			"type": "cargo",
+			"version_format": "namespaced"
 		}
 	},
 	"source": {
-		"host": "forgejo.example.com",
-		"owner": "mzwxlqcha",
-		"provider": "forgejo",
-		"repo": "wyduxhjrbw"
+		"api_url": "api.gitea.example.com",
+		"owner": "wbwwvct",
+		"provider": "gitea",
+		"pull_requests": {
+			"auto_merge": true,
+			"base": "main",
+			"branch_prefix": "wbwwvct/release",
+			"enabled": true,
+			"labels": [
+				"release",
+				"automated"
+			],
+			"title": "chore(release): prepare wbwwvct release",
+			"verified_commits": false
+		},
+		"repo": "teeyk"
 	}
 }

@@ -90,7 +90,16 @@ fn config_artifact_fixtures_are_valid_json() -> Result<(), Box<dyn Error>> {
 		assert!(!json_str(&raw, "/source/repo")?.is_empty());
 		for key in source.keys() {
 			assert!(
-				["provider", "owner", "repo", "host"].contains(&key.as_str()),
+				[
+					"provider",
+					"owner",
+					"repo",
+					"host",
+					"api_url",
+					"pull_requests",
+					"releases"
+				]
+				.contains(&key.as_str()),
 				"{name} includes unexpected source key `{key}`"
 			);
 		}
