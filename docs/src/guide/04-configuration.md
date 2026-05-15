@@ -296,7 +296,7 @@ When `trusted_publishing` is enabled:
 
 - npm packages can be configured automatically with `npm trust github ...`
 - pnpm workspaces use `pnpm exec npm trust ...` and `pnpm publish`, so workspace protocol and catalog dependency handling stays aligned with the workspace manager
-- Cargo, `jsr`, `pub.dev`, and PyPI currently require manual trusted-publishing setup; monochange reports the setup URL and blocks built-in release publishing until trust is configured
+- Cargo, `jsr`, `pub.dev`, and `PyPI` currently require manual trusted-publishing setup; monochange reports the setup URL and blocks built-in release publishing until trust is configured
 
 ### Attestation policy
 
@@ -313,7 +313,7 @@ require_registry_provenance = true
 require_registry_provenance = false
 ```
 
-monochange currently treats npm provenance and JSR package provenance as enforceable built-in registry provenance. PyPI PEP 740 attestations are modeled in the capability matrix, but `require_registry_provenance` is rejected for PyPI until the built-in Python publisher exposes a publish command that can require uploading those attestations. `crates.io`, `pub.dev`, Go proxy publishing, and custom registries are also rejected when this requirement is enabled because monochange cannot verify equivalent registry-native package attestations for those flows.
+monochange currently treats npm provenance and JSR package provenance as enforceable built-in registry provenance. `PyPI` PEP 740 attestations are modeled in the capability matrix, but `require_registry_provenance` is rejected for `PyPI` until the built-in Python publisher exposes a publish command that can require uploading those attestations. `crates.io`, `pub.dev`, Go proxy publishing, and custom registries are also rejected when this requirement is enabled because monochange cannot verify equivalent registry-native package attestations for those flows.
 
 GitHub release asset attestations are a separate release policy under `[source.releases.attestations]` and are valid only for the GitHub source provider:
 
@@ -338,7 +338,7 @@ The built-in package publishing flow is intentionally narrow for now:
 
 - no private or custom registry support in `mode = "builtin"`
 - rate-limit planning can batch work and enforce single-window safety, but monochange still does not sleep across windows or requeue later batches automatically
-- manual trusted-publishing setup is still required for `crates.io`, `jsr`, `pub.dev`, and PyPI
+- manual trusted-publishing setup is still required for `crates.io`, `jsr`, `pub.dev`, and `PyPI`
 
 If your workflow needs any of those today, keep the package on `mode = "external"` and let your own CI or scripts own publication.
 

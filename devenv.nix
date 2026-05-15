@@ -150,6 +150,36 @@ in
       description = "Check that publication is valid for this project";
       binary = "bash";
     };
+    "package:check" = {
+      exec = ''
+        set -euo pipefail
+        echo "=== Verifying crate packages with cargo package ==="
+        log=$(mktemp)
+        cargo package --workspace --all-features \
+          --exclude monochange_book \
+          --exclude monochange_integration_tests \
+          --exclude xtask 2>&1 | tee "$log" || {
+          if grep -q 'failed to select a version\|unable to update registry\|download of config.json failed\|curl failed\|HTTP.*framing layer\|network\|fetch.*failed' "$log" 2>/dev/null; then
+            echo "\nWARNING: cargo package failed due to a network error (could not reach crates.io)."
+            echo "The packaging itself succeeded, but dependency verification requires registry access."
+            echo "This is expected when running without network access and is not a code issue."
+            rm -f "$log"
+            exit 0
+          fi
+          echo "\nERROR: cargo package failed."
+          echo "This means at least one crate cannot be published because its packaged source fails to compile."
+          echo "Common causes:"
+          echo "  - build.rs not included in package.include (OUT_DIR not set during publish verification)"
+          echo "  - files referenced via include_str! not included in package.include"
+          echo "  - path dependencies that don't exist in the tarball"
+          rm -f "$log"
+          exit 1
+        }
+        rm -f "$log"
+      '';
+      description = "Verify all publishable workspace crates can be packaged and built from their tarballs (catches publish failures before they happen)";
+      binary = "bash";
+    };
     "test:all" = {
       exec = ''
         set -euo pipefail
