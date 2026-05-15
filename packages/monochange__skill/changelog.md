@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-### Changed
+### 📝 Changed
 
 - Rewrote the skill package around the current monochange CLI/tool harness.
 - Documented verified built-in commands, step commands, MCP tools, user-defined command behavior, and all current CLI step types.
@@ -10,13 +10,13 @@
 
 ## [0.5.1](https://github.com/monochange/monochange/releases/tag/v0.5.1) (2026-05-15)
 
-### Changed
+### 📝 Changed
 
 - No package-specific changes were recorded; `@monochange/skill` was updated to 0.5.1 as part of group `main`.
 
 ## [0.5.0](https://github.com/monochange/monochange/releases/tag/v0.5.0) (2026-05-14)
 
-### Breaking Change
+### 💥 Breaking Change
 
 #### require CLI steps to opt in to inherited command inputs
 
@@ -51,7 +51,7 @@ steps = [
 
 Migration path: review custom `[cli.<command>]` definitions and add `inputs = ["name"]` to every step that needs a command-level input. Built-in default CLI commands and generated templates have been updated to declare their inherited inputs explicitly.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #467](https://github.com/monochange/monochange/pull/467) _Introduced in:_ [`ce4712f`](https://github.com/monochange/monochange/commit/ce4712f2890e0636c368b056db756df32f4cf769) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #467](https://github.com/monochange/monochange/pull/467) _Introduced in:_ [`ce4712f`](https://github.com/monochange/monochange/commit/ce4712f2890e0636c368b056db756df32f4cf769) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
 
 #### generate built-in release and validation step commands
 
@@ -94,46 +94,46 @@ steps = [{ type = "Validate" }]
 mc step:validate
 ```
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #479](https://github.com/monochange/monochange/pull/479) _Introduced in:_ [`d9adff8`](https://github.com/monochange/monochange/commit/d9adff8fb396df908e335d2a6688aa729abb5f4d) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8) _Closed issues:_ [#476](https://github.com/monochange/monochange/issues/476)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #479](https://github.com/monochange/monochange/pull/479) _Introduced in:_ [`d9adff8`](https://github.com/monochange/monochange/commit/d9adff8fb396df908e335d2a6688aa729abb5f4d) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8) _Closed issues:_ [#476](https://github.com/monochange/monochange/issues/476)
 
-### Added
+### 🚀 Feature
 
 #### Configurable publish-order dependency fields
 
 Add configurable ecosystem-specific dependency fields for package publish ordering across npm, Cargo, Deno, Dart/Flutter, Python, and Go.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #472](https://github.com/monochange/monochange/pull/472) _Introduced in:_ [`0d9cf46`](https://github.com/monochange/monochange/commit/0d9cf461a05057b61efa987d361ebd27d800dbdb) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8) _Closed issues:_ [#465](https://github.com/monochange/monochange/issues/465)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #472](https://github.com/monochange/monochange/pull/472) _Introduced in:_ [`0d9cf46`](https://github.com/monochange/monochange/commit/0d9cf461a05057b61efa987d361ebd27d800dbdb) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8) _Closed issues:_ [#465](https://github.com/monochange/monochange/issues/465)
 
 #### Publish all configured packages
 
 Add a `--all` flag to the PublishPackages CLI step so migration workflows can publish every configured package, including packages that were not part of the prepared release record.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #461](https://github.com/monochange/monochange/pull/461) _Introduced in:_ [`3d956cd`](https://github.com/monochange/monochange/commit/3d956cd3e34747e088add98fe0358251f388782f) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #461](https://github.com/monochange/monochange/pull/461) _Introduced in:_ [`3d956cd`](https://github.com/monochange/monochange/commit/3d956cd3e34747e088add98fe0358251f388782f) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
 
-### Fixed
+### 🐛 Fixed
 
 #### Add interactive CLI command wizard
 
 Added `mc command`, an interactive dashboard for adding and editing `[cli.<name>]` commands in `monochange.toml`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #471](https://github.com/monochange/monochange/pull/471) _Introduced in:_ [`fea471c`](https://github.com/monochange/monochange/commit/fea471c4b67b618cde51eaacfd4e30742cfb0dc1) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #471](https://github.com/monochange/monochange/pull/471) _Introduced in:_ [`fea471c`](https://github.com/monochange/monochange/commit/fea471c4b67b618cde51eaacfd4e30742cfb0dc1) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
 
 #### add release-record migration command
 
 Add `mc migrate release-records` to rewrite persisted release records to the latest schema version, expose the release-record migration helper from core, and update the generated skill command inventory.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #500](https://github.com/monochange/monochange/pull/500) _Introduced in:_ [`bd56420`](https://github.com/monochange/monochange/commit/bd564204b786961371b0ac1bad21071ebe5fe90c) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #500](https://github.com/monochange/monochange/pull/500) _Introduced in:_ [`bd56420`](https://github.com/monochange/monochange/commit/bd564204b786961371b0ac1bad21071ebe5fe90c) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
 
 #### Rewrite monochange skill guidance
 
 The monochange skill package now documents the current CLI/tool harness, verified built-in commands, step commands, MCP tools, custom `monochange.toml` workflows, and package versioning examples. The command guide also includes a generated inventory checked by `cargo xtask skill commands check` to prevent future CLI drift.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #463](https://github.com/monochange/monochange/pull/463) _Introduced in:_ [`0f3d15c`](https://github.com/monochange/monochange/commit/0f3d15c38b15124a9bb96ed4c73829602e34e838) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #463](https://github.com/monochange/monochange/pull/463) _Introduced in:_ [`0f3d15c`](https://github.com/monochange/monochange/commit/0f3d15c38b15124a9bb96ed4c73829602e34e838) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
 
-### Testing
+### 🧪 Testing
 
 #### Validate generated release commits in PR CI
 
 Pull requests now run release-state test and lint preflights after creating a local release commit, while generated release PRs skip those extra preflights.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #477](https://github.com/monochange/monochange/pull/477) _Introduced in:_ [`a09020f`](https://github.com/monochange/monochange/commit/a09020f9282be207ace6f641b716c3c4004886af) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #477](https://github.com/monochange/monochange/pull/477) _Introduced in:_ [`a09020f`](https://github.com/monochange/monochange/commit/a09020f9282be207ace6f641b716c3c4004886af) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
