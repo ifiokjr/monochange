@@ -83,7 +83,7 @@ fn config_artifact_fixtures_are_valid_json() -> Result<(), Box<dyn Error>> {
 		let provider = json_str(&raw, "/source/provider")?;
 		let valid_providers = ["github", "gitlab", "gitea", "forgejo"];
 		assert!(
-			valid_providers.contains(&provider.as_ref()),
+			valid_providers.contains(&provider),
 			"{name} has unexpected source provider `{provider}`"
 		);
 		assert!(!json_str(&raw, "/source/owner")?.is_empty());
