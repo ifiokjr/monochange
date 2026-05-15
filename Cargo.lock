@@ -1944,6 +1944,8 @@ dependencies = [
  "referencing",
  "regex",
  "regex-syntax",
+ "reqwest",
+ "rustls",
  "serde",
  "serde_json",
  "unicode-general-category",
