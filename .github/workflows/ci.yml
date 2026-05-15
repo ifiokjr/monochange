@@ -182,6 +182,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          free-runner-space: "true"
+
       - name: detect release commit
         id: release_record
         run: |

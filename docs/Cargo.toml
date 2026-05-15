@@ -10,16 +10,31 @@ description = "Book and documentation for monochange"
 [dependencies]
 doc-comment = { workspace = true, default-features = true }
 monochange = { workspace = true }
+monochange_analysis = { workspace = true }
 monochange_cargo = { workspace = true }
+monochange_changelog = { workspace = true }
 monochange_config = { workspace = true }
 monochange_core = { workspace = true }
 monochange_dart = { workspace = true }
 monochange_deno = { workspace = true }
+monochange_ecmascript = { workspace = true }
+monochange_forgejo = { workspace = true }
+monochange_gitea = { workspace = true }
 monochange_github = { workspace = true }
+monochange_gitlab = { workspace = true }
+monochange_go = { workspace = true }
 monochange_graph = { workspace = true }
+monochange_hosting = { workspace = true }
+monochange_lint = { workspace = true }
+monochange_linting = { workspace = true }
 monochange_npm = { workspace = true }
+monochange_publish = { workspace = true }
+monochange_python = { workspace = true }
+monochange_schema = { workspace = true }
 monochange_semver = { workspace = true }
+monochange_telemetry = { workspace = true }
 semver = { workspace = true, default-features = true }
+serde_json = { workspace = true, default-features = true }
 
 [lints]
 workspace = true
