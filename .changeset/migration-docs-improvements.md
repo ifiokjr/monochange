@@ -1,11 +1,11 @@
 ---
+monochange: minor
+@monochange/skill: minor
 monochange_schema: minor
 monochange_core: minor
 monochange_config: minor
 ---
 
-# Add migration documentation improvements plan
+# Add mc migrate knope subcommand and expand migration documentation
 
-Create an active plan document identifying gaps in migration documentation and skill coverage based on real-world migration experience across 9 repositories.
-
-The plan covers: ecosystem-specific migration guides, CI workflow templates, binary release guidance, `mc agent` integration, and product improvement suggestions for `mc init` and `mc migrate`.
+Implement `mc migrate knope` that translates knope.toml to monochange.toml, converts knope-format changesets, and optionally generates CI workflow files. Expand migration skill documentation with ecosystem guides, CI workflow templates, and trusted publishing details.
