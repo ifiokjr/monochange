@@ -39,6 +39,7 @@ Agents should optimize for safety and traceability: inspect config first, prefer
 - [skills/linting.md](skills/linting.md) — `mc check`, lint presets, and manifest policy.
 - [skills/multi-package-publishing.md](skills/multi-package-publishing.md) — readiness, bootstrap, and package publishing flows.
 - [skills/trusted-publishing.md](skills/trusted-publishing.md) — registry trust/OIDC notes for publishing.
+- [skills/migration-workflows.md](skills/migration-workflows.md) — ecosystem-specific migration notes, CI workflow templates, and binary release guide.
 - [skills/reference.md](skills/reference.md) — full operating guide.
 - [examples/readme.md](examples/readme.md) — copyable example scenarios.
 
@@ -49,6 +50,7 @@ The command inventory in this skill is based on `crates/monochange/src/cli.rs`, 
 Built-in commands in the current CLI:
 
 - `mc init` — create a starter `monochange.toml` from discovered manifests.
+- `mc migrate knope` — translate a `knope.toml` to `monochange.toml` and convert changeset files.
 - `mc populate` — add missing configurable workflow definitions to an existing config.
 - `mc skill` — install or update the monochange skill bundle.
 - `mc subagents` — generate repository-local agent/subagent guidance for monochange work.
