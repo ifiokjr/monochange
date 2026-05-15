@@ -369,3 +369,23 @@ For example, callers can continue to load a legacy record like:
 and receive the current `schemaVersion` field after migration. The release schema preflight now also checks committed schema assets, Rust migration edges, generated docs copies, and active schema changesets so release PRs fail before publishing inconsistent schema artifacts.
 
 > _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #500](https://github.com/monochange/monochange/pull/500) _Introduced in:_ [`bd56420`](https://github.com/monochange/monochange/commit/bd564204b786961371b0ac1bad21071ebe5fe90c) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+
+## monochange_schema [0.2.1](https://github.com/monochange/monochange/releases/tag/monochange_schema/v0.2.1) (2026-05-15)
+
+### Fixed
+
+#### Fix publish failures and cargo package warnings
+
+Remove `build.rs` from `monochange_schema` and replace the generated `CURRENT_SCHEMA_VERSION_TEXT` with a direct `include_str!` + `trim_ascii_end()` compile-time embed, eliminating the `OUT_DIR` dependency that caused `cargo publish` verification to fail.
+
+Add `src/**/*.template` to `monochange`'s `package.include` list so that `monochange.toml.template` (referenced via `include_str!`) is included in the published crate tarball.
+
+Add `tests/**/*.rs` to `monochange_core` and `monochange_github` package include lists to suppress cargo package "ignoring test" warnings.
+
+Fix `monochange_go` readme from workspace-inherited path (`../../readme.md`) to local path (`readme.md`) to suppress the "readme outside package" cargo package warning.
+
+Remove `doc-comment` dependency and replace `doc_comment::doctest!` with `#[doc = include_str!(...)]` in the book crate. Only keep local file references that resolve within the package directory.
+
+Add rustdoc backticks around `PyPI` and `pub.dev` in configuration guide markdown to satisfy the missing-backticks lint.
+
+> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #509](https://github.com/monochange/monochange/pull/509) _Introduced in:_ [`e6af821`](https://github.com/monochange/monochange/commit/e6af8212983b66c1b8370443e7978c6067b89fa6)
