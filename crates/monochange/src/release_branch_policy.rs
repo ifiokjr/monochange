@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use std::path::Path;
 
 use glob::Pattern;
@@ -18,7 +19,7 @@ pub(crate) struct ReleaseBranchVerificationReport {
 	pub matched_branch: String,
 }
 
-pub(crate) fn verify_release_ref_for_tags(
+pub(crate) async fn verify_release_ref_for_tags(
 	root: &Path,
 	source: Option<&SourceConfiguration>,
 	ref_name: &str,
@@ -29,10 +30,12 @@ pub(crate) fn verify_release_ref_for_tags(
 	if !source.releases.enforce_for_tags {
 		return Ok(None);
 	}
-	verify_release_ref(root, &source.releases, ref_name).map(Some)
+	verify_release_ref(root, &source.releases, ref_name)
+		.await
+		.map(Some)
 }
 
-pub(crate) fn verify_release_ref_for_publish(
+pub(crate) async fn verify_release_ref_for_publish(
 	root: &Path,
 	source: Option<&SourceConfiguration>,
 	ref_name: &str,
@@ -43,10 +46,12 @@ pub(crate) fn verify_release_ref_for_publish(
 	if !source.releases.enforce_for_publish {
 		return Ok(None);
 	}
-	verify_release_ref(root, &source.releases, ref_name).map(Some)
+	verify_release_ref(root, &source.releases, ref_name)
+		.await
+		.map(Some)
 }
 
-pub(crate) fn verify_release_ref_for_commit(
+pub(crate) async fn verify_release_ref_for_commit(
 	root: &Path,
 	source: Option<&SourceConfiguration>,
 	ref_name: &str,
@@ -57,10 +62,12 @@ pub(crate) fn verify_release_ref_for_commit(
 	if !source.releases.enforce_for_commit {
 		return Ok(None);
 	}
-	verify_release_ref(root, &source.releases, ref_name).map(Some)
+	verify_release_ref(root, &source.releases, ref_name)
+		.await
+		.map(Some)
 }
 
-pub(crate) fn verify_release_ref(
+pub(crate) async fn verify_release_ref(
 	root: &Path,
 	policy: &ProviderReleaseSettings,
 	ref_name: &str,
@@ -72,11 +79,11 @@ pub(crate) fn verify_release_ref(
 		));
 	}
 
-	let commit = git_support::resolve_git_commit_ref(root, ref_name)?;
-	let branch_refs = candidate_release_branch_refs(root, &policy.branches)?;
+	let commit = git_support::resolve_git_commit_ref(root, ref_name).await?;
+	let branch_refs = candidate_release_branch_refs(root, &policy.branches).await?;
 
 	for branch_ref in &branch_refs {
-		if git_support::git_is_ancestor(root, &commit, &branch_ref.ref_name)? {
+		if git_support::git_is_ancestor(root, &commit, &branch_ref.ref_name).await? {
 			return Ok(ReleaseBranchVerificationReport {
 				ref_name: ref_name.to_string(),
 				commit,
@@ -86,22 +93,43 @@ pub(crate) fn verify_release_ref(
 		}
 	}
 
-	let available = branch_refs
-		.iter()
-		.map(|branch| branch.display_name.as_str())
-		.collect::<Vec<_>>()
-		.join(", ");
-	let available = if available.is_empty() {
-		"none found".to_string()
-	} else {
-		available
-	};
+	let mut message = String::new();
+	let _ = write!(
+		message,
+		"release ref `{ref_name}` resolves to commit {}, which is not reachable from any configured release branch pattern [",
+		crate::short_commit_sha(&commit)
+	);
+	write_comma_separated(&mut message, policy.branches.iter().map(String::as_str));
+	message.push_str("]; matching branch refs: ");
+	write_branch_ref_names(&mut message, &branch_refs);
 
-	Err(MonochangeError::Config(format!(
-		"release ref `{ref_name}` resolves to commit {}, which is not reachable from any configured release branch pattern [{}]; matching branch refs: {available}",
-		crate::short_commit_sha(&commit),
-		policy.branches.join(", ")
-	)))
+	Err(MonochangeError::Config(message))
+}
+
+fn write_branch_ref_names(output: &mut String, branch_refs: &[BranchRef]) {
+	if branch_refs.is_empty() {
+		output.push_str("none found");
+		return;
+	}
+
+	write_comma_separated(
+		output,
+		branch_refs
+			.iter()
+			.map(|branch| branch.display_name.as_str()),
+	);
+}
+
+fn write_comma_separated<'a>(output: &mut String, values: impl IntoIterator<Item = &'a str>) {
+	let mut is_first = true;
+	for value in values {
+		if is_first {
+			is_first = false;
+		} else {
+			output.push_str(", ");
+		}
+		output.push_str(value);
+	}
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -110,7 +138,7 @@ struct BranchRef {
 	display_name: String,
 }
 
-fn candidate_release_branch_refs(
+async fn candidate_release_branch_refs(
 	root: &Path,
 	patterns: &[String],
 ) -> MonochangeResult<Vec<BranchRef>> {
@@ -125,8 +153,17 @@ fn candidate_release_branch_refs(
 		})
 		.collect::<MonochangeResult<Vec<_>>>()?;
 
-	#[rustfmt::skip]
-	let output = git_support::run_git_capture(root, &["for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes"], "failed to list git branches for release branch verification")?;
+	let output = git_support::run_git_capture(
+		root,
+		&[
+			"for-each-ref",
+			"--format=%(refname)",
+			"refs/heads",
+			"refs/remotes",
+		],
+		"failed to list git branches for release branch verification",
+	)
+	.await?;
 
 	let mut branches = Vec::new();
 	for (ref_name, display_name) in output

@@ -1,3 +1,5 @@
+#![allow(clippy::large_futures)]
+#![allow(clippy::disallowed_methods)]
 use std::fs;
 
 use serde_json::Value;

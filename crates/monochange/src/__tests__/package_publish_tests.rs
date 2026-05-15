@@ -37,14 +37,11 @@ use monochange_publish::RegistryEndpoints;
 use monochange_publish::append_publish_dry_run_args;
 use monochange_publish::build_npm_placeholder_publish_command;
 use monochange_publish::build_npm_release_publish_command;
-use monochange_publish::build_placeholder_directory as build_placeholder_directory_with_writers;
 use monochange_publish::build_publish_command;
 use monochange_publish::crates_io_index_entry_path;
 use monochange_publish::crates_io_index_version_exists;
 use monochange_publish::default_registry_kind_for_ecosystem;
-use monochange_publish::enforce_release_attestation_prerequisites as enforce_release_attestation_prerequisites_impl;
 use monochange_publish::ensure_publish_report_succeeded;
-use monochange_publish::execute_publish_requests as execute_publish_requests_impl;
 use monochange_publish::filter_pending_publish_requests_with_transport;
 use monochange_publish::forbidden_npm_token_env_keys;
 use monochange_publish::publish_report_json_error;
@@ -55,7 +52,7 @@ use monochange_publish::resolve_placeholder_readme;
 use monochange_publish::resolve_registry_kind;
 use monochange_publish::write_publish_report_artifact;
 use monochange_test_helpers::git;
-use reqwest::blocking::Client;
+use reqwest::Client;
 use semver::Version;
 use serde_json::Value as JsonValue;
 use temp_env::with_vars;
@@ -260,46 +257,6 @@ fn with_locked_env_vars<T>(action: impl FnOnce() -> T) -> T {
 	action()
 }
 
-#[allow(clippy::too_many_arguments)]
-fn execute_publish_requests(
-	root: &Path,
-	source: Option<&SourceConfiguration>,
-	mode: PackagePublishRunMode,
-	dry_run: bool,
-	requests: &[PublishRequest],
-	client: &Client,
-	endpoints: &RegistryEndpoints,
-	env_map: &BTreeMap<String, String>,
-	executor: &mut dyn CommandExecutor,
-) -> MonochangeResult<PackagePublishReport> {
-	execute_publish_requests_impl(
-		root,
-		source,
-		mode,
-		dry_run,
-		requests,
-		client,
-		endpoints,
-		env_map,
-		executor,
-		&build_publish_command_builder(),
-		&placeholder_manifest_writer_registry(),
-		&publish_readiness_registry(),
-		&CliPublishTrustHandler,
-	)
-}
-
-fn enforce_release_attestation_prerequisites(
-	request: &PublishRequest,
-	env_map: &BTreeMap<String, String>,
-) -> MonochangeResult<()> {
-	enforce_release_attestation_prerequisites_impl(
-		request,
-		env_map,
-		&build_publish_command_builder(),
-	)
-}
-
 fn build_npm_trust_list_command(request: &PublishRequest) -> CommandSpec {
 	CommandSpec {
 		program: "npm".to_string(),
@@ -361,23 +318,6 @@ fn configure_npm_trusted_publishing(
 		setup_url: Some(manual_setup_url(request)),
 		message: "configured npm trusted publishing for the current GitHub workflow".to_string(),
 	})
-}
-
-fn build_placeholder_directory(
-	root: &Path,
-	request: &PublishRequest,
-	source: Option<&SourceConfiguration>,
-) -> MonochangeResult<TempDir> {
-	build_placeholder_directory_with_writers(
-		root,
-		request,
-		source,
-		&placeholder_manifest_writer_registry(),
-	)
-}
-
-fn placeholder_tempdir_error(error: &std::io::Error) -> MonochangeError {
-	MonochangeError::Io(format!("failed to create placeholder tempdir: {error}"))
 }
 
 fn workflow_root() -> TempDir {
@@ -1051,8 +991,8 @@ fn build_placeholder_directory_uses_package_name_when_go_module_metadata_is_miss
 	assert_eq!(go_mod, "module github.com/example/fallback\n\ngo 1.22\n");
 }
 
-#[test]
-fn registry_version_exists_returns_false_for_missing_go_proxy_version() {
+#[tokio::test(flavor = "multi_thread")]
+async fn registry_version_exists_returns_false_for_missing_go_proxy_version() {
 	let server = MockServer::start();
 	server.mock(|when, then| {
 		when.method(GET)
@@ -1069,7 +1009,11 @@ fn registry_version_exists_returns_false_for_missing_go_proxy_version() {
 		..sample_request(RegistryKind::GoProxy)
 	};
 
-	assert!(!registry_version_exists(&client, &endpoints, &request).expect("missing go version"));
+	assert!(
+		!registry_version_exists(&client, &endpoints, &request)
+			.await
+			.expect("missing go version")
+	);
 }
 
 #[test]
@@ -1203,8 +1147,8 @@ fn resolve_placeholder_readme_reports_missing_file_errors() {
 	);
 }
 
-#[test]
-fn registry_version_exists_parses_all_supported_registry_shapes() {
+#[tokio::test(flavor = "multi_thread")]
+async fn registry_version_exists_parses_all_supported_registry_shapes() {
 	let server = MockServer::start();
 	server.mock(|when, then| {
 		when.method(GET).path("/pkg");
@@ -1259,22 +1203,27 @@ fn registry_version_exists_parses_all_supported_registry_shapes() {
 
 	assert!(
 		registry_version_exists(&client, &endpoints, &sample_request(RegistryKind::Npm))
+			.await
 			.expect("npm exists:")
 	);
 	assert!(
 		registry_version_exists(&client, &endpoints, &sample_request(RegistryKind::CratesIo))
+			.await
 			.expect("cargo exists:")
 	);
 	assert!(
 		registry_version_exists(&client, &endpoints, &sample_request(RegistryKind::PubDev))
+			.await
 			.expect("dart exists:")
 	);
 	assert!(
 		registry_version_exists(&client, &endpoints, &sample_request(RegistryKind::Jsr))
+			.await
 			.expect("jsr exists:")
 	);
 	assert!(
 		registry_version_exists(&client, &endpoints, &sample_request(RegistryKind::Pypi))
+			.await
 			.expect("PyPI exists:")
 	);
 	let go_request = PublishRequest {
@@ -1284,11 +1233,15 @@ fn registry_version_exists_parses_all_supported_registry_shapes() {
 		)]),
 		..sample_request(RegistryKind::GoProxy)
 	};
-	assert!(registry_version_exists(&client, &endpoints, &go_request).expect("Go exists:"));
+	assert!(
+		registry_version_exists(&client, &endpoints, &go_request)
+			.await
+			.expect("Go exists:")
+	);
 }
 
-#[test]
-fn registry_version_exists_treats_any_existing_version_as_placeholder_bootstrap() {
+#[tokio::test(flavor = "multi_thread")]
+async fn registry_version_exists_treats_any_existing_version_as_placeholder_bootstrap() {
 	let server = MockServer::start();
 	server.mock(|when, then| {
 		when.method(GET).path("/pkg");
@@ -1334,22 +1287,27 @@ fn registry_version_exists_treats_any_existing_version_as_placeholder_bootstrap(
 
 	assert!(
 		registry_version_exists(&client, &endpoints, &placeholder(RegistryKind::Npm))
+			.await
 			.expect("npm placeholder exists:")
 	);
 	assert!(
 		registry_version_exists(&client, &endpoints, &placeholder(RegistryKind::CratesIo))
+			.await
 			.expect("cargo placeholder exists:")
 	);
 	assert!(
 		registry_version_exists(&client, &endpoints, &placeholder(RegistryKind::PubDev))
+			.await
 			.expect("pub.dev placeholder exists:")
 	);
 	assert!(
 		registry_version_exists(&client, &endpoints, &placeholder(RegistryKind::Jsr))
+			.await
 			.expect("jsr placeholder exists:")
 	);
 	assert!(
 		registry_version_exists(&client, &endpoints, &placeholder(RegistryKind::Pypi))
+			.await
 			.expect("PyPI placeholder exists:")
 	);
 }
@@ -1363,8 +1321,8 @@ fn crates_io_index_entry_path_covers_sparse_layout_rules() {
 	assert_eq!(crates_io_index_entry_path("Crate"), "cr/at/crate");
 }
 
-#[test]
-fn registry_version_exists_falls_back_to_crates_io_index_when_api_is_forbidden() {
+#[tokio::test(flavor = "multi_thread")]
+async fn registry_version_exists_falls_back_to_crates_io_index_when_api_is_forbidden() {
 	let server = MockServer::start();
 	server.mock(|when, then| {
 		when.method(GET).path("/crates/pkg");
@@ -1380,12 +1338,13 @@ fn registry_version_exists_falls_back_to_crates_io_index_when_api_is_forbidden()
 
 	assert!(
 		registry_version_exists(&client, &endpoints, &sample_request(RegistryKind::CratesIo))
+			.await
 			.expect("crates.io fallback exists:")
 	);
 }
 
-#[test]
-fn registry_version_exists_reports_crates_io_index_fallback_failures() {
+#[tokio::test(flavor = "multi_thread")]
+async fn registry_version_exists_reports_crates_io_index_fallback_failures() {
 	let server = MockServer::start();
 	server.mock(|when, then| {
 		when.method(GET).path("/crates/pkg");
@@ -1399,6 +1358,7 @@ fn registry_version_exists_reports_crates_io_index_fallback_failures() {
 	let endpoints = sample_endpoints(&server.base_url());
 	let error =
 		registry_version_exists(&client, &endpoints, &sample_request(RegistryKind::CratesIo))
+			.await
 			.expect_err("expected crates.io fallback error");
 
 	assert!(
@@ -1413,8 +1373,8 @@ fn registry_version_exists_reports_crates_io_index_fallback_failures() {
 	);
 }
 
-#[test]
-fn crates_io_index_version_exists_handles_missing_invalid_and_nonmatching_entries() {
+#[tokio::test(flavor = "multi_thread")]
+async fn crates_io_index_version_exists_handles_missing_invalid_and_nonmatching_entries() {
 	let client = Client::builder().build().expect("http client:");
 
 	let missing_server = MockServer::start();
@@ -1428,6 +1388,7 @@ fn crates_io_index_version_exists_handles_missing_invalid_and_nonmatching_entrie
 			&sample_endpoints(&missing_server.base_url()),
 			&sample_request(RegistryKind::CratesIo),
 		)
+		.await
 		.expect("missing index entry:")
 	);
 
@@ -1441,6 +1402,7 @@ fn crates_io_index_version_exists_handles_missing_invalid_and_nonmatching_entrie
 		&sample_endpoints(&invalid_server.base_url()),
 		&sample_request(RegistryKind::CratesIo),
 	)
+	.await
 	.expect_err("expected index decode error");
 	assert!(
 		invalid_error
@@ -1460,12 +1422,13 @@ fn crates_io_index_version_exists_handles_missing_invalid_and_nonmatching_entrie
 			&sample_endpoints(&nonmatching_server.base_url()),
 			&sample_request(RegistryKind::CratesIo),
 		)
+		.await
 		.expect("nonmatching index entry:")
 	);
 }
 
-#[test]
-fn crates_io_index_version_exists_matches_placeholder_or_requested_version() {
+#[tokio::test(flavor = "multi_thread")]
+async fn crates_io_index_version_exists_matches_placeholder_or_requested_version() {
 	let client = Client::builder().build().expect("http client:");
 	let server = MockServer::start();
 	server.mock(|when, then| {
@@ -1485,6 +1448,7 @@ fn crates_io_index_version_exists_matches_placeholder_or_requested_version() {
 				..sample_request(RegistryKind::CratesIo)
 			},
 		)
+		.await
 		.expect("placeholder index entry:")
 	);
 	assert!(
@@ -1493,12 +1457,13 @@ fn crates_io_index_version_exists_matches_placeholder_or_requested_version() {
 			&endpoints,
 			&sample_request(RegistryKind::CratesIo),
 		)
+		.await
 		.expect("matching index entry:")
 	);
 }
 
-#[test]
-fn registry_version_exists_returns_false_for_missing_packages() {
+#[tokio::test(flavor = "multi_thread")]
+async fn registry_version_exists_returns_false_for_missing_packages() {
 	let server = MockServer::start();
 	server.mock(|when, then| {
 		when.method(GET).path("/missing");
@@ -1523,16 +1488,24 @@ fn registry_version_exists_returns_false_for_missing_packages() {
 		package_name: "missing".to_string(),
 		..request
 	};
-	assert!(!registry_version_exists(&client, &endpoints, &request).expect("missing:"));
+	assert!(
+		!registry_version_exists(&client, &endpoints, &request)
+			.await
+			.expect("missing:")
+	);
 	let pypi_request = PublishRequest {
 		package_name: "missing".to_string(),
 		..sample_request(RegistryKind::Pypi)
 	};
-	assert!(!registry_version_exists(&client, &endpoints, &pypi_request).expect("PyPI missing:"));
+	assert!(
+		!registry_version_exists(&client, &endpoints, &pypi_request)
+			.await
+			.expect("PyPI missing:")
+	);
 }
 
-#[test]
-fn registry_version_exists_handles_missing_and_invalid_registry_responses() {
+#[tokio::test(flavor = "multi_thread")]
+async fn registry_version_exists_handles_missing_and_invalid_registry_responses() {
 	let server = MockServer::start();
 	for path in [
 		"/crates/missing",
@@ -1572,6 +1545,7 @@ fn registry_version_exists_handles_missing_and_invalid_registry_responses() {
 				..sample_request(RegistryKind::CratesIo)
 			},
 		)
+		.await
 		.expect("crates missing:")
 	);
 	assert!(
@@ -1583,6 +1557,7 @@ fn registry_version_exists_handles_missing_and_invalid_registry_responses() {
 				..sample_request(RegistryKind::PubDev)
 			},
 		)
+		.await
 		.expect("pub missing:")
 	);
 	assert!(
@@ -1594,6 +1569,7 @@ fn registry_version_exists_handles_missing_and_invalid_registry_responses() {
 				..sample_request(RegistryKind::Jsr)
 			},
 		)
+		.await
 		.expect("jsr missing:")
 	);
 
@@ -1605,6 +1581,7 @@ fn registry_version_exists_handles_missing_and_invalid_registry_responses() {
 			..sample_request(RegistryKind::Npm)
 		},
 	)
+	.await
 	.expect_err("expected npm decode error");
 	assert!(
 		decode_error
@@ -1620,6 +1597,7 @@ fn registry_version_exists_handles_missing_and_invalid_registry_responses() {
 			..sample_request(RegistryKind::Npm)
 		},
 	)
+	.await
 	.expect_err("expected npm http error");
 	assert!(
 		http_error
@@ -3274,8 +3252,8 @@ fn verify_github_trust_context_reports_identity_mismatches() {
 	assert!(missing_oidc.to_string().contains("grant `id-token: write`"));
 }
 
-#[test]
-fn execute_publish_requests_blocks_trusted_publish_before_external_command() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_publish_requests_blocks_trusted_publish_before_external_command() {
 	let server = MockServer::start();
 	server.mock(|when, then| {
 		when.method(GET).path("/pkg");
@@ -3295,6 +3273,7 @@ fn execute_publish_requests_blocks_trusted_publish_before_external_command() {
 		&BTreeMap::new(),
 		&mut executor,
 	)
+	.await
 	.expect_err("trusted publishing should block local release publish");
 
 	assert!(
@@ -3589,8 +3568,8 @@ publish = ["crates-io"]
 	assert!(blockers.is_empty());
 }
 
-#[test]
-fn execute_publish_requests_marks_dry_run_cargo_metadata_blockers() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_publish_requests_marks_dry_run_cargo_metadata_blockers() {
 	let root = tempfile::tempdir().expect("tempdir");
 	let server = MockServer::start();
 	server.mock(|when, then| {
@@ -3621,6 +3600,7 @@ version = "1.2.3"
 		&BTreeMap::new(),
 		&mut executor,
 	)
+	.await
 	.expect("report");
 
 	assert_eq!(report.packages[0].status, PackagePublishStatus::Blocked);
@@ -3632,8 +3612,8 @@ version = "1.2.3"
 	assert!(executor.commands.is_empty());
 }
 
-#[test]
-fn execute_publish_requests_rejects_real_cargo_metadata_blockers() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_publish_requests_rejects_real_cargo_metadata_blockers() {
 	let root = tempfile::tempdir().expect("tempdir");
 	let server = MockServer::start();
 	server.mock(|when, then| {
@@ -3664,6 +3644,7 @@ version = "1.2.3"
 		&BTreeMap::new(),
 		&mut executor,
 	)
+	.await
 	.expect_err("expected readiness blocker");
 
 	assert!(
@@ -3674,8 +3655,8 @@ version = "1.2.3"
 	assert!(executor.commands.is_empty());
 }
 
-#[test]
-fn execute_publish_requests_skips_external_and_existing_versions() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_publish_requests_skips_external_and_existing_versions() {
 	let server = MockServer::start();
 	server.mock(|when, then| {
 		when.method(GET).path("/pkg");
@@ -3710,6 +3691,7 @@ fn execute_publish_requests_skips_external_and_existing_versions() {
 		&BTreeMap::new(),
 		&mut executor,
 	)
+	.await
 	.expect("report:");
 	assert_eq!(report.packages.len(), 2);
 	assert_eq!(
@@ -3722,8 +3704,8 @@ fn execute_publish_requests_skips_external_and_existing_versions() {
 	);
 }
 
-#[test]
-fn filter_pending_publish_requests_skips_external_and_existing_versions() {
+#[tokio::test(flavor = "multi_thread")]
+async fn filter_pending_publish_requests_skips_external_and_existing_versions() {
 	let server = MockServer::start();
 	server.mock(|when, then| {
 		when.method(GET).path("/pkg");
@@ -3753,14 +3735,15 @@ fn filter_pending_publish_requests_skips_external_and_existing_versions() {
 		&client,
 		&endpoints,
 	)
+	.await
 	.expect("filtered requests:");
 
 	assert_eq!(filtered.len(), 1);
 	assert_eq!(filtered[0].package_id, "pkg-next");
 }
 
-#[test]
-fn execute_publish_requests_publishes_release_with_trust_outcome() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_publish_requests_publishes_release_with_trust_outcome() {
 	let server = MockServer::start();
 	server.mock(|when, then| {
 		when.method(GET).path("/pkg");
@@ -3805,6 +3788,7 @@ fn execute_publish_requests_publishes_release_with_trust_outcome() {
 		&env_map,
 		&mut executor,
 	)
+	.await
 	.expect("report:");
 
 	assert_eq!(report.packages.len(), 1);
@@ -3823,8 +3807,8 @@ fn execute_publish_requests_publishes_release_with_trust_outcome() {
 	assert_eq!(executor.commands.len(), 1);
 }
 
-#[test]
-fn release_dry_run_orders_cargo_dev_and_build_dependencies_before_dependents() {
+#[tokio::test(flavor = "multi_thread")]
+async fn release_dry_run_orders_cargo_dev_and_build_dependencies_before_dependents() {
 	let expected_order = vec![
 		"zephyr-build",
 		"lima-dev",
@@ -3930,9 +3914,9 @@ fn release_dry_run_orders_cargo_dev_and_build_dependencies_before_dependents() {
 		})
 		.collect::<Vec<_>>();
 
-	with_vars(
+	temp_env::async_with_vars(
 		[("MONOCHANGE_CRATES_IO_API_URL", Some(server.base_url()))],
-		|| {
+		async {
 			let report = run_publish_packages_with_publications(
 				root.path(),
 				&configuration,
@@ -3940,6 +3924,7 @@ fn release_dry_run_orders_cargo_dev_and_build_dependencies_before_dependents() {
 				&BTreeSet::new(),
 				true,
 			)
+			.await
 			.expect("publish report:");
 			let order = report
 				.packages
@@ -3949,11 +3934,12 @@ fn release_dry_run_orders_cargo_dev_and_build_dependencies_before_dependents() {
 
 			assert_eq!(order, expected_order);
 		},
-	);
+	)
+	.await;
 }
 
-#[test]
-fn execute_publish_requests_placeholder_dry_run_validates_publish_command() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_publish_requests_placeholder_dry_run_validates_publish_command() {
 	let server = MockServer::start();
 	server.mock(|when, then| {
 		when.method(GET).path("/pkg");
@@ -3978,6 +3964,7 @@ fn execute_publish_requests_placeholder_dry_run_validates_publish_command() {
 		&BTreeMap::new(),
 		&mut executor,
 	)
+	.await
 	.expect("report:");
 
 	assert_eq!(report.packages[0].status, PackagePublishStatus::Planned);
@@ -3990,8 +3977,8 @@ fn execute_publish_requests_placeholder_dry_run_validates_publish_command() {
 	);
 }
 
-#[test]
-fn execute_publish_requests_placeholder_dry_run_surfaces_manifest_prerequisites() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_publish_requests_placeholder_dry_run_surfaces_manifest_prerequisites() {
 	let server = MockServer::start();
 	server.mock(|when, then| {
 		when.method(GET).path("/crates/pkg");
@@ -4025,6 +4012,7 @@ fn execute_publish_requests_placeholder_dry_run_surfaces_manifest_prerequisites(
 		&BTreeMap::new(),
 		&mut executor,
 	)
+	.await
 	.expect_err("expected placeholder manifest error");
 	assert!(
 		error.to_string().contains(
@@ -4034,8 +4022,8 @@ fn execute_publish_requests_placeholder_dry_run_surfaces_manifest_prerequisites(
 	assert!(executor.commands.is_empty());
 }
 
-#[test]
-fn execute_publish_requests_publishes_placeholder_and_flags_manual_trust() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_publish_requests_publishes_placeholder_and_flags_manual_trust() {
 	let server = MockServer::start();
 	server.mock(|when, then| {
 		when.method(GET).path("/crates/pkg");
@@ -4077,6 +4065,7 @@ fn execute_publish_requests_publishes_placeholder_and_flags_manual_trust() {
 		&BTreeMap::new(),
 		&mut executor,
 	)
+	.await
 	.expect("report:");
 
 	assert_eq!(report.packages[0].status, PackagePublishStatus::Published);
@@ -4087,8 +4076,8 @@ fn execute_publish_requests_publishes_placeholder_and_flags_manual_trust() {
 	assert_eq!(executor.commands[0].program, "cargo");
 }
 
-#[test]
-fn execute_publish_requests_surfaces_publish_command_failures() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_publish_requests_surfaces_publish_command_failures() {
 	let server = MockServer::start();
 	server.mock(|when, then| {
 		when.method(GET).path("/pkg");
@@ -4113,6 +4102,7 @@ fn execute_publish_requests_surfaces_publish_command_failures() {
 		&BTreeMap::new(),
 		&mut executor,
 	)
+	.await
 	.expect("publish report");
 
 	assert_eq!(report.packages[0].status, PackagePublishStatus::Failed);
@@ -4131,6 +4121,7 @@ fn execute_publish_requests_surfaces_publish_command_failures() {
 		&BTreeMap::new(),
 		&mut executor,
 	)
+	.await
 	.expect("publish report");
 	assert_eq!(report.packages[0].status, PackagePublishStatus::Failed);
 	assert!(
@@ -4140,8 +4131,8 @@ fn execute_publish_requests_surfaces_publish_command_failures() {
 	);
 }
 
-#[test]
-fn execute_publish_requests_uses_disabled_trust_outcome_for_successful_builtin_publish() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_publish_requests_uses_disabled_trust_outcome_for_successful_builtin_publish() {
 	let server = MockServer::start();
 	server.mock(|when, then| {
 		when.method(GET).path("/pkg");
@@ -4166,6 +4157,7 @@ fn execute_publish_requests_uses_disabled_trust_outcome_for_successful_builtin_p
 		&BTreeMap::new(),
 		&mut executor,
 	)
+	.await
 	.expect("report");
 	assert_eq!(
 		report.packages[0].trusted_publishing.status,
@@ -4173,8 +4165,8 @@ fn execute_publish_requests_uses_disabled_trust_outcome_for_successful_builtin_p
 	);
 }
 
-#[test]
-fn run_placeholder_publish_uses_env_overrides_for_registry_endpoints() {
+#[tokio::test(flavor = "multi_thread")]
+async fn run_placeholder_publish_uses_env_overrides_for_registry_endpoints() {
 	let server = MockServer::start();
 	server.mock(|when, then| {
 		when.method(GET).path("/pkg");
@@ -4195,26 +4187,26 @@ fn run_placeholder_publish_uses_env_overrides_for_registry_endpoints() {
 	.expect("manifest:");
 	let configuration = crate::load_workspace_configuration(root.path()).expect("configuration:");
 
-	with_locked_env_vars(|| {
-		with_vars(
-			vec![(
-				"MONOCHANGE_NPM_REGISTRY_URL",
-				Some(server.base_url().as_str()),
-			)],
-			|| {
-				let report =
-					run_placeholder_publish(root.path(), &configuration, &BTreeSet::new(), true)
-						.expect("placeholder report:");
-				assert_eq!(report.mode, PackagePublishRunMode::Placeholder);
-				assert_eq!(report.packages.len(), 1);
-				assert_eq!(report.packages[0].status, PackagePublishStatus::Planned);
-			},
-		);
-	});
+	temp_env::async_with_vars(
+		vec![(
+			"MONOCHANGE_NPM_REGISTRY_URL",
+			Some(server.base_url().as_str()),
+		)],
+		async {
+			let report =
+				run_placeholder_publish(root.path(), &configuration, &BTreeSet::new(), true)
+					.await
+					.expect("placeholder report:");
+			assert_eq!(report.mode, PackagePublishRunMode::Placeholder);
+			assert_eq!(report.packages.len(), 1);
+			assert_eq!(report.packages[0].status, PackagePublishStatus::Planned);
+		},
+	)
+	.await;
 }
 
-#[test]
-fn run_publish_packages_uses_prepared_release_publications() {
+#[tokio::test(flavor = "multi_thread")]
+async fn run_publish_packages_uses_prepared_release_publications() {
 	let server = MockServer::start();
 	server.mock(|when, then| {
 		when.method(GET).path("/pkg");
@@ -4253,13 +4245,13 @@ fn run_publish_packages_uses_prepared_release_publications() {
 				Some(server.base_url().as_str()),
 			)],
 			|| {
-				let report = run_publish_packages(
+				let report = crate::cli_runtime::block_on_in_context(run_publish_packages(
 					root.path(),
 					&configuration,
 					Some(&prepared_release),
 					&BTreeSet::new(),
 					true,
-				)
+				))
 				.expect("publish report:");
 				assert_eq!(report.mode, PackagePublishRunMode::Release);
 				assert_eq!(report.packages.len(), 1);
@@ -4270,8 +4262,8 @@ fn run_publish_packages_uses_prepared_release_publications() {
 	});
 }
 
-#[test]
-fn run_publish_packages_discovers_release_record_publications_from_head() {
+#[tokio::test(flavor = "multi_thread")]
+async fn run_publish_packages_discovers_release_record_publications_from_head() {
 	let server = MockServer::start();
 	server.mock(|when, then| {
 		when.method(GET).path("/pkg");
@@ -4312,6 +4304,7 @@ fn run_publish_packages_discovers_release_record_publications_from_head() {
 		}],
 	);
 	let discovered = release_record_package_publications_from_prepared_or_head(root.path(), None)
+		.await
 		.expect("release record publications");
 	assert_eq!(discovered.len(), 1);
 
@@ -4322,9 +4315,14 @@ fn run_publish_packages_discovers_release_record_publications_from_head() {
 				Some(server.base_url().as_str()),
 			)],
 			|| {
-				let report =
-					run_publish_packages(root.path(), &configuration, None, &BTreeSet::new(), true)
-						.expect("publish report:");
+				let report = crate::cli_runtime::block_on_in_context(run_publish_packages(
+					root.path(),
+					&configuration,
+					None,
+					&BTreeSet::new(),
+					true,
+				))
+				.expect("publish report:");
 				assert_eq!(report.mode, PackagePublishRunMode::Release);
 				assert_eq!(report.packages.len(), 1);
 				assert_eq!(report.packages[0].status, PackagePublishStatus::Planned);
@@ -4580,8 +4578,8 @@ fn build_release_requests_uses_publication_targets_and_package_metadata() {
 	);
 }
 
-#[test]
-fn run_publish_packages_with_resume_filters_by_group_and_ecosystem() {
+#[tokio::test(flavor = "multi_thread")]
+async fn run_publish_packages_with_resume_filters_by_group_and_ecosystem() {
 	let server = MockServer::start();
 	server.mock(|when, then| {
 		when.method(GET).path("/pkg");
@@ -4627,17 +4625,19 @@ fn run_publish_packages_with_resume_filters_by_group_and_ecosystem() {
 				Some(server.base_url().as_str()),
 			)],
 			|| {
-				let report = run_publish_packages_with_resume(
-					root.path(),
-					&configuration,
-					Some(&prepared_release),
-					&BTreeSet::new(),
-					&selected_groups,
-					&selected_ecosystems,
-					true,
-					None,
-				)
-				.expect("publish report:");
+				let report =
+					crate::cli_runtime::block_on_in_context(run_publish_packages_with_resume(
+						root.path(),
+						&configuration,
+						Some(&prepared_release),
+						&BTreeSet::new(),
+						&selected_groups,
+						&selected_ecosystems,
+						false,
+						true,
+						None,
+					))
+					.expect("publish report:");
 
 				assert_eq!(report.packages.len(), 1);
 				assert_eq!(report.packages[0].package, "pkg");

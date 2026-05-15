@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 use std::process::Command;
 
 use monochange_core::ProviderMergeRequestSettings;
@@ -6,6 +7,13 @@ use monochange_core::SourceProvider;
 use tempfile::tempdir;
 
 use super::*;
+
+#[test]
+fn write_comma_separated_joins_multiple_values() {
+	let mut output = String::new();
+	write_comma_separated(&mut output, ["main", "release/*"]);
+	assert_eq!(output, "main, release/*");
+}
 
 #[test]
 fn release_branch_pattern_matches_local_and_remote_branches() {
@@ -32,14 +40,15 @@ fn release_branch_pattern_matches_local_and_remote_branches() {
 	));
 }
 
-#[test]
-fn verify_release_ref_rejects_empty_branch_policy() {
+#[tokio::test(flavor = "multi_thread")]
+async fn verify_release_ref_rejects_empty_branch_policy() {
 	let repo = init_git_repo();
 	let policy = ProviderReleaseSettings {
 		branches: Vec::new(),
 		..ProviderReleaseSettings::default()
 	};
 	let error = verify_release_ref(repo.path(), &policy, "HEAD")
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected empty branch policy error"));
 
@@ -50,14 +59,15 @@ fn verify_release_ref_rejects_empty_branch_policy() {
 	);
 }
 
-#[test]
-fn verify_release_ref_rejects_invalid_branch_pattern() {
+#[tokio::test(flavor = "multi_thread")]
+async fn verify_release_ref_rejects_invalid_branch_pattern() {
 	let repo = init_git_repo();
 	let policy = ProviderReleaseSettings {
 		branches: vec!["[".to_string()],
 		..ProviderReleaseSettings::default()
 	};
 	let error = verify_release_ref(repo.path(), &policy, "HEAD")
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected invalid branch pattern error"));
 
@@ -78,19 +88,20 @@ fn display_branch_name_ignores_remote_head_symbolic_refs() {
 	);
 }
 
-#[test]
-fn verify_release_ref_reports_git_branch_listing_errors() {
+#[tokio::test(flavor = "multi_thread")]
+async fn verify_release_ref_reports_git_branch_listing_errors() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let policy = ProviderReleaseSettings::default();
 	let error = verify_release_ref(tempdir.path(), &policy, "HEAD")
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected git branch listing error"));
 
 	assert!(!error.to_string().is_empty());
 }
 
-#[test]
-fn verify_release_ref_ignores_remote_head_symbolic_refs() {
+#[tokio::test(flavor = "multi_thread")]
+async fn verify_release_ref_ignores_remote_head_symbolic_refs() {
 	let repo = init_git_repo();
 	run_git(
 		repo.path(),
@@ -103,17 +114,19 @@ fn verify_release_ref_ignores_remote_head_symbolic_refs() {
 	let policy = ProviderReleaseSettings::default();
 
 	verify_release_ref(repo.path(), &policy, "HEAD")
+		.await
 		.unwrap_or_else(|error| panic!("verify release ref: {error}"));
 }
 
-#[test]
-fn verify_release_ref_reports_when_no_release_branch_refs_match_policy() {
+#[tokio::test(flavor = "multi_thread")]
+async fn verify_release_ref_reports_when_no_release_branch_refs_match_policy() {
 	let repo = init_git_repo();
 	let policy = ProviderReleaseSettings {
 		branches: vec!["stable".to_string()],
 		..ProviderReleaseSettings::default()
 	};
 	let error = verify_release_ref(repo.path(), &policy, "HEAD")
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected release branch policy error"));
 
@@ -124,8 +137,8 @@ fn verify_release_ref_reports_when_no_release_branch_refs_match_policy() {
 	);
 }
 
-#[test]
-fn enforcement_wrappers_verify_when_enabled() {
+#[tokio::test(flavor = "multi_thread")]
+async fn enforcement_wrappers_verify_when_enabled() {
 	let repo = init_git_repo();
 	let mut source = source_configuration();
 	source.releases.branches = vec!["release/*".to_string()];
@@ -133,23 +146,26 @@ fn enforcement_wrappers_verify_when_enabled() {
 
 	assert!(
 		verify_release_ref_for_tags(repo.path(), Some(&source), "HEAD")
+			.await
 			.unwrap_or_else(|error| panic!("tag verification: {error}"))
 			.is_some()
 	);
 	assert!(
 		verify_release_ref_for_publish(repo.path(), Some(&source), "HEAD")
+			.await
 			.unwrap_or_else(|error| panic!("publish verification: {error}"))
 			.is_some()
 	);
 	assert!(
 		verify_release_ref_for_commit(repo.path(), Some(&source), "HEAD")
+			.await
 			.unwrap_or_else(|error| panic!("commit verification: {error}"))
 			.is_some()
 	);
 }
 
-#[test]
-fn enforcement_wrappers_skip_absent_source_or_disabled_policy() {
+#[tokio::test(flavor = "multi_thread")]
+async fn enforcement_wrappers_skip_absent_source_or_disabled_policy() {
 	let repo = init_git_repo();
 	let mut source = source_configuration();
 	source.releases.enforce_for_tags = false;
@@ -157,38 +173,44 @@ fn enforcement_wrappers_skip_absent_source_or_disabled_policy() {
 
 	assert!(
 		verify_release_ref_for_tags(repo.path(), None, "HEAD")
+			.await
 			.unwrap_or_else(|error| panic!("tag verification: {error}"))
 			.is_none()
 	);
 	assert!(
 		verify_release_ref_for_tags(repo.path(), Some(&source), "HEAD")
+			.await
 			.unwrap_or_else(|error| panic!("tag verification: {error}"))
 			.is_none()
 	);
 	assert!(
 		verify_release_ref_for_publish(repo.path(), None, "HEAD")
+			.await
 			.unwrap_or_else(|error| panic!("publish verification: {error}"))
 			.is_none()
 	);
 	assert!(
 		verify_release_ref_for_publish(repo.path(), Some(&source), "HEAD")
+			.await
 			.unwrap_or_else(|error| panic!("publish verification: {error}"))
 			.is_none()
 	);
 	assert!(
 		verify_release_ref_for_commit(repo.path(), None, "HEAD")
+			.await
 			.unwrap_or_else(|error| panic!("commit verification: {error}"))
 			.is_none()
 	);
 	assert!(
 		verify_release_ref_for_commit(repo.path(), Some(&source), "HEAD")
+			.await
 			.unwrap_or_else(|error| panic!("commit verification: {error}"))
 			.is_none()
 	);
 }
 
-#[test]
-fn commit_wrapper_enforces_policy_when_enabled() {
+#[tokio::test(flavor = "multi_thread")]
+async fn commit_wrapper_enforces_policy_when_enabled() {
 	let repo = init_git_repo();
 	run_git(repo.path(), &["checkout", "main"]);
 	run_git(repo.path(), &["checkout", "-b", "feature/demo"]);
@@ -197,6 +219,7 @@ fn commit_wrapper_enforces_policy_when_enabled() {
 	source.releases.branches = vec!["release/*".to_string()];
 	source.releases.enforce_for_commit = true;
 	let error = verify_release_ref_for_commit(repo.path(), Some(&source), "HEAD")
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected commit verification error"));
 
@@ -207,8 +230,8 @@ fn commit_wrapper_enforces_policy_when_enabled() {
 	);
 }
 
-#[test]
-fn verify_release_ref_accepts_commits_reachable_from_globbed_release_branch() {
+#[tokio::test(flavor = "multi_thread")]
+async fn verify_release_ref_accepts_commits_reachable_from_globbed_release_branch() {
 	let repo = init_git_repo();
 	write_and_commit(repo.path(), "release.txt", "release", "release commit");
 	run_git(repo.path(), &["tag", "v1.0.0"]);
@@ -219,6 +242,7 @@ fn verify_release_ref_accepts_commits_reachable_from_globbed_release_branch() {
 	};
 
 	let report = verify_release_ref(repo.path(), &policy, "v1.0.0")
+		.await
 		.unwrap_or_else(|error| panic!("verify release ref: {error}"));
 
 	assert_eq!(report.ref_name, "v1.0.0");
@@ -226,8 +250,8 @@ fn verify_release_ref_accepts_commits_reachable_from_globbed_release_branch() {
 	assert_eq!(report.matched_branch, "release/production");
 }
 
-#[test]
-fn verify_release_ref_rejects_commits_not_reachable_from_release_branch() {
+#[tokio::test(flavor = "multi_thread")]
+async fn verify_release_ref_rejects_commits_not_reachable_from_release_branch() {
 	let repo = init_git_repo();
 	run_git(repo.path(), &["checkout", "main"]);
 	run_git(repo.path(), &["checkout", "-b", "feature/demo"]);
@@ -238,6 +262,7 @@ fn verify_release_ref_rejects_commits_not_reachable_from_release_branch() {
 		..ProviderReleaseSettings::default()
 	};
 	let error = verify_release_ref(repo.path(), &policy, "HEAD")
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected release branch policy error"));
 

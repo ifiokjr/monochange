@@ -1,10 +1,15 @@
+#[cfg(test)]
 use std::cell::Cell;
+use std::io::BufRead;
+use std::io::BufReader;
+use std::io::BufWriter;
 use std::io::IsTerminal;
 
 use similar::TextDiff;
 
 use super::*;
 
+#[cfg(test)]
 thread_local! {
 	pub(crate) static FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR: Cell<bool> = const { Cell::new(false) };
 }
@@ -24,21 +29,40 @@ const DEDUP_INDEX_PATH: &str = ".monochange/local/release-index.jsonl";
 /// are treated as empty indices.
 fn load_dedup_index(root: &Path) -> std::collections::HashSet<String> {
 	let path = root.join(DEDUP_INDEX_PATH);
-	let Ok(content) = fs::read_to_string(&path) else {
+	let Ok(file) = fs::File::open(&path) else {
 		return std::collections::HashSet::new();
 	};
-	content
-		.lines()
-		.filter_map(|line| {
-			let line = line.trim();
-			if line.is_empty() {
-				return None;
-			}
-			serde_json::from_str::<serde_json::Value>(line)
-				.ok()
-				.and_then(|v| v.get("hash").and_then(|h| h.as_str().map(String::from)))
-		})
-		.collect()
+	let reader = BufReader::new(file);
+	load_dedup_index_from_reader(reader).unwrap_or_default()
+}
+
+fn load_dedup_index_from_reader(reader: impl BufRead) -> Option<std::collections::HashSet<String>> {
+	let mut index = std::collections::HashSet::new();
+	for line in reader.lines() {
+		let Ok(line) = line else {
+			return None;
+		};
+		let line = line.trim();
+		if line.is_empty() {
+			continue;
+		}
+		if let Some(hash) = parse_dedup_index_hash(line) {
+			index.insert(hash.to_owned());
+		}
+	}
+	Some(index)
+}
+
+fn parse_dedup_index_hash(line: &str) -> Option<&str> {
+	#[derive(serde::Deserialize)]
+	struct DedupIndexEntry<'a> {
+		#[serde(borrow)]
+		hash: &'a str,
+	}
+
+	serde_json::from_str::<DedupIndexEntry<'_>>(line)
+		.ok()
+		.map(|entry| entry.hash)
 }
 
 /// Save the persistent deduplication index atomically.
@@ -53,13 +77,21 @@ fn save_dedup_index(
 	let parent = path.parent().unwrap_or(root);
 	fs::create_dir_all(parent)
 		.map_err(|error| MonochangeError::Io(format!("create dedup index dir: {error}")))?;
-	let mut lines = Vec::with_capacity(index.len());
-	for hash in index {
-		lines.push(format!(r#"{{"hash":"{hash}"}}"#));
-	}
-	lines.sort();
+	let mut hashes = index.iter().map(String::as_str).collect::<Vec<_>>();
+	hashes.sort_unstable();
 	let temp = path.with_extension("tmp");
-	fs::write(&temp, lines.join("\n"))
+	let file = fs::File::create(&temp)
+		.map_err(|error| MonochangeError::Io(format!("write dedup index: {error}")))?;
+	let mut writer = BufWriter::new(file);
+	for (position, hash) in hashes.iter().enumerate() {
+		if position > 0 {
+			std::io::Write::write_all(&mut writer, b"\n")
+				.map_err(|error| MonochangeError::Io(format!("write dedup index: {error}")))?;
+		}
+		std::io::Write::write_fmt(&mut writer, format_args!(r#"{{"hash":"{hash}"}}"#))
+			.map_err(|error| MonochangeError::Io(format!("write dedup index: {error}")))?;
+	}
+	std::io::Write::flush(&mut writer)
 		.map_err(|error| MonochangeError::Io(format!("write dedup index: {error}")))?;
 	fs::rename(&temp, &path)
 		.map_err(|error| MonochangeError::Io(format!("rename dedup index: {error}")))?;
@@ -80,7 +112,7 @@ fn remove_from_dedup_index(root: &Path, hash: &str) -> MonochangeResult<()> {
 	save_dedup_index(root, &index)
 }
 
-pub(crate) fn build_release_targets(
+pub(crate) async fn build_release_targets(
 	configuration: &monochange_core::WorkspaceConfiguration,
 	packages: &[PackageRecord],
 	plan: &ReleasePlan,
@@ -103,54 +135,73 @@ pub(crate) fn build_release_targets(
 	// a tiny formatting helper into repeated subprocess latency. The target builder
 	// only needs a stable view of tags for the current command, so sharing one
 	// loaded list avoids re-running the same git command over and over.
-	let sorted_tags = load_sorted_tags(&configuration.root_path);
-
-	let mut release_targets = configuration
+	let sorted_tags = load_sorted_tags(&configuration.root_path).await;
+	let configured_package_by_id = configuration
+		.packages
+		.iter()
+		.map(|package| (package.id.as_str(), package))
+		.collect::<std::collections::HashMap<_, _>>();
+	let mut group_by_package_id = std::collections::HashMap::with_capacity(
+		configuration
+			.groups
+			.iter()
+			.map(|group| group.packages.len())
+			.sum(),
+	);
+	for group in &configuration.groups {
+		for package_id in &group.packages {
+			group_by_package_id
+				.entry(package_id.as_str())
+				.or_insert(group);
+		}
+	}
+	let planned_group_by_id = plan
 		.groups
 		.iter()
-		.filter_map(|group| {
-			plan.groups
-				.iter()
-				.find(|pg| pg.group_id == group.id && pg.recommended_bump.is_release())
-				.and_then(|pg| {
-					pg.planned_version.as_ref().map(|version| {
-						let vs = version.to_string();
-						let tag = render_tag_name(&group.id, &vs, group.version_format);
-						let prev = find_previous_tag_in(&tag, &sorted_tags);
-						let ctx = TitleRenderContext::new(
-							&group.id,
-							&vs,
-							changes_count,
-							source,
-							&tag,
-							prev.as_deref(),
-						);
-						let rt = effective_title_template(
-							group.release_title.as_deref(),
-							defaults_release_title,
-							default_release_title_for_format(group.version_format),
-						);
-						let ct = effective_title_template(
-							group.changelog_version_title.as_deref(),
-							defaults_changelog_title,
-							default_changelog_version_title_for_format(group.version_format),
-						);
-						ReleaseTarget {
-							id: group.id.clone(),
-							kind: ReleaseOwnerKind::Group,
-							version: vs,
-							tag: group.tag,
-							release: group.release,
-							version_format: group.version_format,
-							tag_name: tag,
-							members: group.packages.clone(),
-							rendered_title: ctx.render(rt),
-							rendered_changelog_title: ctx.render(ct),
-						}
-					})
-				})
+		.filter(|group| group.recommended_bump.is_release())
+		.map(|group| (group.group_id.as_str(), group))
+		.collect::<std::collections::HashMap<_, _>>();
+
+	let mut release_targets = Vec::with_capacity(configuration.groups.len() + plan.decisions.len());
+	release_targets.extend(configuration.groups.iter().filter_map(|group| {
+		planned_group_by_id.get(group.id.as_str()).and_then(|pg| {
+			pg.planned_version.as_ref().map(|version| {
+				let vs = version.to_string();
+				let tag = render_tag_name(&group.id, &vs, group.version_format);
+				let prev = find_previous_tag_in(&tag, &sorted_tags);
+				let ctx = TitleRenderContext::new(
+					&group.id,
+					&vs,
+					changes_count,
+					source,
+					&tag,
+					prev.as_deref(),
+				);
+				let rt = effective_title_template(
+					group.release_title.as_deref(),
+					defaults_release_title,
+					default_release_title_for_format(group.version_format),
+				);
+				let ct = effective_title_template(
+					group.changelog_version_title.as_deref(),
+					defaults_changelog_title,
+					default_changelog_version_title_for_format(group.version_format),
+				);
+				ReleaseTarget {
+					id: group.id.clone(),
+					kind: ReleaseOwnerKind::Group,
+					version: vs,
+					tag: group.tag,
+					release: group.release,
+					version_format: group.version_format,
+					tag_name: tag,
+					members: group.packages.clone(),
+					rendered_title: ctx.render(rt),
+					rendered_changelog_title: ctx.render(ct),
+				}
+			})
 		})
-		.collect::<Vec<_>>();
+	}));
 	for decision in plan
 		.decisions
 		.iter()
@@ -167,40 +218,54 @@ pub(crate) fn build_release_targets(
 			.get("config_id")
 			.cloned()
 			.unwrap_or_else(|| package.name.clone());
-		let Some(identity) = configuration.effective_release_identity(&config_id) else {
+		let Some(package_definition) = configured_package_by_id.get(config_id.as_str()).copied()
+		else {
 			continue;
 		};
+		let (owner_id, owner_kind, tag_enabled, release_enabled, version_format, members) =
+			if let Some(group) = group_by_package_id.get(config_id.as_str()).copied() {
+				(
+					&group.id,
+					ReleaseOwnerKind::Group,
+					group.tag,
+					group.release,
+					group.version_format,
+					group.packages.clone(),
+				)
+			} else {
+				(
+					&package_definition.id,
+					ReleaseOwnerKind::Package,
+					package_definition.tag,
+					package_definition.release,
+					package_definition.version_format,
+					vec![package_definition.id.clone()],
+				)
+			};
 		let vs = version.to_string();
-		let tag = render_tag_name(&identity.owner_id, &vs, identity.version_format);
+		let tag = render_tag_name(owner_id, &vs, version_format);
 		let prev = find_previous_tag_in(&tag, &sorted_tags);
-		let pkg_def = configuration.package_by_id(&config_id);
-		let ctx = TitleRenderContext::new(
-			&identity.owner_id,
-			&vs,
-			changes_count,
-			source,
-			&tag,
-			prev.as_deref(),
-		);
+		let ctx =
+			TitleRenderContext::new(owner_id, &vs, changes_count, source, &tag, prev.as_deref());
 		let rt = effective_title_template(
-			pkg_def.and_then(|p| p.release_title.as_deref()),
+			package_definition.release_title.as_deref(),
 			defaults_release_title,
-			default_release_title_for_format(identity.version_format),
+			default_release_title_for_format(version_format),
 		);
 		let ct = effective_title_template(
-			pkg_def.and_then(|p| p.changelog_version_title.as_deref()),
+			package_definition.changelog_version_title.as_deref(),
 			defaults_changelog_title,
-			default_changelog_version_title_for_format(identity.version_format),
+			default_changelog_version_title_for_format(version_format),
 		);
 		release_targets.push(ReleaseTarget {
-			id: identity.owner_id.clone(),
-			kind: identity.owner_kind,
+			id: owner_id.clone(),
+			kind: owner_kind,
 			version: vs,
-			tag: identity.tag,
-			release: identity.release,
-			version_format: identity.version_format,
+			tag: tag_enabled,
+			release: release_enabled,
+			version_format,
 			tag_name: tag,
-			members: identity.members,
+			members,
 			rendered_title: ctx.render(rt),
 			rendered_changelog_title: ctx.render(ct),
 		});
@@ -217,7 +282,12 @@ pub(crate) fn build_package_publication_targets(
 	let package_by_id = packages
 		.iter()
 		.map(|package| (package.id.as_str(), package))
-		.collect::<BTreeMap<_, _>>();
+		.collect::<std::collections::HashMap<_, _>>();
+	let configured_package_by_id = configuration
+		.packages
+		.iter()
+		.map(|package| (package.id.as_str(), package))
+		.collect::<std::collections::HashMap<_, _>>();
 	let mut targets = plan
 		.decisions
 		.iter()
@@ -230,7 +300,7 @@ pub(crate) fn build_package_publication_targets(
 				.get("config_id")
 				.cloned()
 				.unwrap_or_else(|| package.name.clone());
-			let package_definition = configuration.package_by_id(&config_id)?;
+			let package_definition = configured_package_by_id.get(config_id.as_str()).copied()?;
 			if !package_definition.publish.enabled
 				|| matches!(
 					package.publish_state,
@@ -347,11 +417,13 @@ pub(crate) fn compare_url_for_provider(
 	}
 }
 
-fn load_sorted_tags(root: &Path) -> Vec<String> {
+async fn load_sorted_tags(root: &Path) -> Vec<String> {
 	let output = match monochange_core::git::git_command_output(
 		root,
 		&["tag", "--list", "--sort=-v:refname"],
-	) {
+	)
+	.await
+	{
 		Ok(output) if output.status.success() => output,
 		_ => return Vec::new(),
 	};
@@ -375,6 +447,11 @@ fn find_previous_tag_in(current_tag: &str, sorted_tags: &[String]) -> Option<Str
 		})
 		.max_by(|left, right| left.1.cmp(&right.1))
 		.map(|(tag, _)| tag)
+}
+
+#[cfg(test)]
+pub(crate) async fn find_previous_tag(root: &Path, current_tag: &str) -> Option<String> {
+	find_previous_tag_in(current_tag, &load_sorted_tags(root).await)
 }
 
 pub(crate) fn parse_tag_prefix_and_version(tag: &str) -> Option<(String, semver::Version)> {
@@ -793,18 +870,8 @@ fn atomic_write(path: &Path, content: &[u8]) -> MonochangeResult<()> {
 			parent.display()
 		))
 	})?;
-	std::io::Write::write_all(&mut temp, content).map_err(|error| {
-		MonochangeError::Io(format!(
-			"failed to write temp file for {}: {error}",
-			path.display()
-		))
-	})?;
-	temp.persist(path).map_err(|error| {
-		MonochangeError::Io(format!(
-			"failed to rename temp file to {}: {error}",
-			path.display()
-		))
-	})?;
+	write_temp_file(&mut temp, path, content)?;
+	persist_temp_file(temp, path)?;
 	// Restore original permissions after rename.
 	if let Some(permissions) = original_permissions {
 		fs::set_permissions(path, permissions).map_err(|error| {
@@ -817,9 +884,41 @@ fn atomic_write(path: &Path, content: &[u8]) -> MonochangeResult<()> {
 	Ok(())
 }
 
-#[rustfmt::skip]
+fn write_temp_file(
+	writer: &mut impl std::io::Write,
+	path: &Path,
+	content: &[u8],
+) -> MonochangeResult<()> {
+	std::io::Write::write_all(writer, content).map_err(|error| temp_file_write_error(path, &error))
+}
+
+fn persist_temp_file(temp: tempfile::NamedTempFile, path: &Path) -> MonochangeResult<()> {
+	temp.persist(path)
+		.map(|_| ())
+		.map_err(|error| temp_file_persist_error(path, &error))
+}
+
+fn temp_file_write_error(path: &Path, error: &std::io::Error) -> MonochangeError {
+	MonochangeError::Io(format!(
+		"failed to write temp file for {}: {error}",
+		path.display()
+	))
+}
+
+fn temp_file_persist_error(path: &Path, error: &tempfile::PersistError) -> MonochangeError {
+	MonochangeError::Io(format!(
+		"failed to rename temp file to {}: {error}",
+		path.display()
+	))
+}
+
 #[tracing::instrument(skip_all)]
-pub(crate) fn build_file_diff_previews(root: &Path, updates: &[FileUpdate]) -> MonochangeResult<Vec<PreparedFileDiff>> { let colorize_diffs = diff_output_colors_enabled();
+pub(crate) fn build_file_diff_previews(
+	root: &Path,
+	updates: &[FileUpdate],
+) -> MonochangeResult<Vec<PreparedFileDiff>> {
+	let colorize_diffs = diff_output_colors_enabled();
+	#[cfg(test)]
 	if FORCE_BUILD_FILE_DIFF_PREVIEWS_ERROR.with(Cell::get) {
 		return Err(MonochangeError::Io(
 			"forced build_file_diff_previews test error".to_string(),
@@ -903,31 +1002,39 @@ pub(crate) fn diff_output_supports_color(stdout_is_terminal: bool) -> bool {
 	stdout_is_terminal
 }
 
-fn colorize_diff_output(diff: &str) -> String {
-	diff.lines()
-		.map(colorize_diff_line)
-		.collect::<Vec<_>>()
-		.join("\n")
+pub(crate) fn colorize_diff_output(diff: &str) -> String {
+	let mut output = String::with_capacity(diff.len());
+	for (index, line) in diff.lines().enumerate() {
+		if index > 0 {
+			output.push('\n');
+		}
+		push_colorized_diff_line(&mut output, line);
+	}
+	output
 }
 
-pub(crate) fn colorize_diff_line(line: &str) -> String {
+fn push_colorized_diff_line(output: &mut String, line: &str) {
 	if line.starts_with("--- ") || line.starts_with("+++ ") {
-		apply_ansi_style(line, "1;36")
+		push_ansi_style(output, line, "1;36");
 	} else if line.starts_with("@@ ") {
-		apply_ansi_style(line, "36")
+		push_ansi_style(output, line, "36");
 	} else if line.starts_with('+') && !line.starts_with("+++") {
-		apply_ansi_style(line, "32")
+		push_ansi_style(output, line, "32");
 	} else if line.starts_with('-') && !line.starts_with("---") {
-		apply_ansi_style(line, "31")
+		push_ansi_style(output, line, "31");
 	} else if line == r"\ No newline at end of file" {
-		apply_ansi_style(line, "33")
+		push_ansi_style(output, line, "33");
 	} else {
-		line.to_string()
+		output.push_str(line);
 	}
 }
 
-fn apply_ansi_style(line: &str, style: &str) -> String {
-	format!("\u{1b}[{style}m{line}\u{1b}[0m")
+fn push_ansi_style(output: &mut String, line: &str, style: &str) {
+	output.push_str("\u{1b}[");
+	output.push_str(style);
+	output.push('m');
+	output.push_str(line);
+	output.push_str("\u{1b}[0m");
 }
 
 pub(crate) fn shared_release_version(plan: &ReleasePlan) -> Option<String> {
@@ -1317,19 +1424,19 @@ pub(crate) fn build_source_change_request(
 	request
 }
 
-pub(crate) fn publish_source_release_requests(
+pub(crate) async fn publish_source_release_requests(
 	source: &SourceConfiguration,
 	requests: &[SourceReleaseRequest],
 ) -> MonochangeResult<Vec<SourceReleaseOutcome>> {
 	match source.provider {
 		#[cfg(feature = "github")]
-		SourceProvider::GitHub => github_provider::publish_release_requests(source, requests),
+		SourceProvider::GitHub => github_provider::publish_release_requests(source, requests).await,
 		#[cfg(feature = "gitlab")]
-		SourceProvider::GitLab => gitlab_provider::publish_release_requests(source, requests),
+		SourceProvider::GitLab => gitlab_provider::publish_release_requests(source, requests).await,
 		#[cfg(feature = "gitea")]
-		SourceProvider::Gitea => gitea_provider::publish_release_requests(source, requests),
+		SourceProvider::Gitea => gitea_provider::publish_release_requests(source, requests).await,
 		#[cfg(feature = "forgejo")]
-		SourceProvider::Forgejo => forgejo_provider::publish_release_requests(source, requests),
+		SourceProvider::Forgejo => forgejo_provider::publish_release_requests(source, requests).await,
 		#[cfg(not(any(
 			feature = "github",
 			feature = "gitlab",
@@ -1340,7 +1447,7 @@ pub(crate) fn publish_source_release_requests(
 	}
 }
 
-pub(crate) fn publish_source_change_request(
+pub(crate) async fn publish_source_change_request(
 	source: &SourceConfiguration,
 	root: &Path,
 	request: &SourceChangeRequest,
@@ -1357,6 +1464,7 @@ pub(crate) fn publish_source_change_request(
 				tracked_paths,
 				no_verify,
 			)
+			.await
 		}
 		#[cfg(feature = "gitlab")]
 		SourceProvider::GitLab => {
@@ -1367,6 +1475,7 @@ pub(crate) fn publish_source_change_request(
 				tracked_paths,
 				no_verify,
 			)
+			.await
 		}
 		#[cfg(feature = "gitea")]
 		SourceProvider::Gitea => {
@@ -1377,6 +1486,7 @@ pub(crate) fn publish_source_change_request(
 				tracked_paths,
 				no_verify,
 			)
+			.await
 		}
 		#[cfg(feature = "forgejo")]
 		SourceProvider::Forgejo => {
@@ -1387,6 +1497,7 @@ pub(crate) fn publish_source_change_request(
 				tracked_paths,
 				no_verify,
 			)
+			.await
 		}
 		#[cfg(not(any(
 			feature = "github",
@@ -1453,8 +1564,13 @@ pub(crate) fn render_release_cli_command_json(
 		"publishRateLimits": sections.publish_rate_limits,
 	});
 	if !sections.file_diffs.is_empty() {
-		#[rustfmt::skip]
-		value.as_object_mut().unwrap_or_else(|| panic!("release json wrapper must stay object")).insert("fileDiffs".to_string(), serde_json::to_value(sections.file_diffs).unwrap_or_default());
+		value
+			.as_object_mut()
+			.unwrap_or_else(|| panic!("release json wrapper must stay object"))
+			.insert(
+				"fileDiffs".to_string(),
+				serde_json::to_value(sections.file_diffs).unwrap_or_default(),
+			);
 	}
 	serde_json::to_string_pretty(&value)
 		.map_err(|error| MonochangeError::Discovery(error.to_string()))
@@ -1801,7 +1917,7 @@ fn deduplicate_overlapping_release_records(
 	Ok(())
 }
 
-pub(crate) fn commit_release(
+pub(crate) async fn commit_release(
 	root: &Path,
 	context: &CliContext,
 	source: Option<&SourceConfiguration>,
@@ -1816,8 +1932,8 @@ pub(crate) fn commit_release(
 	let mut tracked_paths = tracked_paths;
 	tracked_paths.push(release_record_path);
 	if !context.dry_run {
-		git_stage_paths(root, &tracked_paths)?;
-		git_commit_paths(root, &message, no_verify)?;
+		git_stage_paths(root, &tracked_paths).await?;
+		git_commit_paths(root, &message, no_verify).await?;
 	}
 	Ok(CommitReleaseReport {
 		subject: message.subject,
@@ -1825,7 +1941,7 @@ pub(crate) fn commit_release(
 		commit: if context.dry_run {
 			None
 		} else {
-			Some(git_head_commit(root)?)
+			Some(git_head_commit(root).await?)
 		},
 		tracked_paths,
 		dry_run: context.dry_run,

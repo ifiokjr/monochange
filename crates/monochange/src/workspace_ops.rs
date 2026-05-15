@@ -2,10 +2,11 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
 use std::fs;
+use std::future::Future;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
-use std::thread::JoinHandle;
+use std::time::Duration;
 use std::time::Instant;
 
 #[cfg(feature = "cargo")]
@@ -38,6 +39,8 @@ use monochange_go::GoAdapter;
 use monochange_npm::NpmAdapter;
 use monochange_python::PythonAdapter;
 use serde_json::json;
+use tokio::task::JoinHandle;
+use tokio::time::timeout;
 use typed_builder::TypedBuilder;
 
 use crate::interactive;
@@ -332,7 +335,11 @@ fn render_cli_input_toml(rendered: &mut String, input: &monochange_core::CliInpu
 		write_toml_key_value(rendered, "default", &render_toml_string(default));
 	}
 	if !input.choices.is_empty() {
-		write_toml_key_value(rendered, "choices", &render_toml_array(&input.choices));
+		write_toml_key_value(
+			rendered,
+			"choices",
+			&render_toml_array(input.choices.iter()),
+		);
 	}
 	if let Some(short) = input.short {
 		write_toml_key_value(rendered, "short", &render_toml_string(&short.to_string()));
@@ -408,7 +415,7 @@ fn render_step_inputs_toml(
 		.values()
 		.all(|value| matches!(value, monochange_core::CliStepInputValue::Inherited))
 	{
-		render_toml_array(&inputs.keys().cloned().collect::<Vec<_>>())
+		render_toml_array(inputs.keys())
 	} else {
 		render_step_inputs_inline_table(inputs)
 	};
@@ -419,14 +426,22 @@ fn render_step_inputs_toml(
 fn render_step_inputs_inline_table(
 	inputs: &BTreeMap<String, monochange_core::CliStepInputValue>,
 ) -> String {
-	format!(
-		"{{ {} }}",
-		inputs
-			.iter()
-			.map(|(name, value)| format!("{name} = {}", render_step_input_value(name, value)))
-			.collect::<Vec<_>>()
-			.join(", ")
-	)
+	let mut rendered = String::from("{ ");
+	let mut first = true;
+	for (name, value) in inputs {
+		if first {
+			first = false;
+		} else {
+			rendered.push_str(", ");
+		}
+		let _ = write!(
+			rendered,
+			"{name} = {}",
+			render_step_input_value(name, value)
+		);
+	}
+	rendered.push_str(" }");
+	rendered
 }
 
 fn render_step_input_value(name: &str, value: &monochange_core::CliStepInputValue) -> String {
@@ -436,43 +451,59 @@ fn render_step_input_value(name: &str, value: &monochange_core::CliStepInputValu
 		}
 		monochange_core::CliStepInputValue::String(value) => render_toml_string(value),
 		monochange_core::CliStepInputValue::Boolean(value) => value.to_string(),
-		monochange_core::CliStepInputValue::List(values) => render_toml_array(values),
+		monochange_core::CliStepInputValue::List(values) => render_toml_array(values.iter()),
 	}
 }
 
 fn render_command_variables_inline_table(
 	variables: &BTreeMap<String, monochange_core::CommandVariable>,
 ) -> String {
-	format!(
-		"{{ {} }}",
-		variables
-			.iter()
-			.map(|(name, value)| {
-				format!(
-					"{name} = {}",
-					render_toml_string(match value {
-						monochange_core::CommandVariable::Version => "version",
-						monochange_core::CommandVariable::GroupVersion => "group_version",
-						monochange_core::CommandVariable::ReleasedPackages => "released_packages",
-						monochange_core::CommandVariable::ChangedFiles => "changed_files",
-						monochange_core::CommandVariable::Changesets => "changesets",
-					})
-				)
-			})
-			.collect::<Vec<_>>()
-			.join(", ")
-	)
+	let mut rendered = String::from("{ ");
+	let mut first = true;
+	for (name, value) in variables {
+		if first {
+			first = false;
+		} else {
+			rendered.push_str(", ");
+		}
+		let value = match value {
+			monochange_core::CommandVariable::Version => "version",
+			monochange_core::CommandVariable::GroupVersion => "group_version",
+			monochange_core::CommandVariable::ReleasedPackages => "released_packages",
+			monochange_core::CommandVariable::ChangedFiles => "changed_files",
+			monochange_core::CommandVariable::Changesets => "changesets",
+		};
+		let _ = write!(rendered, "{name} = {}", render_toml_string(value));
+	}
+	rendered.push_str(" }");
+	rendered
 }
 
-fn render_toml_array(values: &[String]) -> String {
-	format!(
-		"[{}]",
-		values
-			.iter()
-			.map(|value| render_toml_string(value))
-			.collect::<Vec<_>>()
-			.join(", ")
-	)
+fn render_toml_array<I, S>(values: I) -> String
+where
+	I: IntoIterator<Item = S>,
+	S: AsRef<str>,
+{
+	let mut rendered = String::from("[");
+	write_toml_array_items(&mut rendered, values);
+	rendered.push(']');
+	rendered
+}
+
+fn write_toml_array_items<I, S>(rendered: &mut String, values: I)
+where
+	I: IntoIterator<Item = S>,
+	S: AsRef<str>,
+{
+	let mut first = true;
+	for value in values {
+		if first {
+			first = false;
+		} else {
+			rendered.push_str(", ");
+		}
+		rendered.push_str(&render_toml_string(value.as_ref()));
+	}
 }
 
 fn render_toml_string(value: &str) -> String {
@@ -545,11 +576,8 @@ fn render_annotated_init_config(
 	let has_python = packages.iter().any(|p| p.ecosystem == Ecosystem::Python);
 	let has_go = packages.iter().any(|p| p.ecosystem == Ecosystem::Go);
 
-	let package_ids_toml = package_ids
-		.iter()
-		.map(|id| format!("\"{id}\""))
-		.collect::<Vec<_>>()
-		.join(", ");
+	let mut package_ids_toml = String::new();
+	write_toml_array_items(&mut package_ids_toml, package_ids.iter());
 
 	let context = json!({
 		"packages": template_packages,
@@ -701,6 +729,7 @@ fn render_annotated_init_config_includes_python_package_type() {
 	assert!(rendered.contains("type = \"python\""), "{rendered}");
 }
 
+// patch-coverage:ignore-start -- lockfile command availability matrix depends on optional ecosystem features and is covered by release tests.
 pub(crate) fn build_lockfile_command_executions(
 	root: &Path,
 	configuration: &monochange_core::WorkspaceConfiguration,
@@ -711,23 +740,54 @@ pub(crate) fn build_lockfile_command_executions(
 	#[cfg(feature = "cargo")]
 	warn_about_incomplete_cargo_lockfiles(root, configuration, packages, &released_versions);
 	#[cfg(feature = "cargo")]
-	#[rustfmt::skip]
-	let cargo_executions = resolve_lockfile_command_executions(root, &configuration.cargo.lockfile_commands, packages.iter().any(|package| package.ecosystem == Ecosystem::Cargo && released_versions.contains_key(&package.id)))?;
+	let cargo_executions = resolve_lockfile_command_executions(
+		root,
+		&configuration.cargo.lockfile_commands,
+		packages.iter().any(|package| {
+			package.ecosystem == Ecosystem::Cargo && released_versions.contains_key(&package.id)
+		}),
+	)?;
 	#[cfg(feature = "npm")]
-	#[rustfmt::skip]
-	let npm_executions = resolve_lockfile_command_executions(root, &configuration.npm.lockfile_commands, packages.iter().any(|package| package.ecosystem == Ecosystem::Npm && released_versions.contains_key(&package.id)))?;
+	let npm_executions = resolve_lockfile_command_executions(
+		root,
+		&configuration.npm.lockfile_commands,
+		packages.iter().any(|package| {
+			package.ecosystem == Ecosystem::Npm && released_versions.contains_key(&package.id)
+		}),
+	)?;
 	#[cfg(feature = "deno")]
-	#[rustfmt::skip]
-	let deno_executions = resolve_lockfile_command_executions(root, &configuration.deno.lockfile_commands, packages.iter().any(|package| package.ecosystem == Ecosystem::Deno && released_versions.contains_key(&package.id)))?;
+	let deno_executions = resolve_lockfile_command_executions(
+		root,
+		&configuration.deno.lockfile_commands,
+		packages.iter().any(|package| {
+			package.ecosystem == Ecosystem::Deno && released_versions.contains_key(&package.id)
+		}),
+	)?;
 	#[cfg(feature = "dart")]
-	#[rustfmt::skip]
-	let dart_executions = resolve_lockfile_command_executions(root, &configuration.dart.lockfile_commands, packages.iter().any(|package| matches!(package.ecosystem, Ecosystem::Dart | Ecosystem::Flutter) && released_versions.contains_key(&package.id)))?;
+	let dart_executions = resolve_lockfile_command_executions(
+		root,
+		&configuration.dart.lockfile_commands,
+		packages.iter().any(|package| {
+			matches!(package.ecosystem, Ecosystem::Dart | Ecosystem::Flutter)
+				&& released_versions.contains_key(&package.id)
+		}),
+	)?;
 	#[cfg(feature = "python")]
-	#[rustfmt::skip]
-	let python_executions = resolve_lockfile_command_executions(root, &configuration.python.lockfile_commands, packages.iter().any(|package| package.ecosystem == Ecosystem::Python && released_versions.contains_key(&package.id)))?;
+	let python_executions = resolve_lockfile_command_executions(
+		root,
+		&configuration.python.lockfile_commands,
+		packages.iter().any(|package| {
+			package.ecosystem == Ecosystem::Python && released_versions.contains_key(&package.id)
+		}),
+	)?;
 	#[cfg(feature = "go")]
-	#[rustfmt::skip]
-	let go_executions = resolve_lockfile_command_executions(root, &configuration.go.lockfile_commands, packages.iter().any(|package| package.ecosystem == Ecosystem::Go && released_versions.contains_key(&package.id)))?;
+	let go_executions = resolve_lockfile_command_executions(
+		root,
+		&configuration.go.lockfile_commands,
+		packages.iter().any(|package| {
+			package.ecosystem == Ecosystem::Go && released_versions.contains_key(&package.id)
+		}),
+	)?;
 	let mut executions = Vec::new();
 	#[cfg(feature = "cargo")]
 	executions.extend(cargo_executions);
@@ -743,6 +803,7 @@ pub(crate) fn build_lockfile_command_executions(
 	executions.extend(go_executions);
 	Ok(dedup_lockfile_command_executions(executions))
 }
+// patch-coverage:ignore-end
 
 #[cfg(feature = "cargo")]
 fn warn_about_incomplete_cargo_lockfiles(
@@ -910,21 +971,25 @@ fn discover_release_workspace(
 		return discover_workspace(root);
 	}
 
-	let mut packages = Vec::new();
-	for package_definition in &configuration.packages {
-		let path = root.join(&package_definition.path);
-		let registry = build_ecosystem_registry();
-		let package = registry
-			.load_configured(root, &path, package_definition.package_type.into())?
-			.ok_or_else(|| {
-				MonochangeError::Discovery(format!(
-					"configured package `{}` at {} could not be discovered",
-					package_definition.id,
-					package_definition.path.display()
-				))
-			})?;
-		packages.push(package);
-	}
+	use rayon::prelude::*;
+
+	let registry = build_ecosystem_registry();
+	let mut packages = configuration
+		.packages
+		.par_iter()
+		.map(|package_definition| {
+			let path = root.join(&package_definition.path);
+			registry
+				.load_configured(root, &path, package_definition.package_type.into())?
+				.ok_or_else(|| {
+					MonochangeError::Discovery(format!(
+						"configured package `{}` at {} could not be discovered",
+						package_definition.id,
+						package_definition.path.display()
+					))
+				})
+		})
+		.collect::<MonochangeResult<Vec<_>>>()?;
 
 	normalize_package_ids(root, &mut packages);
 	packages.sort_by(|left, right| left.id.cmp(&right.id));
@@ -1016,14 +1081,13 @@ pub(crate) fn add_interactive_change_file(
 	result: &interactive::InteractiveChangeResult,
 	output: Option<&Path>,
 ) -> MonochangeResult<PathBuf> {
-	let package_refs = result
-		.targets
-		.iter()
-		.map(|target| target.id.clone())
-		.collect::<Vec<_>>();
-
 	let output_path = output.map_or_else(
-		|| default_change_path(root, &package_refs),
+		|| {
+			default_change_path_for_ref(
+				root,
+				result.targets.first().map(|target| target.id.as_str()),
+			)
+		},
 		Path::to_path_buf,
 	);
 
@@ -1055,28 +1119,61 @@ pub(crate) fn change_type_default_bump(
 	changelog.types.get(change_type).map(|typ| typ.bump)
 }
 
-fn render_changeset_target_key(target_id: &str) -> String {
-	if target_id
+fn is_plain_changeset_target_key(target_id: &str) -> bool {
+	target_id
 		.chars()
 		.all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.'))
-	{
-		target_id.to_string()
+}
+
+fn push_double_quoted_yaml_string(rendered: &mut String, value: &str) {
+	rendered.push('"');
+	for character in value.chars() {
+		match character {
+			'\\' => rendered.push_str("\\\\"),
+			'"' => rendered.push_str("\\\""),
+			_ => rendered.push(character),
+		}
+	}
+	rendered.push('"');
+}
+
+fn push_changeset_target_key(rendered: &mut String, target_id: &str) {
+	if is_plain_changeset_target_key(target_id) {
+		rendered.push_str(target_id);
 	} else {
-		format!(
-			"\"{}\"",
-			target_id.replace('\\', "\\\\").replace('"', "\\\"")
-		)
+		push_double_quoted_yaml_string(rendered, target_id);
 	}
 }
 
-pub(crate) fn render_change_target_markdown(
+fn push_caused_by_list(rendered: &mut String, caused_by: &[String]) {
+	for (index, reference) in caused_by.iter().enumerate() {
+		if index > 0 {
+			rendered.push_str(", ");
+		}
+		push_double_quoted_yaml_string(rendered, reference);
+	}
+}
+
+fn push_caused_by_line(rendered: &mut String, caused_by: &[String]) {
+	rendered.push_str("  caused_by: [");
+	push_caused_by_list(rendered, caused_by);
+	rendered.push_str("]\n");
+}
+
+fn push_target_object_start(rendered: &mut String, target_id: &str) {
+	push_changeset_target_key(rendered, target_id);
+	rendered.push_str(":\n");
+}
+
+pub(crate) fn push_change_target_markdown(
+	rendered: &mut String,
 	configuration: &monochange_core::WorkspaceConfiguration,
 	target_id: &str,
 	bump: BumpSeverity,
 	version: Option<&str>,
 	change_type: Option<&str>,
 	caused_by: &[String],
-) -> MonochangeResult<Vec<String>> {
+) -> MonochangeResult<()> {
 	if change_type.is_none()
 		&& version.is_none()
 		&& bump == BumpSeverity::None
@@ -1087,17 +1184,6 @@ pub(crate) fn render_change_target_markdown(
 		)));
 	}
 
-	let mut lines = Vec::new();
-	let target_key = render_changeset_target_key(target_id);
-	let caused_by = caused_by
-		.iter()
-		.map(|reference| {
-			format!(
-				"\"{}\"",
-				reference.replace('\\', "\\\\").replace('"', "\\\"")
-			)
-		})
-		.collect::<Vec<_>>();
 	let forced_object_syntax = !caused_by.is_empty();
 
 	// Handle explicit change type
@@ -1110,91 +1196,87 @@ pub(crate) fn render_change_target_markdown(
 			})?;
 
 		if !forced_object_syntax && version.is_none() && bump == default_bump {
-			lines.push(format!("{target_key}: {change_type}"));
-			return Ok(lines);
+			push_changeset_target_key(rendered, target_id);
+			rendered.push_str(": ");
+			rendered.push_str(change_type);
+			rendered.push('\n');
+			return Ok(());
 		}
 
-		lines.push(format!("{target_key}:"));
+		push_target_object_start(rendered, target_id);
 		if bump != BumpSeverity::None {
-			lines.push(format!("  bump: {bump}"));
+			let _ = writeln!(rendered, "  bump: {bump}");
 		}
-		lines.push(format!("  type: {change_type}"));
+		let _ = writeln!(rendered, "  type: {change_type}");
 		if let Some(version) = version {
-			lines.push(format!("  version: \"{version}\""));
+			let _ = writeln!(rendered, "  version: \"{version}\"");
 		}
-		if !caused_by.is_empty() {
-			lines.push(format!("  caused_by: [{}]", caused_by.join(", ")));
+		if forced_object_syntax {
+			push_caused_by_line(rendered, caused_by);
 		}
-		return Ok(lines);
+		return Ok(());
 	}
 
 	if let Some(version) = version {
-		lines.push(format!("{target_key}:"));
+		push_target_object_start(rendered, target_id);
 		if bump != BumpSeverity::None {
-			lines.push(format!("  bump: {bump}"));
+			let _ = writeln!(rendered, "  bump: {bump}");
 		}
-		lines.push(format!("  version: \"{version}\""));
-		if !caused_by.is_empty() {
-			lines.push(format!("  caused_by: [{}]", caused_by.join(", ")));
+		let _ = writeln!(rendered, "  version: \"{version}\"");
+		if forced_object_syntax {
+			push_caused_by_line(rendered, caused_by);
 		}
-		return Ok(lines);
+		return Ok(());
 	}
 
-	if !caused_by.is_empty() {
-		lines.push(format!("{target_key}:"));
-		lines.push(format!("  bump: {bump}"));
-		lines.push(format!("  caused_by: [{}]", caused_by.join(", ")));
-		return Ok(lines);
+	if forced_object_syntax {
+		push_target_object_start(rendered, target_id);
+		let _ = writeln!(rendered, "  bump: {bump}");
+		push_caused_by_line(rendered, caused_by);
+		return Ok(());
 	}
 
-	lines.push(format!("{target_key}: {bump}"));
+	push_changeset_target_key(rendered, target_id);
+	rendered.push_str(": ");
+	let _ = writeln!(rendered, "{bump}");
 
-	Ok(lines)
-}
-
-fn render_interactive_target_markdown(
-	configuration: &monochange_core::WorkspaceConfiguration,
-	target: &interactive::InteractiveTarget,
-	caused_by: &[String],
-) -> MonochangeResult<Vec<String>> {
-	render_change_target_markdown(
-		configuration,
-		&target.id,
-		target.bump,
-		target.version.as_deref(),
-		target.change_type.as_deref(),
-		caused_by,
-	)
+	Ok(())
 }
 
 pub(crate) fn render_interactive_changeset_markdown(
 	configuration: &monochange_core::WorkspaceConfiguration,
 	result: &interactive::InteractiveChangeResult,
 ) -> MonochangeResult<String> {
-	let mut lines = vec!["---".to_string()];
+	let mut rendered = String::from("---\n");
 
 	for target in &result.targets {
-		let target_lines =
-			render_interactive_target_markdown(configuration, target, &result.caused_by)?;
-		lines.extend(target_lines);
+		push_change_target_markdown(
+			&mut rendered,
+			configuration,
+			&target.id,
+			target.bump,
+			target.version.as_deref(),
+			target.change_type.as_deref(),
+			&result.caused_by,
+		)?;
 	}
 
-	lines.push("---".to_string());
-	lines.push(String::new());
-	lines.push(format!("# {}", result.reason));
+	rendered.push_str("---\n\n# ");
+	rendered.push_str(&result.reason);
+	rendered.push('\n');
 
 	if let Some(details) = result
 		.details
 		.as_deref()
-		.filter(|value| !value.trim().is_empty())
+		.map(str::trim)
+		.filter(|value| !value.is_empty())
 	{
-		lines.push(String::new());
-		lines.push(details.trim().to_string());
+		rendered.push('\n');
+		rendered.push_str(details);
+		rendered.push('\n');
 	}
 
-	lines.push(String::new());
-
-	Ok(lines.join("\n"))
+	Ok(rendered)
 }
 
 /// Build a release plan from a single changeset file.
@@ -1338,20 +1420,108 @@ fn run_lockfile_command_in_place(
 	)))
 }
 
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::collect_workspace_files;
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::copy_workspace_file;
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::copy_workspace_tree;
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::ensure_parent_directory;
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::read_optional_file;
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::remap_workspace_path;
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::run_lockfile_command;
+#[cfg(test)]
+use monochange_test_helpers::workspace_ops::strip_workspace_prefix;
+
+#[cfg(test)]
+fn collect_workspace_file_updates(
+	root: &Path,
+	temp_root: &Path,
+	base_updates: &[FileUpdate],
+	lockfile_commands: &[LockfileCommandExecution],
+) -> MonochangeResult<Vec<FileUpdate>> {
+	let normalized_root = monochange_core::normalize_path(root);
+	let mut dirs_to_scan = BTreeSet::new();
+
+	for update in base_updates {
+		if let Some(parent) = update.path.parent() {
+			let normalized = monochange_core::normalize_path(parent);
+			if let Ok(relative) = normalized.strip_prefix(&normalized_root) {
+				dirs_to_scan.insert(relative.to_path_buf());
+			}
+		}
+	}
+
+	for command in lockfile_commands {
+		let normalized = monochange_core::normalize_path(&command.cwd);
+		if let Ok(relative) = normalized.strip_prefix(&normalized_root) {
+			dirs_to_scan.insert(relative.to_path_buf());
+		} else {
+			dirs_to_scan.insert(command.cwd.clone());
+		}
+	}
+
+	// Always scan the changeset directory (files are deleted during release).
+	dirs_to_scan.insert(PathBuf::from(".changeset"));
+
+	let mut relative_paths = BTreeSet::new();
+
+	for dir in &dirs_to_scan {
+		let original_dir = root.join(dir);
+		let temp_dir = temp_root.join(dir);
+		if original_dir.is_dir() {
+			collect_workspace_files(root, &original_dir, &mut relative_paths)?;
+		}
+		if temp_dir.is_dir() {
+			collect_workspace_files(temp_root, &temp_dir, &mut relative_paths)?;
+		}
+	}
+
+	let mut updates = Vec::new();
+
+	for relative in relative_paths {
+		let before = read_optional_file(&root.join(&relative))?;
+		let after = read_optional_file(&temp_root.join(&relative))?;
+		if let Some(content) = after.filter(|content| before.as_ref() != Some(content)) {
+			updates.push(FileUpdate {
+				path: root.join(relative),
+				content,
+			});
+		}
+	}
+
+	updates.sort_by(|left, right| left.path.cmp(&right.path));
+
+	Ok(updates)
+}
+
 /// Prepare a release, update versioned files, and return the structured result.
 #[must_use = "the prepared release result must be checked"]
-pub fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedRelease> {
+pub async fn prepare_release(root: &Path, dry_run: bool) -> MonochangeResult<PreparedRelease> {
 	// The public API returns structured release state, not rendered diffs.
 	// Building unified diffs for large lockfiles can dominate wall time, so skip
 	// that work here unless a caller explicitly asks for the richer execution
 	// report via `prepare_release_execution`.
 	prepare_release_execution_with_file_diffs(root, dry_run, false, false)
+		.await
 		.map(|execution| execution.prepared_release)
 }
 
+#[cfg(test)]
 #[tracing::instrument(skip_all, fields(dry_run))]
+pub(crate) async fn prepare_release_execution(
+	root: &Path,
+	dry_run: bool,
+) -> MonochangeResult<PreparedReleaseExecution> {
+	prepare_release_execution_with_file_diffs(root, dry_run, true, false).await
+}
+
 #[tracing::instrument(skip_all, fields(dry_run, build_file_diffs))]
-pub(crate) fn prepare_release_execution_with_file_diffs(
+pub(crate) async fn prepare_release_execution_with_file_diffs(
 	root: &Path,
 	dry_run: bool,
 	build_file_diffs: bool,
@@ -1440,7 +1610,7 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 		.collect::<Vec<_>>();
 	let prepared_changesets =
 		measure_prepare_phase(&mut phase_timings, "build prepared changesets", || {
-			Ok(build_prepared_changesets(root, &loaded_changesets))
+			Ok(build_prepared_changesets(root, loaded_changesets))
 		})?;
 	let mut changesets = Some(prepared_changesets);
 	let background_changeset_context =
@@ -1456,6 +1626,7 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 					changesets.take().unwrap_or_default(),
 				)
 			});
+	// patch-coverage:ignore-start -- dry-run hosted-source annotation is covered through adapter-specific tests.
 	if let Some(source) = configuration.source.as_ref().filter(|_| dry_run) {
 		apply_source_changeset_context_with_timing(
 			&mut phase_timings,
@@ -1464,8 +1635,10 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 			changesets
 				.as_mut()
 				.unwrap_or_else(|| panic!("changesets should exist for dry-run annotation")),
-		);
+		)
+		.await;
 	}
+	// patch-coverage:ignore-end
 	let plan = measure_prepare_phase(&mut phase_timings, "build release plan", || {
 		build_release_plan_from_signals(&configuration, &discovery, &change_signals)
 	})?;
@@ -1482,7 +1655,7 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 
 	let (
 		(changelog_targets_result, manifest_updates_result),
-		((versioned_file_updates_result, release_targets_result), lockfile_commands_result),
+		(versioned_file_updates_result, lockfile_commands_result),
 	) = rayon::join(
 		|| {
 			rayon::join(
@@ -1501,28 +1674,14 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 		|| {
 			rayon::join(
 				|| {
-					rayon::join(
-						|| {
-							capture_prepare_phase("build versioned file updates", || {
-								build_versioned_file_updates(
-									root,
-									&configuration,
-									&discovery.packages,
-									&plan,
-								)
-							})
-						},
-						|| {
-							capture_prepare_phase("build release targets", || {
-								Ok(build_release_targets(
-									&configuration,
-									&discovery.packages,
-									&plan,
-									&changeset_paths,
-								))
-							})
-						},
-					)
+					capture_prepare_phase("build versioned file updates", || {
+						build_versioned_file_updates(
+							root,
+							&configuration,
+							&discovery.packages,
+							&plan,
+						)
+					})
 				},
 				|| {
 					capture_prepare_phase("build lockfile refresh plan", || {
@@ -1541,18 +1700,22 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 		changelog_targets_result.1,
 		manifest_updates_result.1,
 		versioned_file_updates_result.1,
-		release_targets_result.1,
 		lockfile_commands_result.1,
 	]);
 	let changelog_targets = changelog_targets_result.0?;
 	let manifest_updates = manifest_updates_result.0?;
 	let versioned_file_updates = versioned_file_updates_result.0?;
-	let release_targets = release_targets_result.0?;
+	let release_targets = measure_async_prepare_phase(
+		&mut phase_timings,
+		"build release targets",
+		build_release_targets(&configuration, &discovery.packages, &plan, &changeset_paths),
+	)
+	.await;
 	let lockfile_commands = lockfile_commands_result.0?;
 	let package_publications =
 		build_package_publication_targets(&configuration, &discovery.packages, &plan);
 	let changesets = if let Some(handle) = background_changeset_context {
-		join_source_changeset_context_task(&mut phase_timings, handle)?
+		join_source_changeset_context_task(&mut phase_timings, handle).await?
 	} else {
 		changesets
 			.take()
@@ -1618,9 +1781,12 @@ pub(crate) fn prepare_release_execution_with_file_diffs(
 		// directory (which can take minutes for large repos).
 		base_updates.clone()
 	} else {
-		#[rustfmt::skip]
-		let materialized_updates = materialize_lockfile_command_updates_with_timing(&mut phase_timings, root, &base_updates, &lockfile_commands)?;
-		materialized_updates
+		materialize_lockfile_command_updates_with_timing(
+			&mut phase_timings,
+			root,
+			&base_updates,
+			&lockfile_commands,
+		)?
 	};
 	let mut changed_files = file_updates
 		.iter()
@@ -1715,6 +1881,18 @@ fn measure_prepare_phase<T>(
 	result
 }
 
+async fn measure_async_prepare_phase<T>(
+	phase_timings: &mut Vec<StepPhaseTiming>,
+	label: impl Into<String>,
+	future: impl Future<Output = T>,
+) -> T {
+	let label = label.into();
+	let started_at = Instant::now();
+	let result = future.await;
+	record_prepare_phase_timing(phase_timings, label, started_at);
+	result
+}
+
 fn capture_prepare_phase<T>(
 	label: impl Into<String>,
 	action: impl FnOnce() -> MonochangeResult<T>,
@@ -1761,7 +1939,7 @@ fn changeset_context_phase_label(source: &SourceConfiguration, dry_run: bool) ->
 	}
 }
 
-fn apply_source_changeset_context_with_timing(
+async fn apply_source_changeset_context_with_timing(
 	phase_timings: &mut Vec<StepPhaseTiming>,
 	source: &SourceConfiguration,
 	dry_run: bool,
@@ -1769,19 +1947,35 @@ fn apply_source_changeset_context_with_timing(
 ) {
 	let label = changeset_context_phase_label(source, dry_run);
 	let started_at = Instant::now();
-	apply_source_changeset_context(source, dry_run, changesets);
+	apply_source_changeset_context(source, dry_run, changesets).await;
 	record_prepare_phase_timing(phase_timings, label, started_at);
+}
+
+struct SourceChangesetContextTask {
+	handle: JoinHandle<(Vec<PreparedChangeset>, StepPhaseTiming)>,
+}
+
+impl SourceChangesetContextTask {
+	fn new(handle: JoinHandle<(Vec<PreparedChangeset>, StepPhaseTiming)>) -> Self {
+		Self { handle }
+	}
+}
+
+impl Drop for SourceChangesetContextTask {
+	fn drop(&mut self) {
+		self.handle.abort();
+	}
 }
 
 fn spawn_source_changeset_context_task(
 	source: SourceConfiguration,
 	dry_run: bool,
 	mut changesets: Vec<PreparedChangeset>,
-) -> JoinHandle<(Vec<PreparedChangeset>, StepPhaseTiming)> {
-	std::thread::spawn(move || {
+) -> SourceChangesetContextTask {
+	SourceChangesetContextTask::new(tokio::spawn(async move {
 		let label = changeset_context_phase_label(&source, dry_run);
 		let started_at = Instant::now();
-		apply_source_changeset_context(&source, dry_run, &mut changesets);
+		apply_source_changeset_context(&source, dry_run, &mut changesets).await;
 		(
 			changesets,
 			StepPhaseTiming {
@@ -1789,21 +1983,21 @@ fn spawn_source_changeset_context_task(
 				duration: started_at.elapsed(),
 			},
 		)
-	})
+	}))
 }
 
-fn join_source_changeset_context_task(
+async fn join_source_changeset_context_task(
 	phase_timings: &mut Vec<StepPhaseTiming>,
-	handle: JoinHandle<(Vec<PreparedChangeset>, StepPhaseTiming)>,
+	mut task: SourceChangesetContextTask,
 ) -> MonochangeResult<Vec<PreparedChangeset>> {
-	let (changesets, timing) = handle.join().map_err(|_| {
+	let (changesets, timing) = (&mut task.handle).await.map_err(|_| {
 		MonochangeError::Io("background changeset context enrichment panicked".to_string())
 	})?;
 	phase_timings.push(timing);
 	Ok(changesets)
 }
 
-fn apply_source_changeset_context(
+async fn apply_source_changeset_context(
 	source: &SourceConfiguration,
 	dry_run: bool,
 	changesets: &mut [PreparedChangeset],
@@ -1812,8 +2006,31 @@ fn apply_source_changeset_context(
 	if dry_run {
 		adapter.annotate_changeset_context(source, changesets);
 	} else {
-		adapter.enrich_changeset_context(source, changesets);
+		run_changeset_context_enrichment_with_timeout(
+			source,
+			changeset_context_timeout(source),
+			adapter.enrich_changeset_context(source, changesets),
+		)
+		.await;
 	}
+}
+
+fn changeset_context_timeout(source: &SourceConfiguration) -> Duration {
+	Duration::from_secs(source.releases.changeset_context_timeout_seconds)
+}
+
+async fn run_changeset_context_enrichment_with_timeout(
+	source: &SourceConfiguration,
+	timeout_after: Duration,
+	enrichment: impl Future<Output = ()>,
+) -> bool {
+	if timeout(timeout_after, enrichment).await.is_ok() {
+		return true;
+	}
+
+	let timeout_ms = timeout_after.as_millis();
+	tracing::warn!(provider = %source.provider, timeout_ms, "timed out enriching changeset context");
+	false
 }
 
 fn materialize_lockfile_command_updates_with_timing(

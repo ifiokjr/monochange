@@ -1,7 +1,6 @@
 #![allow(clippy::disallowed_methods)]
 
 use std::path::PathBuf;
-use std::thread;
 
 use httpmock::Method::GET;
 use httpmock::Method::PATCH;
@@ -19,7 +18,6 @@ use monochange_core::HostedSourceAdapter;
 use monochange_core::HostedSourceFeatures;
 use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
-use monochange_core::MonochangeResult;
 use monochange_core::PreparedChangeset;
 use monochange_core::ProviderMergeRequestSettings;
 use monochange_core::ProviderReleaseNotesSource;
@@ -121,8 +119,8 @@ fn forgejo_source_capabilities_capture_provider_limits() {
 	);
 }
 
-#[test]
-fn hosted_source_adapter_reports_forgejo_features_and_delegates_context_annotation() {
+#[tokio::test(flavor = "multi_thread")]
+async fn hosted_source_adapter_reports_forgejo_features_and_delegates_context_annotation() {
 	let adapter: &dyn HostedSourceAdapter = &HOSTED_SOURCE_ADAPTER;
 	let source = sample_source(None, Some("https://codeberg.org".to_string()));
 	let mut changesets = Vec::new();
@@ -130,7 +128,9 @@ fn hosted_source_adapter_reports_forgejo_features_and_delegates_context_annotati
 	assert_eq!(adapter.provider(), SourceProvider::Forgejo);
 	assert_eq!(adapter.features(), HostedSourceFeatures::default());
 	adapter.annotate_changeset_context(&source, &mut changesets);
-	adapter.enrich_changeset_context(&source, &mut changesets);
+	adapter
+		.enrich_changeset_context(&source, &mut changesets)
+		.await;
 }
 
 #[test]
@@ -699,7 +699,9 @@ fn publish_release_requests_creates_release_via_forgejo_api() {
 	let requests = build_release_requests(&source, &sample_manifest());
 
 	let outcomes = with_forgejo_env(Some("token"), || {
-		publish_release_requests(&source, &requests)
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(publish_release_requests(&source, &requests))
 			.unwrap_or_else(|error| panic!("publish release: {error}"))
 	});
 
@@ -738,7 +740,9 @@ fn publish_release_requests_updates_existing_release_via_forgejo_api() {
 	let requests = build_release_requests(&source, &sample_manifest());
 
 	let outcomes = with_forgejo_env(Some("token"), || {
-		publish_release_requests(&source, &requests)
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(publish_release_requests(&source, &requests))
 			.unwrap_or_else(|error| panic!("publish release: {error}"))
 	});
 
@@ -768,7 +772,9 @@ fn publish_release_requests_reports_forgejo_api_errors() {
 	let requests = build_release_requests(&source, &sample_manifest());
 
 	let error = with_forgejo_env(Some("token"), || {
-		publish_release_requests(&source, &requests)
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(publish_release_requests(&source, &requests))
 	})
 	.err()
 	.unwrap_or_else(|| panic!("expected publish error"));
@@ -810,7 +816,9 @@ fn publish_release_requests_reports_create_and_update_api_errors() {
 		let requests = build_release_requests(&source, &sample_manifest());
 
 		let error = with_forgejo_env(Some("token"), || {
-			publish_release_requests(&source, &requests)
+			tokio::runtime::Runtime::new()
+				.unwrap()
+				.block_on(publish_release_requests(&source, &requests))
 		})
 		.err()
 		.unwrap_or_else(|| panic!("expected release publish error"));
@@ -857,13 +865,15 @@ fn publish_release_pull_request_reports_label_api_errors() {
 	let request = build_release_pull_request_request(&source, &sample_manifest());
 
 	let error = with_forgejo_env(Some("token"), || {
-		publish_release_pull_request(
-			&source,
-			&repo,
-			&request,
-			&[PathBuf::from("release.txt")],
-			false,
-		)
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(publish_release_pull_request(
+				&source,
+				&repo,
+				&request,
+				&[PathBuf::from("release.txt")],
+				false,
+			))
 	})
 	.err()
 	.unwrap_or_else(|| panic!("expected label error"));
@@ -908,14 +918,16 @@ fn publish_release_pull_request_create_branch_is_covered_without_etest() {
 	let request = build_release_pull_request_request(&source, &sample_manifest());
 
 	let outcome = with_forgejo_env(Some("token"), || {
-		publish_release_pull_request(
-			&source,
-			&repo,
-			&request,
-			&[PathBuf::from("release.txt")],
-			false,
-		)
-		.unwrap_or_else(|error| panic!("publish pull request: {error}"))
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(publish_release_pull_request(
+				&source,
+				&repo,
+				&request,
+				&[PathBuf::from("release.txt")],
+				false,
+			))
+			.unwrap_or_else(|error| panic!("publish pull request: {error}"))
 	});
 
 	list.assert();
@@ -947,13 +959,15 @@ fn publish_release_pull_request_reports_commit_and_push_failures() {
 	request.commit_message.subject = "release\0notes".to_string();
 
 	let commit_error = with_forgejo_env(Some("token"), || {
-		publish_release_pull_request(
-			&source,
-			&repo,
-			&request,
-			&[PathBuf::from("release.txt")],
-			false,
-		)
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(publish_release_pull_request(
+				&source,
+				&repo,
+				&request,
+				&[PathBuf::from("release.txt")],
+				false,
+			))
 	})
 	.err()
 	.unwrap_or_else(|| panic!("expected commit error"));
@@ -967,13 +981,15 @@ fn publish_release_pull_request_reports_commit_and_push_failures() {
 	git(&repo, &["remote", "remove", "origin"]);
 	let request = build_release_pull_request_request(&source, &sample_manifest());
 	let push_error = with_forgejo_env(Some("token"), || {
-		publish_release_pull_request(
-			&source,
-			&repo,
-			&request,
-			&[PathBuf::from("release.txt")],
-			false,
-		)
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(publish_release_pull_request(
+				&source,
+				&repo,
+				&request,
+				&[PathBuf::from("release.txt")],
+				false,
+			))
 	})
 	.err()
 	.unwrap_or_else(|| panic!("expected push error"));
@@ -1019,14 +1035,16 @@ fn publish_release_pull_request_creates_pull_request_and_labels() {
 	request.commit_message.body = Some("release body".to_string());
 
 	let outcome = with_forgejo_env(Some("token"), || {
-		publish_release_pull_request(
-			&source,
-			&repo,
-			&request,
-			&[PathBuf::from("release.txt")],
-			false,
-		)
-		.unwrap_or_else(|error| panic!("publish pull request: {error}"))
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(publish_release_pull_request(
+				&source,
+				&repo,
+				&request,
+				&[PathBuf::from("release.txt")],
+				false,
+			))
+			.unwrap_or_else(|error| panic!("publish pull request: {error}"))
 	});
 
 	list.assert();
@@ -1049,17 +1067,19 @@ fn publish_release_pull_request_creates_pull_request_and_labels() {
 fn git_commit_paths_reports_io_and_non_noop_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let missing = tempdir.path().join("missing");
-	let io_error = git_commit_paths(
-		&missing,
-		&CommitMessage {
-			subject: "chore(release): prepare release".to_string(),
-			body: None,
-		},
-		"commit release pull request changes",
-		false,
-	)
-	.err()
-	.unwrap_or_else(|| panic!("expected missing worktree error"));
+	let io_error = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(git_commit_paths(
+			&missing,
+			&CommitMessage {
+				subject: "chore(release): prepare release".to_string(),
+				body: None,
+			},
+			"commit release pull request changes",
+			false,
+		))
+		.err()
+		.unwrap_or_else(|| panic!("expected missing worktree error"));
 	assert!(
 		io_error
 			.to_string()
@@ -1081,17 +1101,19 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 	std::fs::write(repo.join("release.txt"), "initial\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 	git(&repo, &["add", "release.txt"]);
-	let error = git_commit_paths(
-		&repo,
-		&CommitMessage {
-			subject: "chore(release): prepare release".to_string(),
-			body: None,
-		},
-		"commit release pull request changes",
-		false,
-	)
-	.err()
-	.unwrap_or_else(|| panic!("expected pre-commit hook failure"));
+	let error = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(git_commit_paths(
+			&repo,
+			&CommitMessage {
+				subject: "chore(release): prepare release".to_string(),
+				body: None,
+			},
+			"commit release pull request changes",
+			false,
+		))
+		.err()
+		.unwrap_or_else(|| panic!("expected pre-commit hook failure"));
 	assert!(
 		error
 			.to_string()
@@ -1111,16 +1133,18 @@ fn git_commit_paths_treats_clean_worktrees_as_already_committed() {
 	git(&repo, &["add", "release.txt"]);
 	git(&repo, &["commit", "-m", "initial"]);
 
-	git_commit_paths(
-		&repo,
-		&CommitMessage {
-			subject: "chore(release): prepare release".to_string(),
-			body: None,
-		},
-		"commit release pull request changes",
-		false,
-	)
-	.unwrap_or_else(|error| panic!("commit paths: {error}"));
+	tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(git_commit_paths(
+			&repo,
+			&CommitMessage {
+				subject: "chore(release): prepare release".to_string(),
+				body: None,
+			},
+			"commit release pull request changes",
+			false,
+		))
+		.unwrap_or_else(|error| panic!("commit paths: {error}"));
 
 	assert_eq!(
 		git_output(&repo, &["rev-list", "--count", "HEAD"]).trim(),
@@ -1143,11 +1167,23 @@ fn git_checkout_branch_is_noop_when_branch_is_already_checked_out() {
 	git(&repo, &["commit", "-m", "initial"]);
 
 	must_ok(
-		git_checkout_branch(&repo, "monochange/release/release", "test context"),
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(git_checkout_branch(
+				&repo,
+				"monochange/release/release",
+				"test context",
+			)),
 		"checkout branch",
 	);
 	must_ok(
-		git_checkout_branch(&repo, "monochange/release/release", "test context"),
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(git_checkout_branch(
+				&repo,
+				"monochange/release/release",
+				"test context",
+			)),
 		"repeat checkout branch",
 	);
 
@@ -1215,19 +1251,18 @@ fn publish_pull_request_updates_existing_pull_request() {
 	assert_eq!(outcome.operation, SourceChangeRequestOperation::Updated);
 }
 
-#[test]
-fn join_existing_pull_request_lookup_reports_panicked_thread() {
-	let error = join_existing_pull_request_lookup(thread::spawn(
-		|| -> MonochangeResult<Option<ForgejoExistingPullRequest>> {
-			panic!("boom");
-		},
-	))
+#[tokio::test(flavor = "multi_thread")]
+async fn join_existing_pull_request_lookup_reports_panicked_thread() {
+	let error = join_existing_pull_request_lookup(tokio::spawn(async {
+		panic!("boom");
+	}))
+	.await
 	.err()
 	.unwrap_or_else(|| panic!("expected join error"));
 	assert!(
 		error
 			.to_string()
-			.contains("failed to join Forgejo pull request lookup thread")
+			.contains("failed to join Forgejo pull request lookup task")
 	);
 }
 
@@ -1280,14 +1315,16 @@ fn publish_release_pull_request_skips_push_when_existing_pull_request_matches_lo
 	);
 
 	let outcome = with_forgejo_env(Some("token"), || {
-		publish_release_pull_request(
-			&source,
-			&repo,
-			&request,
-			&[PathBuf::from("release.txt")],
-			false,
-		)
-		.unwrap_or_else(|error| panic!("publish pull request: {error}"))
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(publish_release_pull_request(
+				&source,
+				&repo,
+				&request,
+				&[PathBuf::from("release.txt")],
+				false,
+			))
+			.unwrap_or_else(|error| panic!("publish pull request: {error}"))
 	});
 
 	list.assert();

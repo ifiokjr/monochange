@@ -683,3 +683,7 @@ fn status_label(status: &MigrationAuditStatus) -> &'static str {
 		MigrationAuditStatus::MigrationNeeded => "migration-needed",
 	}
 }
+
+#[cfg(test)]
+#[path = "__tests__/migration_audit_tests.rs"]
+mod tests;

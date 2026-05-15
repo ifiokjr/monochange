@@ -1,3 +1,5 @@
+#![allow(clippy::large_futures)]
+#![allow(clippy::disallowed_methods)]
 use rstest::rstest;
 
 mod test_support;

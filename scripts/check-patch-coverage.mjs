@@ -92,6 +92,7 @@ function isTestOnlyPath(filePath) {
 export function parseChangedLines(text, repoRoot = process.cwd()) {
 	const changedLinesByFile = new Map();
 	let currentFile = null;
+	let nextLineNumber = null;
 
 	for (const line of text.split(/\r?\n/u)) {
 		if (line.startsWith("+++ ")) {
@@ -100,34 +101,64 @@ export function parseChangedLines(text, repoRoot = process.cwd()) {
 				normalizedPath && !isIgnoredCoveragePath(normalizedPath) && !isTestOnlyPath(normalizedPath)
 					? normalizedPath
 					: null;
+			nextLineNumber = null;
 			continue;
 		}
 
-		if (!currentFile || !line.startsWith("@@ ")) {
+		if (!currentFile) {
 			continue;
 		}
 
-		const match = /@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/u.exec(line);
-		if (!match) {
+		if (line.startsWith("@@ ")) {
+			const match = /@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/u.exec(line);
+			nextLineNumber = match ? Number.parseInt(match[1], 10) : null;
 			continue;
 		}
 
-		const start = Number.parseInt(match[1], 10);
-		const count = match[2] === undefined ? 1 : Number.parseInt(match[2], 10);
-		if (!Number.isFinite(start) || !Number.isFinite(count) || count === 0) {
+		if (nextLineNumber === null) {
 			continue;
 		}
 
-		const lines = ensureLineSet(changedLinesByFile, currentFile);
-		for (let lineNumber = start; lineNumber < start + count; lineNumber += 1) {
-			lines.add(lineNumber);
+		if (line.startsWith("+")) {
+			ensureLineSet(changedLinesByFile, currentFile).add(nextLineNumber);
+			nextLineNumber += 1;
+			continue;
 		}
+
+		if (line.startsWith("-")) {
+			continue;
+		}
+
+		nextLineNumber += 1;
 	}
 
 	return changedLinesByFile;
 }
 
+function buildIgnoreRangeChecker() {
+	const cache = new Map();
+	return (filePath, lineNumber) => {
+		if (!cache.has(filePath)) {
+			const ranges = [];
+			let start = null;
+			for (const [index, line] of readFileSync(filePath, "utf8").split(/\r?\n/u).entries()) {
+				const currentLine = index + 1;
+				if (line.includes("patch-coverage:ignore-start")) {
+					start = currentLine;
+				}
+				if (line.includes("patch-coverage:ignore-end") && start !== null) {
+					ranges.push([start, currentLine]);
+					start = null;
+				}
+			}
+			cache.set(filePath, ranges);
+		}
+		return cache.get(filePath).some(([start, end]) => lineNumber >= start && lineNumber <= end);
+	};
+}
+
 export function computePatchCoverage(coverageByFile, changedLinesByFile) {
+	const isIgnoredLine = buildIgnoreRangeChecker();
 	let coveredLines = 0;
 	let executableChangedLines = 0;
 	const uncoveredLines = [];
@@ -140,6 +171,9 @@ export function computePatchCoverage(coverageByFile, changedLinesByFile) {
 
 		const sortedChangedLines = [...changedLines].toSorted((left, right) => left - right);
 		for (const lineNumber of sortedChangedLines) {
+			if (isIgnoredLine(filePath, lineNumber)) {
+				continue;
+			}
 			if (!lineCoverage.has(lineNumber)) {
 				continue;
 			}

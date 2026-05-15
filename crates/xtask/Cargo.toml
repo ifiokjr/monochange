@@ -17,6 +17,7 @@ proptest = { workspace = true, features = ["std"] }
 schemars = { workspace = true }
 semver = { workspace = true }
 serde_json = { workspace = true }
+tokio = { workspace = true }
 
 [features]
 schema = ["monochange_config/schema", "monochange_core/schema"]

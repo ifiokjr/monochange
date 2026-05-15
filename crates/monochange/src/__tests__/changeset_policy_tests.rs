@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 use std::fs;
 use std::process::Command;
 
@@ -59,8 +60,8 @@ fn git(root: &Path, args: &[&str]) {
 	);
 }
 
-#[test]
-fn affected_packages_requires_changeset_verification_to_be_enabled() {
+#[tokio::test(flavor = "multi_thread")]
+async fn affected_packages_requires_changeset_verification_to_be_enabled() {
 	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	fs::create_dir_all(tempdir.path().join("crates/core/src"))
 		.unwrap_or_else(|error| panic!("create source tree: {error}"));
@@ -90,6 +91,7 @@ fn affected_packages_requires_changeset_verification_to_be_enabled() {
 		&["crates/core/src/lib.rs".to_string()],
 		&Vec::new(),
 	)
+	.await
 	.err()
 	.unwrap_or_else(|| panic!("expected disabled verification error"));
 	assert!(matches!(error, MonochangeError::Config(_)));
@@ -99,8 +101,8 @@ fn affected_packages_requires_changeset_verification_to_be_enabled() {
 	);
 }
 
-#[test]
-fn affected_packages_skips_release_pull_request_branches() {
+#[tokio::test(flavor = "multi_thread")]
+async fn affected_packages_skips_release_pull_request_branches() {
 	let fixture = setup_fixture("monochange/changeset-policy-base");
 	let config_path = fixture.path().join("monochange.toml");
 	let mut config = fs::read_to_string(&config_path)
@@ -117,6 +119,7 @@ fn affected_packages_skips_release_pull_request_branches() {
 		fixture.path(),
 		&["config", "user.email", "monochange@example.com"],
 	);
+	git(fixture.path(), &["config", "commit.gpgsign", "false"]);
 	git(fixture.path(), &["add", "."]);
 	git(fixture.path(), &["commit", "-m", "initial"]);
 	git(
@@ -129,6 +132,7 @@ fn affected_packages_skips_release_pull_request_branches() {
 		&["crates/core/src/lib.rs".to_string()],
 		&Vec::new(),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("evaluate affected packages: {error}"));
 
 	assert_eq!(evaluation.status, ChangesetPolicyStatus::Skipped);
@@ -145,8 +149,8 @@ fn affected_packages_skips_release_pull_request_branches() {
 	);
 }
 
-#[test]
-fn affected_packages_uses_global_affected_path_filters() {
+#[tokio::test(flavor = "multi_thread")]
+async fn affected_packages_uses_global_affected_path_filters() {
 	let fixture = setup_fixture("monochange/changeset-policy-base");
 	let config_path = fixture.path().join("monochange.toml");
 	let mut config = fs::read_to_string(&config_path)
@@ -171,6 +175,7 @@ fn affected_packages_uses_global_affected_path_filters() {
 		],
 		&Vec::new(),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("affected packages for global paths: {error}"));
 
 	assert_eq!(evaluation.status, ChangesetPolicyStatus::Failed);
@@ -188,8 +193,8 @@ fn affected_packages_uses_global_affected_path_filters() {
 	assert_eq!(evaluation.affected_package_ids, vec!["core".to_string()]);
 }
 
-#[test]
-fn current_branch_prefix_matching_requires_non_empty_prefix() {
+#[tokio::test(flavor = "multi_thread")]
+async fn current_branch_prefix_matching_requires_non_empty_prefix() {
 	let repo = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	git(repo.path(), &["init", "-b", "main"]);
 	git(repo.path(), &["config", "user.name", "monochange"]);
@@ -197,6 +202,7 @@ fn current_branch_prefix_matching_requires_non_empty_prefix() {
 		repo.path(),
 		&["config", "user.email", "monochange@example.com"],
 	);
+	git(repo.path(), &["config", "commit.gpgsign", "false"]);
 	fs::write(repo.path().join("tracked.txt"), "initial\n")
 		.unwrap_or_else(|error| panic!("write tracked file: {error}"));
 	git(repo.path(), &["add", "tracked.txt"]);
@@ -214,19 +220,19 @@ fn current_branch_prefix_matching_requires_non_empty_prefix() {
 
 	source.pull_requests.branch_prefix = "   ".to_string();
 	assert_eq!(
-		current_branch_matches_pull_request_branch_prefix(repo.path(), Some(&source)),
+		current_branch_matches_pull_request_branch_prefix(repo.path(), Some(&source)).await,
 		None
 	);
 
 	source.pull_requests.branch_prefix = "monochange/release/".to_string();
 	assert_eq!(
-		current_branch_matches_pull_request_branch_prefix(repo.path(), Some(&source)),
+		current_branch_matches_pull_request_branch_prefix(repo.path(), Some(&source)).await,
 		None
 	);
 
 	git(repo.path(), &["checkout", "-b", "monochange/release/core"]);
 	assert_eq!(
-		current_branch_matches_pull_request_branch_prefix(repo.path(), Some(&source)),
+		current_branch_matches_pull_request_branch_prefix(repo.path(), Some(&source)).await,
 		Some((
 			"monochange/release/core".to_string(),
 			"monochange/release/".to_string()
@@ -234,8 +240,138 @@ fn current_branch_prefix_matching_requires_non_empty_prefix() {
 	);
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn affected_packages_defers_workspace_discovery_until_changesets_are_present() {
+	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::create_dir_all(tempdir.path().join("crates/core/src"))
+		.unwrap_or_else(|error| panic!("create source tree: {error}"));
+	fs::write(tempdir.path().join("crates/core/Cargo.toml"), "not toml\n")
+		.unwrap_or_else(|error| panic!("write package manifest: {error}"));
+	fs::write(
+		tempdir.path().join("crates/core/src/lib.rs"),
+		"pub fn core() {}\n",
+	)
+	.unwrap_or_else(|error| panic!("write source file: {error}"));
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		"[defaults]\n\
+		package_type = \"cargo\"\n\
+		\n\
+		[changesets.affected]\n\
+		enabled = true\n\
+		required = true\n\
+		\n\
+		[package.core]\n\
+		path = \"crates/core\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+
+	let evaluation = affected_packages(
+		tempdir.path(),
+		&["crates/core/src/lib.rs".to_string()],
+		&Vec::new(),
+	)
+	.await
+	.unwrap_or_else(|error| panic!("evaluate affected packages: {error}"));
+
+	assert_eq!(evaluation.status, ChangesetPolicyStatus::Failed);
+	assert_eq!(evaluation.affected_package_ids, vec!["core".to_string()]);
+	assert!(evaluation.covered_package_ids.is_empty());
+	assert!(
+		evaluation
+			.errors
+			.iter()
+			.any(|error| error.contains("not covered by attached changesets"))
+	);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn affected_packages_uses_configuration_index_for_attached_changesets() {
+	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::create_dir_all(tempdir.path().join(".changeset"))
+		.unwrap_or_else(|error| panic!("create changeset directory: {error}"));
+	fs::create_dir_all(tempdir.path().join("crates/core/src"))
+		.unwrap_or_else(|error| panic!("create source tree: {error}"));
+	fs::write(tempdir.path().join("crates/core/Cargo.toml"), "not toml\n")
+		.unwrap_or_else(|error| panic!("write package manifest: {error}"));
+	fs::write(
+		tempdir.path().join("crates/core/src/lib.rs"),
+		"pub fn core() {}\n",
+	)
+	.unwrap_or_else(|error| panic!("write source file: {error}"));
+	fs::write(
+		tempdir.path().join(".changeset/core.md"),
+		"---\ncore: patch\n---\n\n#### cover core\n",
+	)
+	.unwrap_or_else(|error| panic!("write changeset: {error}"));
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		"[defaults]\n\
+		package_type = \"cargo\"\n\
+		\n\
+		[changesets.affected]\n\
+		enabled = true\n\
+		required = true\n\
+		\n\
+		[package.core]\n\
+		path = \"crates/core\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+
+	let evaluation = affected_packages(
+		tempdir.path(),
+		&[
+			"crates/core/src/lib.rs".to_string(),
+			".changeset/core.md".to_string(),
+		],
+		&Vec::new(),
+	)
+	.await
+	.unwrap_or_else(|error| panic!("evaluate affected packages: {error}"));
+
+	assert_eq!(evaluation.status, ChangesetPolicyStatus::Passed);
+	assert_eq!(evaluation.affected_package_ids, vec!["core".to_string()]);
+	assert_eq!(evaluation.covered_package_ids, vec!["core".to_string()]);
+	assert!(evaluation.errors.is_empty());
+}
+
 #[test]
-fn affected_packages_reports_missing_and_invalid_changeset_inputs() {
+fn configuration_package_records_use_config_ids_without_extra_metadata() {
+	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	fs::create_dir_all(tempdir.path().join("crates/core"))
+		.unwrap_or_else(|error| panic!("create package directory: {error}"));
+	fs::write(
+		tempdir.path().join("crates/core/Cargo.toml"),
+		"[package]\nname = \"core\"\nversion = \"1.0.0\"\nedition = \"2021\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write package manifest: {error}"));
+	fs::write(
+		tempdir.path().join("monochange.toml"),
+		"[defaults]\n\
+		package_type = \"cargo\"\n\
+		\n\
+		[package.core]\n\
+		path = \"crates/core\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
+	let configuration = monochange_config::load_workspace_configuration(tempdir.path())
+		.unwrap_or_else(|error| panic!("load workspace configuration: {error}"));
+
+	let records = configuration_package_records(&configuration);
+
+	assert_eq!(records.len(), 1);
+	assert_eq!(records[0].id, "core");
+	assert_eq!(records[0].name, "core");
+	assert!(records[0].metadata.is_empty());
+	assert!(
+		records[0]
+			.manifest_path
+			.ends_with("crates/core/.monochange-config-package")
+	);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn affected_packages_reports_missing_and_invalid_changeset_inputs() {
 	let fixture = setup_fixture("monochange/changeset-policy-base");
 	fs::create_dir_all(fixture.path().join(".changeset"))
 		.unwrap_or_else(|error| panic!("create .changeset dir: {error}"));
@@ -251,6 +387,7 @@ fn affected_packages_reports_missing_and_invalid_changeset_inputs() {
 		],
 		&Vec::new(),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("evaluate affected packages: {error}"));
 
 	assert_eq!(evaluation.status, ChangesetPolicyStatus::Failed);
@@ -274,14 +411,15 @@ fn affected_packages_reports_missing_and_invalid_changeset_inputs() {
 	assert!(evaluation.comment.is_some());
 }
 
-#[test]
-fn affected_packages_marks_ignored_paths_and_omits_failure_comments_when_disabled() {
+#[tokio::test(flavor = "multi_thread")]
+async fn affected_packages_marks_ignored_paths_and_omits_failure_comments_when_disabled() {
 	let fixture = setup_fixture("monochange/changeset-policy-base");
 	let evaluation = affected_packages(
 		fixture.path(),
 		&["crates/core/tests/policy.rs".to_string()],
 		&Vec::new(),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("affected packages for ignored path: {error}"));
 
 	assert_eq!(evaluation.status, ChangesetPolicyStatus::NotRequired);
@@ -313,6 +451,7 @@ fn compute_changed_paths_since_reports_git_failures_and_includes_untracked_files
 		repo.path(),
 		&["config", "user.email", "monochange@example.com"],
 	);
+	git(repo.path(), &["config", "commit.gpgsign", "false"]);
 	fs::write(repo.path().join("tracked.txt"), "one\n")
 		.unwrap_or_else(|error| panic!("write tracked file: {error}"));
 	git(repo.path(), &["add", "tracked.txt"]);
@@ -352,16 +491,26 @@ fn path_helpers_cover_normalization_matching_and_comment_rendering() {
 	);
 	assert!(is_changeset_markdown_path(".changeset/test.md"));
 	assert!(!is_changeset_markdown_path(".changeset/test.txt"));
-	assert!(path_touches_package("crates/core/src/lib.rs", &package));
-	assert!(path_touches_package("shared/config.json", &package));
-	assert!(path_is_ignored_for_package(
-		"crates/core/README.md",
-		&package
-	));
-	assert!(matches_any_package_pattern(
+
+	let matcher = PackagePathMatcher::new(&package);
+	assert_eq!(
+		matcher.classify("crates/core/src/lib.rs"),
+		PackagePathMatch::Touched
+	);
+	assert_eq!(
+		matcher.classify("shared/config.json"),
+		PackagePathMatch::Touched
+	);
+	assert!(matcher.is_ignored("crates/core/README.md"));
+	let docs_relative_path = package_relative_path(
 		"crates/core/docs/guide.md",
-		&package,
-		&package.ignored_paths
+		&matcher.package_root,
+		&matcher.package_root_prefix,
+	);
+	assert!(matches_any_compiled_package_pattern(
+		"crates/core/docs/guide.md",
+		docs_relative_path,
+		&matcher.ignored_patterns
 	));
 
 	let verify = ChangesetAffectedSettings {
@@ -398,17 +547,20 @@ fn path_helpers_cover_normalization_matching_and_comment_rendering() {
 	assert!(comment.contains("How to fix:"));
 }
 
-#[test]
-fn evaluate_and_verify_changesets_delegate_to_affected_packages() {
+#[tokio::test(flavor = "multi_thread")]
+async fn evaluate_and_verify_changesets_delegate_to_affected_packages() {
 	let fixture = setup_fixture("monochange/changeset-policy-base");
 	let changed_paths = vec!["crates/core/src/lib.rs".to_string()];
 	let labels = vec!["no-changeset-required".to_string()];
 
 	let affected = affected_packages(fixture.path(), &changed_paths, &labels)
+		.await
 		.unwrap_or_else(|error| panic!("affected packages: {error}"));
 	let verified = verify_changesets(fixture.path(), &changed_paths, &labels)
+		.await
 		.unwrap_or_else(|error| panic!("verify changesets: {error}"));
 	let evaluated = evaluate_changeset_policy(fixture.path(), &changed_paths, &labels)
+		.await
 		.unwrap_or_else(|error| panic!("evaluate changeset policy: {error}"));
 
 	assert_eq!(verified, affected);
@@ -450,36 +602,59 @@ fn render_comment_includes_related_skip_guidance() {
 #[test]
 fn package_pattern_helpers_cover_root_relative_and_invalid_patterns() {
 	let package = sample_package();
+	let matcher = PackagePathMatcher::new(&package);
 
-	assert!(path_is_within_package("crates/core", &package));
-	assert!(!path_is_within_package("docs/readme.md", &package));
-	assert!(path_is_ignored_for_package(
-		"crates/core/docs/guide.md",
-		&package
-	));
-	assert!(matches_any_package_pattern(
+	assert_eq!(
+		package_relative_path(
+			"crates/core",
+			&matcher.package_root,
+			&matcher.package_root_prefix,
+		),
+		Some("")
+	);
+	assert!(
+		package_relative_path(
+			"docs/readme.md",
+			&matcher.package_root,
+			&matcher.package_root_prefix,
+		)
+		.is_none()
+	);
+	assert!(matcher.is_ignored("crates/core/docs/guide.md"));
+	assert!(matches_any_compiled_package_pattern(
 		"crates/core/README.md",
-		&package,
-		&package.ignored_paths
+		package_relative_path(
+			"crates/core/README.md",
+			&matcher.package_root,
+			&matcher.package_root_prefix,
+		),
+		&compile_patterns(&package.ignored_paths)
 	));
-	assert!(!matches_any_package_pattern(
+	assert!(!matches_any_compiled_package_pattern(
 		"crates/core/src/lib.rs",
-		&package,
-		&["[".to_string()]
+		package_relative_path(
+			"crates/core/src/lib.rs",
+			&matcher.package_root,
+			&matcher.package_root_prefix,
+		),
+		&compile_patterns(&["[".to_string()])
 	));
-	assert!(path_matches_any_global_pattern(
+	assert!(path_matches_compiled_patterns(
 		"docs/readme.md",
-		&["docs/**".to_string()]
+		&compile_patterns(&["docs/**".to_string()])
 	));
-	assert!(!path_matches_any_global_pattern(
+	assert!(!path_matches_compiled_patterns(
 		"docs/readme.md",
-		&["[".to_string()]
+		&compile_patterns(&["[".to_string()])
 	));
-	assert!(!path_touches_package("docs/readme.md", &package));
+	assert_eq!(
+		matcher.classify("docs/readme.md"),
+		PackagePathMatch::Unmatched
+	);
 }
 
-#[test]
-fn affected_packages_uses_invalid_changeset_summary_when_only_changeset_inputs_fail() {
+#[tokio::test(flavor = "multi_thread")]
+async fn affected_packages_uses_invalid_changeset_summary_when_only_changeset_inputs_fail() {
 	let fixture = setup_fixture("monochange/changeset-policy-base");
 	fs::create_dir_all(fixture.path().join(".changeset"))
 		.unwrap_or_else(|error| panic!("create .changeset dir: {error}"));
@@ -491,6 +666,7 @@ fn affected_packages_uses_invalid_changeset_summary_when_only_changeset_inputs_f
 		&[".changeset/invalid.md".to_string()],
 		&Vec::new(),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("evaluate affected packages: {error}"));
 
 	assert_eq!(evaluation.status, ChangesetPolicyStatus::Failed);

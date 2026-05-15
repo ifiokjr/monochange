@@ -1,3 +1,5 @@
+#![allow(clippy::large_futures)]
+#![allow(clippy::disallowed_methods)]
 use std::ffi::OsString;
 use std::fs;
 use std::path::Path;
@@ -6,18 +8,20 @@ use std::process::Command;
 mod test_support;
 use test_support::setup_scenario_workspace;
 
-fn run_cli<I>(root: &Path, args: I) -> monochange_core::MonochangeResult<String>
+async fn run_cli<I>(root: &Path, args: I) -> monochange_core::MonochangeResult<String>
 where
 	I: IntoIterator<Item = OsString>,
 {
-	monochange::run_with_args_in_dir("mc", args, root)
+	monochange::run_with_args_in_dir("mc", args, root).await
 }
 
-fn run_json<I>(root: &Path, args: I) -> serde_json::Value
+async fn run_json<I>(root: &Path, args: I) -> serde_json::Value
 where
 	I: IntoIterator<Item = OsString>,
 {
-	let output = run_cli(root, args).unwrap_or_else(|error| panic!("command output: {error}"));
+	let output = run_cli(root, args)
+		.await
+		.unwrap_or_else(|error| panic!("command output: {error}"));
 	serde_json::from_str(&output).unwrap_or_else(|error| panic!("parse json: {error}"))
 }
 
@@ -83,8 +87,8 @@ fn command_args(args: &[&str]) -> Vec<OsString> {
 		.collect()
 }
 
-#[test]
-fn explicit_prepared_release_artifact_drives_follow_up_release_pr() {
+#[tokio::test(flavor = "multi_thread")]
+async fn explicit_prepared_release_artifact_drives_follow_up_release_pr() {
 	let tempdir = setup_scenario_workspace("prepared-release/source-github-follow-up");
 	let root = tempdir.path();
 	let artifact_path = root.join(".monochange/local/custom-prepared-release.json");
@@ -101,6 +105,7 @@ fn explicit_prepared_release_artifact_drives_follow_up_release_pr() {
 			&artifact,
 		]),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("release output: {error}"));
 
 	assert!(artifact_path.is_file());
@@ -116,7 +121,8 @@ fn explicit_prepared_release_artifact_drives_follow_up_release_pr() {
 			"--prepared-release",
 			&artifact,
 		]),
-	);
+	)
+	.await;
 	assert_eq!(
 		value.pointer("/releaseRequest/provider"),
 		Some(&serde_json::Value::String("github".to_string()))
@@ -129,13 +135,14 @@ fn explicit_prepared_release_artifact_drives_follow_up_release_pr() {
 	);
 }
 
-#[test]
-fn automatic_prepared_release_cache_survives_commit_and_release_pr_follow_ups() {
+#[tokio::test(flavor = "multi_thread")]
+async fn automatic_prepared_release_cache_survives_commit_and_release_pr_follow_ups() {
 	let tempdir = setup_scenario_workspace("prepared-release/source-github-follow-up");
 	let root = tempdir.path();
 	init_git_repo(root);
 
 	run_cli(root, command_args(&["release", "--format", "json"]))
+		.await
 		.unwrap_or_else(|error| panic!("release output: {error}"));
 	assert!(
 		root.join(".monochange/local/prepared-release-cache.json")
@@ -151,6 +158,7 @@ fn automatic_prepared_release_cache_survives_commit_and_release_pr_follow_ups() 
 	assert!(!root.join(".changeset/feature.md").exists());
 
 	run_cli(root, command_args(&["commit-release", "--format", "json"]))
+		.await
 		.unwrap_or_else(|error| panic!("commit-release output: {error}"));
 	assert_eq!(git_output(root, &["status", "--short"]), "");
 	assert_eq!(
@@ -161,7 +169,8 @@ fn automatic_prepared_release_cache_survives_commit_and_release_pr_follow_ups() 
 	let value = run_json(
 		root,
 		command_args(&["release-pr", "--dry-run", "--format", "json"]),
-	);
+	)
+	.await;
 	assert_eq!(
 		value.pointer("/releaseRequest/title"),
 		Some(&serde_json::Value::String(
@@ -171,13 +180,14 @@ fn automatic_prepared_release_cache_survives_commit_and_release_pr_follow_ups() 
 	assert_eq!(git_output(root, &["status", "--short"]), "");
 }
 
-#[test]
-fn commit_release_can_reuse_saved_prepared_release_without_prepare_step() {
+#[tokio::test(flavor = "multi_thread")]
+async fn commit_release_can_reuse_saved_prepared_release_without_prepare_step() {
 	let tempdir = setup_scenario_workspace("prepared-release/commit-release-flexible");
 	let root = tempdir.path();
 	init_git_repo(root);
 
 	run_cli(root, command_args(&["release", "--format", "json"]))
+		.await
 		.unwrap_or_else(|error| panic!("release output: {error}"));
 	assert!(
 		root.join(".monochange/local/prepared-release-cache.json")
@@ -188,6 +198,7 @@ fn commit_release_can_reuse_saved_prepared_release_without_prepare_step() {
 		root,
 		command_args(&["commit-from-cache", "--format", "json"]),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("commit-from-cache output: {error}"));
 	assert_eq!(git_output(root, &["status", "--short"]), "");
 	assert_eq!(
@@ -196,13 +207,14 @@ fn commit_release_can_reuse_saved_prepared_release_without_prepare_step() {
 	);
 }
 
-#[test]
-fn commit_release_succeeds_when_manifest_is_gitignored() {
+#[tokio::test(flavor = "multi_thread")]
+async fn commit_release_succeeds_when_manifest_is_gitignored() {
 	let tempdir = setup_scenario_workspace("prepared-release/commit-release-flexible");
 	let root = tempdir.path();
 	init_git_repo(root);
 
 	run_cli(root, command_args(&["release", "--format", "json"]))
+		.await
 		.unwrap_or_else(|error| panic!("release output: {error}"));
 	assert!(
 		root.join(".monochange/local/release-manifest.json")
@@ -213,6 +225,7 @@ fn commit_release_succeeds_when_manifest_is_gitignored() {
 		root,
 		command_args(&["commit-from-cache", "--format", "json"]),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("commit-from-cache output: {error}"));
 	assert_eq!(git_output(root, &["status", "--short"]), "");
 	assert_eq!(
@@ -221,8 +234,8 @@ fn commit_release_succeeds_when_manifest_is_gitignored() {
 	);
 }
 
-#[test]
-fn prepared_release_artifact_rejects_workspace_content_drift() {
+#[tokio::test(flavor = "multi_thread")]
+async fn prepared_release_artifact_rejects_workspace_content_drift() {
 	let tempdir = setup_scenario_workspace("prepared-release/source-github-follow-up");
 	let root = tempdir.path();
 	let artifact_path = root.join(".monochange/local/custom-prepared-release.json");
@@ -239,6 +252,7 @@ fn prepared_release_artifact_rejects_workspace_content_drift() {
 			&artifact,
 		]),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("release output: {error}"));
 	fs::write(
 		root.join("crates/core/CHANGELOG.md"),
@@ -257,6 +271,7 @@ fn prepared_release_artifact_rejects_workspace_content_drift() {
 			&artifact,
 		]),
 	)
+	.await
 	.unwrap_err();
 	let message = error.to_string();
 	assert!(message.contains("prepared release artifact"));

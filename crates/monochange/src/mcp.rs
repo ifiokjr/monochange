@@ -203,11 +203,11 @@ fn validate_changeset_content(
 			continue;
 		}
 
-		let examples = item_refs.into_iter().take(3).collect::<Vec<_>>();
 		debug_assert!(
-			!examples.is_empty(),
+			!item_refs.is_empty(),
 			"semantic changes should yield at least one item reference"
 		);
+		let examples = render_semantic_item_examples(item_refs.iter());
 
 		issues.push(ValidationIssue {
 			severity: "warning".to_string(),
@@ -215,12 +215,7 @@ fn validate_changeset_content(
 				"changeset does not mention any detected semantic item for `{package_label}`"
 			),
 			suggestion: Some(format!(
-				"mention one or more changed items such as {}",
-				examples
-					.iter()
-					.map(|item| format!("`{item}`"))
-					.collect::<Vec<_>>()
-					.join(", ")
+				"mention one or more changed items such as {examples}"
 			)),
 		});
 	}
@@ -256,14 +251,32 @@ fn find_package_analysis<'a>(
 }
 
 fn render_changeset_text(changeset: &monochange_config::LoadedChangesetFile) -> String {
-	let mut parts = Vec::new();
+	let mut text = String::new();
+	let mut wrote_part = false;
 	if let Some(summary) = &changeset.summary {
-		parts.push(summary.clone());
+		text.push_str(summary);
+		wrote_part = true;
 	}
 	if let Some(details) = &changeset.details {
-		parts.push(details.clone());
+		if wrote_part {
+			text.push_str("\n\n");
+		}
+		text.push_str(details);
 	}
-	parts.join("\n\n")
+	text
+}
+
+fn render_semantic_item_examples<'a>(items: impl IntoIterator<Item = &'a String>) -> String {
+	let mut rendered = String::new();
+	for (index, item) in items.into_iter().take(3).enumerate() {
+		if index > 0 {
+			rendered.push_str(", ");
+		}
+		rendered.push('`');
+		rendered.push_str(item);
+		rendered.push('`');
+	}
+	rendered
 }
 
 fn extract_backticked_refs(text: &str) -> BTreeSet<String> {
@@ -479,7 +492,7 @@ impl MonochangeMcpServer {
 	) -> Result<CallToolResult, McpError> {
 		let root = resolve_root(params.path.as_deref());
 
-		let report = match crate::changesets::diagnose_changesets(&root, &params.changeset) {
+		let report = match crate::changesets::diagnose_changesets(&root, &params.changeset).await {
 			Ok(report) => report,
 			Err(error) => {
 				return Ok(json_error_result(json!({
@@ -558,7 +571,7 @@ impl MonochangeMcpServer {
 	) -> Result<CallToolResult, McpError> {
 		let root = resolve_root(params.path.as_deref());
 
-		let prepared_release = match crate::prepare_release(&root, true) {
+		let prepared_release = match crate::prepare_release(&root, true).await {
 			Ok(release) => release,
 			Err(error) => {
 				return Ok(json_error_result(json!({
@@ -592,7 +605,7 @@ impl MonochangeMcpServer {
 	) -> Result<CallToolResult, McpError> {
 		let root = resolve_root(params.path.as_deref());
 
-		let prepared_release = match crate::prepare_release(&root, true) {
+		let prepared_release = match crate::prepare_release(&root, true).await {
 			Ok(release) => release,
 			Err(error) => {
 				return Ok(json_error_result(json!({
@@ -629,7 +642,7 @@ impl MonochangeMcpServer {
 		let root = resolve_root(params.path.as_deref());
 
 		let evaluation =
-			match crate::affected_packages(&root, &params.changed_paths, &params.labels) {
+			match crate::affected_packages(&root, &params.changed_paths, &params.labels).await {
 				Ok(eval) => eval,
 				Err(error) => {
 					return Ok(json_error_result(json!({

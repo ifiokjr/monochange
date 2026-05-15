@@ -347,15 +347,15 @@ pub fn analyze_release_trajectory_for_refs(
 /// # Errors
 ///
 /// Returns an error if release-baseline or branch resolution fails.
-pub fn analyze_release_trajectory(
+pub async fn analyze_release_trajectory(
 	repo_root: &Path,
 	config: &AnalysisConfig,
 ) -> MonochangeResult<ReleaseTrajectoryAnalysis> {
 	let repo_root = normalize_path(repo_root);
 	let refs = ReleaseTrajectoryRefs {
-		release_ref: latest_workspace_release_tag(&repo_root)?,
+		release_ref: latest_workspace_release_tag(&repo_root).await?,
 		main_ref: default_branch_ref(&repo_root)?,
-		head_ref: git::git_current_branch(&repo_root)?,
+		head_ref: git::git_current_branch(&repo_root).await?,
 	};
 
 	analyze_release_trajectory_for_refs(&repo_root, &refs, config)
@@ -385,8 +385,9 @@ fn preferred_package_id(package: &PackageRecord) -> String {
 		.unwrap_or_else(|| package.id.clone())
 }
 
-fn latest_workspace_release_tag(repo_root: &Path) -> MonochangeResult<String> {
+async fn latest_workspace_release_tag(repo_root: &Path) -> MonochangeResult<String> {
 	let output = git::git_command_output(repo_root, &["tag", "--list", "--sort=-v:refname"])
+		.await
 		.map_err(|error| MonochangeError::Io(format!("failed to list git tags: {error}")))?;
 
 	if !output.status.success() {

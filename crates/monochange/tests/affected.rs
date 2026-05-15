@@ -1,3 +1,5 @@
+#![allow(clippy::large_futures)]
+#![allow(clippy::disallowed_methods)]
 use std::ffi::OsString;
 use std::path::Path;
 
@@ -102,12 +104,13 @@ use test_support::snapshot_settings;
 		".changeset/feature.md",
 	]
 )]
-fn affected_scenarios_match_snapshot(#[case] fixture: &str, #[case] args: &[&str]) {
+#[tokio::test(flavor = "multi_thread")]
+async fn affected_scenarios_match_snapshot(#[case] fixture: &str, #[case] args: &[&str]) {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
 	let _guard = settings.bind_to_scope();
 
-	let output = run_affected_json(&fixture_path(fixture), args);
+	let output = run_affected_json(&fixture_path(fixture), args).await;
 	assert_readable_json_snapshot!(output);
 }
 
@@ -154,8 +157,8 @@ fn affected_with_verify_flag_exits_zero_when_covered() {
 	);
 }
 
-#[etest::etest]
-fn affected_since_flag_detects_changes_from_git_revision() {
+#[tokio::test(flavor = "multi_thread")]
+async fn affected_since_flag_detects_changes_from_git_revision() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
 	let _guard = settings.bind_to_scope();
@@ -171,12 +174,12 @@ fn affected_since_flag_detects_changes_from_git_revision() {
 
 	copy_directory(&fixture_path("affected/since-changed-source"), root);
 
-	let json = run_affected_json(root, &["--from", "HEAD"]);
+	let json = run_affected_json(root, &["--from", "HEAD"]).await;
 	assert_readable_json_snapshot!(json);
 }
 
-#[etest::etest]
-fn affected_since_flag_detects_changeset_added_after_revision() {
+#[tokio::test(flavor = "multi_thread")]
+async fn affected_since_flag_detects_changeset_added_after_revision() {
 	let mut settings = snapshot_settings();
 	settings.set_snapshot_suffix(current_test_name());
 	let _guard = settings.bind_to_scope();
@@ -192,12 +195,12 @@ fn affected_since_flag_detects_changeset_added_after_revision() {
 
 	copy_directory(&fixture_path("affected/since-changed-with-changeset"), root);
 
-	let json = run_affected_json(root, &["--from", "HEAD"]);
+	let json = run_affected_json(root, &["--from", "HEAD"]).await;
 	assert_readable_json_snapshot!(json);
 }
 
-#[etest::etest]
-fn affected_since_takes_priority_over_changed_paths_with_warning() {
+#[tokio::test(flavor = "multi_thread")]
+async fn affected_since_takes_priority_over_changed_paths_with_warning() {
 	let tempdir = setup_scenario_workspace("affected/since-base");
 	let root = tempdir.path();
 
@@ -223,13 +226,14 @@ fn affected_since_takes_priority_over_changed_paths_with_warning() {
 	);
 }
 
-fn run_affected_json(root: &Path, args: &[&str]) -> Value {
+async fn run_affected_json(root: &Path, args: &[&str]) -> Value {
 	let cli_args = std::iter::once(OsString::from("mc"))
 		.chain(std::iter::once(OsString::from("step:affected-packages")))
 		.chain(std::iter::once(OsString::from("--format")))
 		.chain(std::iter::once(OsString::from("json")))
 		.chain(args.iter().map(|value| OsString::from(*value)));
 	let output = monochange::run_with_args_in_dir("mc", cli_args, root)
+		.await
 		.unwrap_or_else(|error| panic!("command output: {error}"));
 	serde_json::from_str(&output)
 		.unwrap_or_else(|error| panic!("parse json: {error}\nstdout: {output}"))

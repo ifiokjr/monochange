@@ -1,3 +1,5 @@
+#![allow(clippy::large_futures)]
+#![allow(clippy::disallowed_methods)]
 #![allow(
 	clippy::indexing_slicing,
 	clippy::single_char_pattern,

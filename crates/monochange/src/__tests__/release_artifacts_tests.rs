@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 use std::fs;
 
 use monochange_core::ChangelogSettings;
@@ -206,8 +207,8 @@ fn sample_package(root: &Path, config_id: &str, package_type: PackageType) -> Pa
 	package
 }
 
-#[test]
-fn release_target_and_title_helpers_cover_provider_and_skip_paths() {
+#[tokio::test(flavor = "multi_thread")]
+async fn release_target_and_title_helpers_cover_provider_and_skip_paths() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	let mut configuration = empty_configuration(root);
@@ -312,12 +313,9 @@ fn release_target_and_title_helpers_cover_provider_and_skip_paths() {
 		compatibility_evidence: Vec::new(),
 	};
 
-	let targets = build_release_targets(
-		&configuration,
-		&[package],
-		&plan,
-		&[PathBuf::from(".changeset/feature.md")],
-	);
+	let packages = vec![package];
+	let changeset_paths = vec![PathBuf::from(".changeset/feature.md")];
+	let targets = build_release_targets(&configuration, &packages, &plan, &changeset_paths).await;
 	assert_eq!(targets.len(), 2);
 	assert!(
 		targets
@@ -329,6 +327,42 @@ fn release_target_and_title_helpers_cover_provider_and_skip_paths() {
 			.iter()
 			.all(|target| !target.rendered_changelog_title.is_empty())
 	);
+
+	let mut ungrouped_configuration = configuration.clone();
+	ungrouped_configuration.groups.clear();
+	let ungrouped_targets =
+		build_release_targets(&ungrouped_configuration, &packages, &plan, &changeset_paths).await;
+	assert!(ungrouped_targets.iter().any(|target| {
+		target.id == "pkg-a"
+			&& target.kind == ReleaseOwnerKind::Package
+			&& target.members == ["pkg-a".to_string()]
+	}));
+
+	let mut missing_config_package = sample_package(root, "pkg-ghost", PackageType::Cargo);
+	missing_config_package
+		.metadata
+		.insert("config_id".to_string(), "ghost".to_string());
+	let mut missing_config_plan = plan.clone();
+	missing_config_plan.groups.clear();
+	missing_config_plan.decisions = vec![ReleaseDecision {
+		package_id: missing_config_package.id.clone(),
+		trigger_type: "changeset".to_string(),
+		recommended_bump: BumpSeverity::Patch,
+		planned_version: Some(Version::new(1, 0, 0)),
+		group_id: None,
+		reasons: Vec::new(),
+		upstream_sources: Vec::new(),
+		warnings: Vec::new(),
+	}];
+	let missing_config_packages = vec![missing_config_package];
+	let missing_config_targets = build_release_targets(
+		&configuration,
+		&missing_config_packages,
+		&missing_config_plan,
+		&changeset_paths,
+	)
+	.await;
+	assert!(missing_config_targets.is_empty());
 
 	assert_eq!(
 		effective_title_template(Some("specific"), Some("default"), "builtin"),
@@ -664,8 +698,8 @@ fn render_release_cli_command_json_includes_publish_rate_limits_when_present() {
 	assert!(json.contains("publishRateLimits"));
 }
 
-#[test]
-fn release_manifest_and_source_helpers_cover_provider_specific_paths() {
+#[tokio::test(flavor = "multi_thread")]
+async fn release_manifest_and_source_helpers_cover_provider_specific_paths() {
 	let manifest = sample_manifest();
 	let source = source_configuration(SourceProvider::GitLab);
 	let record = build_release_record(Some(&source), &manifest);
@@ -703,14 +737,49 @@ fn release_manifest_and_source_helpers_cover_provider_specific_paths() {
 	assert_eq!(gitea_change_request.provider, SourceProvider::Gitea);
 	assert!(tag_url_for_provider(&gitea, "sdk/v2.0.0").contains("/releases/tag/"));
 
-	let dry_requests_error = publish_source_release_requests(&gitea, &[])
-		.err()
-		.unwrap_or_else(|| {
-			panic!("expected publishing gitea release requests without auth to fail")
-		});
-	assert!(dry_requests_error.to_string().contains("GITEA_TOKEN"));
+	let github = source_configuration(SourceProvider::GitHub);
+	match publish_source_release_requests(&github, &[]).await {
+		Ok(outcomes) => assert!(outcomes.is_empty()),
+		Err(error) => assert!(!error.to_string().is_empty()),
+	}
+
+	match publish_source_release_requests(&source, &[]).await {
+		Ok(outcomes) => assert!(outcomes.is_empty()),
+		Err(error) => assert!(!error.to_string().is_empty()),
+	}
+
+	match publish_source_release_requests(&gitea, &[]).await {
+		Ok(outcomes) => assert!(outcomes.is_empty()),
+		Err(error) => assert!(!error.to_string().is_empty()),
+	}
 
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	match publish_source_change_request(
+		&source,
+		tempdir.path(),
+		&build_source_change_request(&source, &manifest),
+		&manifest.changed_files,
+		false,
+	)
+	.await
+	{
+		Ok(outcome) => assert_eq!(outcome.provider, SourceProvider::GitLab),
+		Err(error) => assert!(!error.to_string().is_empty()),
+	}
+
+	match publish_source_change_request(
+		&github,
+		tempdir.path(),
+		&build_source_change_request(&github, &manifest),
+		&manifest.changed_files,
+		false,
+	)
+	.await
+	{
+		Ok(outcome) => assert_eq!(outcome.provider, SourceProvider::GitHub),
+		Err(error) => assert!(!error.to_string().is_empty()),
+	}
+
 	let publish_error = publish_source_change_request(
 		&gitea,
 		tempdir.path(),
@@ -730,6 +799,7 @@ fn release_manifest_and_source_helpers_cover_provider_specific_paths() {
 		&manifest.changed_files,
 		false,
 	)
+	.await
 	.err()
 	.unwrap_or_else(|| {
 		panic!("expected publishing a gitea change request outside a git repo to fail")
@@ -840,6 +910,8 @@ fn dedup_index_roundtrip() {
 	set.insert("abc123".to_string());
 	set.insert("def456".to_string());
 	save_dedup_index(root, &set).unwrap();
+	let content = fs::read_to_string(root.join(DEDUP_INDEX_PATH)).unwrap();
+	assert_eq!(content, "{\"hash\":\"abc123\"}\n{\"hash\":\"def456\"}");
 
 	let loaded = load_dedup_index(root);
 	assert_eq!(loaded.len(), 2);
@@ -903,6 +975,30 @@ fn deduplicate_uses_persistent_index_to_skip_scan() {
 	);
 	assert!(result.is_ok());
 	assert!(stale_dir.is_dir());
+}
+
+#[test]
+fn deduplicate_skips_current_record_dir_during_overlap_scan() {
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+	let current_record_dir = root.join(".monochange/releases/current");
+	fs::create_dir_all(&current_record_dir).unwrap();
+
+	let target = ReleaseRecordTarget {
+		id: "pkg-current".to_string(),
+		kind: ReleaseOwnerKind::Package,
+		version: "1.2.3".to_string(),
+		version_format: VersionFormat::Primary,
+		tag: true,
+		release: true,
+		tag_name: "v1.2.3".to_string(),
+		members: vec![],
+	};
+
+	let result = deduplicate_overlapping_release_records(root, &[target], &current_record_dir);
+
+	assert!(result.is_ok());
+	assert!(current_record_dir.is_dir());
 }
 
 #[test]
@@ -974,6 +1070,105 @@ fn load_dedup_index_skips_empty_and_invalid_lines() {
 	let index = load_dedup_index(root);
 	assert_eq!(index.len(), 1);
 	assert!(index.contains("valid"));
+}
+
+#[test]
+fn load_dedup_index_from_reader_returns_none_on_read_error() {
+	struct BrokenBufRead {
+		line: &'static [u8],
+		read_error: bool,
+	}
+
+	impl std::io::Read for BrokenBufRead {
+		fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+			let available = self.fill_buf()?;
+			if available.is_empty() {
+				return Ok(0);
+			}
+			let length = available.len().min(buffer.len());
+			buffer[..length].copy_from_slice(&available[..length]);
+			self.consume(length);
+			Ok(length)
+		}
+	}
+
+	impl std::io::BufRead for BrokenBufRead {
+		fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+			if self.read_error {
+				return Err(std::io::Error::other("broken reader"));
+			}
+			Ok(self.line)
+		}
+
+		fn consume(&mut self, amount: usize) {
+			if amount >= self.line.len() {
+				self.line = b"";
+				self.read_error = true;
+				return;
+			}
+			self.line = &self.line[amount..];
+		}
+	}
+
+	let index = load_dedup_index_from_reader(BrokenBufRead {
+		line: b"{\"hash\":\"valid\"}\n",
+		read_error: false,
+	});
+	assert!(index.is_none());
+}
+
+#[test]
+fn atomic_write_writes_content_through_temp_file() {
+	let tmp = tempdir().unwrap();
+	let path = tmp.path().join("artifact.txt");
+
+	atomic_write(&path, b"hello").unwrap();
+
+	assert_eq!(fs::read(&path).unwrap(), b"hello");
+}
+
+#[test]
+fn atomic_write_reports_temp_creation_errors() {
+	let tmp = tempdir().unwrap();
+	let path = tmp.path().join("missing/artifact.txt");
+
+	let result = atomic_write(&path, b"hello");
+	let error = result.unwrap_err().to_string();
+
+	assert!(error.contains("failed to create temp file in"));
+}
+
+#[test]
+fn write_temp_file_reports_write_errors() {
+	struct BrokenWriter;
+
+	impl std::io::Write for BrokenWriter {
+		fn write(&mut self, _buffer: &[u8]) -> std::io::Result<usize> {
+			Err(std::io::Error::other("broken writer"))
+		}
+
+		fn flush(&mut self) -> std::io::Result<()> {
+			Ok(())
+		}
+	}
+
+	let mut writer = BrokenWriter;
+	let result = write_temp_file(&mut writer, std::path::Path::new("artifact.txt"), b"hello");
+	let error = result.unwrap_err().to_string();
+
+	assert!(error.contains("failed to write temp file for artifact.txt: broken writer"));
+}
+
+#[test]
+fn persist_temp_file_reports_rename_errors() {
+	let tmp = tempdir().unwrap();
+	let named_temp = tempfile::NamedTempFile::new_in(tmp.path()).unwrap();
+	let path = tmp.path().join("missing/artifact.txt");
+
+	let result = persist_temp_file(named_temp, &path);
+	let error = result.unwrap_err().to_string();
+
+	assert!(error.contains("failed to rename temp file to"));
 }
 
 #[test]

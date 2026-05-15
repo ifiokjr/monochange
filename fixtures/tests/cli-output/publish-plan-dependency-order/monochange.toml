@@ -3,23 +3,45 @@ package_type = "cargo"
 changelog = false
 
 [cli.plan-release-publish]
-inputs = [
-	{ name = "format", type = "choice", choices = ["json"], default = "json" },
-	{ name = "all", type = "boolean", default = false },
-]
-steps = [
-	{ name = "prepare release", type = "PrepareRelease", inputs = ["format"] },
-	{ name = "plan publish rate limits", type = "PlanPublishRateLimits", inputs = ["format", "all"] },
-]
+
+[[cli.plan-release-publish.inputs]]
+name = "format"
+type = "choice"
+choices = ["json"]
+default = "json"
+
+[[cli.plan-release-publish.inputs]]
+name = "all"
+type = "boolean"
+default = false
+
+[[cli.plan-release-publish.steps]]
+name = "prepare release"
+type = "PrepareRelease"
+inputs = { format = "{{ inputs.format }}" }
+
+[[cli.plan-release-publish.steps]]
+name = "plan publish rate limits"
+type = "PlanPublishRateLimits"
+inputs = { format = "{{ inputs.format }}", all = "{{ inputs.all }}" }
 
 [cli.publish]
-inputs = [
-	{ name = "format", type = "choice", choices = ["json"], default = "json" },
-	{ name = "all", type = "boolean", default = false },
-]
-steps = [
-	{ name = "publish packages", type = "PublishPackages", inputs = ["format", "all"] },
-]
+
+[[cli.publish.inputs]]
+name = "format"
+type = "choice"
+choices = ["json"]
+default = "json"
+
+[[cli.publish.inputs]]
+name = "all"
+type = "boolean"
+default = false
+
+[[cli.publish.steps]]
+name = "publish packages"
+type = "PublishPackages"
+inputs = { format = "{{ inputs.format }}", all = "{{ inputs.all }}" }
 
 [package.zeta_transport]
 path = "crates/zeta_transport"

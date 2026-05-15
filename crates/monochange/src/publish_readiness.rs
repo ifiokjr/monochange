@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -82,15 +83,15 @@ struct PublishReadinessSource<'a> {
 	record_commit: &'a str,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
-struct PackageIdentity {
-	package: String,
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
+struct PackageIdentity<'a> {
+	package: &'a str,
 	ecosystem: Ecosystem,
-	registry: String,
-	version: String,
+	registry: &'a str,
+	version: &'a str,
 }
 
-pub(crate) fn run_publish_readiness(
+pub(crate) async fn run_publish_readiness(
 	root: &Path,
 	configuration: &WorkspaceConfiguration,
 	options: &PublishReadinessOptions,
@@ -100,7 +101,8 @@ pub(crate) fn run_publish_readiness(
 		configuration,
 		&options.from,
 		&options.selected_packages,
-	)?;
+	)
+	.await?;
 	options
 		.output
 		.as_deref()
@@ -109,7 +111,26 @@ pub(crate) fn run_publish_readiness(
 	render_report(&report, options.format)
 }
 
-pub(crate) fn publish_plan_package_filter_from_readiness_artifact(
+#[cfg(test)]
+pub(crate) async fn validate_publish_readiness_artifact(
+	root: &Path,
+	configuration: &WorkspaceConfiguration,
+	prepared_release: Option<&PreparedRelease>,
+	selected_packages: &BTreeSet<String>,
+	artifact_path: &Path,
+) -> MonochangeResult<()> {
+	let artifact = read_report_artifact(artifact_path)?;
+	let current_report = build_publish_readiness_report_for_publish(
+		root,
+		configuration,
+		prepared_release,
+		selected_packages,
+	)
+	.await?;
+	validate_publish_readiness_report(&artifact, &current_report)
+}
+
+pub(crate) async fn publish_plan_package_filter_from_readiness_artifact(
 	root: &Path,
 	configuration: &WorkspaceConfiguration,
 	prepared_release: Option<&PreparedRelease>,
@@ -117,8 +138,13 @@ pub(crate) fn publish_plan_package_filter_from_readiness_artifact(
 	artifact_path: &Path,
 ) -> MonochangeResult<BTreeSet<String>> {
 	let artifact = read_report_artifact(artifact_path)?;
-	#[rustfmt::skip]
-	let current_report = build_publish_readiness_report_for_publish(root, configuration, prepared_release, selected_packages)?;
+	let current_report = build_publish_readiness_report_for_publish(
+		root,
+		configuration,
+		prepared_release,
+		selected_packages,
+	)
+	.await?;
 	validate_publish_readiness_plan_artifact(&artifact, &current_report)?;
 
 	let artifact_ready_packages = publish_plan_ready_package_ids(&artifact);
@@ -129,16 +155,22 @@ pub(crate) fn publish_plan_package_filter_from_readiness_artifact(
 		.collect())
 }
 
-fn build_publish_readiness_report(
+async fn build_publish_readiness_report(
 	root: &Path,
 	configuration: &WorkspaceConfiguration,
 	from: &str,
 	selected_packages: &BTreeSet<String>,
 ) -> MonochangeResult<PublishReadinessReport> {
-	let discovery = discover_release_record(root, from)?;
+	let discovery = discover_release_record(root, from).await?;
 	let input_fingerprint = publish_readiness_input_fingerprint(root, configuration)?;
-	#[rustfmt::skip]
-	let publish_report = package_publish::run_publish_packages_with_publications(root, configuration, &discovery.record.package_publications, selected_packages, true)?;
+	let publish_report = package_publish::run_publish_packages_with_publications(
+		root,
+		configuration,
+		&discovery.record.package_publications,
+		selected_packages,
+		true,
+	)
+	.await?;
 	Ok(build_report_from_publish_report(
 		source_from_discovery(&discovery),
 		&publish_report,
@@ -146,7 +178,7 @@ fn build_publish_readiness_report(
 	))
 }
 
-fn build_publish_readiness_report_for_publish(
+async fn build_publish_readiness_report_for_publish(
 	root: &Path,
 	configuration: &WorkspaceConfiguration,
 	prepared_release: Option<&PreparedRelease>,
@@ -154,8 +186,14 @@ fn build_publish_readiness_report_for_publish(
 ) -> MonochangeResult<PublishReadinessReport> {
 	if let Some(prepared_release) = prepared_release {
 		let input_fingerprint = publish_readiness_input_fingerprint(root, configuration)?;
-		#[rustfmt::skip]
-		let publish_report = package_publish::run_publish_packages(root, configuration, Some(prepared_release), selected_packages, true)?;
+		let publish_report = package_publish::run_publish_packages(
+			root,
+			configuration,
+			Some(prepared_release),
+			selected_packages,
+			true,
+		)
+		.await?;
 		let source = PublishReadinessSource {
 			from: "prepared-release",
 			resolved_commit: "prepared-release",
@@ -167,7 +205,7 @@ fn build_publish_readiness_report_for_publish(
 			input_fingerprint,
 		));
 	}
-	build_publish_readiness_report(root, configuration, "HEAD", selected_packages)
+	build_publish_readiness_report(root, configuration, "HEAD", selected_packages).await
 }
 
 fn build_report_from_publish_report(
@@ -424,6 +462,19 @@ fn read_report_artifact(input: &Path) -> MonochangeResult<PublishReadinessReport
 	serde_json::from_str(&body).map_err(publish_readiness_json_error)
 }
 
+#[cfg(test)]
+fn validate_publish_readiness_report(
+	artifact: &PublishReadinessReport,
+	current: &PublishReadinessReport,
+) -> MonochangeResult<()> {
+	validate_readiness_artifact_header(artifact)?;
+	validate_readiness_artifact_status(artifact)?;
+	validate_readiness_current_status(current)?;
+	validate_readiness_release_commit(artifact, current)?;
+	validate_readiness_input_fingerprint(artifact, current)?;
+	validate_readiness_packages(artifact, current)
+}
+
 fn validate_publish_readiness_plan_artifact(
 	artifact: &PublishReadinessReport,
 	current: &PublishReadinessReport,
@@ -450,6 +501,26 @@ fn validate_readiness_artifact_header(report: &PublishReadinessReport) -> Monoch
 	Ok(())
 }
 
+#[cfg(test)]
+fn validate_readiness_artifact_status(report: &PublishReadinessReport) -> MonochangeResult<()> {
+	if report.status == PublishReadinessGlobalStatus::Ready {
+		return Ok(());
+	}
+	Err(MonochangeError::Config(
+		"publish readiness artifact is blocked; rerun `mc publish-readiness` and resolve blockers before `mc publish`".to_string(),
+	))
+}
+
+#[cfg(test)]
+fn validate_readiness_current_status(report: &PublishReadinessReport) -> MonochangeResult<()> {
+	if report.status == PublishReadinessGlobalStatus::Ready {
+		return Ok(());
+	}
+	Err(MonochangeError::Config(
+		"current publish readiness is blocked; rerun `mc publish-readiness` and resolve blockers before `mc publish`".to_string(),
+	))
+}
+
 fn validate_readiness_release_commit(
 	artifact: &PublishReadinessReport,
 	current: &PublishReadinessReport,
@@ -460,6 +531,37 @@ fn validate_readiness_release_commit(
 	Err(MonochangeError::Config(format!(
 		"publish readiness artifact was generated for release record {}, but `mc publish` selected {}; rerun `mc step:publish-readiness --from HEAD --output <PATH>`",
 		artifact.record_commit, current.record_commit
+	)))
+}
+
+#[cfg(test)]
+fn validate_readiness_packages(
+	artifact: &PublishReadinessReport,
+	current: &PublishReadinessReport,
+) -> MonochangeResult<()> {
+	let artifact_packages = package_identities(&artifact.packages)?;
+	let current_packages = package_identities(&current.packages)?;
+	if artifact.package_set_fingerprint != package_set_fingerprint(&artifact.packages) {
+		return Err(MonochangeError::Config(
+			"publish readiness artifact package fingerprint does not match its package list"
+				.to_string(),
+		));
+	}
+	if artifact_packages == current_packages {
+		return Ok(());
+	}
+	let missing = current_packages
+		.difference(&artifact_packages)
+		.map(render_package_identity)
+		.collect::<Vec<_>>();
+	let stale = artifact_packages
+		.difference(&current_packages)
+		.map(render_package_identity)
+		.collect::<Vec<_>>();
+	Err(MonochangeError::Config(format!(
+		"publish readiness artifact package set is stale or does not match selected packages (missing: {}; stale: {})",
+		render_package_identity_list(&missing),
+		render_package_identity_list(&stale)
 	)))
 }
 
@@ -494,11 +596,11 @@ fn validate_readiness_package_subset(
 
 fn package_identities(
 	packages: &[PublishReadinessPackage],
-) -> MonochangeResult<BTreeSet<PackageIdentity>> {
+) -> MonochangeResult<BTreeSet<PackageIdentity<'_>>> {
 	let mut identities = BTreeSet::new();
 	for package in packages {
 		let identity = package_identity(package);
-		if !identities.insert(identity.clone()) {
+		if !identities.insert(identity) {
 			return Err(MonochangeError::Config(format!(
 				"publish readiness artifact contains duplicate package entry {}",
 				render_package_identity(&identity)
@@ -509,37 +611,56 @@ fn package_identities(
 }
 
 fn package_set_fingerprint(packages: &[PublishReadinessPackage]) -> String {
-	packages
+	let identities = packages
 		.iter()
 		.map(package_identity)
-		.collect::<BTreeSet<_>>()
-		.iter()
-		.map(render_package_identity)
-		.collect::<Vec<_>>()
-		.join("\n")
+		.collect::<BTreeSet<_>>();
+	let mut fingerprint = String::new();
+	for identity in identities {
+		if !fingerprint.is_empty() {
+			fingerprint.push('\n');
+		}
+		write_package_identity(&mut fingerprint, &identity);
+	}
+	fingerprint
 }
 
-fn package_identity(package: &PublishReadinessPackage) -> PackageIdentity {
+fn package_identity(package: &PublishReadinessPackage) -> PackageIdentity<'_> {
 	PackageIdentity {
-		package: package.package.clone(),
+		package: package.package.as_str(),
 		ecosystem: package.ecosystem,
-		registry: package.registry.clone(),
-		version: package.version.clone(),
+		registry: package.registry.as_str(),
+		version: package.version.as_str(),
 	}
 }
 
-fn render_package_identity(identity: &PackageIdentity) -> String {
-	format!(
+fn render_package_identity(identity: &PackageIdentity<'_>) -> String {
+	let mut rendered = String::new();
+	write_package_identity(&mut rendered, identity);
+	rendered
+}
+
+fn write_package_identity(output: &mut String, identity: &PackageIdentity<'_>) {
+	let _ = write!(
+		output,
 		"{} {:?} {} {}",
 		identity.package, identity.ecosystem, identity.registry, identity.version
-	)
+	);
 }
 
 fn render_package_identity_list(identities: &[String]) -> String {
 	if identities.is_empty() {
 		return "none".to_string();
 	}
-	identities.join(", ")
+
+	let mut rendered = String::new();
+	for identity in identities {
+		if !rendered.is_empty() {
+			rendered.push_str(", ");
+		}
+		rendered.push_str(identity);
+	}
+	rendered
 }
 
 fn publish_readiness_json_error(error: impl std::fmt::Display) -> MonochangeError {
@@ -562,7 +683,10 @@ fn render_report(
 	match format {
 		OutputFormat::Json => {
 			serde_json::to_string_pretty(report)
-				.map(|body| format!("{body}\n"))
+				.map(|mut body| {
+					body.push('\n');
+					body
+				})
 				.map_err(publish_readiness_json_error)
 		}
 		OutputFormat::Markdown => Ok(render_markdown_report(report)),
@@ -570,59 +694,63 @@ fn render_report(
 	}
 }
 fn render_text_report(report: &PublishReadinessReport) -> String {
-	let mut lines = vec![format!(
+	let mut output = String::new();
+	let _ = writeln!(
+		output,
 		"publish readiness: {}",
 		readiness_global_status_label(report.status)
-	)];
-	lines.push(format!("release ref: {}", report.from));
-	lines.push(format!("release record: {}", report.record_commit));
+	);
+	let _ = writeln!(output, "release ref: {}", report.from);
+	let _ = writeln!(output, "release record: {}", report.record_commit);
 	if report.packages.is_empty() {
-		lines.push("packages: none".to_string());
+		output.push_str("packages: none\n");
 	} else {
-		lines.push("packages:".to_string());
+		output.push_str("packages:\n");
 		for package in &report.packages {
-			lines.push(format!(
+			let _ = writeln!(
+				output,
 				"- {} {} {} [{}]: {}",
 				package.package,
 				package.version,
 				package.registry,
 				readiness_package_status_label(package.status),
 				package.message
-			));
+			);
 		}
 	}
-	format!("{}\n", lines.join("\n"))
+	output
 }
 
 fn render_markdown_report(report: &PublishReadinessReport) -> String {
-	let mut lines = vec![
-		"## Publish readiness".to_string(),
-		String::new(),
-		format!(
-			"- Status: `{}`",
-			readiness_global_status_label(report.status)
-		),
-		format!("- Release ref: `{}`", report.from),
-		format!("- Release record: `{}`", report.record_commit),
-		String::new(),
-	];
+	let mut output = String::new();
+	let _ = writeln!(output, "## Publish readiness");
+	output.push('\n');
+	let _ = writeln!(
+		output,
+		"- Status: `{}`",
+		readiness_global_status_label(report.status)
+	);
+	let _ = writeln!(output, "- Release ref: `{}`", report.from);
+	let _ = writeln!(output, "- Release record: `{}`", report.record_commit);
+	output.push('\n');
 	if report.packages.is_empty() {
-		lines.push("No packages selected for publishing.".to_string());
+		output.push_str("No packages selected for publishing.\n");
 	} else {
-		lines.push("| Package | Version | Registry | Status | Message |".to_string());
-		lines.push("| --- | --- | --- | --- | --- |".to_string());
+		output.push_str("| Package | Version | Registry | Status | Message |\n");
+		output.push_str("| --- | --- | --- | --- | --- |\n");
 		for package in &report.packages {
-			lines.push(format!(
+			let _ = writeln!(
+				output,
 				"| `{}` | `{}` | `{}` | `{}` | {} |",
 				package.package,
 				package.version,
 				package.registry,
 				readiness_package_status_label(package.status),
 				package.message.replace('|', "\\|")
-			));
+			);
 		}
 	}
-	format!("{}\n", lines.join("\n"))
+	output
 }
 
 fn readiness_global_status_label(status: PublishReadinessGlobalStatus) -> &'static str {

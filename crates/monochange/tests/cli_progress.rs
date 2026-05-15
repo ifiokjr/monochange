@@ -1,3 +1,5 @@
+#![allow(clippy::large_futures)]
+#![allow(clippy::disallowed_methods)]
 use std::path::Path;
 
 use insta::assert_snapshot;
@@ -48,6 +50,25 @@ fn normalized_progress_events(stderr: &str) -> Vec<Value> {
 			*duration = Value::String("[duration_ms]".to_string());
 		}
 		if let Some(phase_timings) = object.get_mut("phaseTimings").and_then(Value::as_array_mut) {
+			phase_timings.sort_by_key(|phase| {
+				match phase.get("label").and_then(Value::as_str) {
+					Some("load workspace configuration") => 0,
+					Some("discover release workspace") => 1,
+					Some("discover changeset paths") => 2,
+					Some("read changeset files") => 3,
+					Some("parse changeset files") => 4,
+					Some("build prepared changesets") => 5,
+					Some("build release plan") => 6,
+					Some("resolve changelog targets") => 7,
+					Some("build manifest updates") => 8,
+					Some("build versioned file updates") => 9,
+					Some("build release targets") => 10,
+					Some("build lockfile refresh plan") => 11,
+					Some("build changelog updates") => 12,
+					Some("apply release changes") => 13,
+					_ => usize::MAX,
+				}
+			});
 			for phase in phase_timings {
 				if let Some(duration) = phase.get_mut("durationMs") {
 					*duration = Value::String("[duration_ms]".to_string());

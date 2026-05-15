@@ -157,9 +157,10 @@ pub fn git_push_branch_command(root: &Path, branch: &str, no_verify: bool) -> Co
 
 /// Return the current branch name for the repository at `root`.
 #[must_use = "the git branch result must be checked"]
-pub fn git_current_branch(root: &Path) -> MonochangeResult<String> {
-	let output =
-		git_command_output(root, &["symbolic-ref", "--short", "HEAD"]).map_err(|error| {
+pub async fn git_current_branch(root: &Path) -> MonochangeResult<String> {
+	let output = git_command_output(root, &["symbolic-ref", "--short", "HEAD"])
+		.await
+		.map_err(|error| {
 			MonochangeError::Io(format!("failed to read current git branch: {error}"))
 		})?;
 
@@ -175,8 +176,9 @@ pub fn git_current_branch(root: &Path) -> MonochangeResult<String> {
 
 /// Return the full HEAD commit SHA for the repository at `root`.
 #[must_use = "the HEAD commit result must be checked"]
-pub fn git_head_commit(root: &Path) -> MonochangeResult<String> {
+pub async fn git_head_commit(root: &Path) -> MonochangeResult<String> {
 	let output = git_command_output(root, &["rev-parse", "HEAD"])
+		.await
 		.map_err(|error| MonochangeError::Io(format!("failed to read HEAD commit: {error}")))?;
 
 	if !output.status.success() {
@@ -192,9 +194,10 @@ pub fn git_head_commit(root: &Path) -> MonochangeResult<String> {
 #[tracing::instrument(skip_all, fields(args = ?args))]
 /// Run `git` with the supplied args and capture the raw process output.
 #[must_use = "the command output must be checked"]
-pub fn git_command_output(root: &Path, args: &[&str]) -> std::io::Result<Output> {
+pub async fn git_command_output(root: &Path, args: &[&str]) -> std::io::Result<Output> {
 	let mut command = git_command(root);
-	command.args(args).output()
+	command.args(args);
+	tokio::process::Command::from(command).output().await
 }
 
 /// Return stdout as trimmed UTF-8 lossily decoded text.
@@ -227,9 +230,10 @@ pub fn git_reports_nothing_to_commit(output: &Output) -> bool {
 #[tracing::instrument(skip_all, fields(action))]
 /// Run a prepared command and convert process failures into `MonochangeError`.
 #[must_use = "the command result must be checked"]
-pub fn run_command(mut command: Command, action: &str) -> MonochangeResult<()> {
-	let output = command
+pub async fn run_command(command: Command, action: &str) -> MonochangeResult<()> {
+	let output = tokio::process::Command::from(command)
 		.output()
+		.await
 		.map_err(|error| MonochangeError::Io(format!("failed to {action}: {error}")))?;
 
 	if !output.status.success() {
@@ -244,7 +248,7 @@ pub fn run_command(mut command: Command, action: &str) -> MonochangeResult<()> {
 
 /// Run a `git commit` command with a commit message stored in a temporary file.
 #[must_use = "the commit command result must be checked"]
-pub fn run_git_commit_message(
+pub async fn run_git_commit_message(
 	root: &Path,
 	message: &CommitMessage,
 	action: &str,
@@ -258,13 +262,14 @@ pub fn run_git_commit_message(
 		|message_file, message_text| message_file.write_all(message_text.as_bytes()),
 		flush_git_commit_message_file,
 	)
+	.await
 }
 
 fn flush_git_commit_message_file(message_file: &mut NamedTempFile) -> std::io::Result<()> {
 	message_file.as_file_mut().sync_all()
 }
 
-fn run_git_commit_message_with_io<WriteMessage, FlushMessage>(
+async fn run_git_commit_message_with_io<WriteMessage, FlushMessage>(
 	root: &Path,
 	message: &CommitMessage,
 	action: &str,
@@ -311,21 +316,24 @@ where
 		)
 	})?;
 
-	let mut command = git_commit_file_command(root, message_file.path(), no_verify);
-	let output = command.output().map_err(|error| {
-		MonochangeError::Io(format!(
-			"failed to {action}: {error}\n{}",
-			git_commit_message_diagnostics(
-				root,
-				message,
-				&message_text,
-				action,
-				"spawning git commit with --file",
-				no_verify,
-				Some(message_file.path()),
-			)
-		))
-	})?;
+	let command = git_commit_file_command(root, message_file.path(), no_verify);
+	let output = tokio::process::Command::from(command)
+		.output()
+		.await
+		.map_err(|error| {
+			MonochangeError::Io(format!(
+				"failed to {action}: {error}\n{}",
+				git_commit_message_diagnostics(
+					root,
+					message,
+					&message_text,
+					action,
+					"spawning git commit with --file",
+					no_verify,
+					Some(message_file.path()),
+				)
+			))
+		})?;
 
 	if output.status.success() || git_reports_nothing_to_commit(&output) {
 		return Ok(());
@@ -348,12 +356,13 @@ where
 
 /// Run a commit command and treat `nothing to commit` as success.
 #[must_use = "the commit command result must be checked"]
-pub fn run_commit_command_allow_nothing_to_commit(
-	mut command: Command,
+pub async fn run_commit_command_allow_nothing_to_commit(
+	command: Command,
 	action: &str,
 ) -> MonochangeResult<()> {
-	let output = command
+	let output = tokio::process::Command::from(command)
 		.output()
+		.await
 		.map_err(|error| MonochangeError::Io(format!("failed to {action}: {error}")))?;
 
 	if output.status.success() || git_reports_nothing_to_commit(&output) {

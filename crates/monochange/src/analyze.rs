@@ -61,7 +61,7 @@ pub(crate) struct AnalyzeReport {
 	warnings: Vec<String>,
 }
 
-pub(crate) fn render_analyze_report(
+pub(crate) async fn render_analyze_report(
 	root: &Path,
 	package_reference: &str,
 	release_ref: Option<&str>,
@@ -72,7 +72,7 @@ pub(crate) fn render_analyze_report(
 ) -> MonochangeResult<String> {
 	let detection_level = parse_detection_level(detection_level)?;
 	let refs = (release_ref, main_ref, head_ref);
-	let report = build_report(root, package_reference, refs, detection_level)?;
+	let report = build_report(root, package_reference, refs, detection_level).await?;
 
 	match format {
 		OutputFormat::Json => {
@@ -87,7 +87,7 @@ pub(crate) fn render_analyze_report(
 	}
 }
 
-fn build_report(
+async fn build_report(
 	root: &Path,
 	package_reference: &str,
 	refs: (Option<&str>, Option<&str>, Option<&str>),
@@ -111,12 +111,12 @@ fn build_report(
 	let release_identity = configuration.effective_release_identity(&selected_package_id);
 	let main_ref = match main_ref {
 		Some(main_ref) => main_ref.to_string(),
-		None => default_branch_name(root)?,
+		None => default_branch_name(root).await?,
 	};
 	let head_ref = head_ref.map_or_else(|| "HEAD".to_string(), ToString::to_string);
 	let resolved_release_ref = match release_ref {
 		Some(release_ref) => Some(release_ref.to_string()),
-		None => latest_release_tag_for_identity(root, release_identity.as_ref())?,
+		None => latest_release_tag_for_identity(root, release_identity.as_ref()).await?,
 	};
 	let config = AnalysisConfig {
 		detection_level,
@@ -237,20 +237,24 @@ fn parse_origin_head_branch(symbolic_ref: &str) -> Option<String> {
 	}
 }
 
-fn default_branch_name(root: &Path) -> MonochangeResult<String> {
-	run_git_capture(
+async fn default_branch_name(root: &Path) -> MonochangeResult<String> {
+	let result = run_git_capture(
 		root,
 		&["rev-parse", "--abbrev-ref", "origin/HEAD"],
 		"failed to determine default branch from origin/HEAD",
 	)
+	.await
 	.ok()
-	.and_then(|symbolic_ref| parse_origin_head_branch(&symbolic_ref))
-	.map_or_else(|| fallback_default_branch(root), Ok)
+	.and_then(|symbolic_ref| parse_origin_head_branch(&symbolic_ref));
+	match result {
+		Some(branch) => Ok(branch),
+		None => fallback_default_branch(root).await,
+	}
 }
 
-fn fallback_default_branch(root: &Path) -> MonochangeResult<String> {
+async fn fallback_default_branch(root: &Path) -> MonochangeResult<String> {
 	for branch in ["main", "master"] {
-		if resolve_git_commit_ref(root, branch).is_ok() {
+		if resolve_git_commit_ref(root, branch).await.is_ok() {
 			return Ok(branch.to_string());
 		}
 	}
@@ -260,7 +264,7 @@ fn fallback_default_branch(root: &Path) -> MonochangeResult<String> {
 	))
 }
 
-fn latest_release_tag_for_identity(
+async fn latest_release_tag_for_identity(
 	root: &Path,
 	release_identity: Option<&EffectiveReleaseIdentity>,
 ) -> MonochangeResult<Option<String>> {
@@ -276,7 +280,8 @@ fn latest_release_tag_for_identity(
 		root,
 		&["tag", "--list", "--sort=-v:refname"],
 		"failed to list git tags for release baseline resolution",
-	)?;
+	)
+	.await?;
 	let latest = tag_output
 		.lines()
 		.map(str::trim)

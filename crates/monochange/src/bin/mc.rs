@@ -1,14 +1,10 @@
-fn main() {
-	let quiet = std::env::args_os().any(|arg| matches!(arg.to_str(), Some("--quiet" | "-q")));
+#![allow(unstable_features)]
+#![allow(clippy::large_futures)]
+#![feature(coverage_attribute)]
 
-	let result = monochange::run_from_env("mc");
-	let Err(error) = result else {
-		return;
-	};
-
-	if !quiet {
-		eprintln!("{}", error.render());
-	}
-
-	std::process::exit(1);
+#[coverage(off)]
+#[allow(clippy::disallowed_methods)]
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> std::process::ExitCode {
+	monochange::run_cli_binary_from_env("mc").await
 }

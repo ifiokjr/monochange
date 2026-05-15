@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
@@ -8,6 +9,7 @@ use monochange_core::EcosystemType;
 use super::CachedDocument;
 use super::VersionedFileUpdateContext;
 use super::apply_versioned_file_definition;
+use super::build_versioned_file_updates;
 use super::inferred_lockfile_ecosystem_type;
 use super::inferred_lockfile_paths;
 use super::read_cached_document;
@@ -71,6 +73,37 @@ fn read_cached_document_handles_go_text_and_invalid_utf8() {
 	let error = read_cached_document(&mut updates, &go_mod, EcosystemType::Go)
 		.expect_err("invalid go.mod should fail");
 	assert!(error.to_string().contains("failed to parse"));
+}
+
+#[test]
+#[cfg(feature = "npm")]
+fn read_cached_document_preserves_bun_lock_binary_without_utf8_parse() {
+	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let bun_lock = tempdir.path().join("bun.lockb");
+	let binary_contents = vec![0xff, 0xfe, 0x00, 0x01];
+	std::fs::write(&bun_lock, &binary_contents)
+		.unwrap_or_else(|error| panic!("write bun.lockb: {error}"));
+	let mut updates = BTreeMap::new();
+
+	let document = read_cached_document(&mut updates, &bun_lock, EcosystemType::Npm)
+		.unwrap_or_else(|error| panic!("bun lock binary document: {error}"));
+
+	assert!(matches!(document, CachedDocument::Bytes(contents) if contents == binary_contents));
+}
+
+#[test]
+fn read_cached_document_reports_deno_lock_invalid_utf8_as_text_parse_error() {
+	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let deno_lock = tempdir.path().join("deno.lock");
+	std::fs::write(&deno_lock, [0xff, 0xfe])
+		.unwrap_or_else(|error| panic!("write invalid deno.lock: {error}"));
+	let mut updates = BTreeMap::new();
+
+	let error = read_cached_document(&mut updates, &deno_lock, EcosystemType::Deno)
+		.expect_err("invalid deno.lock should fail");
+	let message = error.to_string();
+	assert!(message.contains("failed to parse"));
+	assert!(message.contains("as text"));
 }
 
 #[test]
@@ -177,6 +210,93 @@ fn apply_versioned_file_definition_updates_go_mod_dependencies() {
 		updated_document,
 		CachedDocument::Text(contents) if contents.contains("github.com/example/lib v1.2.3")
 	));
+}
+
+#[test]
+fn build_versioned_file_updates_uses_package_versioned_file_name_override() {
+	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let package_dir = root.join("packages/lib");
+	std::fs::create_dir_all(&package_dir)
+		.unwrap_or_else(|error| panic!("create package directory: {error}"));
+	let manifest_path = package_dir.join("package.json");
+	std::fs::write(
+		&manifest_path,
+		r#"{
+  "name": "consumer",
+  "version": "0.0.0",
+  "dependencies": {
+    "lib": "^1.0.0",
+    "actual": "^1.0.0"
+  }
+}
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write package manifest: {error}"));
+	std::fs::write(
+		root.join("monochange.toml"),
+		r#"
+[defaults]
+package_type = "npm"
+
+[package.lib]
+path = "packages/lib"
+versioned_files = [
+  { path = "packages/lib/package.json", type = "npm", name = "lib", fields = ["dependencies.{{ name }}"] }
+]
+
+[ecosystems.npm]
+enabled = true
+"#,
+	)
+	.unwrap_or_else(|error| panic!("write monochange config: {error}"));
+	let configuration = monochange_config::load_workspace_configuration(root)
+		.unwrap_or_else(|error| panic!("configuration: {error}"));
+	let mut package = monochange_core::PackageRecord::new(
+		Ecosystem::Npm,
+		"lib",
+		manifest_path.clone(),
+		root.to_path_buf(),
+		Some(semver::Version::new(1, 0, 0)),
+		monochange_core::PublishState::Public,
+	);
+	package
+		.metadata
+		.insert("config_id".to_string(), "lib".to_string());
+	let plan = monochange_core::ReleasePlan {
+		workspace_root: root.to_path_buf(),
+		decisions: vec![monochange_core::ReleaseDecision {
+			package_id: package.id.clone(),
+			trigger_type: "changeset".to_string(),
+			recommended_bump: monochange_core::BumpSeverity::Minor,
+			planned_version: Some(semver::Version::new(1, 2, 0)),
+			group_id: None,
+			reasons: Vec::new(),
+			upstream_sources: Vec::new(),
+			warnings: Vec::new(),
+		}],
+		groups: Vec::new(),
+		warnings: Vec::new(),
+		unresolved_items: Vec::new(),
+		compatibility_evidence: Vec::new(),
+	};
+
+	let updates =
+		build_versioned_file_updates(root, &configuration, std::slice::from_ref(&package), &plan)
+			.unwrap_or_else(|error| panic!("build versioned updates: {error}"));
+
+	assert_eq!(updates.len(), 1);
+	assert_eq!(updates[0].path, manifest_path);
+	let content = String::from_utf8(updates[0].content.clone())
+		.unwrap_or_else(|error| panic!("updated manifest should be utf-8: {error}"));
+	assert!(content.contains(r#""lib": "1.2.0""#));
+	assert!(content.contains(r#""actual": "^1.0.0""#));
+
+	std::fs::write(&manifest_path, "{")
+		.unwrap_or_else(|error| panic!("write invalid package manifest: {error}"));
+	let error = build_versioned_file_updates(root, &configuration, &[package], &plan)
+		.expect_err("invalid overridden versioned file should fail");
+	assert!(error.to_string().contains("failed to parse"));
 }
 
 #[test]

@@ -1,5 +1,4 @@
-mod proptest_bump_severity_tests;
-
+#![allow(clippy::disallowed_methods)]
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
@@ -183,6 +182,39 @@ impl HostedSourceAdapter for DefaultHostedSourceAdapter {
 	}
 }
 
+struct PanicDiscoveryAdapter;
+
+impl crate::EcosystemAdapter for PanicDiscoveryAdapter {
+	fn ecosystem(&self) -> Ecosystem {
+		Ecosystem::Cargo
+	}
+
+	fn discover(&self, _root: &Path) -> crate::MonochangeResult<crate::AdapterDiscovery> {
+		panic!("discovery panic for coverage");
+	}
+
+	fn load_configured(
+		&self,
+		_root: &Path,
+		_package_path: &Path,
+	) -> crate::MonochangeResult<Option<PackageRecord>> {
+		Ok(None)
+	}
+
+	fn supported_versioned_file_kind(&self, _path: &Path) -> bool {
+		false
+	}
+
+	fn validate_versioned_file(
+		&self,
+		_full_path: &Path,
+		_display_path: &str,
+		_custom_fields: Option<&[String]>,
+	) -> crate::MonochangeResult<()> {
+		Ok(())
+	}
+}
+
 fn test_source_configuration(provider: SourceProvider) -> SourceConfiguration {
 	SourceConfiguration {
 		provider,
@@ -305,8 +337,8 @@ fn must_err_panics_on_ok_results() {
 	assert!(std::panic::catch_unwind(|| must_err(Ok::<(), &str>(()), "context")).is_err());
 }
 
-#[test]
-fn hosted_source_adapter_default_comment_publishing_returns_empty_when_no_plans_exist() {
+#[tokio::test(flavor = "multi_thread")]
+async fn hosted_source_adapter_default_comment_publishing_returns_empty_when_no_plans_exist() {
 	let adapter = DefaultHostedSourceAdapter {
 		provider: SourceProvider::GitLab,
 	};
@@ -314,7 +346,7 @@ fn hosted_source_adapter_default_comment_publishing_returns_empty_when_no_plans_
 	let manifest = test_release_manifest();
 
 	let outcomes = must_ok(
-		adapter.comment_released_issues(&source, &manifest),
+		adapter.comment_released_issues(&source, &manifest).await,
 		"default comment publishing should allow empty plans",
 	);
 
@@ -337,8 +369,8 @@ fn hosted_source_adapter_default_features_are_empty_and_comment_plans_are_empty(
 	);
 }
 
-#[test]
-fn hosted_source_adapter_default_enrich_delegates_to_annotate() {
+#[tokio::test(flavor = "multi_thread")]
+async fn hosted_source_adapter_default_enrich_delegates_to_annotate() {
 	let adapter = DefaultHostedSourceAdapter {
 		provider: SourceProvider::GitLab,
 	};
@@ -351,7 +383,9 @@ fn hosted_source_adapter_default_enrich_delegates_to_annotate() {
 		context: None,
 	}];
 
-	adapter.enrich_changeset_context(&source, &mut changesets);
+	adapter
+		.enrich_changeset_context(&source, &mut changesets)
+		.await;
 
 	assert_eq!(
 		changesets
@@ -361,8 +395,8 @@ fn hosted_source_adapter_default_enrich_delegates_to_annotate() {
 	);
 }
 
-#[test]
-fn hosted_source_adapter_default_comment_publishing_errors_when_provider_lacks_support() {
+#[tokio::test(flavor = "multi_thread")]
+async fn hosted_source_adapter_default_comment_publishing_errors_when_provider_lacks_support() {
 	let adapter = TestHostedSourceAdapter {
 		provider: SourceProvider::GitLab,
 		features: HostedSourceFeatures::default(),
@@ -378,7 +412,7 @@ fn hosted_source_adapter_default_comment_publishing_errors_when_provider_lacks_s
 	let manifest = test_release_manifest();
 
 	let error = must_err(
-		adapter.comment_released_issues(&source, &manifest),
+		adapter.comment_released_issues(&source, &manifest).await,
 		"default comment publishing should reject unsupported providers",
 	);
 
@@ -400,7 +434,7 @@ fn hosted_source_adapter_default_retarget_planning_marks_unsupported_providers()
 	let plan = adapter.plan_retargeted_releases(&test_retarget_tags());
 	let plan_entry = plan
 		.first()
-		.expect("default retarget planning should emit one entry");
+		.unwrap_or_else(|| panic!("default retarget planning should emit one entry"));
 
 	assert_eq!(plan.len(), 1);
 	assert_eq!(plan_entry.provider, SourceProvider::GitLab);
@@ -411,8 +445,8 @@ fn hosted_source_adapter_default_retarget_planning_marks_unsupported_providers()
 	);
 }
 
-#[test]
-fn hosted_source_adapter_default_retarget_sync_uses_dry_run_plans_and_blocks_real_runs() {
+#[tokio::test(flavor = "multi_thread")]
+async fn hosted_source_adapter_default_retarget_sync_uses_dry_run_plans_and_blocks_real_runs() {
 	let adapter = TestHostedSourceAdapter {
 		provider: SourceProvider::GitHub,
 		features: HostedSourceFeatures {
@@ -426,16 +460,18 @@ fn hosted_source_adapter_default_retarget_sync_uses_dry_run_plans_and_blocks_rea
 	let tags = test_retarget_tags();
 
 	let dry_run_plan = must_ok(
-		adapter.sync_retargeted_releases(&source, &tags, true),
+		adapter.sync_retargeted_releases(&source, &tags, true).await,
 		"default retarget sync should reuse dry-run planning",
 	);
 	let dry_run_entry = dry_run_plan
 		.first()
-		.expect("default retarget sync should emit one dry-run entry");
+		.unwrap_or_else(|| panic!("default retarget sync should emit one dry-run entry"));
 	assert_eq!(dry_run_entry.operation, RetargetProviderOperation::Planned);
 
 	let error = must_err(
-		adapter.sync_retargeted_releases(&source, &tags, false),
+		adapter
+			.sync_retargeted_releases(&source, &tags, false)
+			.await,
 		"default retarget sync should reject unsupported real runs",
 	);
 	assert!(
@@ -476,7 +512,12 @@ fn git_current_branch_reports_checked_out_branch_name() {
 	let tempdir = must_ok(tempdir(), "tempdir");
 	let root = tempdir.path();
 	init_git_repository(root);
-	let branch = must_ok(git_current_branch(root), "current branch");
+	let branch = must_ok(
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(git_current_branch(root)),
+		"current branch",
+	);
 	assert_eq!(branch, "main");
 }
 
@@ -520,7 +561,12 @@ fn git_current_branch_reports_detached_head_as_an_error() {
 		);
 	}
 
-	let error = must_err(git_current_branch(root), "expected detached-head error");
+	let error = must_err(
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(git_current_branch(root)),
+		"expected detached-head error",
+	);
 	assert!(
 		error
 			.to_string()
@@ -534,7 +580,9 @@ fn git_current_branch_reports_missing_directory_as_io_error() {
 	let tempdir = must_ok(tempdir(), "tempdir");
 	let missing_root = tempdir.path().join("missing");
 	let error = must_err(
-		git_current_branch(&missing_root),
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(git_current_branch(&missing_root)),
 		"expected missing-directory error",
 	);
 	assert!(
@@ -578,7 +626,12 @@ fn git_head_commit_reports_current_commit_sha() {
 		);
 	}
 
-	let sha = must_ok(git_head_commit(root), "head commit");
+	let sha = must_ok(
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(git_head_commit(root)),
+		"head commit",
+	);
 	assert_eq!(sha.len(), 40);
 }
 
@@ -587,7 +640,12 @@ fn git_head_commit_reports_unborn_head_as_config_error() {
 	let tempdir = must_ok(tempdir(), "tempdir");
 	let root = tempdir.path();
 	init_git_repository(root);
-	let error = must_err(git_head_commit(root), "expected unborn HEAD config error");
+	let error = must_err(
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(git_head_commit(root)),
+		"expected unborn HEAD config error",
+	);
 	assert!(
 		matches!(error, MonochangeError::Config(message) if message.contains("failed to read HEAD commit"))
 	);
@@ -788,6 +846,75 @@ fn package_record_ids_are_stable_for_relative_and_absolute_roots() {
 
 	assert_eq!(relative.id, absolute.id);
 	assert_eq!(relative.id, "cargo:crates/core/Cargo.toml");
+}
+
+#[test]
+fn discovery_path_filter_applies_gitignore_to_relative_paths() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	fs::write(root.join(".gitignore"), "ignored/\n*.log\n")
+		.unwrap_or_else(|error| panic!("write gitignore: {error}"));
+	fs::create_dir_all(root.join("ignored"))
+		.unwrap_or_else(|error| panic!("create ignored dir: {error}"));
+	fs::create_dir_all(root.join("kept"))
+		.unwrap_or_else(|error| panic!("create kept dir: {error}"));
+	fs::write(root.join("kept/app.log"), "log\n")
+		.unwrap_or_else(|error| panic!("write log: {error}"));
+
+	let filter = crate::DiscoveryPathFilter::new(root);
+
+	assert!(!filter.should_descend(Path::new("ignored")));
+	assert!(!filter.allows(&root.join("kept/app.log")));
+	assert!(filter.allows(Path::new("kept/app.txt")));
+}
+
+#[test]
+fn discovery_path_filter_handles_paths_prefixed_by_relative_input_root() {
+	let tempdir = tempfile::Builder::new()
+		.prefix("relative-filter-")
+		.tempdir_in(".")
+		.unwrap_or_else(|error| panic!("tempdir in current directory: {error}"));
+	let relative_root = PathBuf::from(
+		tempdir
+			.path()
+			.file_name()
+			.unwrap_or_else(|| panic!("expected tempdir file name"))
+			.to_os_string(),
+	);
+	let filter = crate::DiscoveryPathFilter::new(&relative_root);
+
+	assert!(filter.should_descend(&relative_root.join("src")));
+}
+
+#[test]
+fn discovery_path_filter_skips_nested_git_worktrees() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	let nested = root.join("vendor/repo");
+	fs::create_dir_all(nested.join("src"))
+		.unwrap_or_else(|error| panic!("create nested worktree: {error}"));
+	fs::write(nested.join(".git"), "gitdir: ../.git/worktrees/repo\n")
+		.unwrap_or_else(|error| panic!("write nested git marker: {error}"));
+
+	let filter = crate::DiscoveryPathFilter::new(root);
+
+	assert!(!filter.should_descend(&nested));
+	assert!(!filter.allows(&nested.join("src/lib.rs")));
+}
+
+#[test]
+fn ecosystem_registry_reports_panicked_discovery_worker() {
+	let registry = crate::EcosystemRegistry::new().with_adapter(Box::new(PanicDiscoveryAdapter));
+	let error = registry
+		.discover_all(Path::new("."))
+		.err()
+		.unwrap_or_else(|| panic!("expected panicked discovery worker error"));
+
+	assert!(
+		error
+			.to_string()
+			.contains("ecosystem discovery worker panicked")
+	);
 }
 
 #[test]
@@ -1287,7 +1414,7 @@ fn valid_input_names_returns_expected_names_for_display_and_publish_steps() {
 				"group",
 				"ecosystem",
 				"resume",
-				"all"
+				"all",
 			]
 			.as_slice()
 		)
@@ -1300,7 +1427,7 @@ fn valid_input_names_returns_expected_names_for_display_and_publish_steps() {
 		inputs: BTreeMap::new(),
 	};
 	let names = plan.valid_input_names().unwrap();
-	for expected in ["format", "mode", "package", "ci", "readiness", "all"] {
+	for expected in ["format", "mode", "package", "ci", "readiness"] {
 		assert!(names.contains(&expected), "missing: {expected}");
 	}
 }
@@ -1688,7 +1815,6 @@ fn expected_input_kind_returns_correct_types_for_display_and_publish_steps() {
 		plan.expected_input_kind("readiness"),
 		Some(CliInputKind::Path)
 	);
-	assert_eq!(plan.expected_input_kind("all"), Some(CliInputKind::Boolean));
 	assert_eq!(plan.expected_input_kind("unknown"), None);
 }
 

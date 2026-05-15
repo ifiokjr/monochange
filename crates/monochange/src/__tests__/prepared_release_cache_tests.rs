@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 use std::process::Command;
 
 use monochange_config::load_workspace_configuration;
@@ -15,6 +16,7 @@ fn setup_prepared_release_repo() -> TempDir {
 	git(root, &["init", "-b", "main"]);
 	git(root, &["config", "user.name", "monochange tests"]);
 	git(root, &["config", "user.email", "monochange@example.com"]);
+	git(root, &["config", "commit.gpgsign", "false"]);
 	git(root, &["add", "."]);
 	git(
 		root,
@@ -51,10 +53,11 @@ fn explicit_artifact_path(root: &Path) -> PathBuf {
 	root.join(".monochange/local/unit-prepared-release.json")
 }
 
-fn save_artifact(root: &Path, dry_run: bool, explicit_path: &Path) -> WorkspaceConfiguration {
+async fn save_artifact(root: &Path, dry_run: bool, explicit_path: &Path) -> WorkspaceConfiguration {
 	let configuration = load_workspace_configuration(root)
 		.unwrap_or_else(|error| panic!("load workspace configuration: {error}"));
 	let prepared = crate::prepare_release_execution_with_file_diffs(root, dry_run, false, false)
+		.await
 		.unwrap_or_else(|error| panic!("prepare release execution: {error}"));
 	save_prepared_release_execution(
 		root,
@@ -63,6 +66,7 @@ fn save_artifact(root: &Path, dry_run: bool, explicit_path: &Path) -> WorkspaceC
 		&prepared.file_diffs,
 		Some(explicit_path),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("save prepared release artifact: {error}"));
 	configuration
 }
@@ -100,7 +104,49 @@ fn read_prepared_release_artifact_reports_invalid_json() {
 }
 
 #[test]
-fn git_status_snapshot_sorts_results_and_excludes_artifact_path() {
+fn configuration_snapshot_error_reports_serialization_context() {
+	let error = serde_json::from_str::<serde_json::Value>("{invalid json").unwrap_err();
+	let message = configuration_snapshot_error(&error).to_string();
+	assert!(message.contains(CONFIGURATION_SNAPSHOT_ERROR));
+}
+
+#[test]
+fn prepared_release_artifact_write_error_reports_io_and_serialization_context() {
+	let path = Path::new("cache.json");
+	let io_error = serde_json::Error::io(std::io::Error::other("disk full"));
+	let message = prepared_release_artifact_write_error(path, &io_error).to_string();
+	assert!(message.contains("failed to write prepared release artifact cache.json"));
+
+	let serialization_error =
+		serde_json::from_str::<serde_json::Value>("{invalid json").unwrap_err();
+	let message = prepared_release_artifact_write_error(path, &serialization_error).to_string();
+	assert!(message.contains("failed to serialize prepared release artifact"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn hash_file_helpers_return_single_hash_and_reject_mismatched_output() {
+	let tempdir = setup_prepared_release_repo();
+	let root = tempdir.path();
+	let path = root.join("hash-me.txt");
+	fs::write(&path, "hash me\n").unwrap_or_else(|error| panic!("write hash fixture: {error}"));
+
+	let hash = hash_file_at_path(root, &path)
+		.await
+		.unwrap_or_else(|error| panic!("hash file: {error}"));
+	assert_eq!(hash.len(), 40);
+
+	let error = parse_hash_object_output(b"abc123\n", 2)
+		.err()
+		.unwrap_or_else(|| panic!("expected mismatched hash count error"));
+	assert!(
+		error
+			.to_string()
+			.contains("failed to hash files: expected 2 hashes, got 1")
+	);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn git_status_snapshot_sorts_results_and_excludes_artifact_path() {
 	let tempdir = setup_prepared_release_repo();
 	let root = tempdir.path();
 	fs::create_dir_all(root.join(".monochange/local"))
@@ -111,6 +157,7 @@ fn git_status_snapshot_sorts_results_and_excludes_artifact_path() {
 	fs::write(root.join("aaa.txt"), "a\n").unwrap_or_else(|error| panic!("write aaa: {error}"));
 
 	let lines = git_status_snapshot(root, Some(&root.join(".monochange/local/cache.json")))
+		.await
 		.unwrap_or_else(|error| panic!("git status snapshot: {error}"));
 	assert_eq!(
 		lines,
@@ -118,13 +165,14 @@ fn git_status_snapshot_sorts_results_and_excludes_artifact_path() {
 	);
 }
 
-#[test]
-fn tracked_path_snapshots_deduplicate_paths_and_mark_deleted_entries() {
+#[tokio::test(flavor = "multi_thread")]
+async fn tracked_path_snapshots_deduplicate_paths_and_mark_deleted_entries() {
 	let tempdir = setup_prepared_release_repo();
 	let root = tempdir.path();
 	let configuration = load_workspace_configuration(root)
 		.unwrap_or_else(|error| panic!("load workspace configuration: {error}"));
 	let prepared = crate::prepare_release_execution_with_file_diffs(root, true, false, false)
+		.await
 		.unwrap_or_else(|error| panic!("prepare release execution: {error}"));
 	let changed_file = prepared
 		.prepared_release
@@ -142,6 +190,7 @@ fn tracked_path_snapshots_deduplicate_paths_and_mark_deleted_entries() {
 		&prepared.file_diffs,
 		Some(&explicit_artifact_path(root)),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("save prepared release artifact: {error}"));
 
 	let snapshots = tracked_path_snapshots(
@@ -152,6 +201,7 @@ fn tracked_path_snapshots_deduplicate_paths_and_mark_deleted_entries() {
 			..prepared.prepared_release.clone()
 		},
 	)
+	.await
 	.unwrap_or_else(|error| panic!("tracked path snapshots: {error}"));
 
 	assert_eq!(
@@ -181,27 +231,29 @@ fn render_unified_file_diff_includes_expected_headers() {
 	assert!(diff.contains("+version = \"1.0.1\""));
 }
 
-#[test]
-fn load_prepared_release_execution_rejects_non_dry_run_follow_up_from_dry_run_artifact() {
+#[tokio::test(flavor = "multi_thread")]
+async fn load_prepared_release_execution_rejects_non_dry_run_follow_up_from_dry_run_artifact() {
 	let tempdir = setup_prepared_release_repo();
 	let root = tempdir.path();
 	let artifact_path = explicit_artifact_path(root);
-	let configuration = save_artifact(root, true, &artifact_path);
+	let configuration = save_artifact(root, true, &artifact_path).await;
 
 	let error =
 		load_prepared_release_execution(root, &configuration, Some(&artifact_path), false, false)
+			.await
 			.unwrap_err();
 	assert!(error.to_string().contains("dry-run artifacts"));
 }
 
-#[test]
-fn load_prepared_release_execution_returns_cached_release_with_message_and_timings() {
+#[tokio::test(flavor = "multi_thread")]
+async fn load_prepared_release_execution_returns_cached_release_with_message_and_timings() {
 	let tempdir = setup_prepared_release_repo();
 	let root = tempdir.path();
 	let artifact_path = explicit_artifact_path(root);
 	let configuration = load_workspace_configuration(root)
 		.unwrap_or_else(|error| panic!("load workspace configuration: {error}"));
 	let prepared = crate::prepare_release_execution_with_file_diffs(root, false, true, false)
+		.await
 		.unwrap_or_else(|error| panic!("prepare release execution: {error}"));
 	save_prepared_release_execution(
 		root,
@@ -210,10 +262,12 @@ fn load_prepared_release_execution_returns_cached_release_with_message_and_timin
 		&prepared.file_diffs,
 		Some(&artifact_path),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("save prepared release artifact: {error}"));
 
 	let loaded =
 		load_prepared_release_execution(root, &configuration, Some(&artifact_path), false, true)
+			.await
 			.unwrap_or_else(|error| panic!("load prepared release execution: {error}"))
 			.unwrap_or_else(|| panic!("expected cached prepared release"));
 
@@ -227,12 +281,12 @@ fn load_prepared_release_execution_returns_cached_release_with_message_and_timin
 	);
 }
 
-#[test]
-fn load_prepared_release_execution_rejects_configuration_drift() {
+#[tokio::test(flavor = "multi_thread")]
+async fn load_prepared_release_execution_rejects_configuration_drift() {
 	let tempdir = setup_prepared_release_repo();
 	let root = tempdir.path();
 	let artifact_path = explicit_artifact_path(root);
-	let _original_configuration = save_artifact(root, true, &artifact_path);
+	let _original_configuration = save_artifact(root, true, &artifact_path).await;
 	fs::write(
 		root.join("monochange.toml"),
 		fs::read_to_string(root.join("monochange.toml"))
@@ -250,6 +304,7 @@ fn load_prepared_release_execution_rejects_configuration_drift() {
 		true,
 		false,
 	)
+	.await
 	.unwrap_err();
 	assert!(
 		error
@@ -258,12 +313,12 @@ fn load_prepared_release_execution_rejects_configuration_drift() {
 	);
 }
 
-#[test]
-fn load_prepared_release_execution_rejects_head_and_status_drift() {
+#[tokio::test(flavor = "multi_thread")]
+async fn load_prepared_release_execution_rejects_head_and_status_drift() {
 	let tempdir = setup_prepared_release_repo();
 	let root = tempdir.path();
 	let artifact_path = explicit_artifact_path(root);
-	let configuration = save_artifact(root, false, &artifact_path);
+	let configuration = save_artifact(root, false, &artifact_path).await;
 
 	fs::write(root.join("README.md"), "head drift\n")
 		.unwrap_or_else(|error| panic!("write README: {error}"));
@@ -275,18 +330,20 @@ fn load_prepared_release_execution_rejects_head_and_status_drift() {
 
 	let head_error =
 		load_prepared_release_execution(root, &configuration, Some(&artifact_path), false, false)
+			.await
 			.unwrap_err();
 	assert!(head_error.to_string().contains("HEAD changed"));
 
 	let tempdir = setup_prepared_release_repo();
 	let root = tempdir.path();
 	let artifact_path = explicit_artifact_path(root);
-	let configuration = save_artifact(root, false, &artifact_path);
+	let configuration = save_artifact(root, false, &artifact_path).await;
 	fs::write(root.join("README.md"), "status drift\n")
 		.unwrap_or_else(|error| panic!("write README: {error}"));
 
 	let status_error =
 		load_prepared_release_execution(root, &configuration, Some(&artifact_path), false, false)
+			.await
 			.unwrap_err();
 	assert!(
 		status_error
@@ -295,12 +352,12 @@ fn load_prepared_release_execution_rejects_head_and_status_drift() {
 	);
 }
 
-#[test]
-fn load_prepared_release_execution_rejects_tracked_path_drift() {
+#[tokio::test(flavor = "multi_thread")]
+async fn load_prepared_release_execution_rejects_tracked_path_drift() {
 	let tempdir = setup_prepared_release_repo();
 	let root = tempdir.path();
 	let artifact_path = explicit_artifact_path(root);
-	let configuration = save_artifact(root, false, &artifact_path);
+	let configuration = save_artifact(root, false, &artifact_path).await;
 	let mut artifact = read_prepared_release_artifact(&artifact_path)
 		.unwrap_or_else(|error| panic!("read prepared release artifact: {error}"));
 	let tracked = artifact
@@ -317,16 +374,17 @@ fn load_prepared_release_execution_rejects_tracked_path_drift() {
 	.unwrap_or_else(|error| panic!("rewrite artifact: {error}"));
 	let error =
 		load_prepared_release_execution(root, &configuration, Some(&artifact_path), false, false)
+			.await
 			.unwrap_err();
 	assert!(error.to_string().contains("workspace content drifted"));
 }
 
-#[test]
-fn load_prepared_release_execution_rejects_schema_mismatch() {
+#[tokio::test(flavor = "multi_thread")]
+async fn load_prepared_release_execution_rejects_schema_mismatch() {
 	let tempdir = setup_prepared_release_repo();
 	let root = tempdir.path();
 	let artifact_path = explicit_artifact_path(root);
-	let configuration = save_artifact(root, true, &artifact_path);
+	let configuration = save_artifact(root, true, &artifact_path).await;
 	let mut artifact = read_prepared_release_artifact(&artifact_path)
 		.unwrap_or_else(|error| panic!("read prepared release artifact: {error}"));
 	artifact.schema_version += 1;
@@ -339,18 +397,20 @@ fn load_prepared_release_execution_rejects_schema_mismatch() {
 
 	let error =
 		load_prepared_release_execution(root, &configuration, Some(&artifact_path), true, false)
+			.await
 			.unwrap_err();
 	assert!(error.to_string().contains("schema version"));
 }
 
-#[test]
-fn maybe_load_prepared_release_execution_ignores_stale_default_cache() {
+#[tokio::test(flavor = "multi_thread")]
+async fn maybe_load_prepared_release_execution_ignores_stale_default_cache() {
 	let tempdir = setup_prepared_release_repo();
 	let root = tempdir.path();
 	let default_path = default_prepared_release_cache_path(root);
 	let configuration = load_workspace_configuration(root)
 		.unwrap_or_else(|error| panic!("load workspace configuration: {error}"));
 	let prepared = crate::prepare_release_execution_with_file_diffs(root, false, false, false)
+		.await
 		.unwrap_or_else(|error| panic!("prepare release execution: {error}"));
 	save_prepared_release_execution(
 		root,
@@ -359,6 +419,7 @@ fn maybe_load_prepared_release_execution_ignores_stale_default_cache() {
 		&prepared.file_diffs,
 		None,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("save default prepared release artifact: {error}"));
 	assert!(default_path.is_file());
 	fs::write(
@@ -368,16 +429,17 @@ fn maybe_load_prepared_release_execution_ignores_stale_default_cache() {
 	.unwrap_or_else(|error| panic!("write drifted changelog: {error}"));
 
 	let loaded = maybe_load_prepared_release_execution(root, &configuration, None, false, false)
+		.await
 		.unwrap_or_else(|error| panic!("maybe load prepared release execution: {error}"));
 	assert!(loaded.is_none());
 }
 
-#[test]
-fn maybe_load_prepared_release_execution_returns_explicit_stale_errors() {
+#[tokio::test(flavor = "multi_thread")]
+async fn maybe_load_prepared_release_execution_returns_explicit_stale_errors() {
 	let tempdir = setup_prepared_release_repo();
 	let root = tempdir.path();
 	let artifact_path = explicit_artifact_path(root);
-	let configuration = save_artifact(root, false, &artifact_path);
+	let configuration = save_artifact(root, false, &artifact_path).await;
 	fs::write(root.join("README.md"), "explicit stale\n")
 		.unwrap_or_else(|error| panic!("write README: {error}"));
 
@@ -388,6 +450,7 @@ fn maybe_load_prepared_release_execution_returns_explicit_stale_errors() {
 		false,
 		false,
 	)
+	.await
 	.unwrap_err();
 	assert!(
 		error
@@ -396,15 +459,16 @@ fn maybe_load_prepared_release_execution_returns_explicit_stale_errors() {
 	);
 }
 
-#[test]
-fn load_prepared_release_execution_rejects_missing_diff_previews_when_requested() {
+#[tokio::test(flavor = "multi_thread")]
+async fn load_prepared_release_execution_rejects_missing_diff_previews_when_requested() {
 	let tempdir = setup_prepared_release_repo();
 	let root = tempdir.path();
 	let artifact_path = explicit_artifact_path(root);
-	let configuration = save_artifact(root, false, &artifact_path);
+	let configuration = save_artifact(root, false, &artifact_path).await;
 
 	let error =
 		load_prepared_release_execution(root, &configuration, Some(&artifact_path), false, true)
+			.await
 			.unwrap_err();
 	assert!(error.to_string().contains("diff previews"));
 }
@@ -412,21 +476,20 @@ fn load_prepared_release_execution_rejects_missing_diff_previews_when_requested(
 #[test]
 fn status_line_path_handles_short_and_standard_status_lines() {
 	assert_eq!(status_line_path("??"), None);
-	assert_eq!(
-		status_line_path(" M Cargo.toml"),
-		Some(PathBuf::from("Cargo.toml"))
-	);
+	assert_eq!(status_line_path(" M Cargo.toml"), Some("Cargo.toml"));
 }
 
-#[test]
-fn ensure_monochange_artifact_ignored_updates_git_exclude_once() {
+#[tokio::test(flavor = "multi_thread")]
+async fn ensure_monochange_artifact_ignored_updates_git_exclude_once() {
 	let tempdir = setup_prepared_release_repo();
 	let root = tempdir.path();
 	let artifact_path = root.join(".monochange/local/cache.json");
 
 	ensure_monochange_artifact_ignored(root, &artifact_path)
+		.await
 		.unwrap_or_else(|error| panic!("ensure artifact ignored: {error}"));
 	ensure_monochange_artifact_ignored(root, &artifact_path)
+		.await
 		.unwrap_or_else(|error| panic!("ensure artifact ignored twice: {error}"));
 
 	let exclude_path = root.join(".git").join("info").join("exclude");
@@ -441,13 +504,14 @@ fn ensure_monochange_artifact_ignored_updates_git_exclude_once() {
 	);
 }
 
-#[test]
-fn save_prepared_release_execution_reports_parent_and_write_failures() {
+#[tokio::test(flavor = "multi_thread")]
+async fn save_prepared_release_execution_reports_parent_and_write_failures() {
 	let tempdir = setup_prepared_release_repo();
 	let root = tempdir.path();
 	let configuration = load_workspace_configuration(root)
 		.unwrap_or_else(|error| panic!("load workspace configuration: {error}"));
 	let prepared = crate::prepare_release_execution_with_file_diffs(root, false, false, false)
+		.await
 		.unwrap_or_else(|error| panic!("prepare release execution: {error}"));
 
 	let parent_file = root.join("artifact-parent");
@@ -459,6 +523,7 @@ fn save_prepared_release_execution_reports_parent_and_write_failures() {
 		&prepared.file_diffs,
 		Some(&parent_file.join("artifact.json")),
 	)
+	.await
 	.unwrap_err();
 	assert!(
 		parent_error
@@ -476,6 +541,7 @@ fn save_prepared_release_execution_reports_parent_and_write_failures() {
 		&prepared.file_diffs,
 		Some(&artifact_dir),
 	)
+	.await
 	.unwrap_err();
 	assert!(
 		write_error
@@ -484,8 +550,8 @@ fn save_prepared_release_execution_reports_parent_and_write_failures() {
 	);
 }
 
-#[test]
-fn read_status_hash_and_ignore_helpers_report_non_git_cases() {
+#[tokio::test(flavor = "multi_thread")]
+async fn read_status_hash_and_ignore_helpers_report_non_git_cases() {
 	let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 
@@ -499,6 +565,7 @@ fn read_status_hash_and_ignore_helpers_report_non_git_cases() {
 	);
 
 	let status_error = git_status_snapshot(root, None)
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected non-git status error"));
 	assert!(
@@ -508,41 +575,54 @@ fn read_status_hash_and_ignore_helpers_report_non_git_cases() {
 	);
 
 	let hash_error = hash_file_at_path(root, &root.join("missing.txt"))
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected hash-object failure"));
 	assert!(hash_error.to_string().contains("failed to hash"));
 
 	ensure_monochange_artifact_ignored(root, &root.join(".monochange/local/cache.json"))
+		.await
 		.unwrap_or_else(|error| panic!("non-git artifact ignore should succeed: {error}"));
 }
 
 #[test]
-fn git_status_snapshot_without_excluded_path_keeps_all_lines() {
+fn first_hash_for_path_reports_empty_git_output() {
+	let error = first_hash_for_path(Path::new("tracked.txt"), Vec::new())
+		.err()
+		.unwrap_or_else(|| panic!("expected empty hash output error"));
+
+	assert!(error.to_string().contains("git returned no hash"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn git_status_snapshot_without_excluded_path_keeps_all_lines() {
 	let tempdir = setup_prepared_release_repo();
 	let root = tempdir.path();
 	fs::write(root.join("scratch.txt"), "scratch\n")
 		.unwrap_or_else(|error| panic!("write scratch file: {error}"));
 
 	let lines = git_status_snapshot(root, None)
+		.await
 		.unwrap_or_else(|error| panic!("git status snapshot without exclusions: {error}"));
 	assert!(lines.iter().any(|line| line.ends_with("scratch.txt")));
 }
 
-#[test]
-fn ensure_monochange_artifact_ignored_skips_paths_outside_monochange_dir() {
+#[tokio::test(flavor = "multi_thread")]
+async fn ensure_monochange_artifact_ignored_skips_paths_outside_monochange_dir() {
 	let tempdir = setup_prepared_release_repo();
 	let root = tempdir.path();
 	let artifact_path = root.join("prepared-release.json");
 	let exclude_path = root.join(".git").join("info").join("exclude");
 
 	ensure_monochange_artifact_ignored(root, &artifact_path)
+		.await
 		.unwrap_or_else(|error| panic!("ensure external artifact ignored: {error}"));
 	let exclude = fs::read_to_string(&exclude_path).unwrap_or_default();
 	assert!(!exclude.contains(".monochange/local/"));
 }
 
-#[test]
-fn ensure_monochange_artifact_ignored_appends_after_existing_content_without_newline() {
+#[tokio::test(flavor = "multi_thread")]
+async fn ensure_monochange_artifact_ignored_appends_after_existing_content_without_newline() {
 	let tempdir = setup_prepared_release_repo();
 	let root = tempdir.path();
 	let exclude_path = root.join(".git").join("info").join("exclude");
@@ -550,6 +630,7 @@ fn ensure_monochange_artifact_ignored_appends_after_existing_content_without_new
 		.unwrap_or_else(|error| panic!("seed git exclude file: {error}"));
 
 	ensure_monochange_artifact_ignored(root, &root.join(".monochange/local/cache.json"))
+		.await
 		.unwrap_or_else(|error| panic!("append monochange ignore rule: {error}"));
 
 	let exclude = fs::read_to_string(&exclude_path)
@@ -557,8 +638,8 @@ fn ensure_monochange_artifact_ignored_appends_after_existing_content_without_new
 	assert_eq!(exclude, "*.log\n.monochange/local/\n");
 }
 
-#[test]
-fn ensure_monochange_artifact_ignored_reports_git_resolution_and_write_failures() {
+#[tokio::test(flavor = "multi_thread")]
+async fn ensure_monochange_artifact_ignored_reports_git_resolution_and_write_failures() {
 	let removed_root = {
 		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		tempdir.path().to_path_buf()
@@ -567,6 +648,7 @@ fn ensure_monochange_artifact_ignored_reports_git_resolution_and_write_failures(
 		&removed_root,
 		&removed_root.join(".monochange/local/cache.json"),
 	)
+	.await
 	.err()
 	.unwrap_or_else(|| panic!("expected git exclude resolution error"));
 	assert!(
@@ -585,6 +667,7 @@ fn ensure_monochange_artifact_ignored_reports_git_resolution_and_write_failures(
 
 	let write_error =
 		ensure_monochange_artifact_ignored(root, &root.join(".monochange/local/cache.json"))
+			.await
 			.err()
 			.unwrap_or_else(|| panic!("expected git exclude write error"));
 	assert!(
@@ -594,8 +677,8 @@ fn ensure_monochange_artifact_ignored_reports_git_resolution_and_write_failures(
 	);
 }
 
-#[test]
-fn helper_error_paths_cover_hashing_and_git_exclude_directory_creation() {
+#[tokio::test(flavor = "multi_thread")]
+async fn helper_error_paths_cover_hashing_and_git_exclude_directory_creation() {
 	let removed_root = {
 		let tempdir = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		let root = tempdir.path().to_path_buf();
@@ -604,6 +687,7 @@ fn helper_error_paths_cover_hashing_and_git_exclude_directory_creation() {
 		root
 	};
 	let hash_error = hash_file_at_path(&removed_root, &removed_root.join("tracked.txt"))
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected hash spawn error"));
 	assert!(hash_error.to_string().contains("failed to hash"));
@@ -619,6 +703,7 @@ fn helper_error_paths_cover_hashing_and_git_exclude_directory_creation() {
 
 	let create_dir_error =
 		ensure_monochange_artifact_ignored(root, &root.join(".monochange/local/cache.json"))
+			.await
 			.err()
 			.unwrap_or_else(|| panic!("expected git exclude directory creation error"));
 	assert!(
@@ -626,4 +711,43 @@ fn helper_error_paths_cover_hashing_and_git_exclude_directory_creation() {
 			.to_string()
 			.contains("failed to create git exclude directory")
 	);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn tracked_path_snapshots_hashes_existing_changed_files() {
+	let tempdir = setup_prepared_release_repo();
+	let root = tempdir.path();
+	let prepared_release = PreparedRelease {
+		plan: monochange_core::ReleasePlan {
+			workspace_root: root.to_path_buf(),
+			decisions: Vec::new(),
+			groups: Vec::new(),
+			warnings: Vec::new(),
+			unresolved_items: Vec::new(),
+			compatibility_evidence: Vec::new(),
+		},
+		changeset_paths: Vec::new(),
+		changesets: Vec::new(),
+		released_packages: Vec::new(),
+		package_publications: Vec::new(),
+		version: None,
+		group_version: None,
+		release_targets: Vec::new(),
+		changed_files: vec![PathBuf::from("monochange.toml")],
+		changelogs: Vec::new(),
+		updated_changelogs: Vec::new(),
+		deleted_changesets: Vec::new(),
+		dry_run: false,
+	};
+
+	let tracked_paths = tracked_path_snapshots(root, &prepared_release)
+		.await
+		.unwrap_or_else(|error| panic!("tracked path snapshots: {error}"));
+
+	assert_eq!(tracked_paths.len(), 1);
+	assert_eq!(
+		tracked_paths[0].state,
+		PreparedReleaseTrackedPathState::File
+	);
+	assert!(tracked_paths[0].hash.is_some());
 }

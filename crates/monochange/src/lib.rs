@@ -1,4 +1,5 @@
 #![allow(unstable_features)]
+#![cfg_attr(test, allow(unused_imports, unused_qualifications))]
 #![feature(coverage_attribute)]
 
 //! # `monochange`
@@ -55,6 +56,7 @@ use std::io::IsTerminal;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
+use std::process::ExitCode;
 use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
@@ -62,6 +64,8 @@ use std::time::UNIX_EPOCH;
 use analyze::render_analyze_report;
 pub(crate) use monochange_changelog::ChangelogBuildContext;
 pub(crate) use monochange_changelog::build_changelog_updates;
+#[cfg(test)]
+pub(crate) use monochange_changelog::render_group_filtered_update_message;
 pub(crate) use monochange_changelog::render_jinja_template;
 pub mod changelog {
 	pub use monochange_changelog::render_message_template;
@@ -75,23 +79,74 @@ pub use changeset_policy::verify_changesets;
 pub(crate) use changesets::*;
 use clap::ValueEnum;
 use clap::error::ErrorKind;
+#[cfg(test)]
+pub(crate) use cli::apply_runtime_change_type_choices;
+#[cfg(test)]
+pub(crate) use cli::apply_runtime_prepare_release_markdown_defaults;
+#[cfg(test)]
+pub(crate) use cli::build_cli_command_subcommand;
 pub use cli::build_command;
+#[cfg(test)]
+pub(crate) use cli::build_command_for_root;
 use cli::build_command_with_cli;
+#[cfg(test)]
+pub(crate) use cli::build_skill_subcommand;
+#[cfg(test)]
+pub(crate) use cli::build_subagents_subcommand;
+#[cfg(test)]
+pub(crate) use cli::cli_command_after_help;
+#[cfg(test)]
+pub(crate) use cli::cli_commands_for_root;
 use cli::cli_commands_from_config;
+#[cfg(test)]
+pub(crate) use cli::configured_change_type_choices;
 use cli::current_dir_or_dot;
+#[cfg(test)]
+pub(crate) use cli_runtime::build_cli_template_context;
+#[cfg(test)]
+pub(crate) use cli_runtime::build_retarget_release_report;
 pub(crate) use cli_runtime::collect_cli_command_inputs;
 pub(crate) use cli_runtime::execute_cli_command;
 use cli_runtime::execute_matches;
+#[cfg(test)]
+pub(crate) use cli_runtime::inferred_retarget_source_configuration;
+#[cfg(test)]
+pub(crate) use cli_runtime::lookup_template_value;
 pub(crate) use cli_runtime::maybe_render_markdown_for_terminal;
+#[cfg(test)]
+pub(crate) use cli_runtime::parse_boolean_step_input;
+#[cfg(test)]
+pub(crate) use cli_runtime::parse_change_bump;
+#[cfg(test)]
+pub(crate) use cli_runtime::parse_direct_template_reference;
 pub(crate) use cli_runtime::parse_output_format;
+#[cfg(test)]
+pub(crate) use cli_runtime::render_cli_command_markdown_result;
+#[cfg(test)]
+pub(crate) use cli_runtime::render_cli_command_result;
+#[cfg(test)]
+pub(crate) use cli_runtime::render_markdown_if_terminal;
+#[cfg(test)]
+pub(crate) use cli_runtime::render_retarget_release_report;
+#[cfg(test)]
+pub(crate) use cli_runtime::retarget_operation_label;
+#[cfg(test)]
+pub(crate) use cli_runtime::template_value_to_input_values;
 use command_wizard::run_command_wizard;
 use git_support::git_commit_paths;
 use git_support::git_head_commit;
 use git_support::git_stage_paths;
+#[cfg(test)]
+pub(crate) use git_support::read_git_commit_message;
+#[cfg(test)]
+pub(crate) use git_support::run_git_capture;
+#[cfg(test)]
+pub(crate) use git_support::run_git_process;
+#[cfg(test)]
+pub(crate) use git_support::run_git_status;
 use migration_audit::run_migration_command;
 #[cfg(feature = "cargo")]
 use monochange_cargo::RustSemverProvider;
-use monochange_config::load_changeset_file;
 use monochange_config::load_workspace_configuration;
 use monochange_config::resolve_package_reference;
 use monochange_core::BumpSeverity;
@@ -163,6 +218,20 @@ use monochange_gitlab as gitlab_provider;
 use monochange_graph::build_release_plan;
 use monochange_semver::CompatibilityProvider;
 use monochange_semver::collect_assessments;
+#[cfg(test)]
+pub(crate) use workspace_ops::build_lockfile_command_executions;
+#[cfg(test)]
+pub(crate) use workspace_ops::change_type_default_bump;
+#[cfg(test)]
+pub(crate) use workspace_ops::prepare_release_execution;
+#[cfg(test)]
+pub(crate) use workspace_ops::render_cli_commands_toml;
+#[cfg(test)]
+pub(crate) use workspace_ops::render_interactive_changeset_markdown;
+
+#[cfg(test)]
+pub(crate) static TEST_ENV_LOCK: std::sync::LazyLock<std::sync::Mutex<()>> =
+	std::sync::LazyLock::new(|| std::sync::Mutex::new(()));
 pub(crate) use release_artifacts::*;
 pub use release_record::discover_release_record;
 pub use release_record::execute_release_retarget;
@@ -188,7 +257,7 @@ pub use workspace_ops::plan_release;
 use workspace_ops::populate_workspace;
 pub use workspace_ops::prepare_release;
 pub(crate) use workspace_ops::prepare_release_execution_with_file_diffs;
-pub(crate) use workspace_ops::render_change_target_markdown;
+pub(crate) use workspace_ops::push_change_target_markdown;
 #[cfg(feature = "cargo")]
 pub(crate) use workspace_ops::validate_cargo_workspace_version_groups;
 
@@ -530,13 +599,14 @@ const CHANGESET_DIR: &str = ".changeset";
 /// matching subcommand, and prints any non-empty stdout payload unless
 /// `--quiet` was requested.
 #[must_use = "the run result must be checked"]
-pub fn run_from_env(bin_name: &'static str) -> MonochangeResult<()> {
+#[allow(clippy::large_futures)]
+pub async fn run_from_env(bin_name: &'static str) -> MonochangeResult<()> {
 	let log_level = extract_log_level_from_args();
 	tracing_setup::init_tracing(log_level.as_deref());
 
 	let quiet = extract_quiet_from_args(std::env::args_os());
 	let args = std::env::args_os();
-	let output = run_with_args(bin_name, args)?;
+	let output = run_with_args(bin_name, args).await?;
 	if !quiet && !output.is_empty() {
 		let format = detect_output_format_from_env_args(std::env::args());
 		if format == OutputFormat::Markdown {
@@ -546,6 +616,26 @@ pub fn run_from_env(bin_name: &'static str) -> MonochangeResult<()> {
 		}
 	}
 	Ok(())
+}
+
+/// Run a CLI binary from process arguments and return the process exit code.
+///
+/// Binary entrypoints choose the Tokio runtime before delegating here so `mc`
+/// and `monochange` share the same output and error handling.
+#[coverage(off)]
+#[must_use = "the process exit code must be returned"]
+pub async fn run_cli_binary_from_env(bin_name: &'static str) -> ExitCode {
+	let quiet = extract_quiet_from_args(std::env::args_os());
+	let result = Box::pin(run_from_env(bin_name)).await;
+	let Err(error) = result else {
+		return ExitCode::SUCCESS;
+	};
+
+	if !quiet {
+		eprintln!("{}", error.render());
+	}
+
+	ExitCode::FAILURE
 }
 
 pub(crate) fn detect_output_format_from_env_args(
@@ -609,12 +699,12 @@ where
 
 /// Execute the `monochange` CLI with an explicit argument iterator.
 #[must_use = "the run result must be checked"]
-pub fn run_with_args<I>(bin_name: &'static str, args: I) -> MonochangeResult<String>
+pub async fn run_with_args<I>(bin_name: &'static str, args: I) -> MonochangeResult<String>
 where
 	I: IntoIterator<Item = OsString>,
 {
 	let root = current_dir_or_dot();
-	run_with_args_in_dir(bin_name, args, &root)
+	run_with_args_in_dir(bin_name, args, &root).await
 }
 
 #[tracing::instrument(skip_all, fields(bin_name))]
@@ -689,11 +779,33 @@ fn render_custom_command_argument_error(
 	)
 }
 
+fn format_populate_workspace_result(result: &PopulateWorkspaceResult) -> String {
+	if result.added_commands.is_empty() {
+		format!(
+			"{} already defines all default CLI commands",
+			result.path.display()
+		)
+	} else {
+		let mut message = format!(
+			"updated {} and added {} default CLI commands: ",
+			result.path.display(),
+			result.added_commands.len()
+		);
+		for (index, command) in result.added_commands.iter().enumerate() {
+			if index > 0 {
+				message.push_str(", ");
+			}
+			message.push_str(command);
+		}
+		message
+	}
+}
+
 /// control both the argv payload and the workspace root used for config loading
 /// and command execution.
 #[doc(hidden)]
 #[allow(clippy::redundant_closure_for_method_calls)]
-pub fn run_with_args_in_dir<I>(
+pub async fn run_with_args_in_dir<I>(
 	bin_name: &'static str,
 	args: I,
 	root: &Path,
@@ -835,9 +947,11 @@ where
 				detection_level,
 				format,
 			)
+			.await
 		}
 		Some(("migrate", migrate_matches)) => run_migration_command(root, quiet, migrate_matches),
-		Some(("mcp", _)) => run_mcp_command_with(quiet, mcp::run_server),
+		Some(("mcp", _)) => run_mcp_command_with(quiet, mcp::run_server).await,
+
 		Some(("check", check_matches)) => {
 			if quiet {
 				return Ok(String::new());
@@ -864,12 +978,13 @@ where
 			}
 			lint::handle_lint_subcommand(root, lint_matches)
 		}
+
 		Some((cli_command_name, cli_command_matches)) if cli_command_name.starts_with("step:") => {
 			let configuration = configuration?;
 			let synthetic = synthetic_step_command_definition(cli_command_name)?;
 			let inputs = collect_cli_command_inputs(&synthetic, cli_command_matches);
 			let dry_run = quiet || cli_command_matches.get_flag("dry-run");
-			execute_cli_command(root, &configuration, &synthetic, dry_run, inputs)
+			execute_cli_command(root, &configuration, &synthetic, dry_run, inputs).await
 		}
 		Some((cli_command_name, cli_command_matches)) => {
 			let configuration = configuration?;
@@ -880,6 +995,7 @@ where
 				cli_command_matches,
 				quiet,
 			)
+			.await
 		}
 		None => Err(MonochangeError::Config("Usage: mc".to_string())),
 	}?;
@@ -891,22 +1007,6 @@ where
 	}
 }
 
-fn format_populate_workspace_result(result: &PopulateWorkspaceResult) -> String {
-	if result.added_commands.is_empty() {
-		format!(
-			"{} already defines all default CLI commands",
-			result.path.display()
-		)
-	} else {
-		format!(
-			"updated {} and added {} default CLI commands: {}",
-			result.path.display(),
-			result.added_commands.len(),
-			result.added_commands.join(", ")
-		)
-	}
-}
-
 #[coverage(off)]
 fn run_command_wizard_for_cli(root: &Path, quiet: bool) -> MonochangeResult<String> {
 	if quiet {
@@ -915,7 +1015,7 @@ fn run_command_wizard_for_cli(root: &Path, quiet: bool) -> MonochangeResult<Stri
 	run_command_wizard(root)
 }
 
-fn run_mcp_command_with<F, Fut>(quiet: bool, run_server: F) -> MonochangeResult<String>
+async fn run_mcp_command_with<F, Fut>(quiet: bool, run_server: F) -> MonochangeResult<String>
 where
 	F: FnOnce() -> Fut,
 	Fut: Future<Output = ()>,
@@ -924,9 +1024,7 @@ where
 		return Ok(String::new());
 	}
 
-	let runtime = tokio::runtime::Runtime::new()
-		.map_err(|error| MonochangeError::Config(error.to_string()))?;
-	runtime.block_on(run_server());
+	run_server().await;
 	Ok(String::new())
 }
 

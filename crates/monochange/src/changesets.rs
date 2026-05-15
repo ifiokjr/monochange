@@ -1,13 +1,14 @@
 use std::collections::BTreeMap;
+use std::fmt::Write as _;
 
 use super::*;
+use crate::changeset_policy::configuration_package_records;
 
-pub(crate) fn diagnose_changesets(
+pub(crate) async fn diagnose_changesets(
 	root: &Path,
 	requested: &[String],
 ) -> MonochangeResult<ChangesetDiagnosticsReport> {
 	let configuration = load_workspace_configuration(root)?;
-	let discovery = discover_workspace(root)?;
 
 	let changeset_paths = if requested.is_empty() {
 		discover_changeset_paths(root, false)?
@@ -26,26 +27,76 @@ pub(crate) fn diagnose_changesets(
 		resolved
 	};
 
-	let loaded_changesets = changeset_paths
-		.iter()
-		.map(|path| load_changeset_file(path, &configuration, &discovery.packages))
-		.collect::<MonochangeResult<Vec<_>>>()?;
+	let loaded_changesets = load_diagnostic_changesets(root, &configuration, &changeset_paths)?;
 
-	let mut changesets = build_prepared_changesets(root, &loaded_changesets);
+	let mut changesets = build_prepared_changesets(root, loaded_changesets);
 
 	if let Some(source) = configuration.source.as_ref() {
 		hosted_sources::configured_hosted_source_adapter(source)
-			.enrich_changeset_context(source, &mut changesets);
+			.enrich_changeset_context(source, &mut changesets)
+			.await;
 	}
 
-	let requested_changesets = changeset_paths
+	let requested_changesets = changesets
 		.iter()
-		.map(|path| root_relative(root, path))
+		.map(|changeset| changeset.path.clone())
 		.collect();
 
 	Ok(ChangesetDiagnosticsReport {
 		requested_changesets,
 		changesets,
+	})
+}
+
+fn load_diagnostic_changesets(
+	root: &Path,
+	configuration: &monochange_core::WorkspaceConfiguration,
+	changeset_paths: &[PathBuf],
+) -> MonochangeResult<Vec<monochange_config::LoadedChangesetFile>> {
+	match load_diagnostic_changesets_with_packages(
+		configuration,
+		changeset_paths,
+		&configuration_package_records(configuration),
+	) {
+		Ok(loaded_changesets)
+			if !diagnostics_need_discovered_package_versions(&loaded_changesets) =>
+		{
+			Ok(loaded_changesets)
+		}
+		Ok(_) | Err(_) => {
+			let discovery = discover_workspace(root)?;
+			load_diagnostic_changesets_with_packages(
+				configuration,
+				changeset_paths,
+				&discovery.packages,
+			)
+		}
+	}
+}
+
+fn load_diagnostic_changesets_with_packages(
+	configuration: &monochange_core::WorkspaceConfiguration,
+	changeset_paths: &[PathBuf],
+	packages: &[PackageRecord],
+) -> MonochangeResult<Vec<monochange_config::LoadedChangesetFile>> {
+	let changeset_load_context =
+		monochange_config::build_changeset_load_context(configuration, packages);
+	changeset_paths
+		.iter()
+		.map(|path| {
+			monochange_config::load_changeset_file_with_context(path, &changeset_load_context)
+		})
+		.collect()
+}
+
+fn diagnostics_need_discovered_package_versions(
+	loaded_changesets: &[monochange_config::LoadedChangesetFile],
+) -> bool {
+	loaded_changesets.iter().any(|changeset| {
+		changeset
+			.signals
+			.iter()
+			.any(|signal| signal.explicit_version.is_some() && signal.requested_bump.is_none())
 	})
 }
 
@@ -107,58 +158,79 @@ pub(crate) fn render_changeset_diagnostics(report: &ChangesetDiagnosticsReport) 
 		return "no matching changesets found".to_string();
 	}
 
-	let mut lines = Vec::new();
+	let mut rendered = String::new();
 
-	for changeset in &report.changesets {
+	for (index, changeset) in report.changesets.iter().enumerate() {
+		if index > 0 {
+			rendered.push('\n');
+		}
+
 		let change_summary = changeset.summary.as_deref().unwrap_or("<missing summary>");
 
-		lines.push(format!("changeset: {}", changeset.path.display()));
-		lines.push(format!("  summary: {change_summary}"));
+		let _ = writeln!(&mut rendered, "changeset: {}", changeset.path.display());
+		let _ = writeln!(&mut rendered, "  summary: {change_summary}");
 
 		if let Some(details) = &changeset.details {
-			lines.push(format!("  details: {details}"));
+			let _ = writeln!(&mut rendered, "  details: {details}");
 		}
 
 		if !changeset.targets.is_empty() {
-			lines.push("  targets:".to_string());
+			rendered.push_str("  targets:\n");
 
 			for target in &changeset.targets {
-				let bump = target
-					.bump
-					.map_or_else(|| "auto".to_string(), |bump| bump.to_string());
-				lines.push(format!(
-					"  - {} {} (bump: {}, origin: {})",
-					target.kind, target.id, bump, target.origin,
-				));
+				let _ = match target.bump {
+					Some(bump) => {
+						writeln!(
+							&mut rendered,
+							"  - {} {} (bump: {}, origin: {})",
+							target.kind, target.id, bump, target.origin,
+						)
+					}
+					None => {
+						writeln!(
+							&mut rendered,
+							"  - {} {} (bump: auto, origin: {})",
+							target.kind, target.id, target.origin,
+						)
+					}
+				};
 
 				if !target.caused_by.is_empty() {
-					lines.push(format!("    caused by: {}", target.caused_by.join(", ")));
+					rendered.push_str("    caused by: ");
+					push_comma_separated(
+						&mut rendered,
+						target.caused_by.iter().map(String::as_str),
+					);
+					rendered.push('\n');
 				}
 
 				if !target.evidence_refs.is_empty() {
-					lines.push(format!("    evidence: {}", target.evidence_refs.join(", ")));
+					rendered.push_str("    evidence: ");
+					push_comma_separated(
+						&mut rendered,
+						target.evidence_refs.iter().map(String::as_str),
+					);
+					rendered.push('\n');
 				}
 			}
 		}
 
 		if let Some(context) = &changeset.context {
-			push_changeset_context_lines(&mut lines, context);
+			push_changeset_context_lines(&mut rendered, context);
 		}
-
-		lines.push(String::new());
 	}
 
-	lines.pop();
-	lines.join("\n")
+	rendered.pop();
+	rendered
 }
 
-fn push_changeset_context_lines(lines: &mut Vec<String>, context: &ChangesetContext) {
+fn push_changeset_context_lines(rendered: &mut String, context: &ChangesetContext) {
 	if let Some(introduced) = context
 		.introduced
 		.as_ref()
 		.and_then(|revision| revision.commit.as_ref())
 	{
-		lines.push(format!("  introduced: {}", introduced.short_sha));
+		let _ = writeln!(rendered, "  introduced: {}", introduced.short_sha);
 	}
 
 	if let Some(last_updated) = context
@@ -166,7 +238,7 @@ fn push_changeset_context_lines(lines: &mut Vec<String>, context: &ChangesetCont
 		.as_ref()
 		.and_then(|revision| revision.commit.as_ref())
 	{
-		lines.push(format!("  last-updated: {}", last_updated.short_sha));
+		let _ = writeln!(rendered, "  last-updated: {}", last_updated.short_sha);
 	}
 
 	let review_request = context
@@ -181,25 +253,38 @@ fn push_changeset_context_lines(lines: &mut Vec<String>, context: &ChangesetCont
 		});
 
 	if let Some(review_request) = review_request {
-		let review_request_line = match &review_request.url {
-			Some(url) => format!("  review request: {} ({})", review_request.id, url),
-			None => format!("  review request: {}", review_request.id),
+		let _ = match &review_request.url {
+			Some(url) => {
+				writeln!(
+					rendered,
+					"  review request: {} ({})",
+					review_request.id, url,
+				)
+			}
+			None => writeln!(rendered, "  review request: {}", review_request.id),
 		};
-
-		lines.push(review_request_line);
 	}
 
 	if context.related_issues.is_empty() {
 		return;
 	}
 
-	let issues = context
-		.related_issues
-		.iter()
-		.map(|issue| issue.id.as_str())
-		.collect::<Vec<_>>()
-		.join(", ");
-	lines.push(format!("  related issues: {issues}"));
+	rendered.push_str("  related issues: ");
+	push_comma_separated(
+		rendered,
+		context.related_issues.iter().map(|issue| issue.id.as_str()),
+	);
+	rendered.push('\n');
+}
+
+fn push_comma_separated<'a>(rendered: &mut String, values: impl Iterator<Item = &'a str>) {
+	let mut separator = "";
+
+	for value in values {
+		rendered.push_str(separator);
+		rendered.push_str(value);
+		separator = ", ";
+	}
 }
 
 #[must_use = "the discovery result must be checked"]
@@ -243,37 +328,53 @@ pub(crate) fn discover_changeset_paths(
 
 pub(crate) fn build_prepared_changesets(
 	root: &Path,
-	loaded_changesets: &[monochange_config::LoadedChangesetFile],
+	loaded_changesets: Vec<monochange_config::LoadedChangesetFile>,
 ) -> Vec<PreparedChangeset> {
+	let relative_paths = loaded_changesets
+		.iter()
+		.map(|changeset| root_relative(root, &changeset.path))
+		.collect::<Vec<_>>();
+
 	// Batch-load all changeset git context in a single pass instead of
 	// spawning two git-log subprocesses per changeset (which was O(2N)
 	// subprocess spawns and dominated release planning time).
-	let git_contexts = batch_load_changeset_contexts(root, loaded_changesets);
+	let mut git_contexts = batch_load_changeset_contexts(root, &relative_paths).into_iter();
 
 	loaded_changesets
-		.iter()
-		.enumerate()
-		.map(|(index, changeset)| {
+		.into_iter()
+		.zip(relative_paths)
+		.map(|(changeset, relative_path)| {
 			PreparedChangeset {
-				path: root_relative(root, &changeset.path),
-				summary: changeset.summary.clone(),
-				details: changeset.details.clone(),
+				path: relative_path,
+				summary: changeset.summary,
+				details: changeset.details,
 				targets: changeset
 					.targets
-					.iter()
+					.into_iter()
 					.map(|target| {
+						let monochange_config::LoadedChangesetTarget {
+							id,
+							kind,
+							bump,
+							explicit_version: _,
+							origin,
+							evidence_refs,
+							change_type,
+							caused_by,
+						} = target;
+
 						PreparedChangesetTarget {
-							id: target.id.clone(),
-							kind: target.kind,
-							bump: target.bump,
-							origin: target.origin.clone(),
-							evidence_refs: target.evidence_refs.clone(),
-							change_type: target.change_type.clone(),
-							caused_by: target.caused_by.clone(),
+							id,
+							kind,
+							bump,
+							origin,
+							evidence_refs,
+							change_type,
+							caused_by,
 						}
 					})
 					.collect(),
-				context: git_contexts.get(index).cloned(),
+				context: git_contexts.next(),
 			}
 		})
 		.collect()
@@ -281,18 +382,15 @@ pub(crate) fn build_prepared_changesets(
 
 /// Load git context for all changesets in two batched git-log calls instead
 /// of 2*N individual subprocess spawns.
-#[tracing::instrument(skip_all, fields(count = loaded_changesets.len()))]
-fn batch_load_changeset_contexts(
-	root: &Path,
-	loaded_changesets: &[monochange_config::LoadedChangesetFile],
-) -> Vec<ChangesetContext> {
-	if loaded_changesets.is_empty() {
+#[tracing::instrument(skip_all, fields(count = relative_paths.len()))]
+fn batch_load_changeset_contexts(root: &Path, relative_paths: &[PathBuf]) -> Vec<ChangesetContext> {
+	if relative_paths.is_empty() {
 		return Vec::new();
 	}
 
 	// Skip git operations entirely if there's no git repository.
 	if !root.join(".git").exists() {
-		return loaded_changesets
+		return relative_paths
 			.iter()
 			.map(|_| {
 				ChangesetContext {
@@ -307,13 +405,7 @@ fn batch_load_changeset_contexts(
 			.collect();
 	}
 
-	// Build file list for git log.
-	let relative_paths: Vec<_> = loaded_changesets
-		.iter()
-		.map(|cs| root_relative(root, &cs.path))
-		.collect();
-
-	let (introduced_map, last_updated_map) = batch_git_log(root, &relative_paths);
+	let (introduced_map, last_updated_map) = batch_git_log(root, relative_paths);
 
 	relative_paths
 		.iter()
@@ -357,7 +449,12 @@ fn batch_git_log(
 		.current_dir(root)
 		.arg("log")
 		.arg("--format=%H%x1f%an%x1f%ae%x1f%aI%x1f%cI")
-		.arg("--name-status");
+		.arg("--name-status")
+		// Existing pending changesets only need the commits that added or updated
+		// them. Filtering out deletes, type changes, and other unrelated status
+		// records keeps large history scans smaller without changing introduced or
+		// last-updated attribution for files still present in `.changeset/`.
+		.arg("--diff-filter=AM");
 	command.arg("--").arg(".changeset/");
 
 	let output = match command.output() {
@@ -616,27 +713,24 @@ pub(crate) fn resolve_config_path(root: &Path, path: &Path) -> PathBuf {
 }
 
 pub(crate) fn default_change_path(root: &Path, package_refs: &[String]) -> PathBuf {
+	default_change_path_for_ref(root, package_refs.first().map(String::as_str))
+}
+
+pub(crate) fn default_change_path_for_ref(root: &Path, package_ref: Option<&str>) -> PathBuf {
 	let timestamp = SystemTime::now()
 		.duration_since(UNIX_EPOCH)
 		.map_or(0, |duration| duration.as_secs());
-	let slug_source = package_refs.first().map_or("change", String::as_str);
-	let slug = slug_source
-		.chars()
-		.map(|character| {
-			if character.is_ascii_alphanumeric() {
-				character.to_ascii_lowercase()
-			} else {
-				'-'
-			}
-		})
-		.collect::<String>()
-		.trim_matches('-')
-		.to_string();
-	let slug = if slug.is_empty() {
-		"change".to_string()
-	} else {
-		slug
-	};
+	let slug_source = package_ref.unwrap_or("change");
+	let mut slug = String::with_capacity(slug_source.len());
+	for character in slug_source.chars() {
+		if character.is_ascii_alphanumeric() {
+			slug.push(character.to_ascii_lowercase());
+		} else {
+			slug.push('-');
+		}
+	}
+	let slug = slug.trim_matches('-');
+	let slug = if slug.is_empty() { "change" } else { slug };
 	root.join(CHANGESET_DIR)
 		.join(format!("{timestamp}-{slug}.md"))
 }
@@ -652,26 +746,28 @@ pub(crate) fn render_changeset_markdown(
 	caused_by: &[String],
 	details: Option<&str>,
 ) -> MonochangeResult<String> {
-	let mut lines = vec!["---".to_string()];
+	let mut rendered = String::from("---\n");
 	for package in package_refs {
-		lines.extend(render_change_target_markdown(
+		push_change_target_markdown(
+			&mut rendered,
 			configuration,
 			package,
 			bump,
 			version,
 			change_type,
 			caused_by,
-		)?);
+		)?;
 	}
-	lines.push("---".to_string());
-	lines.push(String::new());
-	lines.push(format!("# {reason}"));
-	if let Some(details) = details.filter(|value| !value.trim().is_empty()) {
-		lines.push(String::new());
-		lines.push(details.trim().to_string());
+
+	rendered.push_str("---\n\n# ");
+	rendered.push_str(reason);
+	rendered.push('\n');
+	if let Some(details) = details.map(str::trim).filter(|value| !value.is_empty()) {
+		rendered.push('\n');
+		rendered.push_str(details);
+		rendered.push('\n');
 	}
-	lines.push(String::new());
-	Ok(lines.join("\n"))
+	Ok(rendered)
 }
 
 #[cfg(test)]

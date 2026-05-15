@@ -199,18 +199,20 @@ fn preview_text_truncates_long_multiline_messages() {
 fn run_git_commit_message_reports_create_temp_file_diagnostics() {
 	let tempdir = tempdir("create parent");
 	let missing_nested_root = tempdir.path().join("missing-parent").join("repo");
-	let error = run_git_commit_message(
-		&missing_nested_root,
-		&CommitMessage {
-			subject: "chore(release): prepare release".to_string(),
-			body: Some("release body".to_string()),
-		},
-		"commit release pull request changes",
-		false,
-	)
-	.err()
-	.unwrap_or_else(|| panic!("expected commit failure"))
-	.to_string();
+	let error = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(run_git_commit_message(
+			&missing_nested_root,
+			&CommitMessage {
+				subject: "chore(release): prepare release".to_string(),
+				body: Some("release body".to_string()),
+			},
+			"commit release pull request changes",
+			false,
+		))
+		.err()
+		.unwrap_or_else(|| panic!("expected commit failure"))
+		.to_string();
 
 	assert!(error.contains("could not create temporary git commit message file"));
 	assert!(error.contains("phase: creating temporary commit message file"));
@@ -226,28 +228,32 @@ fn run_git_commit_message_reports_write_and_flush_diagnostics() {
 		body: Some("release body".to_string()),
 	};
 
-	let write_error = run_git_commit_message_with_io(
-		root,
-		&message,
-		"commit release pull request changes",
-		false,
-		|_, _| Err(io::Error::other("write failed")),
-		flush_git_commit_message_file,
-	)
-	.err()
-	.unwrap_or_else(|| panic!("expected write failure"))
-	.to_string();
-	let flush_error = run_git_commit_message_with_io(
-		root,
-		&message,
-		"commit release pull request changes",
-		false,
-		|_, _| Ok(()),
-		|_| Err(io::Error::other("flush failed")),
-	)
-	.err()
-	.unwrap_or_else(|| panic!("expected flush failure"))
-	.to_string();
+	let write_error = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(run_git_commit_message_with_io(
+			root,
+			&message,
+			"commit release pull request changes",
+			false,
+			|_, _| Err(io::Error::other("write failed")),
+			flush_git_commit_message_file,
+		))
+		.err()
+		.unwrap_or_else(|| panic!("expected write failure"))
+		.to_string();
+	let flush_error = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(run_git_commit_message_with_io(
+			root,
+			&message,
+			"commit release pull request changes",
+			false,
+			|_, _| Ok(()),
+			|_| Err(io::Error::other("flush failed")),
+		))
+		.err()
+		.unwrap_or_else(|| panic!("expected flush failure"))
+		.to_string();
 
 	assert!(write_error.contains("could not write temporary git commit message file"));
 	assert!(write_error.contains("phase: writing temporary commit message file"));
@@ -270,16 +276,18 @@ fn run_git_commit_message_commits_large_message_from_file() {
 	git(root, &["add", "release.txt"]);
 
 	let body = "release target metadata\n".repeat(30_000);
-	run_git_commit_message(
-		root,
-		&CommitMessage {
-			subject: "chore(release): prepare release".to_string(),
-			body: Some(body.clone()),
-		},
-		"commit release pull request changes",
-		false,
-	)
-	.unwrap_or_else(|error| panic!("commit: {error}"));
+	tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(run_git_commit_message(
+			root,
+			&CommitMessage {
+				subject: "chore(release): prepare release".to_string(),
+				body: Some(body.clone()),
+			},
+			"commit release pull request changes",
+			false,
+		))
+		.unwrap_or_else(|error| panic!("commit: {error}"));
 
 	let message = git_stdout(root, &["log", "-1", "--pretty=%B"]);
 	assert!(message.starts_with("chore(release): prepare release\n\n"));
@@ -291,17 +299,19 @@ fn run_git_commit_message_commits_large_message_from_file() {
 fn run_git_commit_message_reports_message_diagnostics_when_git_cannot_start() {
 	let tempdir = tempdir("create parent");
 	let missing = tempdir.path().join("missing");
-	let error = run_git_commit_message(
-		&missing,
-		&CommitMessage {
-			subject: "chore(release): prepare release".to_string(),
-			body: Some("release body".to_string()),
-		},
-		"commit release pull request changes",
-		false,
-	)
-	.err()
-	.unwrap_or_else(|| panic!("expected commit failure"));
+	let error = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(run_git_commit_message(
+			&missing,
+			&CommitMessage {
+				subject: "chore(release): prepare release".to_string(),
+				body: Some("release body".to_string()),
+			},
+			"commit release pull request changes",
+			false,
+		))
+		.err()
+		.unwrap_or_else(|| panic!("expected commit failure"));
 	let error = error.to_string();
 
 	assert!(error.contains("failed to commit release pull request changes"));
@@ -312,4 +322,26 @@ fn run_git_commit_message_reports_message_diagnostics_when_git_cannot_start() {
 	assert!(error.contains("full message bytes: 45"));
 	assert!(error.contains("write the commit message to a file"));
 	assert!(error.contains("avoid passing very large release records"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[allow(clippy::disallowed_methods)]
+async fn run_commit_command_allow_nothing_to_commit_executes_git_commit() {
+	let repo = tempdir("create git repo");
+	git(repo.path(), &["init"]);
+	git(repo.path(), &["config", "user.email", "test@example.com"]);
+	git(repo.path(), &["config", "user.name", "Test User"]);
+	git(repo.path(), &["config", "commit.gpgsign", "false"]);
+	fs::write(repo.path().join("README.md"), "hello\n")
+		.unwrap_or_else(|error| panic!("write README: {error}"));
+	git(repo.path(), &["add", "README.md"]);
+
+	let mut command = git_command(repo.path());
+	command.args(["commit", "-m", "initial"]);
+	run_commit_command_allow_nothing_to_commit(command, "commit changes")
+		.await
+		.unwrap_or_else(|error| panic!("commit changes: {error}"));
+
+	let subject = git_stdout(repo.path(), &["log", "-1", "--pretty=%s"]);
+	assert_eq!(subject.trim(), "initial");
 }

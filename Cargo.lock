@@ -593,6 +593,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tinytemplate",
+ "tokio",
  "walkdir",
 ]
 
@@ -2226,6 +2227,7 @@ dependencies = [
  "temp-env",
  "tempfile",
  "thiserror 2.0.18",
+ "tokio",
  "tracing",
  "walkdir",
 ]
@@ -2332,6 +2334,7 @@ dependencies = [
 name = "monochange_core"
 version = "0.5.1"
 dependencies = [
+ "async-trait",
  "ignore",
  "insta",
  "monochange_schema",
@@ -2345,6 +2348,7 @@ dependencies = [
  "similar-asserts",
  "tempfile",
  "thiserror 2.0.18",
+ "tokio",
  "tracing",
 ]
 
@@ -2405,6 +2409,7 @@ dependencies = [
 name = "monochange_forgejo"
 version = "0.5.1"
 dependencies = [
+ "async-trait",
  "etest",
  "httpmock",
  "insta",
@@ -2425,6 +2430,7 @@ dependencies = [
 name = "monochange_gitea"
 version = "0.5.1"
 dependencies = [
+ "async-trait",
  "etest",
  "httpmock",
  "insta",
@@ -2436,6 +2442,7 @@ dependencies = [
  "serde_json",
  "temp-env",
  "tempfile",
+ "tokio",
  "tracing",
  "urlencoding",
 ]
@@ -2444,6 +2451,7 @@ dependencies = [
 name = "monochange_github"
 version = "0.5.1"
 dependencies = [
+ "async-trait",
  "etest",
  "httpmock",
  "insta",
@@ -2467,6 +2475,7 @@ dependencies = [
 name = "monochange_gitlab"
 version = "0.5.1"
 dependencies = [
+ "async-trait",
  "etest",
  "httpmock",
  "insta",
@@ -2478,6 +2487,7 @@ dependencies = [
  "serde_json",
  "temp-env",
  "tempfile",
+ "tokio",
  "tracing",
  "urlencoding",
 ]
@@ -2520,8 +2530,11 @@ version = "0.5.1"
 dependencies = [
  "httpmock",
  "monochange_core",
+ "monochange_test_helpers",
  "reqwest",
  "serde",
+ "tempfile",
+ "tokio",
 ]
 
 [[package]]
@@ -2595,6 +2608,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "tokio",
  "tracing",
  "urlencoding",
 ]
@@ -4525,6 +4539,7 @@ version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96374855068f47402c3121c6eed88d29cb1de8f3ab27090e273e420bdabcf050"
 dependencies = [
+ "futures",
  "parking_lot",
 ]
 
@@ -5616,6 +5631,7 @@ dependencies = [
  "schemars",
  "semver",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]

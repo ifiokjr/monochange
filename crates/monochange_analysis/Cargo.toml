@@ -38,6 +38,7 @@ monochange_test_helpers = { workspace = true }
 serde_json = { workspace = true, default-features = true }
 temp-env = { workspace = true, default-features = true }
 tempfile = { workspace = true, default-features = true }
+tokio = { workspace = true, default-features = true }
 
 [lints]
 workspace = true

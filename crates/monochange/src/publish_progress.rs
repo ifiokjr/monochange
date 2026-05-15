@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use std::io;
 use std::io::IsTerminal;
 
@@ -22,6 +23,7 @@ impl StderrPublishProgressReporter {
 	}
 
 	pub(crate) fn render_event(event: &PublishProgressEvent, interactive: bool) -> String {
+		let mut output = String::with_capacity(128);
 		match event {
 			PublishProgressEvent::RunStarted {
 				mode,
@@ -29,59 +31,67 @@ impl StderrPublishProgressReporter {
 				total,
 				ecosystems,
 			} => {
-				let ecosystems = ecosystems
-					.iter()
-					.map(|ecosystem| {
-						format!(
-							"{} {}",
-							ecosystem.progress_emoji(),
-							ecosystem.progress_label()
-						)
-					})
-					.collect::<Vec<_>>()
-					.join(", ");
 				let dry_run = if *dry_run { " dry-run" } else { "" };
-				format!("◆ Publishing {total} packages ({mode:?}{dry_run}) across {ecosystems}")
+				write!(
+					output,
+					"◆ Publishing {total} packages ({mode:?}{dry_run}) across "
+				)
+				.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
+				append_ecosystems(&mut output, ecosystems);
 			}
 			PublishProgressEvent::RegistryCheckStarted(package) => {
-				format!(
-					"{} {} checking {} on {}",
-					start_symbol(interactive),
-					package_prefix(package),
-					package.version,
-					package.registry
+				output.push_str(start_symbol(interactive));
+				output.push(' ');
+				append_package_prefix(&mut output, package);
+				write!(
+					output,
+					" checking {} on {}",
+					package.version, package.registry
 				)
+				.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
 			}
 			PublishProgressEvent::PackageStarted(package) => {
-				format!(
-					"{} {} publishing {} to {}",
-					start_symbol(interactive),
-					package_prefix(package),
-					package.version,
-					package.registry
+				output.push_str(start_symbol(interactive));
+				output.push(' ');
+				append_package_prefix(&mut output, package);
+				write!(
+					output,
+					" publishing {} to {}",
+					package.version, package.registry
 				)
+				.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
 			}
 			PublishProgressEvent::PackageSkipped { package, message } => {
-				format!("⏭️ {} {message}", package_prefix(package))
+				output.push_str("⏭️ ");
+				append_package_prefix(&mut output, package);
+				write!(output, " {message}")
+					.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
 			}
 			PublishProgressEvent::PackagePlanned(package) => {
-				format!(
-					"📝 {} would publish {} to {}",
-					package_prefix(package),
-					package.version,
-					package.registry
+				output.push_str("📝 ");
+				append_package_prefix(&mut output, package);
+				write!(
+					output,
+					" would publish {} to {}",
+					package.version, package.registry
 				)
+				.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
 			}
 			PublishProgressEvent::PackagePublished(package) => {
-				format!(
-					"✅ {} published {} to {}",
-					package_prefix(package),
-					package.version,
-					package.registry
+				output.push_str("✅ ");
+				append_package_prefix(&mut output, package);
+				write!(
+					output,
+					" published {} to {}",
+					package.version, package.registry
 				)
+				.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
 			}
 			PublishProgressEvent::PackageFailed { package, message } => {
-				format!("❌ {} failed: {message}", package_prefix(package))
+				output.push_str("❌ ");
+				append_package_prefix(&mut output, package);
+				write!(output, " failed: {message}")
+					.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
 			}
 			PublishProgressEvent::RunFinished {
 				total,
@@ -90,11 +100,14 @@ impl StderrPublishProgressReporter {
 				failed,
 				..
 			} => {
-				format!(
+				write!(
+					output,
 					"◆ Publish complete: {total} packages, ✅ {published} published, ⏭️ {skipped} skipped, ❌ {failed} failed"
 				)
+				.unwrap_or_else(|error| panic!("writing to String cannot fail: {error}"));
 			}
 		}
+		output
 	}
 }
 
@@ -111,13 +124,23 @@ fn start_symbol(interactive: bool) -> &'static str {
 	if interactive { "⠋" } else { "→" }
 }
 
-fn package_prefix(package: &PublishProgressPackage) -> String {
-	format!(
-		"{} {} {}",
-		package.ecosystem.progress_emoji(),
-		package.ecosystem.progress_label(),
-		package.package_name
-	)
+fn append_ecosystems(output: &mut String, ecosystems: &[monochange_core::Ecosystem]) {
+	for (index, ecosystem) in ecosystems.iter().enumerate() {
+		if index > 0 {
+			output.push_str(", ");
+		}
+		output.push_str(ecosystem.progress_emoji());
+		output.push(' ');
+		output.push_str(ecosystem.progress_label());
+	}
+}
+
+fn append_package_prefix(output: &mut String, package: &PublishProgressPackage) {
+	output.push_str(package.ecosystem.progress_emoji());
+	output.push(' ');
+	output.push_str(package.ecosystem.progress_label());
+	output.push(' ');
+	output.push_str(&package.package_name);
 }
 
 #[cfg(test)]

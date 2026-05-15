@@ -1,3 +1,5 @@
+#![allow(clippy::large_futures)]
+#![allow(clippy::disallowed_methods)]
 use insta::assert_snapshot;
 use rstest::rstest;
 use serde_json::Value;

@@ -86,42 +86,6 @@ function readText(path) {
 	}
 }
 
-function parseHyperfineTable(path) {
-	const lines = readText(path).split(/\r?\n/);
-	const results = [];
-	let hasRelative = false;
-	for (const raw of lines) {
-		const line = raw.trim();
-		if (!line || (line.startsWith("|") && line.startsWith("| Com"))) {
-			if (line.includes("Relative")) hasRelative = true;
-			continue;
-		}
-		if (line.startsWith("|:") || !line.startsWith("|")) continue;
-		const cols = line
-			.split("|")
-			.map((col) => col.trim())
-			.filter(Boolean);
-		if (cols.length === 0) continue;
-		const label = cols[0].replace(/^`|`$/g, "").trim();
-		if (!label) continue;
-		if (hasRelative && cols.length >= 5) {
-			const relative = Number.parseFloat(
-				cols
-					.at(-1)
-					.replace(/\\u00b1.*|±.*|\u00b1.*/u, "")
-					.trim(),
-			);
-			if (Number.isNaN(relative) || label.startsWith("main")) continue;
-			results.push({
-				label,
-				status: relative < 0.98 ? "improved" : relative > 1.02 ? "regressed" : "flat",
-				relative,
-			});
-		}
-	}
-	return { results, hasRelative };
-}
-
 function parsePhaseStatus(path) {
 	const counts = { improved: 0, regressed: 0, flat: 0, "over budget": 0 };
 	for (const line of readText(path).split(/\r?\n/)) {
@@ -131,6 +95,56 @@ function parsePhaseStatus(path) {
 		else if (line.includes("| over budget |")) counts["over budget"] += 1;
 	}
 	return counts;
+}
+
+function parseHyperfineTable(path) {
+	const results = [];
+	let hasRelative = false;
+	for (const raw of readText(path).split(/\r?\n/)) {
+		const line = raw.trim();
+		if (!line.startsWith("|") || line.startsWith("|:")) continue;
+		const cols = line
+			.split("|")
+			.map((col) => col.trim())
+			.filter(Boolean);
+		if (cols.length === 0) continue;
+		if (cols.some((col) => col.toLowerCase() === "relative")) {
+			hasRelative = true;
+			continue;
+		}
+		const label = cols[0].replace(/^`|`$/g, "").trim();
+		if (!label || !hasRelative || cols.length < 5) continue;
+		const relativeText =
+			cols
+				.at(-1)
+				?.replace(/\\u00b1.*|±.*|\u00b1.*/u, "")
+				.trim() ?? "";
+		const relative = Number.parseFloat(relativeText);
+		if (Number.isNaN(relative) || label.startsWith("main")) continue;
+		results.push({
+			label,
+			status: relative < 0.98 ? "improved" : relative > 1.02 ? "regressed" : "flat",
+			relative,
+		});
+	}
+	return { results, hasRelative };
+}
+
+function parseHyperfineMeans(path) {
+	const means = new Map();
+	for (const raw of readText(path).split(/\r?\n/)) {
+		const line = raw.trim();
+		if (!line.startsWith("|") || line.startsWith("|:") || line.startsWith("| Command")) continue;
+		const cols = line
+			.split("|")
+			.map((col) => col.trim())
+			.filter(Boolean);
+		if (cols.length < 2) continue;
+		const label = cols[0].replace(/^`|`$/g, "").trim();
+		const mean = Number.parseFloat(cols[1]);
+		if (label && !Number.isNaN(mean)) means.set(label, mean);
+	}
+	return means;
 }
 
 function summarizeScenarioStatus(tablePath, phaseTablePath) {
@@ -145,22 +159,42 @@ function summarizeScenarioStatus(tablePath, phaseTablePath) {
 	]);
 	const hyperfine = parseHyperfineTable(tablePath);
 	const phases = parsePhaseStatus(phaseTablePath);
-	if (hyperfine.results.length === 0 && !Object.values(phases).some((value) => value > 0))
+	const means = parseHyperfineMeans(tablePath);
+	if (
+		hyperfine.results.length === 0 &&
+		means.size === 0 &&
+		!Object.values(phases).some((value) => value > 0)
+	)
 		return "";
+
 	const parts = [];
 	for (const result of hyperfine.results) {
 		let short = result.label;
-		for (const [full, abbr] of shortNames)
+		for (const [full, abbr] of shortNames) {
 			if (result.label.includes(full)) {
 				short = abbr;
 				break;
 			}
+		}
 		parts.push(
 			`${result.status === "improved" ? improved : result.status === "regressed" ? regressed : flat} ${short}`,
 		);
 	}
-	if (phases.improved > 0 && !hyperfine.hasRelative) parts.push(`${improved} phases improved`);
-	if (phases.regressed > 0 && !hyperfine.hasRelative) parts.push(`${regressed} phases regressed`);
+
+	if (parts.length === 0) {
+		for (const { label } of COMMANDS) {
+			const main = means.get(`main · ${label}`);
+			const pr = means.get(`pr · ${label}`);
+			if (main == null || pr == null || main === 0) continue;
+			const ratio = pr / main;
+			const status = ratio < 0.98 ? improved : ratio > 1.02 ? regressed : flat;
+			const short = shortNames.get(label) ?? label.replace("mc ", "");
+			parts.push(`${status} ${short}`);
+		}
+	}
+
+	if (phases.improved > 0 && parts.length === 0) parts.push(`${improved} phases improved`);
+	if (phases.regressed > 0 && parts.length === 0) parts.push(`${regressed} phases regressed`);
 	if (phases["over budget"] > 0) parts.push("🚨 over budget");
 	return parts.join(" ");
 }

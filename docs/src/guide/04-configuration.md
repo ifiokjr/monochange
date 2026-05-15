@@ -708,6 +708,7 @@ branches = ["main", "release/*"]
 enforce_for_tags = true
 enforce_for_publish = true
 enforce_for_commit = false
+changeset_context_timeout_seconds = 120
 
 [source.pull_requests]
 enabled = true

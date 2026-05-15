@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 use inquire::validator::Validation;
 use monochange_config::load_workspace_configuration;
 use monochange_core::BumpSeverity;

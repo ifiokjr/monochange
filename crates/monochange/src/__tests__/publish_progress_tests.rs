@@ -37,6 +37,24 @@ fn render_event_uses_terminal_spinner_marker_when_interactive() {
 }
 
 #[test]
+fn render_event_streams_run_start_summary_with_ecosystems() {
+	let line = StderrPublishProgressReporter::render_event(
+		&PublishProgressEvent::RunStarted {
+			mode: PackagePublishRunMode::Release,
+			dry_run: true,
+			total: 2,
+			ecosystems: vec![Ecosystem::Cargo, Ecosystem::Npm],
+		},
+		false,
+	);
+
+	assert_eq!(
+		line,
+		"◆ Publishing 2 packages (Release dry-run) across 🦀 cargo, 📦 npm"
+	);
+}
+
+#[test]
 fn render_event_summarizes_publish_run_with_emojis() {
 	let line = StderrPublishProgressReporter::render_event(
 		&PublishProgressEvent::RunFinished {

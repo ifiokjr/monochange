@@ -30,7 +30,6 @@
 use std::env;
 use std::path::Path;
 use std::path::PathBuf;
-use std::thread;
 
 use monochange_core::CommitMessage;
 use monochange_core::HostedSourceAdapter;
@@ -65,7 +64,7 @@ use monochange_hosting::put_json;
 use monochange_hosting::release_body;
 use monochange_hosting::release_pull_request_body;
 use monochange_hosting::release_pull_request_branch;
-use reqwest::blocking::Client;
+use reqwest::Client;
 use reqwest::header::CONTENT_TYPE;
 use reqwest::header::HeaderMap;
 use reqwest::header::HeaderValue;
@@ -92,6 +91,7 @@ pub static HOSTED_SOURCE_ADAPTER: GitLabHostedSourceAdapter = GitLabHostedSource
 /// Hosted-source adapter for GitLab repositories.
 pub struct GitLabHostedSourceAdapter;
 
+#[async_trait::async_trait]
 impl HostedSourceAdapter for GitLabHostedSourceAdapter {
 	fn provider(&self) -> SourceProvider {
 		SourceProvider::GitLab
@@ -113,7 +113,7 @@ impl HostedSourceAdapter for GitLabHostedSourceAdapter {
 		annotate_changeset_context(source, changesets);
 	}
 
-	fn enrich_changeset_context(
+	async fn enrich_changeset_context(
 		&self,
 		source: &SourceConfiguration,
 		changesets: &mut [PreparedChangeset],
@@ -390,7 +390,7 @@ pub fn build_release_pull_request_request(
 /// Publish or update all planned GitLab releases for a manifest.
 #[tracing::instrument(skip_all)]
 #[must_use = "the publish result must be checked"]
-pub fn publish_release_requests(
+pub async fn publish_release_requests(
 	source: &SourceConfiguration,
 	requests: &[SourceReleaseRequest],
 ) -> MonochangeResult<Vec<SourceReleaseOutcome>> {
@@ -398,15 +398,17 @@ pub fn publish_release_requests(
 	let token = gitlab_token()?;
 	let headers = auth_headers(&token)?;
 	let api_base = gitlab_api_base(source)?;
-	requests
-		.iter()
-		.map(|request| publish_release_request(&client, &headers, &api_base, source, request))
-		.collect()
+	let mut outcomes = Vec::with_capacity(requests.len());
+	for request in requests {
+		outcomes
+			.push(publish_release_request(&client, &headers, &api_base, source, request).await?);
+	}
+	Ok(outcomes)
 }
 
 /// Commit, push, and publish the release merge request against GitLab.
 #[must_use = "the pull request result must be checked"]
-pub fn publish_release_pull_request(
+pub async fn publish_release_pull_request(
 	source: &SourceConfiguration,
 	root: &Path,
 	request: &SourceChangeRequest,
@@ -415,27 +417,29 @@ pub fn publish_release_pull_request(
 ) -> MonochangeResult<SourceChangeRequestOutcome> {
 	let lookup_source = source.clone();
 	let lookup_request = request.clone();
-	let existing_merge_request = thread::spawn(move || {
+	let existing_merge_request = tokio::task::spawn(async move {
 		let client = build_http_client("GitLab")?;
 		let token = gitlab_token()?;
 		let headers = auth_headers(&token)?;
 		let api_base = gitlab_api_base(&lookup_source)?;
-		lookup_existing_merge_request(&client, &headers, &api_base, &lookup_request)
+		lookup_existing_merge_request(&client, &headers, &api_base, &lookup_request).await
 	});
 	git_checkout_branch(
 		root,
 		&request.head_branch,
 		"prepare release merge request branch",
-	)?;
-	git_stage_paths(root, tracked_paths, "stage release merge request files")?;
+	)
+	.await?;
+	git_stage_paths(root, tracked_paths, "stage release merge request files").await?;
 	git_commit_paths(
 		root,
 		&request.commit_message,
 		"commit release merge request changes",
 		no_verify,
-	)?;
-	let head_commit = git_head_commit(root)?;
-	let existing = join_existing_merge_request_lookup(existing_merge_request)?;
+	)
+	.await?;
+	let head_commit = git_head_commit(root).await?;
+	let existing = join_existing_merge_request_lookup(existing_merge_request).await?;
 	let head_matches_existing =
 		existing.as_ref().and_then(|mr| mr.sha.as_deref()) == Some(head_commit.as_str());
 	if !head_matches_existing {
@@ -444,7 +448,8 @@ pub fn publish_release_pull_request(
 			&request.head_branch,
 			"push release merge request branch",
 			no_verify,
-		)?;
+		)
+		.await?;
 	}
 
 	let client = build_http_client("GitLab")?;
@@ -459,9 +464,10 @@ pub fn publish_release_pull_request(
 		existing.as_ref(),
 		&head_commit,
 	)
+	.await
 }
 
-fn publish_release_request(
+async fn publish_release_request(
 	client: &Client,
 	headers: &HeaderMap,
 	api_base: &str,
@@ -479,7 +485,7 @@ fn publish_release_request(
 		encode(&request.tag_name)
 	);
 	let existing =
-		get_optional_json::<GitLabReleaseResponse>(client, headers, &lookup_url, "GitLab")?;
+		get_optional_json::<GitLabReleaseResponse>(client, headers, &lookup_url, "GitLab").await?;
 	let response: GitLabReleaseResponse = if existing.is_some() {
 		patch_json(
 			client,
@@ -490,7 +496,8 @@ fn publish_release_request(
 				description: request.body.as_deref(),
 			},
 			"GitLab",
-		)?
+		)
+		.await?
 	} else {
 		post_json(
 			client,
@@ -503,7 +510,8 @@ fn publish_release_request(
 				ref_: &source.pull_requests.base,
 			},
 			"GitLab",
-		)?
+		)
+		.await?
 	};
 	Ok(SourceReleaseOutcome {
 		provider: SourceProvider::GitLab,
@@ -519,17 +527,18 @@ fn publish_release_request(
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
-fn publish_merge_request(
+async fn publish_merge_request(
 	client: &Client,
 	headers: &HeaderMap,
 	api_base: &str,
 	request: &SourceChangeRequest,
 ) -> MonochangeResult<SourceChangeRequestOutcome> {
-	let existing = lookup_existing_merge_request(client, headers, api_base, request)?;
+	let existing = lookup_existing_merge_request(client, headers, api_base, request).await?;
 	publish_merge_request_with_existing(client, headers, api_base, request, existing.as_ref(), "")
+		.await
 }
 
-fn publish_merge_request_with_existing(
+async fn publish_merge_request_with_existing(
 	client: &Client,
 	headers: &HeaderMap,
 	api_base: &str,
@@ -575,7 +584,7 @@ fn publish_merge_request_with_existing(
 				labels: &labels,
 			};
 
-			put_json(client, headers, &update_url, &update_payload, "GitLab")?
+			put_json(client, headers, &update_url, &update_payload, "GitLab").await?
 		}
 		None => {
 			let payload = GitLabMergeRequestPayload {
@@ -586,7 +595,7 @@ fn publish_merge_request_with_existing(
 				labels: &labels,
 			};
 
-			post_json(client, headers, &create_url, &payload, "GitLab")?
+			post_json(client, headers, &create_url, &payload, "GitLab").await?
 		}
 	};
 	let outcome = SourceChangeRequestOutcome {
@@ -607,7 +616,7 @@ fn publish_merge_request_with_existing(
 	Ok(outcome)
 }
 
-fn lookup_existing_merge_request(
+async fn lookup_existing_merge_request(
 	client: &Client,
 	headers: &HeaderMap,
 	api_base: &str,
@@ -620,17 +629,18 @@ fn lookup_existing_merge_request(
 		encode(&request.base_branch),
 	);
 	Ok(
-		get_json::<Vec<GitLabExistingMergeRequest>>(client, headers, &list_url, "GitLab")?
+		get_json::<Vec<GitLabExistingMergeRequest>>(client, headers, &list_url, "GitLab")
+			.await?
 			.into_iter()
 			.next(),
 	)
 }
 
-fn join_existing_merge_request_lookup(
-	handle: thread::JoinHandle<MonochangeResult<Option<GitLabExistingMergeRequest>>>,
+async fn join_existing_merge_request_lookup(
+	handle: tokio::task::JoinHandle<MonochangeResult<Option<GitLabExistingMergeRequest>>>,
 ) -> MonochangeResult<Option<GitLabExistingMergeRequest>> {
-	handle.join().map_err(|_| {
-		MonochangeError::Config("failed to join GitLab merge request lookup thread".to_string())
+	handle.await.map_err(|_| {
+		MonochangeError::Config("failed to join GitLab merge request lookup task".to_string())
 	})?
 }
 

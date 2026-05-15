@@ -83,7 +83,7 @@ similar = { workspace = true, default-features = true }
 tempfile = { workspace = true, default-features = true }
 termimad = { workspace = true, default-features = true }
 thiserror = { workspace = true, default-features = true }
-tokio = { workspace = true, features = ["rt-multi-thread", "macros"], default-features = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "process"], default-features = true }
 toml = { workspace = true, default-features = true }
 toml_edit = { workspace = true }
 tracing = { workspace = true, default-features = true }

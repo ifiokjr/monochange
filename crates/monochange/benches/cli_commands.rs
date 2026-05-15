@@ -1,11 +1,14 @@
+#![allow(clippy::large_futures)]
 use std::ffi::OsString;
 use std::fs;
+use std::future::Future;
 use std::path::Path;
 use std::process::Command;
 
 use criterion::BatchSize;
 use criterion::BenchmarkId;
 use criterion::Criterion;
+use criterion::async_executor::AsyncExecutor;
 use criterion::criterion_group;
 use criterion::criterion_main;
 use httpmock::Method::GET;
@@ -205,21 +208,39 @@ fn command_args(command: &str, dry_run: bool) -> Vec<OsString> {
 	args
 }
 
+fn block_on_bench<T>(future: impl Future<Output = T>) -> T {
+	let runtime = tokio::runtime::Builder::new_multi_thread()
+		.enable_all()
+		.build()
+		.unwrap_or_else(|error| panic!("tokio runtime: {error}"));
+
+	AsyncExecutor::block_on(&runtime, future)
+}
+
 fn run_command(root: &Path, command: &str, dry_run: bool) -> String {
-	temp_env::with_vars([("MONOCHANGE_RELEASE_DATE", Some("2026-04-06"))], || {
-		monochange::run_with_args_in_dir("mc", command_args(command, dry_run), root).unwrap()
-	})
+	block_on_bench(temp_env::async_with_vars(
+		[("MONOCHANGE_RELEASE_DATE", Some("2026-04-06"))],
+		async {
+			monochange::run_with_args_in_dir("mc", command_args(command, dry_run), root)
+				.await
+				.unwrap()
+		},
+	))
 }
 
 fn run_release_pr_command(root: &Path, dry_run: bool, github_api_url: Option<&str>) -> String {
-	temp_env::with_vars(
+	block_on_bench(temp_env::async_with_vars(
 		[
 			("MONOCHANGE_RELEASE_DATE", Some("2026-04-06")),
 			("GITHUB_TOKEN", Some("bench-token")),
 			("GITHUB_API_URL", github_api_url),
 		],
-		|| monochange::run_with_args_in_dir("mc", release_pr_args(dry_run), root).unwrap(),
-	)
+		async {
+			monochange::run_with_args_in_dir("mc", release_pr_args(dry_run), root)
+				.await
+				.unwrap()
+		},
+	))
 }
 
 const SCALES: &[(usize, usize)] = &[(5, 10), (20, 50), (50, 200)];
@@ -335,7 +356,9 @@ fn bench_prepare_release_dry_run(c: &mut Criterion) {
 			|b, &(packages, changesets)| {
 				let tempdir = tempfile::tempdir().unwrap();
 				generate_fixture(tempdir.path(), packages, changesets);
-				b.iter(|| monochange::prepare_release(tempdir.path(), true).unwrap());
+				b.iter(|| {
+					block_on_bench(monochange::prepare_release(tempdir.path(), true)).unwrap()
+				});
 			},
 		);
 	}
@@ -460,7 +483,7 @@ fn bench_prepare_release_apply(c: &mut Criterion) {
 						// Benchmark the real non-dry-run path without rendering diff
 						// previews. This is the critical fast path for `mc release`
 						// after we switched supported lockfiles to direct rewrites.
-						monochange::prepare_release(tempdir.path(), false).unwrap();
+						block_on_bench(monochange::prepare_release(tempdir.path(), false)).unwrap();
 					},
 					BatchSize::LargeInput,
 				);
@@ -492,7 +515,7 @@ fn bench_prepare_release_apply_cargo_lockfile_refresh(c: &mut Criterion) {
 					tempdir
 				},
 				|tempdir| {
-					monochange::prepare_release(tempdir.path(), false).unwrap();
+					block_on_bench(monochange::prepare_release(tempdir.path(), false)).unwrap();
 				},
 				BatchSize::LargeInput,
 			);
@@ -515,7 +538,7 @@ fn bench_prepare_release_apply_cargo_lockfile_refresh(c: &mut Criterion) {
 					tempdir
 				},
 				|tempdir| {
-					monochange::prepare_release(tempdir.path(), false).unwrap();
+					block_on_bench(monochange::prepare_release(tempdir.path(), false)).unwrap();
 				},
 				BatchSize::LargeInput,
 			);
@@ -542,7 +565,9 @@ fn bench_prepare_release_with_git_history(c: &mut Criterion) {
 			|b, &history_commits| {
 				let tempdir = tempfile::tempdir().unwrap();
 				generate_fixture_with_git_history(tempdir.path(), 10, 20, history_commits);
-				b.iter(|| monochange::prepare_release(tempdir.path(), true).unwrap());
+				b.iter(|| {
+					block_on_bench(monochange::prepare_release(tempdir.path(), true)).unwrap()
+				});
 			},
 		);
 	}

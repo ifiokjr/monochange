@@ -30,7 +30,6 @@
 use std::env;
 use std::path::Path;
 use std::path::PathBuf;
-use std::thread;
 
 use monochange_core::CommitMessage;
 use monochange_core::HostedSourceAdapter;
@@ -64,7 +63,7 @@ use monochange_hosting::post_json;
 use monochange_hosting::release_body;
 use monochange_hosting::release_pull_request_body;
 use monochange_hosting::release_pull_request_branch;
-use reqwest::blocking::Client;
+use reqwest::Client;
 use reqwest::header::AUTHORIZATION;
 use reqwest::header::CONTENT_TYPE;
 use reqwest::header::HeaderMap;
@@ -92,6 +91,7 @@ pub static HOSTED_SOURCE_ADAPTER: GiteaHostedSourceAdapter = GiteaHostedSourceAd
 /// Hosted-source adapter for Gitea repositories.
 pub struct GiteaHostedSourceAdapter;
 
+#[async_trait::async_trait]
 impl HostedSourceAdapter for GiteaHostedSourceAdapter {
 	fn provider(&self) -> SourceProvider {
 		SourceProvider::Gitea
@@ -113,7 +113,7 @@ impl HostedSourceAdapter for GiteaHostedSourceAdapter {
 		annotate_changeset_context(source, changesets);
 	}
 
-	fn enrich_changeset_context(
+	async fn enrich_changeset_context(
 		&self,
 		source: &SourceConfiguration,
 		changesets: &mut [PreparedChangeset],
@@ -399,7 +399,7 @@ pub fn build_release_pull_request_request(
 /// Publish or update all planned Gitea releases for a manifest.
 #[tracing::instrument(skip_all)]
 #[must_use = "the publish result must be checked"]
-pub fn publish_release_requests(
+pub async fn publish_release_requests(
 	source: &SourceConfiguration,
 	requests: &[SourceReleaseRequest],
 ) -> MonochangeResult<Vec<SourceReleaseOutcome>> {
@@ -407,15 +407,17 @@ pub fn publish_release_requests(
 	let token = gitea_token()?;
 	let headers = auth_headers(&token)?;
 	let api_base = gitea_api_base(source)?;
-	requests
-		.iter()
-		.map(|request| publish_release_request(&client, &headers, &api_base, source, request))
-		.collect()
+	let mut outcomes = Vec::new();
+	for request in requests {
+		outcomes
+			.push(publish_release_request(&client, &headers, &api_base, source, request).await?);
+	}
+	Ok(outcomes)
 }
 
 /// Commit, push, and publish the release pull request against Gitea.
 #[must_use = "the pull request result must be checked"]
-pub fn publish_release_pull_request(
+pub async fn publish_release_pull_request(
 	source: &SourceConfiguration,
 	root: &Path,
 	request: &SourceChangeRequest,
@@ -424,27 +426,29 @@ pub fn publish_release_pull_request(
 ) -> MonochangeResult<SourceChangeRequestOutcome> {
 	let lookup_source = source.clone();
 	let lookup_request = request.clone();
-	let existing_pull_request = thread::spawn(move || {
+	let existing_pull_request = tokio::task::spawn(async move {
 		let client = build_http_client("Gitea")?;
 		let token = gitea_token()?;
 		let headers = auth_headers(&token)?;
 		let api_base = gitea_api_base(&lookup_source)?;
-		lookup_existing_pull_request(&client, &headers, &api_base, &lookup_request)
+		lookup_existing_pull_request(&client, &headers, &api_base, &lookup_request).await
 	});
 	git_checkout_branch(
 		root,
 		&request.head_branch,
 		"prepare release pull request branch",
-	)?;
-	git_stage_paths(root, tracked_paths, "stage release pull request files")?;
+	)
+	.await?;
+	git_stage_paths(root, tracked_paths, "stage release pull request files").await?;
 	git_commit_paths(
 		root,
 		&request.commit_message,
 		"commit release pull request changes",
 		no_verify,
-	)?;
-	let head_commit = git_head_commit(root)?;
-	let existing = join_existing_pull_request_lookup(existing_pull_request)?;
+	)
+	.await?;
+	let head_commit = git_head_commit(root).await?;
+	let existing = join_existing_pull_request_lookup(existing_pull_request).await?;
 	let head_matches_existing = existing
 		.as_ref()
 		.and_then(|pull_request| pull_request.head.sha.as_deref())
@@ -455,7 +459,8 @@ pub fn publish_release_pull_request(
 			&request.head_branch,
 			"push release pull request branch",
 			no_verify,
-		)?;
+		)
+		.await?;
 	}
 
 	let client = build_http_client("Gitea")?;
@@ -470,9 +475,10 @@ pub fn publish_release_pull_request(
 		existing.as_ref(),
 		&head_commit,
 	)
+	.await
 }
 
-fn publish_release_request(
+async fn publish_release_request(
 	client: &Client,
 	headers: &HeaderMap,
 	api_base: &str,
@@ -486,7 +492,7 @@ fn publish_release_request(
 		encode(&request.tag_name)
 	);
 	let existing =
-		get_optional_json::<GiteaReleaseResponse>(client, headers, &lookup_url, "Gitea")?;
+		get_optional_json::<GiteaReleaseResponse>(client, headers, &lookup_url, "Gitea").await?;
 	let response: GiteaReleaseResponse = if existing.is_some() {
 		let update_url = format!(
 			"{api_base}/repos/{}/{}/releases/tags/{}",
@@ -507,7 +513,8 @@ fn publish_release_request(
 				target_commitish: &source.pull_requests.base,
 			},
 			"Gitea",
-		)?
+		)
+		.await?
 	} else {
 		let create_url = format!(
 			"{api_base}/repos/{}/{}/releases",
@@ -526,7 +533,8 @@ fn publish_release_request(
 				target_commitish: &source.pull_requests.base,
 			},
 			"Gitea",
-		)?
+		)
+		.await?
 	};
 	Ok(SourceReleaseOutcome {
 		provider: SourceProvider::Gitea,
@@ -542,17 +550,18 @@ fn publish_release_request(
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
-fn publish_pull_request(
+async fn publish_pull_request(
 	client: &Client,
 	headers: &HeaderMap,
 	api_base: &str,
 	request: &SourceChangeRequest,
 ) -> MonochangeResult<SourceChangeRequestOutcome> {
-	let existing = lookup_existing_pull_request(client, headers, api_base, request)?;
+	let existing = lookup_existing_pull_request(client, headers, api_base, request).await?;
 	publish_pull_request_with_existing(client, headers, api_base, request, existing.as_ref(), "")
+		.await
 }
 
-fn publish_pull_request_with_existing(
+async fn publish_pull_request_with_existing(
 	client: &Client,
 	headers: &HeaderMap,
 	api_base: &str,
@@ -593,7 +602,7 @@ fn publish_pull_request_with_existing(
 				base: &request.base_branch,
 			};
 
-			patch_json(client, headers, &update_url, &update_payload, "Gitea")?
+			patch_json(client, headers, &update_url, &update_payload, "Gitea").await?
 		}
 		None => {
 			let create_url = format!("{api_base}/repos/{}/{}/pulls", request.owner, request.repo);
@@ -604,7 +613,7 @@ fn publish_pull_request_with_existing(
 				body: &request.body,
 			};
 
-			post_json(client, headers, &create_url, &payload, "Gitea")?
+			post_json(client, headers, &create_url, &payload, "Gitea").await?
 		}
 	};
 	if !request.labels.is_empty() && !labels_match {
@@ -620,7 +629,8 @@ fn publish_pull_request_with_existing(
 				labels: &request.labels,
 			},
 			"Gitea",
-		)?;
+		)
+		.await?;
 	}
 	Ok(SourceChangeRequestOutcome {
 		provider: SourceProvider::Gitea,
@@ -638,7 +648,7 @@ fn publish_pull_request_with_existing(
 	})
 }
 
-fn lookup_existing_pull_request(
+async fn lookup_existing_pull_request(
 	client: &Client,
 	headers: &HeaderMap,
 	api_base: &str,
@@ -653,17 +663,18 @@ fn lookup_existing_pull_request(
 		encode(&request.base_branch),
 	);
 	Ok(
-		get_json::<Vec<GiteaExistingPullRequest>>(client, headers, &list_url, "Gitea")?
+		get_json::<Vec<GiteaExistingPullRequest>>(client, headers, &list_url, "Gitea")
+			.await?
 			.into_iter()
 			.next(),
 	)
 }
 
-fn join_existing_pull_request_lookup(
-	handle: thread::JoinHandle<MonochangeResult<Option<GiteaExistingPullRequest>>>,
+async fn join_existing_pull_request_lookup(
+	handle: tokio::task::JoinHandle<MonochangeResult<Option<GiteaExistingPullRequest>>>,
 ) -> MonochangeResult<Option<GiteaExistingPullRequest>> {
-	handle.join().map_err(|_| {
-		MonochangeError::Config("failed to join Gitea pull request lookup thread".to_string())
+	handle.await.map_err(|_| {
+		MonochangeError::Config("failed to join Gitea pull request lookup task".to_string())
 	})?
 }
 

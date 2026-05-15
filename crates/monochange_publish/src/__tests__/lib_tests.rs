@@ -1,3 +1,5 @@
+#![allow(clippy::disallowed_methods)]
+
 use monochange_core::ChangelogSettings;
 use monochange_core::ChangesetSettings;
 use monochange_core::DependencyKind;
@@ -10,11 +12,42 @@ use monochange_core::lint::WorkspaceLintSettings;
 
 use super::*;
 
+fn empty_configuration(root: &Path) -> WorkspaceConfiguration {
+	WorkspaceConfiguration {
+		root_path: root.to_path_buf(),
+		defaults: WorkspaceDefaults::default(),
+		changelog: ChangelogSettings::default(),
+		packages: Vec::new(),
+		groups: Vec::new(),
+		cli: Vec::new(),
+		changesets: ChangesetSettings::default(),
+		source: None,
+		lints: WorkspaceLintSettings::default(),
+		cargo: EcosystemSettings::default(),
+		npm: EcosystemSettings::default(),
+		deno: EcosystemSettings::default(),
+		dart: EcosystemSettings::default(),
+		python: EcosystemSettings::default(),
+		go: EcosystemSettings::default(),
+	}
+}
+
 fn builtin_provider_registry_trust_capability(
 	registry: RegistryKind,
 	provider: CiProviderKind,
 ) -> ProviderRegistryTrustCapability {
 	provider_registry_trust_capability(&PublishRegistry::Builtin(registry), provider)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn build_pending_configured_package_release_requests_handles_empty_configuration() {
+	let configuration = empty_configuration(Path::new("."));
+	let requests =
+		build_pending_configured_package_release_requests(&configuration, &[], &BTreeSet::new())
+			.await
+			.unwrap_or_else(|error| panic!("build pending configured release requests: {error}"));
+
+	assert!(requests.is_empty());
 }
 
 #[test]
@@ -447,8 +480,8 @@ fn ecosystem_progress_presentation_uses_portable_emojis() {
 	assert_eq!(progress_emoji_for_label("future"), "🌐");
 }
 
-#[test]
-fn execute_publish_requests_uses_noop_progress_reporter_by_default() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_publish_requests_uses_noop_progress_reporter_by_default() {
 	let report = execute_publish_requests_with_process(
 		Path::new("."),
 		None,
@@ -460,13 +493,14 @@ fn execute_publish_requests_uses_noop_progress_reporter_by_default() {
 		&PublishReadinessRegistry::new(),
 		&TestPublishTrustHandler,
 	)
+	.await
 	.unwrap();
 
 	assert!(report.packages.is_empty());
 }
 
-#[test]
-fn publish_progress_reports_external_skip_and_summary_events() {
+#[tokio::test(flavor = "multi_thread")]
+async fn publish_progress_reports_external_skip_and_summary_events() {
 	let mut request = sample_publish_request_for_registry(RegistryKind::Npm);
 	request.mode = PublishMode::External;
 	let requests = vec![request];
@@ -489,6 +523,7 @@ fn publish_progress_reports_external_skip_and_summary_events() {
 		&TestPublishTrustHandler,
 		&progress,
 	)
+	.await
 	.unwrap();
 
 	assert_eq!(
@@ -1240,8 +1275,8 @@ fn cargo_publish_request() -> PublishRequest {
 	}
 }
 
-#[test]
-fn dry_run_publish_executes_registry_dry_run_and_captures_output() {
+#[tokio::test(flavor = "multi_thread")]
+async fn dry_run_publish_executes_registry_dry_run_and_captures_output() {
 	let request = cargo_publish_request();
 	let client = registry_client().unwrap_or_else(|error| panic!("registry client: {error}"));
 	let endpoints = RegistryEndpoints::from_env();
@@ -1266,6 +1301,7 @@ fn dry_run_publish_executes_registry_dry_run_and_captures_output() {
 		&readiness,
 		&trust_handler,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("execute publish dry run: {error}"));
 
 	assert_eq!(executor.commands.len(), 1);

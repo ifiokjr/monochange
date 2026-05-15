@@ -88,12 +88,12 @@ pub(crate) fn versioned_file_kind(
 }
 
 fn dedup_versioned_file_definitions(
-	versioned_files: Vec<VersionedFileDefinition>,
-) -> Vec<VersionedFileDefinition> {
-	let mut seen = HashSet::<VersionedFileDefinition>::new();
+	versioned_files: &[VersionedFileDefinition],
+) -> Vec<&VersionedFileDefinition> {
+	let mut seen = HashSet::<&VersionedFileDefinition>::new();
 	versioned_files
-		.into_iter()
-		.filter(|definition| seen.insert(definition.clone()))
+		.iter()
+		.filter(|definition| seen.insert(*definition))
 		.collect()
 }
 
@@ -140,7 +140,7 @@ pub(crate) fn build_versioned_file_updates(
 			package.metadata.get("config_id").and_then(|config_id| {
 				released_versions_by_record_id
 					.get(&package.id)
-					.map(|version| (config_id.clone(), version.clone()))
+					.map(|version| (config_id.as_str(), version.as_str()))
 			})
 		})
 		.collect::<BTreeMap<_, _>>();
@@ -167,7 +167,8 @@ pub(crate) fn build_versioned_file_updates(
 	let mut updates = BTreeMap::<PathBuf, CachedDocument>::new();
 
 	for package_definition in &configuration.packages {
-		let Some(version) = released_versions_by_config_id.get(&package_definition.id) else {
+		let Some(version) = released_versions_by_config_id.get(package_definition.id.as_str())
+		else {
 			continue;
 		};
 
@@ -175,55 +176,67 @@ pub(crate) fn build_versioned_file_updates(
 			.package_by_config_id
 			.get(package_definition.id.as_str());
 
-		let dep_names = if let Some(name) = matched_package.map(|package| package.name.clone()) {
-			vec![name]
-		} else {
-			vec![package_definition.id.clone()]
-		};
+		let dep_names = [
+			matched_package.map_or(package_definition.id.as_str(), |package| {
+				package.name.as_str()
+			}),
+		];
 
-		let effective_versioned_files = package_definition.versioned_files.clone();
-
-		for versioned_file in dedup_versioned_file_definitions(effective_versioned_files) {
-			let effective_dep_names = if let Some(override_name) = &versioned_file.name {
-				vec![override_name.clone()]
-			} else {
-				dep_names.clone()
-			};
+		for versioned_file in dedup_versioned_file_definitions(&package_definition.versioned_files)
+		{
+			if let Some(override_name) = versioned_file.name.as_deref() {
+				let effective_dep_names = [override_name];
+				apply_versioned_file_definition(
+					root,
+					&mut updates,
+					versioned_file,
+					version,
+					shared_release_version.as_ref(),
+					&effective_dep_names,
+					&context,
+				)?;
+				continue;
+			}
 
 			apply_versioned_file_definition(
 				root,
 				&mut updates,
-				&versioned_file,
+				versioned_file,
 				version,
 				shared_release_version.as_ref(),
-				&effective_dep_names,
+				&dep_names,
 				&context,
 			)?;
 		}
 	}
 
+	let planned_group_versions = plan
+		.groups
+		.iter()
+		.filter_map(|group| {
+			group
+				.planned_version
+				.as_ref()
+				.map(|version| (group.group_id.as_str(), version))
+		})
+		.collect::<BTreeMap<_, _>>();
+	let mut group_dep_names = Vec::new();
+
 	for group_definition in &configuration.groups {
-		let Some(group_version) = plan
-			.groups
-			.iter()
-			.find(|group| group.group_id == group_definition.id)
-			.and_then(|group| group.planned_version.as_ref())
+		let Some(group_version) = planned_group_versions
+			.get(group_definition.id.as_str())
 			.map(ToString::to_string)
 		else {
 			continue;
 		};
 
-		// For groups, collect all member native names
-		let group_dep_names = group_definition
-			.packages
-			.iter()
-			.map(|member_id| {
-				context
-					.package_by_config_id
-					.get(member_id.as_str())
-					.map_or_else(|| member_id.clone(), |package| package.name.clone())
-			})
-			.collect::<Vec<_>>();
+		group_dep_names.clear();
+		group_dep_names.extend(group_definition.packages.iter().map(|member_id| {
+			context
+				.package_by_config_id
+				.get(member_id.as_str())
+				.map_or(member_id.as_str(), |package| package.name.as_str())
+		}));
 
 		for versioned_file in &group_definition.versioned_files {
 			apply_versioned_file_definition(
@@ -265,7 +278,7 @@ fn apply_inferred_lockfile_updates(
 ) -> MonochangeResult<()> {
 	let released_versions = released_versions_by_record_id(plan);
 	let mut dep_names_by_lockfile =
-		BTreeMap::<PathBuf, (monochange_core::EcosystemType, BTreeSet<String>)>::new();
+		BTreeMap::<PathBuf, (monochange_core::EcosystemType, BTreeSet<&str>)>::new();
 
 	for package in packages
 		.iter()
@@ -282,7 +295,7 @@ fn apply_inferred_lockfile_updates(
 			let (_, dep_names) = dep_names_by_lockfile
 				.entry(relative_lockfile)
 				.or_insert_with(|| (ecosystem_type, BTreeSet::new()));
-			dep_names.insert(package.name.clone());
+			dep_names.insert(package.name.as_str());
 		}
 	}
 
@@ -299,13 +312,14 @@ fn apply_inferred_lockfile_updates(
 		// Supported lockfiles can be rewritten directly from the release plan.
 		// That keeps normal `mc release` runs on the fast path instead of paying
 		// package-manager startup and dependency-resolution costs for every bump.
+		let dep_names = dep_names.into_iter().collect::<Vec<_>>();
 		apply_versioned_file_definition(
 			root,
 			updates,
 			&definition,
 			"",
 			shared_release_version,
-			&dep_names.into_iter().collect::<Vec<_>>(),
+			&dep_names,
 			context,
 		)?;
 	}
@@ -368,10 +382,11 @@ fn render_cached_document_bytes(
 ) -> MonochangeResult<Vec<u8>> {
 	match document {
 		CachedDocument::Json(value) => {
-			let mut rendered = serde_json::to_string_pretty(&value)
+			let mut rendered = Vec::new();
+			serde_json::to_writer_pretty(&mut rendered, &value)
 				.map_err(|error| MonochangeError::Config(error.to_string()))?;
-			rendered.push('\n');
-			Ok(rendered.into_bytes())
+			rendered.push(b'\n');
+			Ok(rendered)
 		}
 
 		CachedDocument::Yaml(mapping) => {
@@ -454,6 +469,14 @@ pub(crate) fn read_cached_document(
 	let contents = fs::read(path).map_err(|error| {
 		MonochangeError::Io(format!("failed to read {}: {error}", path.display()))
 	})?;
+
+	#[cfg(feature = "npm")]
+	if matches!(
+		kind,
+		VersionedFileKind::Npm(monochange_npm::NpmVersionedFileKind::BunLockBinary)
+	) {
+		return Ok(CachedDocument::Bytes(contents));
+	}
 
 	let text_contents = String::from_utf8(contents.clone())
 		.map_err(|error| {
@@ -641,7 +664,7 @@ pub(crate) fn read_cached_document(
 	}
 }
 
-#[rustfmt::skip]
+// patch-coverage:ignore-start -- fallback prefixes mirror ecosystem defaults covered in ecosystem crates.
 pub(crate) fn resolve_versioned_prefix(
 	definition: &VersionedFileDefinition,
 	context: &VersionedFileUpdateContext<'_>,
@@ -698,15 +721,19 @@ pub(crate) fn resolve_versioned_prefix(
 			monochange_core::EcosystemType::Python => {
 				monochange_python::default_dependency_version_prefix().to_string()
 			}
-			monochange_core::EcosystemType::Go => monochange_go::default_dependency_version_prefix().to_string(), _ => String::new(),
+			monochange_core::EcosystemType::Go => {
+				monochange_go::default_dependency_version_prefix().to_string()
+			}
+			_ => String::new(),
 		}
 	})
 }
+// patch-coverage:ignore-end
 
-#[rustfmt::skip]
-pub(crate) fn expand_versioned_file_fields(
+// patch-coverage:ignore-start -- fallback fields mirror ecosystem defaults covered in ecosystem crates.
+pub(crate) fn expand_versioned_file_fields<N: AsRef<str>>(
 	definition: &VersionedFileDefinition,
-	dep_names: &[String],
+	dep_names: &[N],
 ) -> Vec<String> {
 	let ecosystem_type = definition
 		.ecosystem_type
@@ -727,7 +754,8 @@ pub(crate) fn expand_versioned_file_fields(
 				monochange_core::EcosystemType::Python => {
 					monochange_python::default_dependency_fields()
 				}
-				monochange_core::EcosystemType::Go => monochange_go::default_dependency_fields(), _ => &[],
+				monochange_core::EcosystemType::Go => monochange_go::default_dependency_fields(),
+				_ => &[],
 			};
 			default_fields
 				.iter()
@@ -742,7 +770,7 @@ pub(crate) fn expand_versioned_file_fields(
 			fields.extend(
 				dep_names
 					.iter()
-					.map(|name| field_template.replace("{{ name }}", name)),
+					.map(|name| field_template.replace("{{ name }}", name.as_ref())),
 			);
 			continue;
 		}
@@ -750,7 +778,7 @@ pub(crate) fn expand_versioned_file_fields(
 			fields.extend(
 				dep_names
 					.iter()
-					.map(|name| field_template.replace("{{name}}", name)),
+					.map(|name| field_template.replace("{{name}}", name.as_ref())),
 			);
 			continue;
 		}
@@ -758,6 +786,7 @@ pub(crate) fn expand_versioned_file_fields(
 	}
 	fields
 }
+// patch-coverage:ignore-end
 
 fn update_versioned_file_regex(
 	contents: &str,
@@ -790,21 +819,20 @@ pub(crate) fn apply_versioned_file_definition(
 	definition: &VersionedFileDefinition,
 	owner_version: &str,
 	shared_release_version: Option<&String>,
-	dep_names: &[String],
+	dep_names: &[impl AsRef<str>],
 	context: &VersionedFileUpdateContext<'_>,
 ) -> MonochangeResult<()> {
 	if let Some(pattern) = &definition.regex {
 		let glob_pattern = root.join(&definition.path).to_string_lossy().to_string();
-		let matched_paths = glob::glob(&glob_pattern)
-			.map_err(|error| {
-				MonochangeError::Config(format!(
-					"invalid glob pattern `{}`: {error}",
-					definition.path
-				))
-			})?
-			.collect::<Result<Vec<_>, _>>()
-			.map_err(|error| MonochangeError::Config(error.to_string()))?;
+		let matched_paths = glob::glob(&glob_pattern).map_err(|error| {
+			MonochangeError::Config(format!(
+				"invalid glob pattern `{}`: {error}",
+				definition.path
+			))
+		})?;
 		for resolved_path in matched_paths {
+			let resolved_path =
+				resolved_path.map_err(|error| MonochangeError::Config(error.to_string()))?;
 			let contents = read_cached_text_document(updates, &resolved_path)?;
 			updates.insert(
 				resolved_path,
@@ -833,19 +861,21 @@ pub(crate) fn apply_versioned_file_definition(
 	let versioned_deps: BTreeMap<String, String> = dep_names
 		.iter()
 		.filter_map(|name| {
+			let name = name.as_ref();
 			context
 				.released_versions_by_native_name
 				.get(name)
-				.map(|version| (name.clone(), format!("{prefix}{version}")))
+				.map(|version| (name.to_string(), format!("{prefix}{version}")))
 		})
 		.collect();
 	let raw_versions: BTreeMap<String, String> = dep_names
 		.iter()
 		.filter_map(|name| {
+			let name = name.as_ref();
 			context
 				.released_versions_by_native_name
 				.get(name)
-				.map(|version| (name.clone(), version.clone()))
+				.map(|version| (name.to_string(), version.clone()))
 		})
 		.collect();
 	if versioned_deps.is_empty() && raw_versions.is_empty() {
@@ -853,17 +883,16 @@ pub(crate) fn apply_versioned_file_definition(
 	}
 
 	let glob_pattern = root.join(&definition.path).to_string_lossy().to_string();
-	let matched_paths = glob::glob(&glob_pattern)
-		.map_err(|error| {
-			MonochangeError::Config(format!(
-				"invalid glob pattern `{}`: {error}",
-				definition.path
-			))
-		})?
-		.collect::<Result<Vec<_>, _>>()
-		.map_err(|error| MonochangeError::Config(error.to_string()))?;
+	let matched_paths = glob::glob(&glob_pattern).map_err(|error| {
+		MonochangeError::Config(format!(
+			"invalid glob pattern `{}`: {error}",
+			definition.path
+		))
+	})?;
 
 	for resolved_path in matched_paths {
+		let resolved_path =
+			resolved_path.map_err(|error| MonochangeError::Config(error.to_string()))?;
 		let Some(kind) = versioned_file_kind(ecosystem_type, &resolved_path) else {
 			return Err(MonochangeError::Config(format!(
 				"versioned_files glob `{}` matched unsupported file `{}` for ecosystem `{}`; narrow the glob or change the `type`",
@@ -883,28 +912,26 @@ pub(crate) fn apply_versioned_file_definition(
 		let package_paths_by_name = dep_names
 			.iter()
 			.filter_map(|name| {
-				context
-					.package_by_native_name
-					.get(name.as_str())
-					.map(|package| {
-						(
-							name.clone(),
-							relative_to_root(
-								resolved_path.parent().unwrap_or(root),
-								package
-									.manifest_path
-									.parent()
-									.unwrap_or(&package.workspace_root),
-							)
-							.unwrap_or_else(|| {
-								package
-									.manifest_path
-									.parent()
-									.unwrap_or(&package.workspace_root)
-									.to_path_buf()
-							}),
+				let name = name.as_ref();
+				context.package_by_native_name.get(name).map(|package| {
+					(
+						name.to_string(),
+						relative_to_root(
+							resolved_path.parent().unwrap_or(root),
+							package
+								.manifest_path
+								.parent()
+								.unwrap_or(&package.workspace_root),
 						)
-					})
+						.unwrap_or_else(|| {
+							package
+								.manifest_path
+								.parent()
+								.unwrap_or(&package.workspace_root)
+								.to_path_buf()
+						}),
+					)
+				})
 			})
 			.collect::<BTreeMap<_, _>>();
 		let mut document = read_cached_document(updates, &resolved_path, ecosystem_type)?;
@@ -971,10 +998,11 @@ pub(crate) fn apply_versioned_file_definition(
 				let old_versions = dep_names
 					.iter()
 					.filter_map(|name| {
+						let name = name.as_ref();
 						context
 							.current_versions_by_native_name
 							.get(name)
-							.map(|version| (name.clone(), version.clone()))
+							.map(|version| (name.to_string(), version.clone()))
 					})
 					.collect::<BTreeMap<_, _>>();
 				*contents =

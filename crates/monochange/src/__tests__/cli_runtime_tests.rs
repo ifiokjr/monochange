@@ -1,3 +1,5 @@
+#![allow(clippy::large_futures)]
+#![allow(clippy::disallowed_methods)]
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fs;
@@ -25,7 +27,7 @@ use tempfile::TempDir;
 use tempfile::tempdir;
 
 use super::*;
-use crate::tests::TEST_ENV_LOCK;
+use crate::TEST_ENV_LOCK;
 
 fn cli_context() -> CliContext {
 	CliContext {
@@ -75,6 +77,43 @@ fn sample_source_configuration() -> SourceConfiguration {
 		releases: monochange_core::ProviderReleaseSettings::default(),
 		pull_requests: monochange_core::ProviderMergeRequestSettings::default(),
 	}
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn build_release_request_result_for_source_dry_run_delegates_to_formatter() {
+	let source = sample_source_configuration();
+	let request = monochange_core::SourceChangeRequest {
+		provider: source.provider,
+		repository: "monochange/monochange".to_string(),
+		owner: "monochange".to_string(),
+		repo: "monochange".to_string(),
+		base_branch: "main".to_string(),
+		head_branch: "release/monochange".to_string(),
+		title: "Release monochange".to_string(),
+		body: "Release notes".to_string(),
+		labels: Vec::new(),
+		auto_merge: false,
+		commit_message: monochange_core::CommitMessage {
+			subject: "chore(release): prepare release".to_string(),
+			body: None,
+		},
+	};
+
+	let result = build_release_request_result_for_source(
+		true,
+		&source,
+		Path::new("."),
+		&request,
+		&[],
+		false,
+	)
+	.await
+	.unwrap_or_else(|error| panic!("build release request result: {error}"));
+
+	assert_eq!(
+		result,
+		"dry-run monochange/monochange release/monochange -> main via github"
+	);
 }
 
 #[test]
@@ -147,6 +186,7 @@ fn initialized_workspace_dir() -> TempDir {
 	git_in_dir(root, &["init", "-b", "main"]);
 	git_in_dir(root, &["config", "user.name", "monochange Tests"]);
 	git_in_dir(root, &["config", "user.email", "monochange@example.com"]);
+	git_in_dir(root, &["config", "commit.gpgsign", "false"]);
 	git_in_dir(root, &["add", "Cargo.toml"]);
 	git_in_dir(root, &["commit", "-m", "initial"]);
 	workspace_dir
@@ -355,11 +395,24 @@ fn sample_rate_limit_report() -> monochange_core::PublishRateLimitReport {
 fn git_in_dir(root: &Path, args: &[&str]) {
 	let status = std::process::Command::new("git")
 		.current_dir(root)
-		.args(["-c", "commit.gpgsign=false"])
 		.args(args)
 		.status()
 		.unwrap_or_else(|error| panic!("git {args:?}: {error}"));
 	assert!(status.success(), "git {args:?} failed");
+}
+
+fn prepared_release_git_workspace() -> TempDir {
+	let workspace_dir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = workspace_dir.path();
+	fs::write(root.join("Cargo.toml"), "[workspace]\n")
+		.unwrap_or_else(|error| panic!("write workspace manifest: {error}"));
+	git_in_dir(root, &["init", "-b", "main"]);
+	git_in_dir(root, &["config", "user.name", "monochange Tests"]);
+	git_in_dir(root, &["config", "user.email", "monochange@example.com"]);
+	git_in_dir(root, &["config", "commit.gpgsign", "false"]);
+	git_in_dir(root, &["add", "Cargo.toml"]);
+	git_in_dir(root, &["commit", "-m", "initial"]);
+	workspace_dir
 }
 
 #[test]
@@ -469,8 +522,8 @@ fn render_json_output_reports_context_on_serialization_failure() {
 	assert!(error.contains("broken serialize"));
 }
 
-#[test]
-fn execute_affected_packages_step_supports_from_git_input() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_affected_packages_step_supports_from_git_input() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
 	fs::create_dir_all(root.join("crates/core/src"))
@@ -508,6 +561,7 @@ path = "crates/core"
 	git_in_dir(root, &["init", "-b", "main"]);
 	git_in_dir(root, &["config", "user.name", "monochange Tests"]);
 	git_in_dir(root, &["config", "user.email", "monochange@example.com"]);
+	git_in_dir(root, &["config", "commit.gpgsign", "false"]);
 	git_in_dir(root, &["add", "."]);
 	git_in_dir(root, &["commit", "-m", "initial"]);
 
@@ -522,6 +576,7 @@ path = "crates/core"
 		&BTreeMap::from([("from".to_string(), vec!["HEAD".to_string()])]),
 		true,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("execute affected packages step: {error}"));
 
 	assert_eq!(evaluation.status, ChangesetPolicyStatus::Failed);
@@ -660,10 +715,8 @@ fn render_display_versions_output_supports_text_markdown_and_json() {
 
 #[test]
 fn release_version_summary_renderers_cover_empty_and_single_section_states() {
-	let empty = ReleaseVersionSummary {
-		groups: BTreeMap::new(),
-		packages: BTreeMap::new(),
-	};
+	let empty_release = sample_prepared_release();
+	let empty = build_release_version_summary(&empty_release);
 	assert_eq!(
 		render_release_version_summary_text(&empty),
 		"no package or group versions were planned"
@@ -673,10 +726,9 @@ fn release_version_summary_renderers_cover_empty_and_single_section_states() {
 		"No package or group versions were planned."
 	);
 
-	let groups_only = ReleaseVersionSummary {
-		groups: BTreeMap::from([("sdk".to_string(), "2.0.0".to_string())]),
-		packages: BTreeMap::new(),
-	};
+	let mut groups_release = sample_prepared_release_with_versions();
+	groups_release.plan.decisions.clear();
+	let groups_only = build_release_version_summary(&groups_release);
 	assert_eq!(
 		render_release_version_summary_text(&groups_only),
 		"group versions:\n- sdk: 2.0.0"
@@ -686,13 +738,9 @@ fn release_version_summary_renderers_cover_empty_and_single_section_states() {
 		"## Group versions\n\n- `sdk`: `2.0.0`"
 	);
 
-	let packages_only = ReleaseVersionSummary {
-		groups: BTreeMap::new(),
-		packages: BTreeMap::from([
-			("core".to_string(), "1.2.0".to_string()),
-			("web".to_string(), "1.2.1".to_string()),
-		]),
-	};
+	let mut packages_release = sample_prepared_release_with_versions();
+	packages_release.plan.groups.clear();
+	let packages_only = build_release_version_summary(&packages_release);
 	assert_eq!(
 		render_release_version_summary_text(&packages_only),
 		"package versions:\n- core: 1.2.0\n- web: 1.2.1"
@@ -1336,11 +1384,11 @@ fn render_display_versions_output_rejects_unknown_formats() {
 	);
 }
 
-#[test]
-fn execute_matches_uses_progress_format_from_environment_and_rejects_invalid_values() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_matches_uses_progress_format_from_environment_and_rejects_invalid_values() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 
-	temp_env::with_var("MONOCHANGE_PROGRESS_FORMAT", Some("json"), || {
+	temp_env::async_with_vars([("MONOCHANGE_PROGRESS_FORMAT", Some("json"))], async {
 		let (configuration, matches) = parse_validate_matches(tempdir.path());
 		let step_matches = matches
 			.subcommand_matches("step:discover")
@@ -1352,10 +1400,12 @@ fn execute_matches_uses_progress_format_from_environment_and_rejects_invalid_val
 			step_matches,
 			false,
 		)
+		.await
 		.unwrap_or_else(|error| panic!("step:discover with env progress format: {error}"));
-	});
+	})
+	.await;
 
-	temp_env::with_var("MONOCHANGE_PROGRESS_FORMAT", Some("wat"), || {
+	temp_env::async_with_vars([("MONOCHANGE_PROGRESS_FORMAT", Some("wat"))], async {
 		let (configuration, matches) = parse_validate_matches(tempdir.path());
 		let step_matches = matches
 			.subcommand_matches("step:discover")
@@ -1367,12 +1417,14 @@ fn execute_matches_uses_progress_format_from_environment_and_rejects_invalid_val
 			step_matches,
 			false,
 		)
+		.await
 		.unwrap_err();
 		assert_eq!(
 			error.to_string(),
 			"config error: unknown progress format `wat`; expected one of: auto, unicode, ascii, json"
 		);
-	});
+	})
+	.await;
 }
 
 #[test]
@@ -1534,8 +1586,8 @@ fn map_process_wait_result_reports_io_failures() {
 	);
 }
 
-#[test]
-fn configured_config_step_uses_generic_completion_without_config_json() {
+#[tokio::test(flavor = "multi_thread")]
+async fn configured_config_step_uses_generic_completion_without_config_json() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let configuration = sample_configuration(tempdir.path());
 	let cli_command = CliCommandDefinition {
@@ -1564,17 +1616,15 @@ fn configured_config_step_uses_generic_completion_without_config_json() {
 			progress_format: ProgressFormat::Auto,
 		},
 	)
+	.await
 	.unwrap_or_else(|error| panic!("config command: {error}"));
 
 	assert_eq!(output, "command `configured-config` completed (dry-run)");
 	assert!(!output.contains("projectRoot"));
 }
 
-#[test]
-fn execute_cli_command_captures_telemetry_when_step_input_resolution_fails() {
-	let _guard = TEST_ENV_LOCK
-		.lock()
-		.unwrap_or_else(|error| panic!("test env lock poisoned: {error}"));
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_captures_telemetry_when_step_input_resolution_fails() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let telemetry_path = tempdir.path().join("telemetry-input-error.jsonl");
 	let telemetry_path_value = telemetry_path.to_string_lossy().to_string();
@@ -1595,12 +1645,12 @@ fn execute_cli_command_captures_telemetry_when_step_input_resolution_fails() {
 		dry_run: false,
 	};
 
-	temp_env::with_vars(
+	temp_env::async_with_vars(
 		[
 			("MC_TELEMETRY", None::<&str>),
 			("MC_TELEMETRY_FILE", Some(telemetry_path_value.as_str())),
 		],
-		|| {
+		async {
 			let error = execute_cli_command(
 				tempdir.path(),
 				&configuration,
@@ -1608,10 +1658,12 @@ fn execute_cli_command_captures_telemetry_when_step_input_resolution_fails() {
 				true,
 				BTreeMap::new(),
 			)
+			.await
 			.unwrap_err();
 			assert!(matches!(error, MonochangeError::Config(_)));
 		},
-	);
+	)
+	.await;
 
 	let events = read_telemetry_events(&telemetry_path);
 	let step_event = events
@@ -1635,11 +1687,8 @@ fn execute_cli_command_captures_telemetry_when_step_input_resolution_fails() {
 	assert_eq!(run_event["attributes"]["error_kind"], "config_error");
 }
 
-#[test]
-fn execute_cli_command_captures_telemetry_when_step_condition_fails() {
-	let _guard = TEST_ENV_LOCK
-		.lock()
-		.unwrap_or_else(|error| panic!("test env lock poisoned: {error}"));
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_captures_telemetry_when_step_condition_fails() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let telemetry_path = tempdir.path().join("telemetry-condition-error.jsonl");
 	let telemetry_path_value = telemetry_path.to_string_lossy().to_string();
@@ -1657,12 +1706,12 @@ fn execute_cli_command_captures_telemetry_when_step_condition_fails() {
 		dry_run: false,
 	};
 
-	temp_env::with_vars(
+	temp_env::async_with_vars(
 		[
 			("MC_TELEMETRY", None::<&str>),
 			("MC_TELEMETRY_FILE", Some(telemetry_path_value.as_str())),
 		],
-		|| {
+		async {
 			let error = execute_cli_command(
 				tempdir.path(),
 				&configuration,
@@ -1670,10 +1719,12 @@ fn execute_cli_command_captures_telemetry_when_step_condition_fails() {
 				true,
 				BTreeMap::new(),
 			)
+			.await
 			.unwrap_err();
 			assert!(matches!(error, MonochangeError::Config(_)));
 		},
-	);
+	)
+	.await;
 
 	let events = read_telemetry_events(&telemetry_path);
 	let step_event = events
@@ -1697,8 +1748,8 @@ fn execute_cli_command_captures_telemetry_when_step_condition_fails() {
 	assert_eq!(run_event["attributes"]["error_kind"], "config_error");
 }
 
-#[test]
-fn execute_cli_command_reports_command_failures_after_progress_callbacks() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_reports_command_failures_after_progress_callbacks() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let cli_command = CliCommandDefinition {
 		name: "fail".to_string(),
@@ -1743,6 +1794,7 @@ fn execute_cli_command_reports_command_failures_after_progress_callbacks() {
 		false,
 		BTreeMap::new(),
 	)
+	.await
 	.unwrap_err();
 	assert_eq!(
 		error.to_string(),
@@ -1792,8 +1844,8 @@ fn build_release_template_value_serializes_file_diffs() {
 	assert_eq!(file_diffs[0]["diff"], serde_json::json!("-old\n+new"));
 }
 
-#[test]
-fn execute_cli_command_with_options_covers_final_artifact_save_call() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_with_options_covers_final_artifact_save_call() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let cli_command = CliCommandDefinition {
 		name: "noop".to_string(),
@@ -1816,17 +1868,16 @@ fn execute_cli_command_with_options_covers_final_artifact_save_call() {
 			progress_format: ProgressFormat::Auto,
 		},
 	)
+	.await
 	.unwrap_or_else(|error| panic!("execute noop command: {error}"));
 
 	assert_eq!(output, "command `noop` completed");
 }
 
-#[test]
-fn execute_cli_command_with_options_plans_publish_rate_limits_from_prepared_release_artifact() {
-	let _guard = TEST_ENV_LOCK
-		.lock()
-		.unwrap_or_else(|error| panic!("test env lock: {error}"));
-	let workspace_dir = initialized_workspace_dir();
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_with_options_plans_publish_rate_limits_from_prepared_release_artifact()
+{
+	let workspace_dir = prepared_release_git_workspace();
 	let root = workspace_dir.path();
 	let configuration = sample_configuration(root);
 	let artifact_dir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
@@ -1859,6 +1910,7 @@ fn execute_cli_command_with_options_plans_publish_rate_limits_from_prepared_rele
 		&[],
 		Some(artifact_path.as_path()),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("save prepared release artifact: {error}"));
 
 	let output = execute_cli_command_with_options(
@@ -1874,13 +1926,14 @@ fn execute_cli_command_with_options_plans_publish_rate_limits_from_prepared_rele
 			progress_format: ProgressFormat::Auto,
 		},
 	)
+	.await
 	.unwrap_or_else(|error| panic!("execute publish-plan command: {error}"));
 
 	assert!(output.contains("reused prepared release artifact"));
 }
 
-#[test]
-fn execute_cli_command_with_options_rejects_readiness_for_placeholder_publish_plans() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_with_options_rejects_readiness_for_placeholder_publish_plans() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let cli_command = CliCommandDefinition {
 		name: "publish-plan".to_string(),
@@ -1914,6 +1967,7 @@ fn execute_cli_command_with_options_rejects_readiness_for_placeholder_publish_pl
 			progress_format: ProgressFormat::Auto,
 		},
 	)
+	.await
 	.expect_err("placeholder publish plans should reject readiness artifacts");
 
 	assert!(
@@ -1923,12 +1977,9 @@ fn execute_cli_command_with_options_rejects_readiness_for_placeholder_publish_pl
 	);
 }
 
-#[test]
-fn execute_cli_command_with_options_reuses_prepared_release_artifact_for_versions() {
-	let _guard = TEST_ENV_LOCK
-		.lock()
-		.unwrap_or_else(|error| panic!("test env lock: {error}"));
-	let workspace_dir = initialized_workspace_dir();
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_with_options_reuses_prepared_release_artifact_for_versions() {
+	let workspace_dir = prepared_release_git_workspace();
 	let root = workspace_dir.path();
 	let configuration = sample_configuration(root);
 	let artifact_dir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
@@ -1940,6 +1991,7 @@ fn execute_cli_command_with_options_reuses_prepared_release_artifact_for_version
 		&[],
 		Some(artifact_path.as_path()),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("save prepared release artifact: {error}"));
 
 	let output = execute_cli_command_with_options(
@@ -1955,6 +2007,7 @@ fn execute_cli_command_with_options_reuses_prepared_release_artifact_for_version
 			progress_format: ProgressFormat::Auto,
 		},
 	)
+	.await
 	.unwrap_or_else(|error| panic!("execute versions command: {error}"));
 	let parsed: serde_json::Value = serde_json::from_str(&output)
 		.unwrap_or_else(|error| panic!("parse versions output: {error}"));
@@ -1964,8 +2017,8 @@ fn execute_cli_command_with_options_reuses_prepared_release_artifact_for_version
 	assert_eq!(parsed["packages"]["web"], serde_json::json!("1.2.1"));
 }
 
-#[test]
-fn execute_cli_command_with_options_reports_invalid_versions_artifacts() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_with_options_reports_invalid_versions_artifacts() {
 	let workspace_dir = initialized_workspace_dir();
 	let root = workspace_dir.path();
 	let configuration = sample_configuration(root);
@@ -1987,6 +2040,7 @@ fn execute_cli_command_with_options_reports_invalid_versions_artifacts() {
 			progress_format: ProgressFormat::Auto,
 		},
 	)
+	.await
 	.expect_err("invalid prepared release artifact should fail");
 
 	assert!(
@@ -1996,12 +2050,9 @@ fn execute_cli_command_with_options_reports_invalid_versions_artifacts() {
 	);
 }
 
-#[test]
-fn execute_cli_command_with_options_reports_invalid_versions_output_formats() {
-	let _guard = TEST_ENV_LOCK
-		.lock()
-		.unwrap_or_else(|error| panic!("test env lock: {error}"));
-	let workspace_dir = initialized_workspace_dir();
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_with_options_reports_invalid_versions_output_formats() {
+	let workspace_dir = prepared_release_git_workspace();
 	let root = workspace_dir.path();
 	let configuration = sample_configuration(root);
 	let artifact_dir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
@@ -2013,6 +2064,7 @@ fn execute_cli_command_with_options_reports_invalid_versions_output_formats() {
 		&[],
 		Some(artifact_path.as_path()),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("save prepared release artifact: {error}"));
 
 	let error = execute_cli_command_with_options(
@@ -2028,6 +2080,7 @@ fn execute_cli_command_with_options_reports_invalid_versions_output_formats() {
 			progress_format: ProgressFormat::Auto,
 		},
 	)
+	.await
 	.expect_err("unsupported versions output format should fail");
 
 	assert_eq!(
@@ -2080,8 +2133,8 @@ fn render_cli_command_result_includes_release_results_and_changed_files() {
 	assert!(rendered.contains("- Cargo.toml"));
 }
 
-#[test]
-fn save_prepared_release_artifact_returns_explicit_errors() {
+#[tokio::test(flavor = "multi_thread")]
+async fn save_prepared_release_artifact_returns_explicit_errors() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let mut context = cli_context();
 	context.prepared_release = Some(sample_prepared_release());
@@ -2092,6 +2145,7 @@ fn save_prepared_release_artifact_returns_explicit_errors() {
 		&context,
 		Some(tempdir.path().join("prepared-release.json").as_path()),
 	)
+	.await
 	.err()
 	.unwrap_or_else(|| panic!("expected explicit artifact save error"));
 
@@ -2260,8 +2314,8 @@ fn markdown_painting_covers_title_subtitle_and_muted_styles() {
 	);
 }
 
-#[test]
-fn publish_rate_limit_selected_package_ids_uses_package_inputs_without_readiness() {
+#[tokio::test(flavor = "multi_thread")]
+async fn publish_rate_limit_selected_package_ids_uses_package_inputs_without_readiness() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let configuration = sample_configuration(tempdir.path());
 	let inputs = BTreeMap::from([(
@@ -2276,6 +2330,7 @@ fn publish_rate_limit_selected_package_ids_uses_package_inputs_without_readiness
 		&inputs,
 		publish_rate_limits::PublishRateLimitMode::Placeholder,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("selected packages: {error}"));
 
 	assert_eq!(
@@ -2284,8 +2339,8 @@ fn publish_rate_limit_selected_package_ids_uses_package_inputs_without_readiness
 	);
 }
 
-#[test]
-fn publish_rate_limit_selected_package_ids_rejects_readiness_for_placeholder_plans() {
+#[tokio::test(flavor = "multi_thread")]
+async fn publish_rate_limit_selected_package_ids_rejects_readiness_for_placeholder_plans() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let configuration = sample_configuration(tempdir.path());
 	let inputs = BTreeMap::from([(
@@ -2300,6 +2355,7 @@ fn publish_rate_limit_selected_package_ids_rejects_readiness_for_placeholder_pla
 		&inputs,
 		publish_rate_limits::PublishRateLimitMode::Placeholder,
 	)
+	.await
 	.expect_err("placeholder publish plans should reject readiness artifacts");
 
 	assert!(
@@ -2309,8 +2365,8 @@ fn publish_rate_limit_selected_package_ids_rejects_readiness_for_placeholder_pla
 	);
 }
 
-#[test]
-fn publish_rate_limit_selected_package_ids_uses_readiness_artifact_for_publish_plans() {
+#[tokio::test(flavor = "multi_thread")]
+async fn publish_rate_limit_selected_package_ids_uses_readiness_artifact_for_publish_plans() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let configuration = sample_configuration(tempdir.path());
 	let artifact_path = tempdir.path().join("readiness.json");
@@ -2343,6 +2399,7 @@ fn publish_rate_limit_selected_package_ids_uses_readiness_artifact_for_publish_p
 		&inputs,
 		publish_rate_limits::PublishRateLimitMode::Publish,
 	)
+	.await
 	.unwrap_or_else(|error| panic!("selected packages from readiness: {error}"));
 
 	assert!(selected.is_empty());
@@ -2482,8 +2539,8 @@ fn selected_ecosystem_ids_rejects_unknown_ecosystem() {
 	assert!(error.to_string().contains("unknown ecosystem"), "{error}");
 }
 
-#[test]
-fn execute_cli_command_always_run_steps_continue_after_failure() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_always_run_steps_continue_after_failure() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let marker = tempdir.path().join("always-run-marker");
 	let skipped_marker = tempdir.path().join("skipped-marker");
@@ -2532,9 +2589,10 @@ fn execute_cli_command_always_run_steps_continue_after_failure() {
 		dry_run: false,
 	};
 
+	let configuration = sample_configuration(tempdir.path());
 	let result = execute_cli_command_with_options(
 		tempdir.path(),
-		&sample_configuration(tempdir.path()),
+		&configuration,
 		&cli_command,
 		ExecuteCliCommandOptions {
 			dry_run: false,
@@ -2546,7 +2604,7 @@ fn execute_cli_command_always_run_steps_continue_after_failure() {
 		},
 	);
 
-	assert!(result.is_err());
+	assert!(result.await.is_err());
 	assert!(marker.exists(), "always_run step should have executed");
 	assert!(
 		!skipped_marker.exists(),
@@ -2554,8 +2612,8 @@ fn execute_cli_command_always_run_steps_continue_after_failure() {
 	);
 }
 
-#[test]
-fn execute_cli_command_always_run_continue_after_resolve_step_inputs_failure() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_always_run_continue_after_resolve_step_inputs_failure() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let marker = tempdir.path().join("always-run-marker");
 	let cli_command = CliCommandDefinition {
@@ -2594,9 +2652,10 @@ fn execute_cli_command_always_run_continue_after_resolve_step_inputs_failure() {
 		dry_run: false,
 	};
 
+	let configuration = sample_configuration(tempdir.path());
 	let result = execute_cli_command_with_options(
 		tempdir.path(),
-		&sample_configuration(tempdir.path()),
+		&configuration,
 		&cli_command,
 		ExecuteCliCommandOptions {
 			dry_run: false,
@@ -2608,15 +2667,15 @@ fn execute_cli_command_always_run_continue_after_resolve_step_inputs_failure() {
 		},
 	);
 
-	assert!(result.is_err());
+	assert!(result.await.is_err());
 	assert!(
 		marker.exists(),
 		"always_run step should have executed after resolve_step_inputs failure"
 	);
 }
 
-#[test]
-fn execute_cli_command_always_run_continue_after_should_execute_failure() {
+#[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_always_run_continue_after_should_execute_failure() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let marker = tempdir.path().join("always-run-marker");
 	let cli_command = CliCommandDefinition {
@@ -2652,9 +2711,10 @@ fn execute_cli_command_always_run_continue_after_should_execute_failure() {
 		dry_run: false,
 	};
 
+	let configuration = sample_configuration(tempdir.path());
 	let result = execute_cli_command_with_options(
 		tempdir.path(),
-		&sample_configuration(tempdir.path()),
+		&configuration,
 		&cli_command,
 		ExecuteCliCommandOptions {
 			dry_run: false,
@@ -2666,9 +2726,25 @@ fn execute_cli_command_always_run_continue_after_should_execute_failure() {
 		},
 	);
 
-	assert!(result.is_err());
+	assert!(result.await.is_err());
 	assert!(
 		marker.exists(),
 		"always_run step should have executed after should_execute failure"
 	);
+}
+
+#[test]
+fn block_on_in_context_outside_runtime() {
+	use crate::cli_runtime::block_on_in_context;
+	// Verify block_on_in_context works outside any runtime
+	let result = block_on_in_context(async { 99 });
+	assert_eq!(result, 99);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn block_on_in_context_inside_multi_thread_runtime() {
+	use crate::cli_runtime::block_on_in_context;
+	// Verify block_on_in_context works inside a multi-thread runtime
+	let result = block_on_in_context(async { 77 });
+	assert_eq!(result, 77);
 }

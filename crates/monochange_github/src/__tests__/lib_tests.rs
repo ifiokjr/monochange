@@ -1,6 +1,6 @@
+#![allow(clippy::disallowed_methods)]
 use std::path::Path;
 use std::path::PathBuf;
-use std::thread;
 
 use httpmock::Method::GET;
 use httpmock::Method::PATCH;
@@ -20,7 +20,6 @@ use monochange_core::HostedSourceAdapter;
 use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
 use monochange_core::MonochangeError;
-use monochange_core::MonochangeResult;
 use monochange_core::PreparedChangeset;
 use monochange_core::ProviderMergeRequestSettings;
 use monochange_core::ProviderReleaseNotesSource;
@@ -352,8 +351,8 @@ fn comment_released_issues_with_client_closes_issues_when_plan_close_is_true() {
 	}));
 }
 
-#[test]
-fn comment_released_issues_public_api_uses_source_configuration() {
+#[tokio::test(flavor = "multi_thread")]
+async fn comment_released_issues_public_api_uses_source_configuration() {
 	let server = MockServer::start();
 	let list_issue_comments = server.mock(|when, then| {
 		when.method(GET)
@@ -401,13 +400,14 @@ fn comment_released_issues_public_api_uses_source_configuration() {
 		}),
 	}];
 
-	let outcomes = temp_env::with_vars(
+	let outcomes = temp_env::async_with_vars(
 		[
 			("GITHUB_TOKEN", Some("token")),
 			("GITHUB_SERVER_URL", Some("https://example.com")),
 		],
-		|| comment_released_issues(&source, &manifest),
+		comment_released_issues(&source, &manifest),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("comment released issues: {error}"));
 
 	list_issue_comments.assert();
@@ -422,8 +422,8 @@ fn comment_released_issues_public_api_uses_source_configuration() {
 	);
 }
 
-#[test]
-fn github_hosted_source_adapter_comments_released_issues() {
+#[tokio::test(flavor = "multi_thread")]
+async fn github_hosted_source_adapter_comments_released_issues() {
 	let server = MockServer::start();
 	let list_issue_comments = server.mock(|when, then| {
 		when.method(GET)
@@ -471,13 +471,14 @@ fn github_hosted_source_adapter_comments_released_issues() {
 		}),
 	}];
 
-	let outcomes = temp_env::with_vars(
+	let outcomes = temp_env::async_with_vars(
 		[
 			("GITHUB_TOKEN", Some("token")),
 			("GITHUB_SERVER_URL", Some("https://example.com")),
 		],
-		|| HOSTED_SOURCE_ADAPTER.comment_released_issues(&source, &manifest),
+		HOSTED_SOURCE_ADAPTER.comment_released_issues(&source, &manifest),
 	)
+	.await
 	.unwrap_or_else(|error| panic!("adapter issue comments: {error}"));
 
 	list_issue_comments.assert();
@@ -885,8 +886,8 @@ fn sync_retargeted_releases_errors_when_release_lookup_is_missing() {
 	);
 }
 
-#[test]
-fn sync_retargeted_releases_public_api_uses_source_configuration_and_env() {
+#[tokio::test(flavor = "multi_thread")]
+async fn sync_retargeted_releases_public_api_uses_source_configuration_and_env() {
 	let server = MockServer::start();
 	let release_lookup = server.mock(|when, then| {
 		when.method(GET)
@@ -922,9 +923,11 @@ fn sync_retargeted_releases_public_api_uses_source_configuration_and_env() {
 		message: None,
 	}];
 
-	let outcomes = temp_env::with_var("GITHUB_TOKEN", Some("token"), || {
-		sync_retargeted_releases(&source, &updates, false)
-	})
+	let outcomes = temp_env::async_with_vars(
+		[("GITHUB_TOKEN", Some("token"))],
+		sync_retargeted_releases(&source, &updates, false),
+	)
+	.await
 	.unwrap_or_else(|error| panic!("public sync releases: {error}"));
 
 	release_lookup.assert();
@@ -1099,8 +1102,8 @@ fn release_pull_request_commit_verification_is_opt_in() {
 	);
 }
 
-#[test]
-fn release_pull_request_commit_verification_uses_github_git_database_api() {
+#[tokio::test(flavor = "multi_thread")]
+async fn release_pull_request_commit_verification_uses_github_git_database_api() {
 	let server = MockServer::start();
 	let source = sample_source_with_verified_commits(Some(server.base_url()));
 	let request = sample_pull_request_request();
@@ -1154,22 +1157,21 @@ fn release_pull_request_commit_verification_uses_github_git_database_api() {
 			.body(format!(r#"{{"object":{{"sha":"{verified}"}}}}"#));
 	});
 
-	let result = temp_env::with_vars(
+	let result = temp_env::async_with_vars(
 		[
 			("GITHUB_TOKEN", Some("token")),
 			("GITHUB_ACTIONS", Some("true")),
 			("GITHUB_REPOSITORY", Some("ifiokjr/monochange")),
 		],
-		|| {
-			maybe_replace_release_pull_request_commit_with_verified_github_commit(
-				&source,
-				&request,
-				fallback,
-				root,
-				&[],
-			)
-		},
-	);
+		maybe_replace_release_pull_request_commit_with_verified_github_commit(
+			&source,
+			&request,
+			fallback,
+			root,
+			&[],
+		),
+	)
+	.await;
 
 	original_commit.assert();
 	parent_commit.assert();
@@ -1179,8 +1181,8 @@ fn release_pull_request_commit_verification_uses_github_git_database_api() {
 	assert_eq!(result, Ok(verified.to_string()));
 }
 
-#[test]
-fn release_pull_request_commit_verification_falls_back_when_github_does_not_verify_commit() {
+#[tokio::test(flavor = "multi_thread")]
+async fn release_pull_request_commit_verification_falls_back_when_github_does_not_verify_commit() {
 	let server = MockServer::start();
 	let source = sample_source_with_verified_commits(Some(server.base_url()));
 	let request = sample_pull_request_request();
@@ -1214,30 +1216,29 @@ fn release_pull_request_commit_verification_falls_back_when_github_does_not_veri
 			));
 	});
 
-	let result = temp_env::with_vars(
+	let result = temp_env::async_with_vars(
 		[
 			("GITHUB_TOKEN", Some("token")),
 			("GITHUB_ACTIONS", Some("true")),
 			("GITHUB_REPOSITORY", Some("ifiokjr/monochange")),
 		],
-		|| {
-			maybe_replace_release_pull_request_commit_with_verified_github_commit(
-				&source,
-				&request,
-				fallback,
-				root,
-				&[],
-			)
-		},
-	);
+		maybe_replace_release_pull_request_commit_with_verified_github_commit(
+			&source,
+			&request,
+			fallback,
+			root,
+			&[],
+		),
+	)
+	.await;
 
 	original_commit.assert();
 	parent_commit.assert();
 	create_commit.assert();
 	assert!(result.is_err_and(|message| message.contains("without verification (unsigned)")));
 }
-#[test]
-fn release_pull_request_commit_verification_creates_blobs_for_varied_file_types() {
+#[tokio::test(flavor = "multi_thread")]
+async fn release_pull_request_commit_verification_creates_blobs_for_varied_file_types() {
 	let server = MockServer::start();
 	let source = sample_source_with_verified_commits(Some(server.base_url()));
 	let request = sample_pull_request_request();
@@ -1351,22 +1352,21 @@ fn release_pull_request_commit_verification_creates_blobs_for_varied_file_types(
 			.body(format!(r#"{{"object":{{"sha":"{verified}"}}}}"#));
 	});
 
-	let result = temp_env::with_vars(
+	let result = temp_env::async_with_vars(
 		[
 			("GITHUB_TOKEN", Some("token")),
 			("GITHUB_ACTIONS", Some("true")),
 			("GITHUB_REPOSITORY", Some("ifiokjr/monochange")),
 		],
-		|| {
-			maybe_replace_release_pull_request_commit_with_verified_github_commit(
-				&source,
-				&request,
-				fallback,
-				root,
-				&tracked_paths,
-			)
-		},
-	);
+		maybe_replace_release_pull_request_commit_with_verified_github_commit(
+			&source,
+			&request,
+			fallback,
+			root,
+			&tracked_paths,
+		),
+	)
+	.await;
 
 	original_commit.assert();
 	parent_commit.assert();
@@ -1379,8 +1379,8 @@ fn release_pull_request_commit_verification_creates_blobs_for_varied_file_types(
 	update_ref.assert();
 	assert_eq!(result, Ok(verified.to_string()));
 }
-#[test]
-fn release_pull_request_commit_verification_uses_root_commit_without_parent() {
+#[tokio::test(flavor = "multi_thread")]
+async fn release_pull_request_commit_verification_uses_root_commit_without_parent() {
 	let server = MockServer::start();
 	let source = sample_source_with_verified_commits(Some(server.base_url()));
 	let request = sample_pull_request_request();
@@ -1447,22 +1447,21 @@ fn release_pull_request_commit_verification_uses_root_commit_without_parent() {
 			.body(format!(r#"{{"object":{{"sha":"{verified}"}}}}"#));
 	});
 
-	let result = temp_env::with_vars(
+	let result = temp_env::async_with_vars(
 		[
 			("GITHUB_TOKEN", Some("token")),
 			("GITHUB_ACTIONS", Some("true")),
 			("GITHUB_REPOSITORY", Some("ifiokjr/monochange")),
 		],
-		|| {
-			maybe_replace_release_pull_request_commit_with_verified_github_commit(
-				&source,
-				&request,
-				fallback,
-				root,
-				&tracked_paths,
-			)
-		},
-	);
+		maybe_replace_release_pull_request_commit_with_verified_github_commit(
+			&source,
+			&request,
+			fallback,
+			root,
+			&tracked_paths,
+		),
+	)
+	.await;
 
 	original_commit.assert();
 	blob.assert();
@@ -1649,14 +1648,16 @@ fn publish_release_pull_request_falls_back_when_verified_commit_is_unavailable()
 			("GITHUB_REPOSITORY", Some("ifiokjr/monochange")),
 		],
 		|| {
-			publish_release_pull_request(
-				&source,
-				&repo,
-				&request,
-				&[PathBuf::from("release.txt")],
-				false,
-			)
-			.unwrap_or_else(|error| panic!("publish pull request: {error}"))
+			tokio::runtime::Runtime::new()
+				.unwrap()
+				.block_on(publish_release_pull_request(
+					&source,
+					&repo,
+					&request,
+					&[PathBuf::from("release.txt")],
+					false,
+				))
+				.unwrap_or_else(|error| panic!("publish pull request: {error}"))
 		},
 	);
 
@@ -1771,19 +1772,18 @@ fn publish_release_pull_request_updates_stale_existing_pull_request_body() {
 	assert_eq!(outcome.url.as_deref(), Some("https://example.com/pr/9"));
 }
 
-#[test]
-fn join_existing_pull_request_lookup_reports_panicked_thread() {
-	let error = join_existing_pull_request_lookup(thread::spawn(
-		|| -> MonochangeResult<Option<GitHubExistingPullRequest>> {
-			panic!("boom");
-		},
-	))
+#[tokio::test(flavor = "multi_thread")]
+async fn join_existing_pull_request_lookup_reports_panicked_thread() {
+	let error = join_existing_pull_request_lookup(tokio::spawn(async {
+		panic!("boom");
+	}))
+	.await
 	.err()
 	.unwrap_or_else(|| panic!("expected join error"));
 	assert!(
 		error
 			.to_string()
-			.contains("failed to join GitHub pull request lookup thread")
+			.contains("failed to join GitHub pull request lookup task")
 	);
 }
 
@@ -1967,14 +1967,16 @@ fn publish_release_pull_request_skips_push_when_existing_pull_request_matches_lo
 	);
 
 	let outcome = with_github_env(Some("token"), || {
-		publish_release_pull_request(
-			&source,
-			&repo,
-			&request,
-			&[PathBuf::from("release.txt")],
-			false,
-		)
-		.unwrap_or_else(|error| panic!("publish pull request: {error}"))
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(publish_release_pull_request(
+				&source,
+				&repo,
+				&request,
+				&[PathBuf::from("release.txt")],
+				false,
+			))
+			.unwrap_or_else(|error| panic!("publish pull request: {error}"))
 	});
 
 	list_pull_requests.assert();
@@ -2011,18 +2013,24 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 	);
 
 	must_ok(
-		git_checkout_branch(&repo, "monochange/release/release"),
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(git_checkout_branch(&repo, "monochange/release/release")),
 		"checkout branch",
 	);
 	must_ok(
-		git_checkout_branch(&repo, "monochange/release/release"),
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(git_checkout_branch(&repo, "monochange/release/release")),
 		"repeat checkout branch",
 	);
 	must_ok(
-		git_stage_paths(&repo, &[PathBuf::from("release.txt")]),
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(git_stage_paths(&repo, &[PathBuf::from("release.txt")])),
 		"stage paths",
 	);
-	git_commit_paths(
+	tokio::runtime::Runtime::new().unwrap().block_on(git_commit_paths(
 		&repo,
 		&CommitMessage {
 			subject: "chore(release): prepare release".to_string(),
@@ -2031,9 +2039,11 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 			),
 		},
 		false,
-	)
+	))
 		.unwrap_or_else(|error| panic!("commit paths: {error}"));
-	git_push_branch(&repo, "monochange/release/release", false)
+	tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(git_push_branch(&repo, "monochange/release/release", false))
 		.unwrap_or_else(|error| panic!("push branch: {error}"));
 
 	let branch = git_output(
@@ -2074,13 +2084,15 @@ fn git_stage_paths_skips_missing_untracked_paths_and_ignored_untracked_files() {
 	);
 
 	must_ok(
-		git_stage_paths(
-			&repo,
-			&[
-				PathBuf::from(".monochange/local/release-manifest.json"),
-				PathBuf::from(".changeset/missing.md"),
-			],
-		),
+		tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(git_stage_paths(
+				&repo,
+				&[
+					PathBuf::from(".monochange/local/release-manifest.json"),
+					PathBuf::from(".changeset/missing.md"),
+				],
+			)),
 		"stage paths",
 	);
 
@@ -2095,7 +2107,9 @@ fn git_path_is_tracked_reports_command_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path().join("missing");
 
-	let error = git_path_is_tracked(&root, Path::new("release.txt"))
+	let error = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(git_path_is_tracked(&root, Path::new("release.txt")))
 		.err()
 		.unwrap_or_else(|| panic!("expected tracked command failure"));
 	assert!(
@@ -2115,7 +2129,9 @@ fn git_path_is_tracked_reports_inspection_failures() {
 		"write release file",
 	);
 
-	let error = git_path_is_tracked(&repo, Path::new("release.txt"))
+	let error = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(git_path_is_tracked(&repo, Path::new("release.txt")))
 		.err()
 		.unwrap_or_else(|| panic!("expected tracked inspection failure"));
 	assert!(
@@ -2136,7 +2152,9 @@ fn git_path_is_ignored_reports_false_for_unignored_paths() {
 	);
 
 	assert!(
-		!git_path_is_ignored(&repo, Path::new("release.txt"))
+		!tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(git_path_is_ignored(&repo, Path::new("release.txt")))
 			.unwrap_or_else(|error| panic!("git path ignored: {error}"))
 	);
 }
@@ -2151,7 +2169,9 @@ fn git_path_is_ignored_reports_inspection_failures() {
 		"write release file",
 	);
 
-	let error = git_path_is_ignored(&repo, Path::new("release.txt"))
+	let error = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(git_path_is_ignored(&repo, Path::new("release.txt")))
 		.err()
 		.unwrap_or_else(|| panic!("expected ignored inspection failure"));
 	assert!(
@@ -2166,7 +2186,9 @@ fn git_path_is_ignored_reports_command_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path().join("missing");
 
-	let error = git_path_is_ignored(&root, Path::new("release.txt"))
+	let error = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(git_path_is_ignored(&root, Path::new("release.txt")))
 		.err()
 		.unwrap_or_else(|| panic!("expected ignored command failure"));
 	assert!(
@@ -2180,16 +2202,18 @@ fn git_path_is_ignored_reports_command_failures() {
 fn git_commit_paths_reports_io_and_non_noop_failures() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let missing = tempdir.path().join("missing");
-	let io_error = git_commit_paths(
-		&missing,
-		&CommitMessage {
-			subject: "chore(release): prepare release".to_string(),
-			body: None,
-		},
-		false,
-	)
-	.err()
-	.unwrap_or_else(|| panic!("expected missing worktree error"));
+	let io_error = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(git_commit_paths(
+			&missing,
+			&CommitMessage {
+				subject: "chore(release): prepare release".to_string(),
+				body: None,
+			},
+			false,
+		))
+		.err()
+		.unwrap_or_else(|| panic!("expected missing worktree error"));
 	assert!(
 		io_error
 			.to_string()
@@ -2212,16 +2236,18 @@ fn git_commit_paths_reports_io_and_non_noop_failures() {
 	fs::write(repo.join("release.txt"), "initial\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
 	git(&repo, &["add", "release.txt"]);
-	let error = git_commit_paths(
-		&repo,
-		&CommitMessage {
-			subject: "chore(release): prepare release".to_string(),
-			body: None,
-		},
-		false,
-	)
-	.err()
-	.unwrap_or_else(|| panic!("expected pre-commit hook failure"));
+	let error = tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(git_commit_paths(
+			&repo,
+			&CommitMessage {
+				subject: "chore(release): prepare release".to_string(),
+				body: None,
+			},
+			false,
+		))
+		.err()
+		.unwrap_or_else(|| panic!("expected pre-commit hook failure"));
 	assert!(
 		error
 			.to_string()
@@ -2242,15 +2268,17 @@ fn git_commit_paths_treats_clean_worktrees_as_already_committed() {
 	git(&repo, &["add", "release.txt"]);
 	git(&repo, &["commit", "-m", "initial"]);
 
-	git_commit_paths(
-		&repo,
-		&CommitMessage {
-			subject: "chore(release): prepare release".to_string(),
-			body: None,
-		},
-		false,
-	)
-	.unwrap_or_else(|error| panic!("commit paths: {error}"));
+	tokio::runtime::Runtime::new()
+		.unwrap()
+		.block_on(git_commit_paths(
+			&repo,
+			&CommitMessage {
+				subject: "chore(release): prepare release".to_string(),
+				body: None,
+			},
+			false,
+		))
+		.unwrap_or_else(|error| panic!("commit paths: {error}"));
 
 	assert_eq!(
 		git_output(&repo, &["rev-list", "--count", "HEAD"]).trim(),
@@ -2376,8 +2404,8 @@ fn review_request_query_uses_lean_pull_request_payload() {
 	assert!(!query.contains("closingIssuesReferences"));
 }
 
-#[test]
-fn enrich_changeset_context_public_api_uses_source_configuration() {
+#[tokio::test(flavor = "multi_thread")]
+async fn enrich_changeset_context_public_api_uses_source_configuration() {
 	let source = SourceConfiguration {
 		provider: SourceProvider::GitHub,
 		host: None,
@@ -2416,13 +2444,14 @@ fn enrich_changeset_context_public_api_uses_source_configuration() {
 		}),
 	}];
 
-	temp_env::with_vars(
+	temp_env::async_with_vars(
 		[
 			("GITHUB_SERVER_URL", Some("https://example.com")),
 			("GITHUB_TOKEN", None::<&str>),
 		],
-		|| enrich_changeset_context(&source, &mut changesets),
-	);
+		enrich_changeset_context(&source, &mut changesets),
+	)
+	.await;
 
 	let commit_url = changesets
 		.first()

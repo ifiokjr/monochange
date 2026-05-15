@@ -1,3 +1,5 @@
+#![allow(clippy::large_futures)]
+#![allow(clippy::disallowed_methods)]
 //! Integration tests for `mc help` subcommand output.
 
 use insta_cmd::assert_cmd_snapshot;

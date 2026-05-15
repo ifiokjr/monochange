@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 use std::fs;
 
 use monochange_core::ChangesetTargetKind;

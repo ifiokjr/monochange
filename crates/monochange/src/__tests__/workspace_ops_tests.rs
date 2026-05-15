@@ -1,64 +1,4 @@
-fn collect_workspace_file_updates(
-	root: &Path,
-	temp_root: &Path,
-	base_updates: &[FileUpdate],
-	lockfile_commands: &[LockfileCommandExecution],
-) -> MonochangeResult<Vec<FileUpdate>> {
-	let normalized_root = monochange_core::normalize_path(root);
-	let mut dirs_to_scan = BTreeSet::new();
-
-	for update in base_updates {
-		if let Some(parent) = update.path.parent() {
-			let normalized = monochange_core::normalize_path(parent);
-			if let Ok(relative) = normalized.strip_prefix(&normalized_root) {
-				dirs_to_scan.insert(relative.to_path_buf());
-			}
-		}
-	}
-
-	for command in lockfile_commands {
-		let normalized = monochange_core::normalize_path(&command.cwd);
-		if let Ok(relative) = normalized.strip_prefix(&normalized_root) {
-			dirs_to_scan.insert(relative.to_path_buf());
-		} else {
-			dirs_to_scan.insert(command.cwd.clone());
-		}
-	}
-
-	// Always scan the changeset directory (files are deleted during release).
-	dirs_to_scan.insert(PathBuf::from(".changeset"));
-
-	let mut relative_paths = BTreeSet::new();
-
-	for dir in &dirs_to_scan {
-		let original_dir = root.join(dir);
-		let temp_dir = temp_root.join(dir);
-		if original_dir.is_dir() {
-			collect_workspace_files(root, &original_dir, &mut relative_paths)?;
-		}
-		if temp_dir.is_dir() {
-			collect_workspace_files(temp_root, &temp_dir, &mut relative_paths)?;
-		}
-	}
-
-	let mut updates = Vec::new();
-
-	for relative in relative_paths {
-		let before = read_optional_file(&root.join(&relative))?;
-		let after = read_optional_file(&temp_root.join(&relative))?;
-		if let Some(content) = after.filter(|content| before.as_ref() != Some(content)) {
-			updates.push(FileUpdate {
-				path: root.join(relative),
-				content,
-			});
-		}
-	}
-
-	updates.sort_by(|left, right| left.path.cmp(&right.path));
-
-	Ok(updates)
-}
-
+#![allow(clippy::disallowed_methods)]
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
@@ -79,14 +19,6 @@ use monochange_core::SourceConfiguration;
 use monochange_core::SourceProvider;
 use monochange_core::VersionFormat;
 use monochange_core::WorkspaceConfiguration;
-use monochange_test_helpers::workspace_ops::collect_workspace_files;
-use monochange_test_helpers::workspace_ops::copy_workspace_file;
-use monochange_test_helpers::workspace_ops::copy_workspace_tree;
-use monochange_test_helpers::workspace_ops::ensure_parent_directory;
-use monochange_test_helpers::workspace_ops::read_optional_file;
-use monochange_test_helpers::workspace_ops::remap_workspace_path;
-use monochange_test_helpers::workspace_ops::run_lockfile_command;
-use monochange_test_helpers::workspace_ops::strip_workspace_prefix;
 
 use super::*;
 
@@ -102,13 +34,50 @@ fn render_step_inputs_toml_uses_array_for_inherited_and_map_for_mixed_inputs() {
 	assert_eq!(rendered, "inputs = [\"format\"]\n");
 
 	inherited_inputs.insert(
+		"release".to_string(),
+		monochange_core::CliStepInputValue::Inherited,
+	);
+	let mut rendered = String::new();
+	render_step_inputs_toml(&mut rendered, &inherited_inputs);
+	assert_eq!(rendered, "inputs = [\"format\", \"release\"]\n");
+
+	inherited_inputs.insert(
 		"draft".to_string(),
 		monochange_core::CliStepInputValue::Boolean(true),
 	);
 	let rendered = render_step_inputs_inline_table(&inherited_inputs);
 	assert_eq!(
 		rendered,
-		"{ draft = true, format = \"{{ inputs.format }}\" }"
+		"{ draft = true, format = \"{{ inputs.format }}\", release = \"{{ inputs.release }}\" }"
+	);
+}
+
+#[test]
+fn write_toml_array_items_streams_values_without_outer_brackets() {
+	let mut rendered = String::new();
+	write_toml_array_items(
+		&mut rendered,
+		["core".to_string(), "web app".to_string()].iter(),
+	);
+
+	assert_eq!(rendered, "\"core\", \"web app\"");
+}
+
+#[test]
+fn render_command_variables_inline_table_streams_multiple_variables() {
+	let mut variables = BTreeMap::new();
+	variables.insert(
+		"changed".to_string(),
+		monochange_core::CommandVariable::ChangedFiles,
+	);
+	variables.insert(
+		"version".to_string(),
+		monochange_core::CommandVariable::Version,
+	);
+
+	assert_eq!(
+		render_command_variables_inline_table(&variables),
+		"{ changed = \"changed_files\", version = \"version\" }"
 	);
 }
 
@@ -411,14 +380,14 @@ fn validate_and_discover_release_workspace_cover_fallback_and_errors() {
 	let undetected = WorkspaceConfiguration {
 		root_path: undetected_root.path().to_path_buf(),
 		defaults: monochange_core::WorkspaceDefaults {
-			package_type: Some(PackageType::Cargo),
+			package_type: Some(PackageType::Go),
 			..monochange_core::WorkspaceDefaults::default()
 		},
 		changelog: ChangelogSettings::default(),
 		packages: vec![PackageDefinition {
 			id: "empty".to_string(),
 			path: PathBuf::from("empty-package"),
-			package_type: PackageType::Cargo,
+			package_type: PackageType::Go,
 			changelog: None,
 			excluded_changelog_types: Vec::new(),
 			empty_update_message: None,
@@ -451,8 +420,7 @@ fn validate_and_discover_release_workspace_cover_fallback_and_errors() {
 	assert!(
 		undetected_error
 			.to_string()
-			.contains("could not be discovered")
-			|| undetected_error.to_string().contains("failed to read")
+			.contains("configured package `empty` at empty-package could not be discovered")
 	);
 
 	let missing_manifest_root =
@@ -1119,6 +1087,22 @@ fn run_lockfile_command_variants_cover_success_and_shell_paths() {
 }
 
 #[test]
+fn collect_workspace_file_updates_ignores_parentless_base_updates() {
+	let root = tempfile::tempdir().unwrap_or_else(|error| panic!("root tempdir: {error}"));
+	let temp_root = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let base_update = FileUpdate {
+		path: PathBuf::new(),
+		content: Vec::new(),
+	};
+
+	let updates =
+		collect_workspace_file_updates(root.path(), temp_root.path(), &[base_update], &[])
+			.unwrap_or_else(|error| panic!("collect updates: {error}"));
+
+	assert!(updates.is_empty());
+}
+
+#[test]
 fn collect_workspace_file_updates_handles_outside_command_cwds() {
 	let fixture = setup_workspace_ops_fixture();
 	let temp_root = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
@@ -1183,19 +1167,29 @@ fn changeset_context_phase_label_covers_annotate_and_enrich_modes() {
 }
 
 #[test]
+fn changeset_context_timeout_uses_configured_source_release_timeout() {
+	let mut source = sample_source(SourceProvider::GitHub);
+	assert_eq!(changeset_context_timeout(&source), Duration::from_secs(120));
+
+	source.releases.changeset_context_timeout_seconds = 7;
+	assert_eq!(changeset_context_timeout(&source), Duration::from_secs(7));
+}
+
+#[test]
 fn warn_about_incomplete_cargo_lockfiles_returns_early_when_commands_are_configured() {
 	let configuration = workspace_configuration_with_lockfile_commands();
 	warn_about_incomplete_cargo_lockfiles(Path::new("."), &configuration, &[], &BTreeMap::new());
 }
 
-#[test]
-fn apply_source_changeset_context_dispatches_non_dry_gitlab_and_gitea_enrichment() {
+#[tokio::test(flavor = "multi_thread")]
+async fn apply_source_changeset_context_dispatches_non_dry_gitlab_and_gitea_enrichment() {
 	let mut gitlab_changesets = vec![sample_changeset_with_context()];
 	apply_source_changeset_context(
 		&sample_source(SourceProvider::GitLab),
 		false,
 		&mut gitlab_changesets,
-	);
+	)
+	.await;
 	let gitlab_context = gitlab_changesets
 		.first()
 		.and_then(|changeset| changeset.context.as_ref())
@@ -1216,7 +1210,8 @@ fn apply_source_changeset_context_dispatches_non_dry_gitlab_and_gitea_enrichment
 		&sample_source(SourceProvider::Gitea),
 		false,
 		&mut gitea_changesets,
-	);
+	)
+	.await;
 	let gitea_context = gitea_changesets
 		.first()
 		.and_then(|changeset| changeset.context.as_ref())
@@ -1233,8 +1228,8 @@ fn apply_source_changeset_context_dispatches_non_dry_gitlab_and_gitea_enrichment
 	);
 }
 
-#[test]
-fn prepare_release_execution_materializes_configured_lockfile_commands() {
+#[tokio::test(flavor = "multi_thread")]
+async fn prepare_release_execution_materializes_configured_lockfile_commands() {
 	let fixture = monochange_test_helpers::fs::setup_fixture_from(
 		env!("CARGO_MANIFEST_DIR"),
 		"monochange/cargo-lock-release",
@@ -1255,6 +1250,7 @@ cwd = "."
 		.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
 
 	let prepared = prepare_release_execution_with_file_diffs(fixture.path(), false, false, false)
+		.await
 		.unwrap_or_else(|error| panic!("prepare release: {error}"));
 
 	assert!(
@@ -1271,8 +1267,8 @@ cwd = "."
 	);
 }
 
-#[test]
-fn prepare_release_execution_tracks_gitlab_context_phase_timing() {
+#[tokio::test(flavor = "multi_thread")]
+async fn prepare_release_execution_tracks_gitlab_context_phase_timing() {
 	let fixture = monochange_test_helpers::fs::setup_fixture_from(
 		env!("CARGO_MANIFEST_DIR"),
 		"monochange/release-base",
@@ -1293,6 +1289,7 @@ repo = "monochange"
 		.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
 
 	let prepared = prepare_release_execution_with_file_diffs(fixture.path(), true, false, false)
+		.await
 		.unwrap_or_else(|error| panic!("prepare release: {error}"));
 
 	assert!(
@@ -1303,8 +1300,8 @@ repo = "monochange"
 	);
 }
 
-#[test]
-fn prepare_release_execution_tracks_github_background_context_phase_timing() {
+#[tokio::test(flavor = "multi_thread")]
+async fn prepare_release_execution_tracks_github_background_context_phase_timing() {
 	let fixture = monochange_test_helpers::fs::setup_fixture_from(
 		env!("CARGO_MANIFEST_DIR"),
 		"monochange/release-base",
@@ -1325,6 +1322,7 @@ repo = "monochange"
 		.unwrap_or_else(|error| panic!("write monochange.toml: {error}"));
 
 	let prepared = prepare_release_execution_with_file_diffs(fixture.path(), false, false, false)
+		.await
 		.unwrap_or_else(|error| panic!("prepare release: {error}"));
 
 	assert!(
@@ -1335,14 +1333,77 @@ repo = "monochange"
 	);
 }
 
-#[test]
-fn join_source_changeset_context_task_reports_background_panic() {
+#[tokio::test(flavor = "multi_thread")]
+async fn run_changeset_context_enrichment_with_timeout_reports_completion() {
+	let source = sample_source(SourceProvider::GitHub);
+	let completed =
+		run_changeset_context_enrichment_with_timeout(&source, Duration::from_secs(1), async {})
+			.await;
+
+	assert!(completed);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn run_changeset_context_enrichment_with_timeout_returns_false_on_elapsed_timeout() {
+	let subscriber = tracing_subscriber::fmt()
+		.with_max_level(tracing::Level::WARN)
+		.with_writer(std::io::sink)
+		.finish();
+	let _default_subscriber = tracing::subscriber::set_default(subscriber);
+	let source = sample_source(SourceProvider::GitHub);
+	let completed = run_changeset_context_enrichment_with_timeout(
+		&source,
+		Duration::from_millis(1),
+		std::future::pending::<()>(),
+	)
+	.await;
+
+	assert!(!completed);
+}
+
+struct DropSignal(Option<tokio::sync::oneshot::Sender<()>>);
+
+impl Drop for DropSignal {
+	fn drop(&mut self) {
+		if let Some(sender) = self.0.take() {
+			let _ = sender.send(());
+		}
+	}
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn source_changeset_context_task_aborts_background_work_when_dropped() {
+	let (started_sender, started_receiver) = tokio::sync::oneshot::channel();
+	let (dropped_sender, dropped_receiver) = tokio::sync::oneshot::channel();
+	let handle = tokio::spawn(async move {
+		let _ = started_sender.send(());
+		let _drop_signal = DropSignal(Some(dropped_sender));
+		std::future::pending::<(Vec<PreparedChangeset>, StepPhaseTiming)>().await
+	});
+	let task = SourceChangesetContextTask::new(handle);
+
+	started_receiver
+		.await
+		.unwrap_or_else(|error| panic!("background task did not start: {error}"));
+	drop(task);
+	let drop_result = tokio::time::timeout(Duration::from_secs(1), dropped_receiver).await;
+
+	assert!(
+		matches!(drop_result, Ok(Ok(()))),
+		"background task was not dropped: {drop_result:?}"
+	);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn join_source_changeset_context_task_reports_background_panic() {
 	let mut phase_timings = Vec::new();
-	let handle = std::thread::spawn(|| -> (Vec<PreparedChangeset>, StepPhaseTiming) {
+	let handle = tokio::spawn(async {
 		panic!("boom");
 	});
+	let task = SourceChangesetContextTask::new(handle);
 
-	let error = join_source_changeset_context_task(&mut phase_timings, handle)
+	let error = join_source_changeset_context_task(&mut phase_timings, task)
+		.await
 		.err()
 		.unwrap_or_else(|| panic!("expected join error"));
 

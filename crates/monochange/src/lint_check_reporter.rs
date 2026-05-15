@@ -1,5 +1,6 @@
 #![forbid(clippy::indexing_slicing)]
 
+use std::fmt::Write as _;
 use std::io;
 use std::io::IsTerminal;
 use std::io::Write;
@@ -36,6 +37,33 @@ fn color_enabled() -> bool {
 
 fn paint(text: &str, style: Style) -> String {
 	format!("{style}{text}{style:#}")
+}
+
+fn summary_count_line(
+	errors: usize,
+	warnings: usize,
+	error_icon: &str,
+	warn_icon: &str,
+) -> Option<String> {
+	let mut line = String::new();
+	if errors > 0 {
+		let _ = write!(
+			line,
+			"{error_icon} {errors} error{}",
+			if errors == 1 { "" } else { "s" }
+		);
+	}
+	if warnings > 0 {
+		if !line.is_empty() {
+			line.push_str(", ");
+		}
+		let _ = write!(
+			line,
+			"{warn_icon} {warnings} warning{}",
+			if warnings == 1 { "" } else { "s" }
+		);
+	}
+	(!line.is_empty()).then_some(line)
 }
 
 fn with_stderr_lock(f: impl FnOnce()) {
@@ -253,30 +281,7 @@ impl LintProgressReporter for HumanLintProgressReporter {
 		let warn_icon = if self.color { "⚠" } else { "!" };
 		let info_icon = if self.color { "·" } else { "-" };
 
-		let parts: Vec<String> = [
-			if errors > 0 {
-				Some(format!(
-					"{error_icon} {errors} error{}",
-					if errors == 1 { "" } else { "s" }
-				))
-			} else {
-				None
-			},
-			if warnings > 0 {
-				Some(format!(
-					"{warn_icon} {warnings} warning{}",
-					if warnings == 1 { "" } else { "s" }
-				))
-			} else {
-				None
-			},
-		]
-		.into_iter()
-		.flatten()
-		.collect();
-
-		if !parts.is_empty() {
-			let summary_line = parts.join(", ");
+		if let Some(summary_line) = summary_count_line(errors, warnings, error_icon, warn_icon) {
 			self.print_line(&summary_line);
 		}
 

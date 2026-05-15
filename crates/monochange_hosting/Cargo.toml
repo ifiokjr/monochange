@@ -19,6 +19,9 @@ serde = { workspace = true, default-features = true }
 
 [dev-dependencies]
 httpmock = { workspace = true }
+monochange_test_helpers = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true, default-features = true }
 
 [lints]
 workspace = true

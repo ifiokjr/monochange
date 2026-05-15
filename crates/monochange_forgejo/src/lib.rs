@@ -65,7 +65,6 @@ use reqwest::header::HeaderValue;
 use serde::Deserialize;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use tokio::runtime::Builder as RuntimeBuilder;
 use urlencoding::encode;
 
 /// Return the hosted-source capabilities supported by the Forgejo provider.
@@ -87,6 +86,7 @@ pub static HOSTED_SOURCE_ADAPTER: ForgejoHostedSourceAdapter = ForgejoHostedSour
 /// Hosted-source adapter for Forgejo repositories.
 pub struct ForgejoHostedSourceAdapter;
 
+#[async_trait::async_trait]
 impl HostedSourceAdapter for ForgejoHostedSourceAdapter {
 	fn provider(&self) -> SourceProvider {
 		SourceProvider::Forgejo
@@ -108,7 +108,7 @@ impl HostedSourceAdapter for ForgejoHostedSourceAdapter {
 		annotate_changeset_context(source, changesets);
 	}
 
-	fn enrich_changeset_context(
+	async fn enrich_changeset_context(
 		&self,
 		source: &SourceConfiguration,
 		changesets: &mut [PreparedChangeset],
@@ -395,35 +395,28 @@ pub fn build_release_pull_request_request(
 #[tracing::instrument(skip_all)]
 #[must_use = "the publish result must be checked"]
 #[allow(clippy::disallowed_methods)]
-pub fn publish_release_requests(
+pub async fn publish_release_requests(
 	source: &SourceConfiguration,
 	requests: &[SourceReleaseRequest],
 ) -> MonochangeResult<Vec<SourceReleaseOutcome>> {
-	let runtime = RuntimeBuilder::new_current_thread()
-		.enable_all()
+	let client = Client::builder()
 		.build()
-		.expect("failed to build Forgejo runtime");
-	runtime.block_on(async {
-		let client = Client::builder()
-			.build()
-			.expect("failed to build Forgejo HTTP client");
-		let token = forgejo_token()?;
-		let headers = auth_headers(&token)?;
-		let api_base = forgejo_api_base(source)?;
-		let mut outcomes = Vec::with_capacity(requests.len());
-		for request in requests {
-			outcomes.push(
-				publish_release_request(&client, &headers, &api_base, source, request).await?,
-			);
-		}
-		Ok(outcomes)
-	})
+		.expect("failed to build Forgejo HTTP client");
+	let token = forgejo_token()?;
+	let headers = auth_headers(&token)?;
+	let api_base = forgejo_api_base(source)?;
+	let mut outcomes = Vec::with_capacity(requests.len());
+	for request in requests {
+		outcomes
+			.push(publish_release_request(&client, &headers, &api_base, source, request).await?);
+	}
+	Ok(outcomes)
 }
 
 /// Commit, push, and publish the release pull request against Forgejo.
 #[must_use = "the pull request result must be checked"]
 #[allow(clippy::disallowed_methods)]
-pub fn publish_release_pull_request(
+pub async fn publish_release_pull_request(
 	source: &SourceConfiguration,
 	root: &Path,
 	request: &SourceChangeRequest,
@@ -432,35 +425,31 @@ pub fn publish_release_pull_request(
 ) -> MonochangeResult<SourceChangeRequestOutcome> {
 	let lookup_source = source.clone();
 	let lookup_request = request.clone();
-	let existing_pull_request = std::thread::spawn(move || {
-		let runtime = RuntimeBuilder::new_current_thread()
-			.enable_all()
+	let existing_pull_request = tokio::spawn(async move {
+		let client = Client::builder()
 			.build()
-			.expect("failed to build Forgejo runtime");
-		runtime.block_on(async {
-			let client = Client::builder()
-				.build()
-				.expect("failed to build Forgejo HTTP client");
-			let token = forgejo_token()?;
-			let headers = auth_headers(&token)?;
-			let api_base = forgejo_api_base(&lookup_source)?;
-			lookup_existing_pull_request(&client, &headers, &api_base, &lookup_request).await
-		})
+			.expect("failed to build Forgejo HTTP client");
+		let token = forgejo_token()?;
+		let headers = auth_headers(&token)?;
+		let api_base = forgejo_api_base(&lookup_source)?;
+		lookup_existing_pull_request(&client, &headers, &api_base, &lookup_request).await
 	});
 	git_checkout_branch(
 		root,
 		&request.head_branch,
 		"prepare release pull request branch",
-	)?;
-	git_stage_paths(root, tracked_paths, "stage release pull request files")?;
+	)
+	.await?;
+	git_stage_paths(root, tracked_paths, "stage release pull request files").await?;
 	git_commit_paths(
 		root,
 		&request.commit_message,
 		"commit release pull request changes",
 		no_verify,
-	)?;
-	let head_commit = git_head_commit(root)?;
-	let existing = join_existing_pull_request_lookup(existing_pull_request)?;
+	)
+	.await?;
+	let head_commit = git_head_commit(root).await?;
+	let existing = join_existing_pull_request_lookup(existing_pull_request).await?;
 	let head_matches_existing = existing
 		.as_ref()
 		.and_then(|pull_request| pull_request.head.sha.as_deref())
@@ -471,30 +460,25 @@ pub fn publish_release_pull_request(
 			&request.head_branch,
 			"push release pull request branch",
 			no_verify,
-		)?;
+		)
+		.await?;
 	}
 
-	let runtime = RuntimeBuilder::new_current_thread()
-		.enable_all()
+	let client = Client::builder()
 		.build()
-		.expect("failed to build Forgejo runtime");
-	runtime.block_on(async {
-		let client = Client::builder()
-			.build()
-			.expect("failed to build Forgejo HTTP client");
-		let token = forgejo_token()?;
-		let headers = auth_headers(&token)?;
-		let api_base = forgejo_api_base(source)?;
-		publish_pull_request_with_existing(
-			&client,
-			&headers,
-			&api_base,
-			request,
-			existing.as_ref(),
-			&head_commit,
-		)
-		.await
-	})
+		.expect("failed to build Forgejo HTTP client");
+	let token = forgejo_token()?;
+	let headers = auth_headers(&token)?;
+	let api_base = forgejo_api_base(source)?;
+	publish_pull_request_with_existing(
+		&client,
+		&headers,
+		&api_base,
+		request,
+		existing.as_ref(),
+		&head_commit,
+	)
+	.await
 }
 
 async fn publish_release_request(
@@ -690,11 +674,11 @@ async fn lookup_existing_pull_request(
 	)
 }
 
-fn join_existing_pull_request_lookup(
-	handle: std::thread::JoinHandle<MonochangeResult<Option<ForgejoExistingPullRequest>>>,
+async fn join_existing_pull_request_lookup(
+	handle: tokio::task::JoinHandle<MonochangeResult<Option<ForgejoExistingPullRequest>>>,
 ) -> MonochangeResult<Option<ForgejoExistingPullRequest>> {
-	handle.join().map_err(|_| {
-		MonochangeError::Config("failed to join Forgejo pull request lookup thread".to_string())
+	handle.await.map_err(|_| {
+		MonochangeError::Config("failed to join Forgejo pull request lookup task".to_string())
 	})?
 }
 

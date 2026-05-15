@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -94,6 +95,19 @@ fn reporter_helpers_cover_color_and_spinner_paths() {
 	reporter.start_spinner("spinning".to_string());
 	thread::sleep(SPINNER_DELAY + SPINNER_TICK + Duration::from_millis(50));
 	reporter.stop_spinner();
+}
+
+#[test]
+fn summary_count_line_streams_present_counts() {
+	assert_eq!(summary_count_line(0, 0, "x", "!"), None);
+	assert_eq!(
+		summary_count_line(1, 0, "x", "!"),
+		Some("x 1 error".to_string())
+	);
+	assert_eq!(
+		summary_count_line(2, 3, "x", "!"),
+		Some("x 2 errors, ! 3 warnings".to_string())
+	);
 }
 
 #[test]
