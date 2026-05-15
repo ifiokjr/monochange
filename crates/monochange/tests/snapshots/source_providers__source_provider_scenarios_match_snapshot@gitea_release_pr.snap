@@ -20,7 +20,7 @@ expression: redacted
               "entries": [
                 "#### add gitea fixture coverage"
               ],
-              "title": "Patch"
+              "title": "🐛 Fixed"
             }
           ],
           "summary": [],

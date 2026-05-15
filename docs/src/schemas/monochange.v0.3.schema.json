@@ -2267,7 +2267,7 @@
 			]
 		}
 	},
-	"$id": "https://monochange.github.io/monochange/schemas/monochange.schema.json",
+	"$id": "https://monochange.github.io/monochange/schemas/monochange.v0.3.schema.json",
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"additionalProperties": false,
 	"description": "JSON Schema for monochange.toml workspace configuration files.",

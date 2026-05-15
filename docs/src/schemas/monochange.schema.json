@@ -67,6 +67,33 @@
 			},
 			"type": "object"
 		},
+		"ChangelogStyle": {
+			"additionalProperties": false,
+			"description": "Rendering style options for changelog output.\n\nControls visual formatting of changelogs: section separators, package labels,\nmetadata lines, and collapsed section rendering. These are purely presentation\nconcerns; data-level configuration (sections, types, thresholds) lives in\n`ChangelogSettings`.\n\nA `ChangelogStyle::rules()` method produces a human-readable description of\nthe active style, suitable for feeding to an AI agent when reformatting\nexisting changelogs.",
+			"properties": {
+				"collapsedSectionStyle": {
+					"$ref": "#/$defs/CollapsedSectionStyle",
+					"default": "details"
+				},
+				"metadataStyle": {
+					"$ref": "#/$defs/MetadataStyle",
+					"default": "plain"
+				},
+				"packageLabelPlacement": {
+					"$ref": "#/$defs/PackageLabelPlacement",
+					"default": "after_heading"
+				},
+				"packageLabelStyle": {
+					"$ref": "#/$defs/PackageLabelStyle",
+					"default": "inline"
+				},
+				"sectionSeparator": {
+					"$ref": "#/$defs/SectionSeparator",
+					"default": "blank_line"
+				}
+			},
+			"type": "object"
+		},
 		"ChangelogType": {
 			"additionalProperties": false,
 			"properties": {
@@ -1087,6 +1114,21 @@
 				}
 			]
 		},
+		"CollapsedSectionStyle": {
+			"description": "How to render collapsed (low-priority) sections in changelogs.",
+			"oneOf": [
+				{
+					"const": "details",
+					"description": "Use HTML `<details>/<summary>` collapsible sections.",
+					"type": "string"
+				},
+				{
+					"const": "plain",
+					"description": "Render as regular `### heading` sections with no collapse.",
+					"type": "string"
+				}
+			]
+		},
 		"CommandVariable": {
 			"enum": [
 				"version",
@@ -1130,6 +1172,61 @@
 				"command"
 			],
 			"type": "object"
+		},
+		"MetadataStyle": {
+			"description": "How to render metadata lines (owner, review link, etc.) in changelog entries.",
+			"oneOf": [
+				{
+					"const": "blockquote",
+					"description": "Render metadata as block-quote lines: `> _Owner:_ @user`",
+					"type": "string"
+				},
+				{
+					"const": "plain",
+					"description": "Render metadata as plain lines: `_Owner:_ @user`",
+					"type": "string"
+				},
+				{
+					"const": "omit",
+					"description": "Omit metadata entirely.",
+					"type": "string"
+				}
+			]
+		},
+		"PackageLabelPlacement": {
+			"description": "Where to place package labels relative to a changelog entry.",
+			"oneOf": [
+				{
+					"const": "after_heading",
+					"description": "Place package labels after the change heading/title and before the change body.",
+					"type": "string"
+				},
+				{
+					"const": "after_change",
+					"description": "Place package labels after the full rendered change.",
+					"type": "string"
+				}
+			]
+		},
+		"PackageLabelStyle": {
+			"description": "How to render multi-package labels in changelog entries.",
+			"oneOf": [
+				{
+					"const": "badge",
+					"description": "Render labels as emphasized package names.",
+					"type": "string"
+				},
+				{
+					"const": "inline",
+					"description": "Render labels inline with the entry.\nSingle label: `- **my-pkg**: entry`\nMultiple labels: `**_pkg-a_, _pkg-b_**: entry`",
+					"type": "string"
+				},
+				{
+					"const": "omit",
+					"description": "Omit package labels entirely.",
+					"type": "string"
+				}
+			]
 		},
 		"PackageType": {
 			"enum": [
@@ -1294,6 +1391,88 @@
 			},
 			"type": "object"
 		},
+		"ReleaseNotesStyleOverrides": {
+			"additionalProperties": false,
+			"description": "Release notes-specific style overrides.\n\nAny unset field inherits from the base `ChangelogStyle` configured under\n`[changelog.style]`.",
+			"properties": {
+				"collapsedSectionStyle": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/CollapsedSectionStyle"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"metadataStyle": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/MetadataStyle"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"packageLabelPlacement": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/PackageLabelPlacement"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"packageLabelStyle": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/PackageLabelStyle"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"sectionSeparator": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/SectionSeparator"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				}
+			},
+			"type": "object"
+		},
+		"SectionSeparator": {
+			"description": "How to format section headings in rendered changelogs.\nNote: Section headings are plain strings — include emoji directly in the `heading` field\nof `ChangelogSectionDef` if desired (e.g. `\"🚀 Added\"`, `\"🐛 Fixed\"`).",
+			"oneOf": [
+				{
+					"const": "blank_line",
+					"description": "Insert a blank line between sections.",
+					"type": "string"
+				},
+				{
+					"const": "thematic_break",
+					"description": "Insert a thematic break (`---`) between sections.",
+					"type": "string"
+				},
+				{
+					"const": "none",
+					"description": "No separator between sections.",
+					"type": "string"
+				}
+			]
+		},
 		"ShellConfig": {
 			"description": "Shell configuration for `Command` steps.",
 			"oneOf": [
@@ -1411,6 +1590,16 @@
 		"changelogSettings": {
 			"additionalProperties": false,
 			"properties": {
+				"release_notes": {
+					"$ref": "#/$defs/ReleaseNotesStyleOverrides",
+					"default": {
+						"collapsedSectionStyle": null,
+						"metadataStyle": null,
+						"packageLabelPlacement": null,
+						"packageLabelStyle": null,
+						"sectionSeparator": null
+					}
+				},
 				"section_thresholds": {
 					"$ref": "#/$defs/ChangelogSectionThresholds",
 					"default": {
@@ -1424,6 +1613,16 @@
 					},
 					"default": {},
 					"type": "object"
+				},
+				"style": {
+					"$ref": "#/$defs/ChangelogStyle",
+					"default": {
+						"collapsedSectionStyle": "details",
+						"metadataStyle": "plain",
+						"packageLabelPlacement": "after_heading",
+						"packageLabelStyle": "inline",
+						"sectionSeparator": "blank_line"
+					}
 				},
 				"templates": {
 					"default": [],

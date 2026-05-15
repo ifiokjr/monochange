@@ -110,8 +110,8 @@ fn release_filters_group_changelog_entries_to_selected_member_packages() {
 	assert!(core_changelog.contains("#### add cli feature"));
 	assert!(app_changelog.contains("#### document internal sync work"));
 	assert!(!group_changelog.contains("Changed members:"));
-	assert!(group_changelog.contains("> [!NOTE]"));
-	assert!(group_changelog.contains("> *core*"));
+	// Default package labels are injected after the change title rather than before a heading.
+	assert!(group_changelog.contains("_Packages:_ _core_"));
 	assert!(group_changelog.contains("#### add cli feature"));
 	assert!(!group_changelog.contains("document internal sync work"));
 }
@@ -158,8 +158,8 @@ fn release_keeps_direct_group_targeted_notes_even_when_group_include_is_group_on
 	let group_changelog = fs::read_to_string(tempdir.path().join("docs/sdk-CHANGELOG.md"))
 		.unwrap_or_else(|error| panic!("group changelog: {error}"));
 
-	assert!(group_changelog.contains("> [!NOTE]"));
-	assert!(group_changelog.contains("> *sdk*"));
+	// Default package labels are injected after the change title rather than before a heading.
+	assert!(group_changelog.contains("_Packages:_ _sdk_"));
 	assert!(group_changelog.contains("#### highlight the grouped release"));
 	assert!(!group_changelog.contains("member note should stay package-only"));
 }
@@ -232,28 +232,28 @@ fn default_changelog_sections_render_heading_for_routed_types() {
 	let group_changelog = fs::read_to_string(tempdir.path().join("docs/sdk-CHANGELOG.md"))
 		.unwrap_or_else(|error| panic!("group changelog: {error}"));
 
-	// Default sections: "feat" routes to section with heading "Added",
-	// "fix" routes to "Fixed", "docs" routes to "Documentation"
+	// Default sections: "feat" routes to section with heading "🚀 Feature",
+	// "fix" routes to "🐛 Fixed", "docs" routes to "📖 Documentation"
 	assert!(
-		group_changelog.contains("### Added"),
-		"expected ### Added heading for minor/feat types"
+		group_changelog.contains("### 🚀 Feature"),
+		"expected ### 🚀 Feature heading for minor/feat types"
 	);
 	assert!(
-		group_changelog.contains("### Fixed"),
-		"expected ### Fixed heading for fix type"
+		group_changelog.contains("### 🐛 Fixed"),
+		"expected ### 🐛 Fixed heading for fix type"
 	);
 	assert!(
-		group_changelog.contains("### Documentation"),
-		"expected ### Documentation heading for docs type"
+		group_changelog.contains("### 📖 Documentation"),
+		"expected ### 📖 Documentation heading for docs type"
 	);
 
 	// Verify entries are grouped under headings
-	// Core changelog has entries under Added heading
+	// Core changelog has entries under Feature heading
 	let core_changelog = fs::read_to_string(tempdir.path().join("crates/core/CHANGELOG.md"))
 		.unwrap_or_else(|error| panic!("core changelog: {error}"));
 	assert!(
-		core_changelog.contains("### Added"),
-		"expected ### Added heading in core changelog"
+		core_changelog.contains("### 🚀 Feature"),
+		"expected ### 🚀 Feature heading in core changelog"
 	);
 	assert!(
 		core_changelog.contains("add release command"),

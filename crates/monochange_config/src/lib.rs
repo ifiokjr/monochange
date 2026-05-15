@@ -496,6 +496,10 @@ pub(crate) struct RawChangelogSettings {
 	pub section_thresholds: monochange_core::ChangelogSectionThresholds,
 	#[serde(default)]
 	pub types: BTreeMap<String, monochange_core::ChangelogType>,
+	#[serde(default)]
+	pub style: monochange_core::ChangelogStyle,
+	#[serde(default)]
+	pub release_notes: monochange_core::ReleaseNotesStyleOverrides,
 }
 
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -3468,6 +3472,8 @@ fn build_changelog_settings(raw: RawChangelogSettings) -> ChangelogSettings {
 	if raw.sections.is_empty() && raw.types.is_empty() && raw.templates.is_empty() {
 		let mut defaults = ChangelogSettings::defaults();
 		defaults.section_thresholds = raw.section_thresholds;
+		defaults.style = raw.style;
+		defaults.release_notes = raw.release_notes;
 		defaults
 	} else {
 		ChangelogSettings {
@@ -3475,6 +3481,8 @@ fn build_changelog_settings(raw: RawChangelogSettings) -> ChangelogSettings {
 			sections: raw.sections,
 			section_thresholds: raw.section_thresholds,
 			types: raw.types,
+			style: raw.style,
+			release_notes: raw.release_notes,
 		}
 	}
 }

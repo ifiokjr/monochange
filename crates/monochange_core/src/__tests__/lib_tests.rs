@@ -13,11 +13,13 @@ use crate::BumpSeverity;
 use crate::ChangelogFormat;
 use crate::ChangelogSectionDef;
 use crate::ChangelogSettings;
+use crate::ChangelogStyle;
 use crate::ChangelogTarget;
 use crate::ChangesetAffectedSettings;
 use crate::ChangesetPolicyStatus;
 use crate::CliInputKind;
 use crate::CliStepDefinition;
+use crate::CollapsedSectionStyle;
 use crate::DependencyKind;
 use crate::Ecosystem;
 use crate::EcosystemSettings;
@@ -28,9 +30,12 @@ use crate::HostedIssueCommentPlan;
 use crate::HostedSourceAdapter;
 use crate::HostedSourceFeatures;
 use crate::HostingProviderKind;
+use crate::MetadataStyle;
 use crate::MonochangeError;
 use crate::PackageDefinition;
 use crate::PackageDependency;
+use crate::PackageLabelPlacement;
+use crate::PackageLabelStyle;
 use crate::PackageRecord;
 use crate::PackageType;
 use crate::ProviderMergeRequestSettings;
@@ -49,6 +54,7 @@ use crate::ReleaseManifest;
 use crate::ReleaseManifestPlan;
 use crate::ReleaseNotesDocument;
 use crate::ReleaseNotesSection;
+use crate::ReleaseNotesStyleOverrides;
 use crate::ReleaseOwnerKind;
 use crate::ReleaseRecord;
 use crate::ReleaseRecordDiscovery;
@@ -61,6 +67,7 @@ use crate::RetargetProviderOperation;
 use crate::RetargetProviderResult;
 use crate::RetargetResult;
 use crate::RetargetTagResult;
+use crate::SectionSeparator;
 use crate::ShellConfig;
 use crate::SourceConfiguration;
 use crate::SourceProvider;
@@ -1883,8 +1890,16 @@ fn render_release_notes_supports_monochange_and_keep_a_changelog_formats() {
 		}],
 	};
 
-	let monochange = render_release_notes(ChangelogFormat::Monochange, &document);
-	let keep_a_changelog = render_release_notes(ChangelogFormat::KeepAChangelog, &document);
+	let monochange = render_release_notes(
+		ChangelogFormat::Monochange,
+		&document,
+		&ChangelogStyle::default(),
+	);
+	let keep_a_changelog = render_release_notes(
+		ChangelogFormat::KeepAChangelog,
+		&document,
+		&ChangelogStyle::default(),
+	);
 
 	insta::assert_snapshot!(
 		"render_release_notes_supports_monochange_and_keep_a_changelog_formats__monochange",
@@ -1908,14 +1923,186 @@ fn render_release_notes_renders_collapsed_sections_as_details_blocks() {
 		}],
 	};
 
-	let monochange = render_release_notes(ChangelogFormat::Monochange, &document);
-	let keep_a_changelog = render_release_notes(ChangelogFormat::KeepAChangelog, &document);
+	let monochange = render_release_notes(
+		ChangelogFormat::Monochange,
+		&document,
+		&ChangelogStyle::default(),
+	);
+	let keep_a_changelog = render_release_notes(
+		ChangelogFormat::KeepAChangelog,
+		&document,
+		&ChangelogStyle::default(),
+	);
 
 	for rendered in [monochange, keep_a_changelog] {
 		assert!(rendered.contains("<details>"));
 		assert!(rendered.contains("<summary><strong>Documentation</strong></summary>"));
 		assert!(rendered.contains("- update migration guide"));
 		assert!(rendered.contains("</details>"));
+	}
+}
+
+#[test]
+fn changelog_style_rules_describe_each_configurable_variant() {
+	let cases = [
+		(
+			ChangelogStyle {
+				section_separator: SectionSeparator::BlankLine,
+				package_label_style: PackageLabelStyle::Badge,
+				package_label_placement: PackageLabelPlacement::AfterHeading,
+				metadata_style: MetadataStyle::Blockquote,
+				collapsed_section_style: CollapsedSectionStyle::Details,
+			},
+			[
+				"single blank line",
+				"emphasized package names",
+				"Place package labels after the change heading/title",
+				"block-quote lines prefixed with >",
+				"HTML <details>/<summary>",
+			],
+		),
+		(
+			ChangelogStyle {
+				section_separator: SectionSeparator::ThematicBreak,
+				package_label_style: PackageLabelStyle::Inline,
+				package_label_placement: PackageLabelPlacement::AfterHeading,
+				metadata_style: MetadataStyle::Plain,
+				collapsed_section_style: CollapsedSectionStyle::Plain,
+			},
+			[
+				"thematic break (---)",
+				"render labels inline",
+				"Place package labels after the change heading/title",
+				"plain text — no block-quote prefix",
+				"regular ### headings",
+			],
+		),
+		(
+			ChangelogStyle {
+				section_separator: SectionSeparator::None,
+				package_label_style: PackageLabelStyle::Omit,
+				package_label_placement: PackageLabelPlacement::AfterChange,
+				metadata_style: MetadataStyle::Omit,
+				collapsed_section_style: CollapsedSectionStyle::Details,
+			},
+			[
+				"Do not add any separator",
+				"Omit package labels",
+				"Place package labels after",
+				"Omit metadata lines",
+				"HTML <details>/<summary>",
+			],
+		),
+	];
+
+	for (style, expected_rules) in cases {
+		let rules = style.rules();
+		for expected_rule in expected_rules {
+			assert!(
+				rules.contains(expected_rule),
+				"missing {expected_rule:?} in {rules}"
+			);
+		}
+	}
+}
+
+#[test]
+fn release_notes_style_overrides_only_replace_configured_fields() {
+	let base = ChangelogStyle {
+		section_separator: SectionSeparator::BlankLine,
+		package_label_style: PackageLabelStyle::Inline,
+		package_label_placement: PackageLabelPlacement::AfterHeading,
+		metadata_style: MetadataStyle::Plain,
+		collapsed_section_style: CollapsedSectionStyle::Details,
+	};
+	let overrides = ReleaseNotesStyleOverrides {
+		section_separator: Some(SectionSeparator::ThematicBreak),
+		package_label_style: None,
+		package_label_placement: Some(PackageLabelPlacement::AfterChange),
+		metadata_style: Some(MetadataStyle::Omit),
+		collapsed_section_style: Some(CollapsedSectionStyle::Plain),
+	};
+
+	let resolved = base.with_release_notes_overrides(&overrides);
+
+	assert!(base.is_default());
+	assert!(!resolved.is_default());
+	assert!(ReleaseNotesStyleOverrides::default().is_default());
+	assert_eq!(ReleaseNotesStyleOverrides::default().resolve(&base), base);
+	assert_eq!(overrides.resolve(&base), resolved);
+	assert_eq!(resolved.section_separator, SectionSeparator::ThematicBreak);
+	assert_eq!(resolved.package_label_style, PackageLabelStyle::Inline);
+	assert_eq!(
+		resolved.package_label_placement,
+		PackageLabelPlacement::AfterChange
+	);
+	assert_eq!(resolved.metadata_style, MetadataStyle::Omit);
+	assert_eq!(
+		resolved.collapsed_section_style,
+		CollapsedSectionStyle::Plain
+	);
+}
+
+#[test]
+fn render_release_notes_applies_separator_and_plain_collapsed_styles() {
+	let document = ReleaseNotesDocument {
+		title: "1.2.3".to_string(),
+		summary: vec![
+			"First paragraph.".to_string(),
+			"Second paragraph.".to_string(),
+		],
+		sections: vec![
+			ReleaseNotesSection {
+				title: "Features".to_string(),
+				collapsed: false,
+				entries: vec![
+					"adds dashboards".to_string(),
+					"- preserves list markers".to_string(),
+				],
+			},
+			ReleaseNotesSection {
+				title: "Documentation".to_string(),
+				collapsed: true,
+				entries: vec![
+					"first line\nsecond line".to_string(),
+					"wrap plain entry".to_string(),
+				],
+			},
+		],
+	};
+	let style = ChangelogStyle {
+		section_separator: SectionSeparator::ThematicBreak,
+		package_label_style: PackageLabelStyle::Inline,
+		package_label_placement: PackageLabelPlacement::AfterHeading,
+		metadata_style: MetadataStyle::Plain,
+		collapsed_section_style: CollapsedSectionStyle::Plain,
+	};
+
+	let monochange = render_release_notes(ChangelogFormat::Monochange, &document, &style);
+	let keep_a_changelog = render_release_notes(ChangelogFormat::KeepAChangelog, &document, &style);
+
+	for rendered in [monochange, keep_a_changelog] {
+		assert!(rendered.contains("First paragraph.\n\nSecond paragraph."));
+		assert!(rendered.contains("### Features\n\n- adds dashboards\n- preserves list markers"));
+		assert!(rendered.contains(
+			"\n---\n\n### Documentation\n\nfirst line\nsecond line\n\n- wrap plain entry"
+		));
+		assert!(!rendered.contains("<details>"));
+	}
+
+	let compact_style = ChangelogStyle {
+		section_separator: SectionSeparator::None,
+		package_label_style: PackageLabelStyle::Inline,
+		package_label_placement: PackageLabelPlacement::AfterHeading,
+		metadata_style: MetadataStyle::Plain,
+		collapsed_section_style: CollapsedSectionStyle::Details,
+	};
+	for compact_format in [ChangelogFormat::Monochange, ChangelogFormat::KeepAChangelog] {
+		let compact = render_release_notes(compact_format, &document, &compact_style);
+		assert!(
+			compact
+				.contains("### Features\n\n- adds dashboards\n- preserves list markers\n<details>")
+		);
 	}
 }
 

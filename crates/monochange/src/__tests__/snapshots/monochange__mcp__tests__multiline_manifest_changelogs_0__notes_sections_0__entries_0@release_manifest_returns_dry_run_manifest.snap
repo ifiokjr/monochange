@@ -2,7 +2,5 @@
 source: crates/monochange/src/__tests__/mcp_tests.rs
 expression: contents
 ---
-> [!NOTE]
-> *core*
-
 #### add release command
+_Packages:_ _core_

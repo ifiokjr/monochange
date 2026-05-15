@@ -206,6 +206,7 @@ fn release_record_rust_migration_edges_are_explicit_and_ordered() {
 		&[
 			(SchemaVersion::new(0, 0), SchemaVersion::new(0, 1)),
 			(SchemaVersion::new(0, 1), SchemaVersion::new(0, 2)),
+			(SchemaVersion::new(0, 2), SchemaVersion::new(0, 3)),
 		]
 	);
 }
@@ -214,12 +215,12 @@ fn release_record_rust_migration_edges_are_explicit_and_ordered() {
 fn release_record_rust_migration_edges_reject_missing_paths() {
 	let mut value = json!({
 		"kind": release_record::KIND,
-		"schemaVersion": "0.2"
+		"schemaVersion": "0.3"
 	});
 	let error = migrations::apply_release_record_edges(
 		&mut value,
-		SchemaVersion::new(0, 2),
 		SchemaVersion::new(0, 3),
+		SchemaVersion::new(0, 4),
 	)
 	.err()
 	.unwrap_or_else(|| panic!("expected missing migration path error"));
@@ -228,8 +229,8 @@ fn release_record_rust_migration_edges_reject_missing_paths() {
 		error,
 		SchemaError::MissingMigrationPath {
 			artifact: release_record::KIND,
-			from: SchemaVersion { major: 0, minor: 2 },
-			to: SchemaVersion { major: 0, minor: 3 },
+			from: SchemaVersion { major: 0, minor: 3 },
+			to: SchemaVersion { major: 0, minor: 4 },
 		}
 	));
 }

@@ -17,8 +17,11 @@ use monochange_core::HostedActorRef;
 use monochange_core::HostedIssueRef;
 use monochange_core::HostedIssueRelationshipKind;
 use monochange_core::HostedReviewRequestRef;
+use monochange_core::MetadataStyle;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
+use monochange_core::PackageLabelPlacement;
+use monochange_core::PackageLabelStyle;
 use monochange_core::PackageRecord;
 use monochange_core::PreparedChangeset;
 use monochange_core::PreparedChangesetTarget;
@@ -149,7 +152,11 @@ pub fn build_changelog_updates(
 		.map(|changeset| {
 			(
 				changeset.path.clone(),
-				build_rendered_changeset_context(context.root, changeset),
+				build_rendered_changeset_context(
+					context.root,
+					changeset,
+					context.configuration.changelog.style.metadata_style,
+				),
 			)
 		})
 		.collect::<BTreeMap<_, _>>();
@@ -255,7 +262,13 @@ pub fn build_changelog_updates(
 			&context.configuration.changelog,
 			&changes,
 		);
-		let rendered = render_release_notes(changelog_target.format, &document);
+		let release_notes_style = context
+			.configuration
+			.changelog
+			.release_notes
+			.resolve(&context.configuration.changelog.style);
+		let rendered =
+			render_release_notes(changelog_target.format, &document, &release_notes_style);
 		let initial_header = render_package_initial_changelog_header(
 			context,
 			changelog_target,
@@ -328,7 +341,13 @@ pub fn build_changelog_updates(
 			&context.configuration.changelog,
 			&changes,
 		);
-		let rendered = render_release_notes(changelog_target.format, &document);
+		let release_notes_style = context
+			.configuration
+			.changelog
+			.release_notes
+			.resolve(&context.configuration.changelog.style);
+		let rendered =
+			render_release_notes(changelog_target.format, &document, &release_notes_style);
 		let initial_header = render_group_initial_changelog_header(
 			context,
 			changelog_target,
@@ -595,9 +614,18 @@ fn build_release_note_change(
 	})
 }
 
+fn format_metadata_line(style: MetadataStyle, text: &str) -> String {
+	match style {
+		MetadataStyle::Blockquote => format!("> {text}"),
+		MetadataStyle::Plain => text.to_string(),
+		MetadataStyle::Omit | _ => String::new(),
+	}
+}
+
 fn build_rendered_changeset_context(
 	root: &Path,
 	changeset: &PreparedChangeset,
+	metadata_style: MetadataStyle,
 ) -> RenderedChangesetContext {
 	let changeset_path = root_relative(root, &changeset.path).display().to_string();
 	let mut rendered = RenderedChangesetContext {
@@ -619,7 +647,10 @@ fn build_rendered_changeset_context(
 		let link = render_markdown_link(&label, actor.url.as_deref());
 		rendered.change_owner = Some(label.clone());
 		rendered.change_owner_link = Some(link.clone());
-		lines.push(format!("> _Owner:_ {link}"));
+		if metadata_style != MetadataStyle::Omit {
+			let prefix = format!("_Owner:_ {link}");
+			lines.push(format_metadata_line(metadata_style, &prefix));
+		}
 	}
 
 	let review_request = context
@@ -637,7 +668,10 @@ fn build_rendered_changeset_context(
 		let link = render_markdown_link(&label, review_request.url.as_deref());
 		rendered.review_request = Some(label.clone());
 		rendered.review_request_link = Some(link.clone());
-		lines.push(format!("> _Review:_ {link}"));
+		if metadata_style != MetadataStyle::Omit {
+			let prefix = format!("_Review:_ {link}");
+			lines.push(format_metadata_line(metadata_style, &prefix));
+		}
 	}
 
 	if let Some(commit) = context
@@ -649,7 +683,10 @@ fn build_rendered_changeset_context(
 		let link = render_markdown_link(&format!("`{label}`"), commit.url.as_deref());
 		rendered.introduced_commit = Some(label);
 		rendered.introduced_commit_link = Some(link.clone());
-		lines.push(format!("> _Introduced in:_ {link}"));
+		if metadata_style != MetadataStyle::Omit {
+			let prefix = format!("_Introduced in:_ {link}");
+			lines.push(format_metadata_line(metadata_style, &prefix));
+		}
 	}
 
 	let introduced_sha = context
@@ -667,7 +704,10 @@ fn build_rendered_changeset_context(
 		let link = render_markdown_link(&format!("`{label}`"), commit.url.as_deref());
 		rendered.last_updated_commit = Some(label);
 		rendered.last_updated_commit_link = Some(link.clone());
-		lines.push(format!("> _Last updated in:_ {link}"));
+		if metadata_style != MetadataStyle::Omit {
+			let prefix = format!("_Last updated in:_ {link}");
+			lines.push(format_metadata_line(metadata_style, &prefix));
+		}
 	}
 
 	let closed_issues = context
@@ -680,7 +720,10 @@ fn build_rendered_changeset_context(
 		let issue_links = render_issue_links(&closed_issues);
 		rendered.closed_issues = Some(labels.clone());
 		rendered.closed_issue_links = Some(issue_links.clone());
-		lines.push(format!("> _Closed issues:_ {issue_links}"));
+		if metadata_style != MetadataStyle::Omit {
+			let prefix = format!("_Closed issues:_ {issue_links}");
+			lines.push(format_metadata_line(metadata_style, &prefix));
+		}
 	}
 
 	let related_issues = context
@@ -693,7 +736,10 @@ fn build_rendered_changeset_context(
 		let issue_links = render_issue_links(&related_issues);
 		rendered.related_issues = Some(labels.clone());
 		rendered.related_issue_links = Some(issue_links.clone());
-		lines.push(format!("> _Related issues:_ {issue_links}"));
+		if metadata_style != MetadataStyle::Omit {
+			let prefix = format!("_Related issues:_ {issue_links}");
+			lines.push(format_metadata_line(metadata_style, &prefix));
+		}
 	}
 
 	rendered.context = lines.join("\n");
@@ -1172,7 +1218,14 @@ fn render_release_note_sections(
 	let mut uncategorized = Vec::<String>::new();
 
 	for change in changes {
-		let rendered = render_change_entry(change, target_id, version, &changelog.templates);
+		let rendered = render_change_entry(
+			change,
+			target_id,
+			version,
+			&changelog.templates,
+			changelog.style.package_label_style,
+			changelog.style.package_label_placement,
+		);
 		let change_type = change.change_type.as_deref().unwrap_or("");
 		if let Some(typ) = changelog.types.get(change_type) {
 			let section_key = typ.section.as_str();
@@ -1231,6 +1284,8 @@ fn render_change_entry(
 	target_id: &str,
 	version: &str,
 	change_templates: &[String],
+	package_label_style: PackageLabelStyle,
+	package_label_placement: PackageLabelPlacement,
 ) -> String {
 	for template in change_templates
 		.iter()
@@ -1238,15 +1293,40 @@ fn render_change_entry(
 		.chain(DEFAULT_CHANGE_TEMPLATES)
 	{
 		if let Some(rendered) = apply_change_template(template, change, target_id, version) {
-			return format_group_labeled_entry(change, &rendered);
+			return format_group_labeled_entry(
+				change,
+				&rendered,
+				package_label_style,
+				package_label_placement,
+			);
 		}
 	}
-	format_group_labeled_entry(change, &format!("- {}", change.summary))
+	format_group_labeled_entry(
+		change,
+		&format!("- {}", change.summary),
+		package_label_style,
+		package_label_placement,
+	)
 }
 
-fn format_group_labeled_entry(change: &ReleaseNoteChange, rendered: &str) -> String {
-	if change.package_labels.is_empty() {
+fn format_group_labeled_entry(
+	change: &ReleaseNoteChange,
+	rendered: &str,
+	style: PackageLabelStyle,
+	placement: PackageLabelPlacement,
+) -> String {
+	if change.package_labels.is_empty() || style == PackageLabelStyle::Omit {
 		return rendered.to_string();
+	}
+	let labels = format_package_labels(change, style);
+	let label_line = format!("_Packages:_ {labels}");
+	if placement == PackageLabelPlacement::AfterChange {
+		return format!("{rendered}\n{label_line}");
+	}
+	if let Some((heading, body)) = rendered.split_once('\n')
+		&& heading.starts_with('#')
+	{
+		return format!("{heading}\n{label_line}\n{body}");
 	}
 	if change.package_labels.len() == 1
 		&& !rendered.contains('\n')
@@ -1255,13 +1335,20 @@ fn format_group_labeled_entry(change: &ReleaseNoteChange, rendered: &str) -> Str
 	{
 		return format!("- **{package_label}**: {entry}");
 	}
-	let labels = change
+	format!("{rendered}\n{label_line}")
+}
+fn format_package_labels(change: &ReleaseNoteChange, style: PackageLabelStyle) -> String {
+	change
 		.package_labels
 		.iter()
-		.map(|package| format!("*{package}*"))
+		.map(|package| {
+			match style {
+				PackageLabelStyle::Badge => format!("*{package}*"),
+				PackageLabelStyle::Inline | PackageLabelStyle::Omit | _ => format!("_{package}_"),
+			}
+		})
 		.collect::<Vec<_>>()
-		.join(", ");
-	format!("> [!NOTE]\n> {labels}\n\n{rendered}")
+		.join(", ")
 }
 
 const DEFAULT_CHANGE_TEMPLATES: [&str; 3] = [
@@ -1334,7 +1421,7 @@ fn apply_change_template(
 	let jinja_context = minijinja::Value::from_serialize(&context);
 	let rendered = render_jinja_template_strict(template, &jinja_context).ok()?;
 	let rendered = rendered.trim().to_string();
-	if rendered.is_empty() {
+	if rendered.is_empty() || rendered == "-" {
 		None
 	} else {
 		Some(rendered)
