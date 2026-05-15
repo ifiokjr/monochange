@@ -320,6 +320,7 @@ mod lint;
 mod lint_check_reporter;
 mod mcp;
 mod migration_audit;
+mod migrate_knope;
 mod package_publish;
 mod prepared_release_cache;
 mod publish_progress;
