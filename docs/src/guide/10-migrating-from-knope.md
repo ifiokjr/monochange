@@ -620,4 +620,4 @@ type = "CreateChangeFile"
 - [ ] Update CI workflows from `knope <command>` to `mc <command>`
 - [ ] Run `mc step:validate` to check config and changesets
 - [ ] Run `mc release --dry-run` to verify the release plan
-- [ ] Remove knope from your dependencies and install monochange
+- [ ] Remove knope from your dependencies and install monochange \nSee active plan at docs/plans/active/migration-docs-improvements.md
