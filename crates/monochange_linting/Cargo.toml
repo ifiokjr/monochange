@@ -10,6 +10,7 @@ readme = "readme.md"
 repository = { workspace = true }
 rust-version = { workspace = true }
 description = "Authoring helpers and macros for monochange lint suites"
+keywords = ["lint", "macros", "authoring", "validation", "monorepo"]
 
 [dependencies]
 monochange_core = { workspace = true }

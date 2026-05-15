@@ -10,6 +10,7 @@ readme = "readme.md"
 repository = { workspace = true }
 rust-version = { workspace = true }
 description = "Ecosystem-specific semantic change analysis for monochange changesets"
+keywords = ["analysis", "changesets", "semantic", "diff", "monorepo"]
 
 [features]
 default = ["cargo", "npm", "deno", "dart"]

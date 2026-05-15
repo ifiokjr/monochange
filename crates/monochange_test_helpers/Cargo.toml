@@ -1,10 +1,16 @@
 [package]
 name = "monochange_test_helpers"
 version = { workspace = true }
+authors = { workspace = true }
+categories = { workspace = true }
 edition = { workspace = true }
+homepage = { workspace = true }
 license = { workspace = true }
+readme = "readme.md"
 repository = { workspace = true }
+rust-version = { workspace = true }
 description = "Internal shared test helpers for monochange"
+keywords = ["testing", "fixtures", "helpers", "snapshots", "monorepo"]
 
 [dependencies]
 insta = { workspace = true, default-features = true }
