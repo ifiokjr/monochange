@@ -54,6 +54,8 @@ pub(crate) struct InitWorkspaceResult {
 	pub config_path: PathBuf,
 	/// Paths to any generated workflow files (e.g., GitHub Actions)
 	pub workflow_paths: Vec<PathBuf>,
+	/// Whether a knope.toml was detected in the repository root
+	pub knope_detected: bool,
 }
 
 impl InitWorkspaceResult {
@@ -64,6 +66,15 @@ impl InitWorkspaceResult {
 			lines.push(format!("wrote {}", path.display()));
 		}
 		lines.join("\n")
+	}
+
+	/// Returns a suggestion to run `mc migrate knope` if one was detected
+	pub(crate) fn knope_suggestion(&self) -> Option<String> {
+		if self.knope_detected {
+			Some("knope.toml detected — run `mc migrate knope` to translate your existing configuration".to_string())
+		} else {
+			None
+		}
 	}
 }
 
@@ -115,6 +126,7 @@ pub(crate) fn init_workspace(
 	Ok(InitWorkspaceResult {
 		config_path: path,
 		workflow_paths,
+		knope_detected: root.join("knope.toml").exists() || root.join(".knope.toml").exists(),
 	})
 }
 

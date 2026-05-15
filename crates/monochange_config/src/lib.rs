@@ -1621,6 +1621,10 @@ pub fn load_changeset_contents_with_context(
 		if !context.package_ids.contains(change.package.as_str())
 			&& !context.groups_by_id.contains_key(change.package.as_str())
 		{
+			let mut hint = "declare the package or group id in monochange.toml before referencing it in a changeset".to_string();
+			if change.package == "default" {
+				hint.push_str("\n\nTip: knope uses `default` as a catch-all bump key; in monochange, replace `default:` with the group id (e.g. `main:`) or list each package separately. Run `mc migrate knope` for automatic migration.");
+			}
 			return Err(changeset_diagnostic(
 				contents,
 				changes_path,
@@ -1634,7 +1638,7 @@ pub fn load_changeset_contents_with_context(
 					&change.package,
 					"unknown package or group",
 				)],
-				Some("declare the package or group id in monochange.toml before referencing it in a changeset".to_string()),
+				Some(hint),
 			));
 		}
 	}

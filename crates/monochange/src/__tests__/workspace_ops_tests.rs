@@ -1415,3 +1415,38 @@ async fn join_source_changeset_context_task_reports_background_panic() {
 	);
 	assert!(phase_timings.is_empty());
 }
+
+#[test]
+fn init_detects_knope_toml() {
+	let temp = tempfile::tempdir().unwrap();
+	let root = temp.path();
+	fs::write(root.join("Cargo.toml"), "[workspace]\n").unwrap();
+	fs::write(root.join("knope.toml"), "[package]\nversioned_files = [\"Cargo.toml\"]\n").unwrap();
+
+	let result = init_workspace(root, false, None).unwrap();
+	assert!(result.knope_detected, "should detect knope.toml");
+	assert!(result.knope_suggestion().is_some());
+	assert!(result.knope_suggestion().unwrap().contains("mc migrate knope"));
+}
+
+#[test]
+fn init_detects_hidden_knope_toml() {
+	let temp = tempfile::tempdir().unwrap();
+	let root = temp.path();
+	fs::write(root.join("Cargo.toml"), "[workspace]\n").unwrap();
+	fs::write(root.join(".knope.toml"), "[package]\nversioned_files = [\"Cargo.toml\"]\n").unwrap();
+
+	let result = init_workspace(root, false, None).unwrap();
+	assert!(result.knope_detected, "should detect .knope.toml");
+}
+
+#[test]
+fn init_no_knope_no_suggestion() {
+	let temp = tempfile::tempdir().unwrap();
+	let root = temp.path();
+	fs::write(root.join("Cargo.toml"), "[workspace]\n").unwrap();
+
+	let result = init_workspace(root, false, None).unwrap();
+	assert!(!result.knope_detected, "should not detect knope when absent");
+	assert!(result.knope_suggestion().is_none());
+}

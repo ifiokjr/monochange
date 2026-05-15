@@ -873,7 +873,12 @@ where
 			if quiet {
 				Ok(String::new())
 			} else {
-				Ok(result.summary())
+				let mut output = result.summary();
+				if let Some(suggestion) = result.knope_suggestion() {
+					output.push_str("\n\n");
+					output.push_str(&suggestion);
+				}
+				Ok(output)
 			}
 		}
 		Some(("populate", _)) => {
