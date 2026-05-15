@@ -110,6 +110,13 @@ runs:
           sleep "$sleep_seconds"
         done
 
+    - name: install rust toolchain on macos
+      shell: bash
+      if: runner.os == 'macOS'
+      run: |
+        set -euo pipefail
+        devenv shell rustup toolchain install --profile default
+
     - name: load devenv environment
       shell: bash
       if: inputs.activate == 'true'
