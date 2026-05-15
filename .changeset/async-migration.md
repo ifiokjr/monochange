@@ -9,6 +9,7 @@ monochange_github: major
 monochange_gitlab: major
 monochange_hosting: major
 monochange_publish: major
+monochange_schema: major
 ---
 
 # Async migration: Tokio async runtime end-to-end
