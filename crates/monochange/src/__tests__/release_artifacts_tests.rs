@@ -1990,8 +1990,8 @@ fn github_actions_oidc_token_reports_http_and_json_errors() {
 	);
 }
 
-#[test]
-fn hosted_commit_release_posts_in_non_dry_run_and_defaults_status() {
+#[tokio::test(flavor = "multi_thread")]
+async fn hosted_commit_release_posts_in_non_dry_run_and_defaults_status() {
 	let tmp = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tmp.path();
 	initialize_git_repo(root);
@@ -2028,21 +2028,21 @@ fn hosted_commit_release_posts_in_non_dry_run_and_defaults_status() {
 		oidc_audience: None,
 	};
 
-	temp_env::with_vars(
+	temp_env::async_with_vars(
 		[
 			("GITHUB_REPOSITORY", Some("monochange/monochange")),
 			("MONOCHANGE_TOKEN", Some("monochange-secret")),
 		],
-		|| {
-			let report = crate::cli_runtime::block_on_in_context(hosted_commit_release(
-				root, &context, None, &manifest, true, &options,
-			))
-			.unwrap_or_else(|error| panic!("hosted commit release: {error}"));
+		async {
+			let report = hosted_commit_release(root, &context, None, &manifest, true, &options)
+				.await
+				.unwrap_or_else(|error| panic!("hosted commit release: {error}"));
 			assert_eq!(report.commit.as_deref(), Some("abc123"));
 			assert_eq!(report.status, "completed");
 			assert!(!report.dry_run);
 		},
-	);
+	)
+	.await;
 
 	let request = server
 		.join()
