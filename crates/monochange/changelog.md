@@ -6,7 +6,7 @@ This changelog is managed by [monochange](https://github.com/monochange/monochan
 
 ## [0.5.1](https://github.com/monochange/monochange/releases/tag/v0.5.1) (2026-05-15)
 
-### Fixed
+### 🐛 Fixed
 
 #### Fix publish failures and cargo package warnings
 
@@ -22,11 +22,11 @@ Remove `doc-comment` dependency and replace `doc_comment::doctest!` with `#[doc 
 
 Add rustdoc backticks around `PyPI` and `pub.dev` in configuration guide markdown to satisfy the missing-backticks lint.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #509](https://github.com/monochange/monochange/pull/509) _Introduced in:_ [`e6af821`](https://github.com/monochange/monochange/commit/e6af8212983b66c1b8370443e7978c6067b89fa6)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #509](https://github.com/monochange/monochange/pull/509) _Introduced in:_ [`e6af821`](https://github.com/monochange/monochange/commit/e6af8212983b66c1b8370443e7978c6067b89fa6)
 
 ## [0.5.0](https://github.com/monochange/monochange/releases/tag/v0.5.0) (2026-05-14)
 
-### Breaking Change
+### 💥 Breaking Change
 
 #### require CLI steps to opt in to inherited command inputs
 
@@ -61,7 +61,7 @@ steps = [
 
 Migration path: review custom `[cli.<command>]` definitions and add `inputs = ["name"]` to every step that needs a command-level input. Built-in default CLI commands and generated templates have been updated to declare their inherited inputs explicitly.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #467](https://github.com/monochange/monochange/pull/467) _Introduced in:_ [`ce4712f`](https://github.com/monochange/monochange/commit/ce4712f2890e0636c368b056db756df32f4cf769) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #467](https://github.com/monochange/monochange/pull/467) _Introduced in:_ [`ce4712f`](https://github.com/monochange/monochange/commit/ce4712f2890e0636c368b056db756df32f4cf769) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
 
 #### generate built-in release and validation step commands
 
@@ -104,27 +104,27 @@ steps = [{ type = "Validate" }]
 mc step:validate
 ```
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #479](https://github.com/monochange/monochange/pull/479) _Introduced in:_ [`d9adff8`](https://github.com/monochange/monochange/commit/d9adff8fb396df908e335d2a6688aa729abb5f4d) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8) _Closed issues:_ [#476](https://github.com/monochange/monochange/issues/476)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #479](https://github.com/monochange/monochange/pull/479) _Introduced in:_ [`d9adff8`](https://github.com/monochange/monochange/commit/d9adff8fb396df908e335d2a6688aa729abb5f4d) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8) _Closed issues:_ [#476](https://github.com/monochange/monochange/issues/476)
 
-### Added
+### 🚀 Feature
 
 #### add release-record migration command
 
 Add `mc migrate release-records` to rewrite persisted release records to the latest schema version, expose the release-record migration helper from core, and update the generated skill command inventory.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #500](https://github.com/monochange/monochange/pull/500) _Introduced in:_ [`bd56420`](https://github.com/monochange/monochange/commit/bd564204b786961371b0ac1bad21071ebe5fe90c) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #500](https://github.com/monochange/monochange/pull/500) _Introduced in:_ [`bd56420`](https://github.com/monochange/monochange/commit/bd564204b786961371b0ac1bad21071ebe5fe90c) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
 
 #### Configurable publish-order dependency fields
 
 Add configurable ecosystem-specific dependency fields for package publish ordering across npm, Cargo, Deno, Dart/Flutter, Python, and Go.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #472](https://github.com/monochange/monochange/pull/472) _Introduced in:_ [`0d9cf46`](https://github.com/monochange/monochange/commit/0d9cf461a05057b61efa987d361ebd27d800dbdb) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8) _Closed issues:_ [#465](https://github.com/monochange/monochange/issues/465)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #472](https://github.com/monochange/monochange/pull/472) _Introduced in:_ [`0d9cf46`](https://github.com/monochange/monochange/commit/0d9cf461a05057b61efa987d361ebd27d800dbdb) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8) _Closed issues:_ [#465](https://github.com/monochange/monochange/issues/465)
 
 #### Publish all configured packages
 
 Add a `--all` flag to the PublishPackages CLI step so migration workflows can publish every configured package, including packages that were not part of the prepared release record.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #461](https://github.com/monochange/monochange/pull/461) _Introduced in:_ [`3d956cd`](https://github.com/monochange/monochange/commit/3d956cd3e34747e088add98fe0358251f388782f) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #461](https://github.com/monochange/monochange/pull/461) _Introduced in:_ [`3d956cd`](https://github.com/monochange/monochange/commit/3d956cd3e34747e088add98fe0358251f388782f) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
 
 #### Remove automated npm trust configuration during publish
 
@@ -134,51 +134,51 @@ When trusted publishing is enabled for npm packages, the publish command now use
 
 Removed `PublishTrustHandler::configure_successful_publish_trust` from the trait and its `CliPublishTrustHandler` implementation. Removed `configure_npm_trusted_publishing` from `package_publish`. Removed `build_npm_trust_list_command` from `monochange_npm`. The `trust_outcome_for_skip` and `planned_trust_outcome` methods remain, showing informational messages about how to manually configure trust.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #456](https://github.com/monochange/monochange/pull/456) _Introduced in:_ [`628a1ea`](https://github.com/monochange/monochange/commit/628a1ea18b62b60551c7648e16405a685cacb5f4) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #456](https://github.com/monochange/monochange/pull/456) _Introduced in:_ [`628a1ea`](https://github.com/monochange/monochange/commit/628a1ea18b62b60551c7648e16405a685cacb5f4) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
 
-### Fixed
+### 🐛 Fixed
 
 #### Include Cargo development dependencies in publish ordering
 
 Cargo package publishing now orders runtime, build, and development dependencies before dependents. This prevents a crate from being published before an unpublished workspace crate referenced through `dev-dependencies` or `build-dependencies`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #466](https://github.com/monochange/monochange/pull/466) _Introduced in:_ [`add0671`](https://github.com/monochange/monochange/commit/add0671b798d2dd4ab6e142801b1b5cac6842a1a) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #466](https://github.com/monochange/monochange/pull/466) _Introduced in:_ [`add0671`](https://github.com/monochange/monochange/commit/add0671b798d2dd4ab6e142801b1b5cac6842a1a) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
 
 #### Validate Cargo private dependency publishing hazards
 
 Cargo linting now reports publishable packages that depend on private workspace packages through `dependencies`, `dev-dependencies`, or `build-dependencies`. Package publish dry runs now execute the registry dry-run command and preserve its stdout and stderr in the publish report instead of only planning the command.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #470](https://github.com/monochange/monochange/pull/470) _Introduced in:_ [`66ffdf7`](https://github.com/monochange/monochange/commit/66ffdf734129fb267fe61dd821e55c292dab5c0e) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #470](https://github.com/monochange/monochange/pull/470) _Introduced in:_ [`66ffdf7`](https://github.com/monochange/monochange/commit/66ffdf734129fb267fe61dd821e55c292dab5c0e) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
 
 #### Group CLI help options by source
 
 Command help now separates generated release flags, configured command inputs, and global flags into distinct headings so users can see where each option originates.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #480](https://github.com/monochange/monochange/pull/480) _Introduced in:_ [`dd01099`](https://github.com/monochange/monochange/commit/dd010996124d8af507ca6bfebb8c32486783fc19) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8) _Closed issues:_ [#475](https://github.com/monochange/monochange/issues/475)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #480](https://github.com/monochange/monochange/pull/480) _Introduced in:_ [`dd01099`](https://github.com/monochange/monochange/commit/dd010996124d8af507ca6bfebb8c32486783fc19) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8) _Closed issues:_ [#475](https://github.com/monochange/monochange/issues/475)
 
 #### Enable readable multi-step command progress output in CI
 
 This is done while disabling animated spinners in CI logs.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #487](https://github.com/monochange/monochange/pull/487) _Introduced in:_ [`e845d1e`](https://github.com/monochange/monochange/commit/e845d1e5212e0d4c1cd3f58d8e4ab9c09cd3fff5) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #487](https://github.com/monochange/monochange/pull/487) _Introduced in:_ [`e845d1e`](https://github.com/monochange/monochange/commit/e845d1e5212e0d4c1cd3f58d8e4ab9c09cd3fff5) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
 
 #### Improve custom command argument errors
 
 Unexpected arguments passed to configured CLI commands now show a focused diagnostic with the explicit usage, the `monochange.toml` section to edit, and an example input definition.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #464](https://github.com/monochange/monochange/pull/464) _Introduced in:_ [`b869604`](https://github.com/monochange/monochange/commit/b86960446661884e9732616249232a4aa5e929b3) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #464](https://github.com/monochange/monochange/pull/464) _Introduced in:_ [`b869604`](https://github.com/monochange/monochange/commit/b86960446661884e9732616249232a4aa5e929b3) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
 
 #### Add interactive CLI command wizard
 
 Added `mc command`, an interactive dashboard for adding and editing `[cli.<name>]` commands in `monochange.toml`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #471](https://github.com/monochange/monochange/pull/471) _Introduced in:_ [`fea471c`](https://github.com/monochange/monochange/commit/fea471c4b67b618cde51eaacfd4e30742cfb0dc1) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #471](https://github.com/monochange/monochange/pull/471) _Introduced in:_ [`fea471c`](https://github.com/monochange/monochange/commit/fea471c4b67b618cde51eaacfd4e30742cfb0dc1) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
 
 #### Publish progress output
 
 Add emoji-based publish progress reporting on stderr with deterministic CI-friendly output and terminal-aware loading markers.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #469](https://github.com/monochange/monochange/pull/469) _Introduced in:_ [`603c731`](https://github.com/monochange/monochange/commit/603c731a60d66f49b876a14467909efd4585408a) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #469](https://github.com/monochange/monochange/pull/469) _Introduced in:_ [`603c731`](https://github.com/monochange/monochange/commit/603c731a60d66f49b876a14467909efd4585408a) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
 
 #### keep release-record discovery compatible across schema upgrades
 
@@ -194,29 +194,29 @@ The GitHub Actions CI workflow now also includes a pull-request `release-records
 
 Generated current and versioned release-record artifact fixtures are also checked into the schema crate. Schema checks ensure the current fixtures are regenerated during release planning, and integration tests load every checked-in release-record artifact through the real parser/migration path.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #491](https://github.com/monochange/monochange/pull/491) _Introduced in:_ [`914a6e8`](https://github.com/monochange/monochange/commit/914a6e88d4bcf31249d467914f0a3a3b240d931a) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #491](https://github.com/monochange/monochange/pull/491) _Introduced in:_ [`914a6e8`](https://github.com/monochange/monochange/commit/914a6e88d4bcf31249d467914f0a3a3b240d931a) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
 
 #### Support release records in shallow checkouts
 
 Fix release record discovery for shallow checkouts when the parent commit is unavailable.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #504](https://github.com/monochange/monochange/pull/504) _Introduced in:_ [`b79accf`](https://github.com/monochange/monochange/commit/b79accfd3d11bbaab94fa8c8b508421615d9029e)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #504](https://github.com/monochange/monochange/pull/504) _Introduced in:_ [`b79accf`](https://github.com/monochange/monochange/commit/b79accfd3d11bbaab94fa8c8b508421615d9029e)
 
 #### Fix command input references in CLI step conditions
 
 Allow `when` conditions to read command-level inputs while preserving step-level input overrides, so release automation can gate commit and pull request steps on `--commit` and `--create-pr`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #488](https://github.com/monochange/monochange/pull/488) _Introduced in:_ [`f4d96b0`](https://github.com/monochange/monochange/commit/f4d96b0d9eddf21745088a5a95f5c3c69f41b1f5) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #488](https://github.com/monochange/monochange/pull/488) _Introduced in:_ [`f4d96b0`](https://github.com/monochange/monochange/commit/f4d96b0d9eddf21745088a5a95f5c3c69f41b1f5) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
 
-### Security
+### 🔒 Security
 
 #### Refresh Ubuntu runner space
 
 Refresh the Ubuntu devenv cache namespace and reclaim runner disk space before the highest-space CI jobs install Nix dependencies.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #506](https://github.com/monochange/monochange/pull/506) _Introduced in:_ [`4a7ad19`](https://github.com/monochange/monochange/commit/4a7ad19c93cba4ba53930ad7a2b216bebc9f9a0b)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #506](https://github.com/monochange/monochange/pull/506) _Introduced in:_ [`4a7ad19`](https://github.com/monochange/monochange/commit/4a7ad19c93cba4ba53930ad7a2b216bebc9f9a0b)
 
-### Testing
+### 🧪 Testing
 
 #### Fix flaky `reuses_prepared_release_artifact_for_versions` test
 
@@ -224,17 +224,17 @@ The `execute_cli_command_with_options_reuses_prepared_release_artifact_for_versi
 
 All three tests now acquire `TEST_ENV_LOCK` before reading the workspace, serialising them against other tests that modify git state.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #458](https://github.com/monochange/monochange/pull/458) _Introduced in:_ [`a78046a`](https://github.com/monochange/monochange/commit/a78046a1803c136426770d4fb2e6a8928e844e19) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #458](https://github.com/monochange/monochange/pull/458) _Introduced in:_ [`a78046a`](https://github.com/monochange/monochange/commit/a78046a1803c136426770d4fb2e6a8928e844e19) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
 
 #### Validate generated release commits in PR CI
 
 Pull requests now run release-state test and lint preflights after creating a local release commit, while generated release PRs skip those extra preflights.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #477](https://github.com/monochange/monochange/pull/477) _Introduced in:_ [`a09020f`](https://github.com/monochange/monochange/commit/a09020f9282be207ace6f641b716c3c4004886af) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #477](https://github.com/monochange/monochange/pull/477) _Introduced in:_ [`a09020f`](https://github.com/monochange/monochange/commit/a09020f9282be207ace6f641b716c3c4004886af) _Last updated in:_ [`a485823`](https://github.com/monochange/monochange/commit/a485823190fecfeebbef996c74ee63f241b6f7d8)
 
 ## [0.4.2](https://github.com/monochange/monochange/releases/tag/v0.4.2) (2026-05-10)
 
-### Added
+### 🚀 Feature
 
 #### Order publish plans by dependencies
 
@@ -242,11 +242,11 @@ Order publish plans by workspace dependencies before applying registry rate-limi
 
 This keeps dependent packages from publishing before their internal dependencies are available and adds realistic fixture coverage for non-alphabetical cargo dependency graphs.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364) _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e) _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364) _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e) _Last updated in:_ [`2392845`](https://github.com/monochange/monochange/commit/2392845ec29289e3f219aca20ac343cf79ee965e)
 
 ## [0.4.1](https://github.com/monochange/monochange/releases/tag/v0.4.1) (2026-05-10)
 
-### Added
+### 🚀 Feature
 
 #### Add `always_run` primitive to CLI steps and group/ecosystem filters to `PublishPackages`
 
@@ -313,13 +313,13 @@ steps = [
 
 Running `mc publish-check` (without `--dry-run`) will still run in dry-run mode because the command definition sets `dry_run = true`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #426](https://github.com/monochange/monochange/pull/426) _Introduced in:_ [`6ea6236`](https://github.com/monochange/monochange/commit/6ea623624e36d795edd531ae72080a2e9c3fb86a)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #426](https://github.com/monochange/monochange/pull/426) _Introduced in:_ [`6ea6236`](https://github.com/monochange/monochange/commit/6ea623624e36d795edd531ae72080a2e9c3fb86a)
 
 #### Add persistent deduplication index and content-hash fast path for release records
 
 Introduce a JSONL index at `.monochange/local/release-index.jsonl` that survives across CLI invocations, eliminating repeated directory scans when checking for duplicate release records. A fast path in `validate_release_record_file` now compares the `releaseTargets` identity of an existing file against the manifest before rebuilding the full `ReleaseRecord`, skipping unnecessary I/O when the targets match.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #435](https://github.com/monochange/monochange/pull/435) _Introduced in:_ [`b906cab`](https://github.com/monochange/monochange/commit/b906cab608c84b30bfd429298892a80766221ef6) _Closed issues:_ [#430](https://github.com/monochange/monochange/issues/430)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #435](https://github.com/monochange/monochange/pull/435) _Introduced in:_ [`b906cab`](https://github.com/monochange/monochange/commit/b906cab608c84b30bfd429298892a80766221ef6) _Closed issues:_ [#430](https://github.com/monochange/monochange/issues/430)
 
 #### Sort release targets and hash identity fields directly
 
@@ -327,15 +327,15 @@ Introduce a JSONL index at `.monochange/local/release-index.jsonl` that survives
 
 `ReleasePaths::from_manifest` computes the hash directly from the manifest without building the intermediate `ReleaseRecord`, and `write_release_record_file` now checks file existence before doing any expensive work.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #431](https://github.com/monochange/monochange/pull/431) _Introduced in:_ [`88a6e4c`](https://github.com/monochange/monochange/commit/88a6e4cea075da0b1745cd24a0a150ebea99bb83) _Closed issues:_ [#430](https://github.com/monochange/monochange/issues/430)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #431](https://github.com/monochange/monochange/pull/431) _Introduced in:_ [`88a6e4c`](https://github.com/monochange/monochange/commit/88a6e4cea075da0b1745cd24a0a150ebea99bb83) _Closed issues:_ [#430](https://github.com/monochange/monochange/issues/430)
 
-### Fixed
+### 🐛 Fixed
 
 #### Split crate boundaries for changelog, config, and publish behavior
 
 Move changelog rendering into `monochange_changelog`, shift publish planning and execution helpers into `monochange_publish`, and reduce direct concrete ecosystem/provider dependencies in `monochange_config`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #441](https://github.com/monochange/monochange/pull/441) _Introduced in:_ [`ae8ea56`](https://github.com/monochange/monochange/commit/ae8ea563ae95c6cc4e8d3d1acdc5303069ea44cf)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #441](https://github.com/monochange/monochange/pull/441) _Introduced in:_ [`ae8ea56`](https://github.com/monochange/monochange/commit/ae8ea563ae95c6cc4e8d3d1acdc5303069ea44cf)
 
 #### Fix release record reformatting after dprint
 
@@ -343,7 +343,7 @@ Prevent `commit_release` from rewriting `release.json` after `dprint fmt` has al
 
 The `CommitRelease` step now accepts an `update_release_json` input (default `false`). When `true`, the step will create or overwrite the `release.json` file if it is missing or mismatched. When `false`, a mismatch produces a clear error asking the user to set `update_release_json = true`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #439](https://github.com/monochange/monochange/pull/439) _Introduced in:_ [`f4b324e`](https://github.com/monochange/monochange/commit/f4b324ec920ea787ec6d5c511b81d9c22fbad753)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #439](https://github.com/monochange/monochange/pull/439) _Introduced in:_ [`f4b324e`](https://github.com/monochange/monochange/commit/f4b324ec920ea787ec6d5c511b81d9c22fbad753)
 
 #### Release PR formatting, schema version, and publish batch ordering
 
@@ -351,15 +351,15 @@ The `CommitRelease` step now accepts an `update_release_json` input (default `fa
 2. Derive expected schema versions in snapshots and tests from the actual `Cargo.toml` version instead of hardcoding `0.0`.
 3. Topologically sort publish requests by both runtime and development dependencies before batching so dependencies are published before dependents.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #436](https://github.com/monochange/monochange/pull/436) _Introduced in:_ [`ea78ccc`](https://github.com/monochange/monochange/commit/ea78ccc844318b0645010f15fcf60b9d8ea6a58c) _Related issues:_ [#434](https://github.com/monochange/monochange/issues/434)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #436](https://github.com/monochange/monochange/pull/436) _Introduced in:_ [`ea78ccc`](https://github.com/monochange/monochange/commit/ea78ccc844318b0645010f15fcf60b9d8ea6a58c) _Related issues:_ [#434](https://github.com/monochange/monochange/issues/434)
 
 #### Replace release record `groupVersion` with `versions`
 
 Release records now include a `versions` map keyed by released package or group id, and no longer write the redundant `groupVersion` field.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #450](https://github.com/monochange/monochange/pull/450) _Introduced in:_ [`375bc19`](https://github.com/monochange/monochange/commit/375bc19dc69c125ffbd944d016b16ebc1c8cb7c5)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #450](https://github.com/monochange/monochange/pull/450) _Introduced in:_ [`375bc19`](https://github.com/monochange/monochange/commit/375bc19dc69c125ffbd944d016b16ebc1c8cb7c5)
 
-### Documentation
+### 📖 Documentation
 
 #### Document `CommitRelease.update_release_json` option
 
@@ -372,19 +372,19 @@ Add comprehensive documentation for the `update_release_json` step-level input o
 - Document the field in the configuration guide's workflow variables section
 - Regenerate JSON Schema assets to include the new `update_release_json` field in `CommitRelease` step definitions
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #443](https://github.com/monochange/monochange/pull/443) _Introduced in:_ [`4b8cc5a`](https://github.com/monochange/monochange/commit/4b8cc5a25644ab3623177c08bd7904c649ea67a0)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #443](https://github.com/monochange/monochange/pull/443) _Introduced in:_ [`4b8cc5a`](https://github.com/monochange/monochange/commit/4b8cc5a25644ab3623177c08bd7904c649ea67a0)
 
-### Other
+### 📦 Other
 
 #### Update release commands to regenerate JSON schemas
 
 Before `dprint fmt`, both commands now regenerate JSON schemas from schemars-annotated types so that committed schema assets stay in sync with the source code.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #442](https://github.com/monochange/monochange/pull/442) _Introduced in:_ [`66260c9`](https://github.com/monochange/monochange/commit/66260c9ff4880b73725807ada2ff67ed24c3096a)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #442](https://github.com/monochange/monochange/pull/442) _Introduced in:_ [`66260c9`](https://github.com/monochange/monochange/commit/66260c9ff4880b73725807ada2ff67ed24c3096a)
 
 ## [0.4.0](https://github.com/monochange/monochange/releases/tag/v0.4.0) (2026-05-09)
 
-### Breaking Change
+### 💥 Breaking Change
 
 #### Publish durable release schema contracts
 
@@ -401,7 +401,7 @@ Usage: editors can use the hosted configuration schema once GitHub Pages publish
 
 The `monochange_schema` package remains independently versioned from the main release group. Its crate version starts at `0.0.0` on this branch, while this major changeset gives release planning the explicit signal to publish the first crate release without changing the durable public schema version `0.1`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #396](https://github.com/monochange/monochange/pull/396) _Introduced in:_ [`563ef83`](https://github.com/monochange/monochange/commit/563ef83fa21260518ae60c972240e2f0562e9bc2) _Last updated in:_ [`8c6a312`](https://github.com/monochange/monochange/commit/8c6a312f2d9e7477fd7901688d878c721ba41336)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #396](https://github.com/monochange/monochange/pull/396) _Introduced in:_ [`563ef83`](https://github.com/monochange/monochange/commit/563ef83fa21260518ae60c972240e2f0562e9bc2) _Last updated in:_ [`8c6a312`](https://github.com/monochange/monochange/commit/8c6a312f2d9e7477fd7901688d878c721ba41336)
 
 #### File-based release records
 
@@ -478,9 +478,9 @@ git diff-tree --no-commit-id --name-only -r HEAD |
 - `.monochange/*` is no longer fully gitignored; only `.monochange/local/` is ignored.
 - The `ReleaseRecord` JSON schema itself remains identical; only the storage location changes.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #408](https://github.com/monochange/monochange/pull/408) _Introduced in:_ [`cd989c3`](https://github.com/monochange/monochange/commit/cd989c303a9722ca8240c44003f1ef4c96abc284)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #408](https://github.com/monochange/monochange/pull/408) _Introduced in:_ [`cd989c3`](https://github.com/monochange/monochange/commit/cd989c303a9722ca8240c44003f1ef4c96abc284)
 
-### Added
+### 🚀 Feature
 
 #### Consolidate adapter traits to remove ecosystem match arms
 
@@ -496,7 +496,7 @@ Replace hardcoded ecosystem and registry match arms in `workspace_ops`, `monocha
 - Introduce `PublishAdapter` trait and `PublishCommandBuilder` in `monochange_publish` to replace `build_publish_command` registry match arms.
 - Extract `default_registry_kind_for_ecosystem` mapping out of `package_publish.rs` into `monochange_core`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #429](https://github.com/monochange/monochange/pull/429) _Introduced in:_ [`271e554`](https://github.com/monochange/monochange/commit/271e55420154265e798a0de3adf26a64faba66c8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #429](https://github.com/monochange/monochange/pull/429) _Introduced in:_ [`271e554`](https://github.com/monochange/monochange/commit/271e55420154265e798a0de3adf26a64faba66c8)
 
 #### Move ecosystem constants out of core and delegate validation to ecosystem crates
 
@@ -504,13 +504,13 @@ Each ecosystem crate now owns its own `default_dependency_version_prefix()`, `de
 
 Closes #137 Closes #138
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #411](https://github.com/monochange/monochange/pull/411) _Introduced in:_ [`57e2322`](https://github.com/monochange/monochange/commit/57e232282d41e89e70f3e5b34b3e07d8b2089fea) _Related issues:_ [#137](https://github.com/monochange/monochange/issues/137), [#138](https://github.com/monochange/monochange/issues/138)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #411](https://github.com/monochange/monochange/pull/411) _Introduced in:_ [`57e2322`](https://github.com/monochange/monochange/commit/57e232282d41e89e70f3e5b34b3e07d8b2089fea) _Related issues:_ [#137](https://github.com/monochange/monochange/issues/137), [#138](https://github.com/monochange/monochange/issues/138)
 
 #### Add Forgejo source provider
 
 Add Forgejo as a hosted source provider for releases and release pull requests.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #401](https://github.com/monochange/monochange/pull/401) _Introduced in:_ [`86026ac`](https://github.com/monochange/monochange/commit/86026acb83e338fe8d07c200fb8e38693616b6e8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #401](https://github.com/monochange/monochange/pull/401) _Introduced in:_ [`86026ac`](https://github.com/monochange/monochange/commit/86026acb83e338fe8d07c200fb8e38693616b6e8)
 
 #### Move release record generation from commit_release to prepare_release
 
@@ -527,9 +527,9 @@ The release record JSON is now written during the `PrepareRelease` CLI step inst
 - `release_path_requires_staging` explicitly allows `.monochange/releases/` paths even when gitignored.
 - `write_release_record_file` skips overwriting an existing record file so that subsequent `PrepareRelease` steps (for example during `mc release-pr`) do not dirty the working tree.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #421](https://github.com/monochange/monochange/pull/421) _Introduced in:_ [`46fb400`](https://github.com/monochange/monochange/commit/46fb40022d6275faa9f8e231764643665248b773) _Closed issues:_ [#418](https://github.com/monochange/monochange/issues/418)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #421](https://github.com/monochange/monochange/pull/421) _Introduced in:_ [`46fb400`](https://github.com/monochange/monochange/commit/46fb40022d6275faa9f8e231764643665248b773) _Closed issues:_ [#418](https://github.com/monochange/monochange/issues/418)
 
-### Fixed
+### 🐛 Fixed
 
 #### Extract publish support into a dedicated crate
 
@@ -542,13 +542,13 @@ monochange_publish owns reusable publish capabilities and command construction.
 monochange wires those capabilities into CLI workflows and release orchestration.
 ```
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #397](https://github.com/monochange/monochange/pull/397) _Introduced in:_ [`fa78e4d`](https://github.com/monochange/monochange/commit/fa78e4db56fd3a6897896c6e1b1c62ea2d8e46b9) _Last updated in:_ [`8c6a312`](https://github.com/monochange/monochange/commit/8c6a312f2d9e7477fd7901688d878c721ba41336)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #397](https://github.com/monochange/monochange/pull/397) _Introduced in:_ [`fa78e4d`](https://github.com/monochange/monochange/commit/fa78e4db56fd3a6897896c6e1b1c62ea2d8e46b9) _Last updated in:_ [`8c6a312`](https://github.com/monochange/monochange/commit/8c6a312f2d9e7477fd7901688d878c721ba41336)
 
 #### Move Cargo placeholder manifests into monochange_cargo
 
 Move crates.io placeholder `Cargo.toml` and `src/lib.rs` generation out of `monochange::package_publish` and into `monochange_cargo`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #427](https://github.com/monochange/monochange/pull/427) _Introduced in:_ [`084e110`](https://github.com/monochange/monochange/commit/084e1102a13408b12da5159cc7c2cf2815174308)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #427](https://github.com/monochange/monochange/pull/427) _Introduced in:_ [`084e110`](https://github.com/monochange/monochange/commit/084e1102a13408b12da5159cc7c2cf2815174308)
 
 #### Move Cargo publish readiness blockers into monochange_cargo
 
@@ -556,25 +556,25 @@ Move `cargo_publish_readiness_blockers` and workspace package table helpers (`re
 
 Also fixes a clippy `indexing_slicing` lint in `monochange_publish` that was introduced by the previous resume/dependency-ordering extraction.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #413](https://github.com/monochange/monochange/pull/413) _Introduced in:_ [`904ba37`](https://github.com/monochange/monochange/commit/904ba37962c1fb2db7af87ebfa2ef80230c780a5)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #413](https://github.com/monochange/monochange/pull/413) _Introduced in:_ [`904ba37`](https://github.com/monochange/monochange/commit/904ba37962c1fb2db7af87ebfa2ef80230c780a5)
 
 #### Move CommandExecutor and command rendering into monochange_publish
 
 Extract `CommandOutput`, `CommandExecutor`, `ProcessCommandExecutor`, and the helper functions `render_command` and `render_command_error` from `monochange::package_publish` into `monochange_publish`. This continues the Phase 2 crate boundary cleanup by ensuring the publish crate owns all command execution infrastructure used during publishing.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #409](https://github.com/monochange/monochange/pull/409) _Introduced in:_ [`f08c48b`](https://github.com/monochange/monochange/commit/f08c48be727539436ba7d839fa93a6ca5df7d0bb)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #409](https://github.com/monochange/monochange/pull/409) _Introduced in:_ [`f08c48b`](https://github.com/monochange/monochange/commit/f08c48be727539436ba7d839fa93a6ca5df7d0bb)
 
 #### Move Dart placeholder manifests into monochange_dart
 
 Move pub.dev placeholder `pubspec.yaml` generation out of `monochange::package_publish` and into `monochange_dart`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #424](https://github.com/monochange/monochange/pull/424) _Introduced in:_ [`d8df7c6`](https://github.com/monochange/monochange/commit/d8df7c61aaa6dc47c54c87c529052322a8ab4d4e) _Related issues:_ [#423](https://github.com/monochange/monochange/issues/423)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #424](https://github.com/monochange/monochange/pull/424) _Introduced in:_ [`d8df7c6`](https://github.com/monochange/monochange/commit/d8df7c61aaa6dc47c54c87c529052322a8ab4d4e) _Related issues:_ [#423](https://github.com/monochange/monochange/issues/423)
 
 #### Move JSR placeholder manifests into monochange_deno
 
 Move JSR placeholder `deno.json` and `mod.ts` generation out of `monochange::package_publish` and into `monochange_deno`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #423](https://github.com/monochange/monochange/pull/423) _Introduced in:_ [`7df4b05`](https://github.com/monochange/monochange/commit/7df4b05ca0279b5ad5409e3eb3404c2cc94ae45a)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #423](https://github.com/monochange/monochange/pull/423) _Introduced in:_ [`7df4b05`](https://github.com/monochange/monochange/commit/7df4b05ca0279b5ad5409e3eb3404c2cc94ae45a)
 
 #### Move GitHub trust context into monochange_github
 
@@ -595,25 +595,25 @@ This includes:
 
 These functions are now behind the usual `monochange_github` feature flag and can be reused independently of the main publish pipeline.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #417](https://github.com/monochange/monochange/pull/417) _Introduced in:_ [`c3475b6`](https://github.com/monochange/monochange/commit/c3475b6fe46f5ecacd64b39ba473595cb56b5509)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #417](https://github.com/monochange/monochange/pull/417) _Introduced in:_ [`c3475b6`](https://github.com/monochange/monochange/commit/c3475b6fe46f5ecacd64b39ba473595cb56b5509)
 
 #### Move Go placeholder manifests into monochange_go
 
 Move Go placeholder `go.mod` generation out of `monochange::package_publish` and into `monochange_go`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #420](https://github.com/monochange/monochange/pull/420) _Introduced in:_ [`28e4c9d`](https://github.com/monochange/monochange/commit/28e4c9d1c31579456ec93dc59d59f683608240e4) _Related issues:_ [#419](https://github.com/monochange/monochange/issues/419)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #420](https://github.com/monochange/monochange/pull/420) _Introduced in:_ [`28e4c9d`](https://github.com/monochange/monochange/commit/28e4c9d1c31579456ec93dc59d59f683608240e4) _Related issues:_ [#419](https://github.com/monochange/monochange/issues/419)
 
 #### Move npm publish helpers into monochange_npm
 
 Move npm trusted-publishing command helpers and npm placeholder manifest generation out of `monochange::package_publish` and into `monochange_npm`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #419](https://github.com/monochange/monochange/pull/419) _Introduced in:_ [`889e318`](https://github.com/monochange/monochange/commit/889e318f66e10193f741963af02d34c199fbcbc3) _Related issues:_ [#408](https://github.com/monochange/monochange/issues/408), [#417](https://github.com/monochange/monochange/issues/417)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #419](https://github.com/monochange/monochange/pull/419) _Introduced in:_ [`889e318`](https://github.com/monochange/monochange/commit/889e318f66e10193f741963af02d34c199fbcbc3) _Related issues:_ [#408](https://github.com/monochange/monochange/issues/408), [#417](https://github.com/monochange/monochange/issues/417)
 
 #### Move Python placeholder manifests into monochange_python
 
 Move PyPI placeholder `pyproject.toml` and module scaffold generation out of `monochange::package_publish` and into `monochange_python`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #425](https://github.com/monochange/monochange/pull/425) _Introduced in:_ [`f0609f1`](https://github.com/monochange/monochange/commit/f0609f15349d693d98694104d2ec986dad61aff6) _Related issues:_ [#424](https://github.com/monochange/monochange/issues/424)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #425](https://github.com/monochange/monochange/pull/425) _Introduced in:_ [`f0609f1`](https://github.com/monochange/monochange/commit/f0609f15349d693d98694104d2ec986dad61aff6) _Related issues:_ [#424](https://github.com/monochange/monochange/issues/424)
 
 #### Move registry infrastructure from `monochange` into `monochange_publish`
 
@@ -631,7 +631,7 @@ This change relocates registry-facing utilities so the publish crate owns all HT
 
 `monochange` now delegates to these via `monochange_publish` imports rather than owning the implementation. `publish_rate_limits.rs` also imports them from `monochange_publish` instead of `package_publish` directly.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #404](https://github.com/monochange/monochange/pull/404) _Introduced in:_ [`7b09570`](https://github.com/monochange/monochange/commit/7b09570cd076b97c49210b6f3e1aeb33fb7eaf68)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #404](https://github.com/monochange/monochange/pull/404) _Introduced in:_ [`7b09570`](https://github.com/monochange/monochange/commit/7b09570cd076b97c49210b6f3e1aeb33fb7eaf68)
 
 #### Move resume and dependency ordering to monochange_publish
 
@@ -639,7 +639,7 @@ Move resume/artifact logic (`read_publish_report_artifact`, `write_publish_repor
 
 This continues the Phase 2 crate boundary audit by removing more publish-orchestration helpers from the top-level `monochange` crate into the dedicated `monochange_publish` crate where they belong.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #412](https://github.com/monochange/monochange/pull/412) _Introduced in:_ [`86cbd66`](https://github.com/monochange/monochange/commit/86cbd668fbbd1ce20154a7b3102eed18e26209a8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #412](https://github.com/monochange/monochange/pull/412) _Introduced in:_ [`86cbd66`](https://github.com/monochange/monochange/commit/86cbd668fbbd1ce20154a7b3102eed18e26209a8)
 
 #### Preserve publish batch dependency order
 
@@ -647,75 +647,75 @@ Carry prior packages into later publish-plan batches so dependency-ordered publi
 
 This fixes publish plans for releases that are split by registry rate limits. Dependent packages now continue to see their earlier dependency-ordered predecessors in later publish jobs instead of publishing before required package versions are available.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #389](https://github.com/monochange/monochange/pull/389) _Introduced in:_ [`12d3582`](https://github.com/monochange/monochange/commit/12d35826c3b0a8768bbf05c82b1e999a0e9ca30a) _Last updated in:_ [`8c6a312`](https://github.com/monochange/monochange/commit/8c6a312f2d9e7477fd7901688d878c721ba41336)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #389](https://github.com/monochange/monochange/pull/389) _Introduced in:_ [`12d3582`](https://github.com/monochange/monochange/commit/12d35826c3b0a8768bbf05c82b1e999a0e9ca30a) _Last updated in:_ [`8c6a312`](https://github.com/monochange/monochange/commit/8c6a312f2d9e7477fd7901688d878c721ba41336)
 
 #### Remove grouped release member summaries
 
 Grouped release notes no longer include generated changed or synchronized member lists, keeping the release note summary focused on the group release itself.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #395](https://github.com/monochange/monochange/pull/395) _Introduced in:_ [`2d012ff`](https://github.com/monochange/monochange/commit/2d012ff900a612f4aed6e4d7034c8c876f50aeae) _Last updated in:_ [`8c6a312`](https://github.com/monochange/monochange/commit/8c6a312f2d9e7477fd7901688d878c721ba41336)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #395](https://github.com/monochange/monochange/pull/395) _Introduced in:_ [`2d012ff`](https://github.com/monochange/monochange/commit/2d012ff900a612f4aed6e4d7034c8c876f50aeae) _Last updated in:_ [`8c6a312`](https://github.com/monochange/monochange/commit/8c6a312f2d9e7477fd7901688d878c721ba41336)
 
 #### Remove indexing/slicing lint allowances
 
 Remove crate-level `clippy::indexing_slicing` allowances and replace production indexing/slicing call sites with safe accessors.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #414](https://github.com/monochange/monochange/pull/414) _Introduced in:_ [`4d06f06`](https://github.com/monochange/monochange/commit/4d06f0695edb280b4dc7ab661cc69449674fe38e)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #414](https://github.com/monochange/monochange/pull/414) _Introduced in:_ [`4d06f06`](https://github.com/monochange/monochange/commit/4d06f0695edb280b4dc7ab661cc69449674fe38e)
 
-### Testing
+### 🧪 Testing
 
 #### Extract inline test modules into separate files
 
 Move all inline `#[cfg(test)] mod tests { ... }` blocks out of source files into dedicated test files. This reduces source file sizes and keeps test code in a consistent `__tests/` directory structure next to the module it tests.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #416](https://github.com/monochange/monochange/pull/416) _Introduced in:_ [`3535c88`](https://github.com/monochange/monochange/commit/3535c887c46d66db2768377cb5f01406f6e9a8b6)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #416](https://github.com/monochange/monochange/pull/416) _Introduced in:_ [`3535c88`](https://github.com/monochange/monochange/commit/3535c887c46d66db2768377cb5f01406f6e9a8b6)
 
 #### Normalize Rust unit test file layout
 
 Move Rust unit tests into colocated `__tests__/` directories and name each file after the module under test with a `_tests.rs` suffix.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #428](https://github.com/monochange/monochange/pull/428) _Introduced in:_ [`b61cc3e`](https://github.com/monochange/monochange/commit/b61cc3e66989fd83ffb16a31568d2f46d7075216)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #428](https://github.com/monochange/monochange/pull/428) _Introduced in:_ [`b61cc3e`](https://github.com/monochange/monochange/commit/b61cc3e66989fd83ffb16a31568d2f46d7075216)
 
 #### Improve readability of multiline JSON snapshots
 
 Redact multiline string fields inside JSON snapshots and assert their contents separately so release-planning test snapshots remain readable without escaped newline sequences.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #398](https://github.com/monochange/monochange/pull/398) _Introduced in:_ [`458b671`](https://github.com/monochange/monochange/commit/458b671252f98a25628cd08a497792149370386d)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #398](https://github.com/monochange/monochange/pull/398) _Introduced in:_ [`458b671`](https://github.com/monochange/monochange/commit/458b671252f98a25628cd08a497792149370386d)
 
 #### Redact schema crate version in snapshot to survive release bumps
 
 Stop hardcoding `monochange_schema` crate version in integration test assertions. Use insta redaction for `schemaCrateVersion` in the schema asset inventory snapshot, and read the expected version from the crate's `Cargo.toml` at runtime.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #406](https://github.com/monochange/monochange/pull/406) _Introduced in:_ [`660d20a`](https://github.com/monochange/monochange/commit/660d20aebadae1096c3f4ddf1d24531c534ee5d4)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #406](https://github.com/monochange/monochange/pull/406) _Introduced in:_ [`660d20a`](https://github.com/monochange/monochange/commit/660d20aebadae1096c3f4ddf1d24531c534ee5d4)
 
 ## [0.3.4](https://github.com/monochange/monochange/releases/tag/v0.3.4) (2026-05-06)
 
-### Fixed
+### 🐛 Fixed
 
 #### Preserve publish batch dependency order
 
 Carry prior packages into later publish-plan batches so dependency-ordered publish requests remain available when registry rate limits split a release into multiple jobs.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #389](https://github.com/monochange/monochange/pull/389) _Introduced in:_ [`12d3582`](https://github.com/monochange/monochange/commit/12d35826c3b0a8768bbf05c82b1e999a0e9ca30a)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #389](https://github.com/monochange/monochange/pull/389) _Introduced in:_ [`12d3582`](https://github.com/monochange/monochange/commit/12d35826c3b0a8768bbf05c82b1e999a0e9ca30a)
 
 #### Use npm for trusted npm publishing
 
 Route trusted npm publishes through the npm CLI even in pnpm-managed workspaces so npm's OIDC trusted publishing flow can exchange the GitHub Actions identity for a short-lived publish credential. The release workflow also relies on devenv environment cleaning directly instead of the removed `strip:env` wrapper.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #388](https://github.com/monochange/monochange/pull/388) _Introduced in:_ [`72773bc`](https://github.com/monochange/monochange/commit/72773bc438167b55c26bb7c3f5dd9d7a21c99084)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #388](https://github.com/monochange/monochange/pull/388) _Introduced in:_ [`72773bc`](https://github.com/monochange/monochange/commit/72773bc438167b55c26bb7c3f5dd9d7a21c99084)
 
 ## [0.3.3](https://github.com/monochange/monochange/releases/tag/v0.3.3) (2026-05-06)
 
-### Fixed
+### 🐛 Fixed
 
 #### preserve GitHub OIDC environment variables in devenv
 
 The development environment's `devenv.yaml` now keeps the GitHub Actions and OIDC identity variables that monochange needs to detect trusted publishing when running inside `devenv shell`. Previously, `strip: env` removed these variables and caused built-in publishing to fail with "No supported CI provider identity was detected."
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #386](https://github.com/monochange/monochange/pull/386) _Introduced in:_ [`fd1a798`](https://github.com/monochange/monochange/commit/fd1a798e57234fc465c33537077ec6acf0a47db8)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #386](https://github.com/monochange/monochange/pull/386) _Introduced in:_ [`fd1a798`](https://github.com/monochange/monochange/commit/fd1a798e57234fc465c33537077ec6acf0a47db8)
 
 ## [0.3.2](https://github.com/monochange/monochange/releases/tag/v0.3.2) (2026-05-06)
 
-### Added
+### 🚀 Feature
 
 #### Make tag-release JSON addressable by release target id
 
@@ -754,19 +754,19 @@ Example output:
 
 The map is intentionally flat because package ids and group ids share one namespace in monochange configuration, so there is no ambiguity between `.tags.main` as a package id and `.tags.main` as a group id.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #377](https://github.com/monochange/monochange/pull/377) _Introduced in:_ [`e79b03d`](https://github.com/monochange/monochange/commit/e79b03d065688c79ad39e7b4a626834447cb551d)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #377](https://github.com/monochange/monochange/pull/377) _Introduced in:_ [`e79b03d`](https://github.com/monochange/monochange/commit/e79b03d065688c79ad39e7b4a626834447cb551d)
 
-### Fixed
+### 🐛 Fixed
 
 #### Show retarget release progress
 
 `mc repair-release` now updates progress while retargeting a release so long-running provider and git ref updates show the active sub-step instead of a static spinner.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #378](https://github.com/monochange/monochange/pull/378) _Introduced in:_ [`0c381ee`](https://github.com/monochange/monochange/commit/0c381ee4ae199ab02243e455b04002f42bc19305)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #378](https://github.com/monochange/monochange/pull/378) _Introduced in:_ [`0c381ee`](https://github.com/monochange/monochange/commit/0c381ee4ae199ab02243e455b04002f42bc19305)
 
 ## [0.3.1](https://github.com/monochange/monochange/releases/tag/v0.3.1) (2026-05-05)
 
-### Added
+### 🚀 Feature
 
 #### Allow `PrepareRelease` to succeed with no changesets
 
@@ -774,21 +774,21 @@ The map is intentionally flat because package ids and group ids share one namesp
 
 This enables `[cli.release-pr]` workflows to run against repos with no pending changes without failing the CI job.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #360](https://github.com/monochange/monochange/pull/360) _Introduced in:_ [`51df5ba`](https://github.com/monochange/monochange/commit/51df5ba79f06a533d0067fdfab3bdeef9df48696) _Closed issues:_ [#344](https://github.com/monochange/monochange/issues/344) _Related issues:_ [#354](https://github.com/monochange/monochange/issues/354)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #360](https://github.com/monochange/monochange/pull/360) _Introduced in:_ [`51df5ba`](https://github.com/monochange/monochange/commit/51df5ba79f06a533d0067fdfab3bdeef9df48696) _Closed issues:_ [#344](https://github.com/monochange/monochange/issues/344) _Related issues:_ [#354](https://github.com/monochange/monochange/issues/354)
 
-### Fixed
+### 🐛 Fixed
 
 #### Preserve rendered changelog metadata in release records
 
 Release records now store full changelog metadata so publish flows reconstructed from git history can use the rendered release notes instead of falling back to minimal release bodies.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #356](https://github.com/monochange/monochange/pull/356) _Introduced in:_ [`6f38c00`](https://github.com/monochange/monochange/commit/6f38c003a77fcc4a95e33ae1c344340bbcce1017)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #356](https://github.com/monochange/monochange/pull/356) _Introduced in:_ [`6f38c00`](https://github.com/monochange/monochange/commit/6f38c003a77fcc4a95e33ae1c344340bbcce1017)
 
 #### Preserve configured changelog sections for scalar change types
 
 Configured changelog types now take precedence over scalar bump names so generated release notes retain their intended sections. Local telemetry JSONL writes now append complete event lines to avoid malformed records during concurrent command runs.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #363](https://github.com/monochange/monochange/pull/363) _Introduced in:_ [`8c8c9dc`](https://github.com/monochange/monochange/commit/8c8c9dc98f6a95d2c8a2d55fb986a66c08f29312)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #363](https://github.com/monochange/monochange/pull/363) _Introduced in:_ [`8c8c9dc`](https://github.com/monochange/monochange/commit/8c8c9dc98f6a95d2c8a2d55fb986a66c08f29312)
 
 #### Filter placeholder publish reports to packages that need action
 
@@ -796,7 +796,7 @@ Configured changelog types now take precedence over scalar bump names so generat
 
 Pass `--show-all` to include the full package report when auditing every selected package.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #372](https://github.com/monochange/monochange/pull/372) _Introduced in:_ [`26f20e6`](https://github.com/monochange/monochange/commit/26f20e6347429e57bc94aea06a40eec81f85c54d)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #372](https://github.com/monochange/monochange/pull/372) _Introduced in:_ [`26f20e6`](https://github.com/monochange/monochange/commit/26f20e6347429e57bc94aea06a40eec81f85c54d)
 
 #### Publish packages in dependency order without readiness artifacts
 
@@ -832,7 +832,7 @@ If multiple packages are independent at the same depth, their order is determini
 
 A package with no selected dependencies is eligible first. A package is not published until all of its selected publish-relevant dependencies have been ordered before it. Dependencies outside the selected publish set do not block ordering. Development-only cycles are ignored. Runtime, build, peer, workspace, and unknown dependency cycles fail before publishing anything, with a cycle diagnostic.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364) _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #364](https://github.com/monochange/monochange/pull/364) _Introduced in:_ [`67eae95`](https://github.com/monochange/monochange/commit/67eae951e6a35a9b4c7c6489e89cd4779e44234e)
 
 #### Make release workspace publishing preserve Cargo verification
 
@@ -840,7 +840,7 @@ A package with no selected dependencies is eligible first. A package is not publ
 
 Package publishing keeps Cargo verification enabled and still runs JavaScript registry tooling without inherited `LD_LIBRARY_PATH`, preserving PNPM support while avoiding Nix/devenv library-path leakage into system Node.js launchers.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #368](https://github.com/monochange/monochange/pull/368) _Introduced in:_ [`b79eef1`](https://github.com/monochange/monochange/commit/b79eef170a01234b69b2b83c8ebd4ef946a079ac)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #368](https://github.com/monochange/monochange/pull/368) _Introduced in:_ [`b79eef1`](https://github.com/monochange/monochange/commit/b79eef170a01234b69b2b83c8ebd4ef946a079ac)
 
 #### Use `GITHUB_TOKEN` for Git Data API to create verified commits
 
@@ -848,15 +848,15 @@ The `release-pr` workflow now passes `GITHUB_COMMIT_TOKEN` (set to `secrets.GITH
 
 The `GH_TOKEN` (PAT) continues to be used for all other GitHub API operations like pull request creation and updates.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #371](https://github.com/monochange/monochange/pull/371) _Introduced in:_ [`3770b48`](https://github.com/monochange/monochange/commit/3770b48bab6b41c80086a0d3e2e4e6a9a7540c39)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #371](https://github.com/monochange/monochange/pull/371) _Introduced in:_ [`3770b48`](https://github.com/monochange/monochange/commit/3770b48bab6b41c80086a0d3e2e4e6a9a7540c39)
 
-### Other
+### 📦 Other
 
 #### Resolve git identity from token for release PR commits
 
 The `release-pr` workflow now queries the GitHub API for the authenticated user's `id`, `login`, and `name`, then constructs the standard GitHub noreply email (`{id}+{login}@users.noreply.github.com`) for `git config user.email`. This replaces the previous hardcoded `github-actions[bot]` identity, so release PR commits are properly attributed to the account that owns the `RELEASE_PR_MERGE_TOKEN`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #367](https://github.com/monochange/monochange/pull/367) _Introduced in:_ [`920bf04`](https://github.com/monochange/monochange/commit/920bf04ba34aa7050e0dc6a9be5c488c9431d085)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #367](https://github.com/monochange/monochange/pull/367) _Introduced in:_ [`920bf04`](https://github.com/monochange/monochange/commit/920bf04ba34aa7050e0dc6a9be5c488c9431d085)
 
 #### Use the current monochange CLI when publishing release tags
 
@@ -864,11 +864,11 @@ The publish workflow now builds the `mc` binary from the workflow commit before 
 
 The workflow keeps full branch and tag history available after switching to the release tag so publish-time release branch reachability checks still work. The release workflow also dispatches `publish.yml` at the current workflow commit, allowing a fixed publish workflow to publish an older release tag.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #366](https://github.com/monochange/monochange/pull/366) _Introduced in:_ [`9bb5ca9`](https://github.com/monochange/monochange/commit/9bb5ca9ca5315f60a1079a55470f7b77ff8e3ea2) _Related issues:_ [#364](https://github.com/monochange/monochange/issues/364)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #366](https://github.com/monochange/monochange/pull/366) _Introduced in:_ [`9bb5ca9`](https://github.com/monochange/monochange/commit/9bb5ca9ca5315f60a1079a55470f7b77ff8e3ea2) _Related issues:_ [#364](https://github.com/monochange/monochange/issues/364)
 
 ## [0.3.0](https://github.com/monochange/monochange/releases/tag/v0.3.0) (2026-04-30)
 
-### Added
+### 🚀 Feature
 
 #### Improve lint and check progress output
 
@@ -881,7 +881,7 @@ Add beautiful interactive progress reporting for `mc check` and `mc lint`.
 - Enhanced `format_check_report` to list which files were fixed when `--fix` is active.
 - Respects `NO_COLOR` and `MONOCHANGE_NO_PROGRESS` environment variables.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #281](https://github.com/monochange/monochange/pull/281) _Introduced in:_ [`a9eec58`](https://github.com/monochange/monochange/commit/a9eec586e72d0a8704d08b7552523e0bd85ed20d) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #281](https://github.com/monochange/monochange/pull/281) _Introduced in:_ [`a9eec58`](https://github.com/monochange/monochange/commit/a9eec586e72d0a8704d08b7552523e0bd85ed20d) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Configure changeset lint rules
 
@@ -889,9 +889,9 @@ Add configurable changeset lint rules under `[lints.rules]` for summaries, secti
 
 Rules can target built-in or custom changeset types with dynamic ids like `changesets/types/breaking` and `changesets/types/unicorns`, while unknown type ids are rejected during configuration loading.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #326](https://github.com/monochange/monochange/pull/326) _Introduced in:_ [`285fd69`](https://github.com/monochange/monochange/commit/285fd697b99502e9d95716413c533251307f0010) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #326](https://github.com/monochange/monochange/pull/326) _Introduced in:_ [`285fd69`](https://github.com/monochange/monochange/commit/285fd697b99502e9d95716413c533251307f0010) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
-### Changed
+### 📝 Changed
 
 #### add attestation policy configuration
 
@@ -901,13 +901,13 @@ When registry provenance is required, built-in release publishing fails before i
 
 GitHub release asset attestation intent is modeled under `[source.releases.attestations]` with `require_github_artifact_attestations`, which is accepted only for GitHub sources.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #339](https://github.com/monochange/monochange/pull/339) _Introduced in:_ [`2849f7b`](https://github.com/monochange/monochange/commit/2849f7b771c24b2e3459450661d24c7f36c91a9c) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#315](https://github.com/monochange/monochange/issues/315)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #339](https://github.com/monochange/monochange/pull/339) _Introduced in:_ [`2849f7b`](https://github.com/monochange/monochange/commit/2849f7b771c24b2e3459450661d24c7f36c91a9c) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#315](https://github.com/monochange/monochange/issues/315)
 
 #### Add cargo-binstall metadata
 
 Add cargo-binstall metadata so `cargo binstall monochange` can resolve the GitHub release archive layout.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #293](https://github.com/monochange/monochange/pull/293) _Introduced in:_ [`497f8c0`](https://github.com/monochange/monochange/commit/497f8c010a534fcac6e3ed26bb21c220c54e7a5e) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #293](https://github.com/monochange/monochange/pull/293) _Introduced in:_ [`497f8c0`](https://github.com/monochange/monochange/commit/497f8c010a534fcac6e3ed26bb21c220c54e7a5e) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Add initial changelog headers
 
@@ -915,7 +915,7 @@ Changelog targets now support `initial_header` in `[defaults.changelog]`, `[pack
 
 When no custom header is configured, the selected changelog format provides a built-in default header.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #344](https://github.com/monochange/monochange/pull/344) _Introduced in:_ [`ad6c84b`](https://github.com/monochange/monochange/commit/ad6c84b8de13a5849b262a4db2e2ac87710944f2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #344](https://github.com/monochange/monochange/pull/344) _Introduced in:_ [`ad6c84b`](https://github.com/monochange/monochange/commit/ad6c84b8de13a5849b262a4db2e2ac87710944f2)
 
 #### Add changelog section thresholds
 
@@ -947,11 +947,11 @@ other = { heading = "Other", priority = 50 }
 ```md
 ## 1.2.3
 
-### Added
+### 🚀 Feature
 
 - ship a new release workflow
 
-### Other
+### 📦 Other
 
 - internal cleanup note
 ```
@@ -972,7 +972,7 @@ ignored = 100
 ```md
 ## 1.2.3
 
-### Added
+### 🚀 Feature
 
 - ship a new release workflow
 
@@ -1020,13 +1020,13 @@ ChangelogSettings {
 }
 ```
 
-> _Owner:_ Ifiok Jr. _Review:_ [PR #337](https://github.com/monochange/monochange/pull/337) _Introduced in:_ [`4426b99`](https://github.com/monochange/monochange/commit/4426b9916791ceff82957f61837be1e681988c9a) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ Ifiok Jr. _Review:_ [PR #337](https://github.com/monochange/monochange/pull/337) _Introduced in:_ [`4426b99`](https://github.com/monochange/monochange/commit/4426b9916791ceff82957f61837be1e681988c9a) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Refactor changeset linting into LintSuite architecture
 
 Move changeset linting out of workspace config loading and into the `LintSuite`/`LintRuleRunner` framework alongside cargo, npm, and dart linting. This ensures `mc check` and `mc validate` surface changeset lint errors consistently.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #337](https://github.com/monochange/monochange/pull/337) _Introduced in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #337](https://github.com/monochange/monochange/pull/337) _Introduced in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Add post-merge release automation
 
@@ -1041,7 +1041,7 @@ Move changeset linting out of workspace config loading and into the `LintSuite`/
 - Add dedicated composite actions: `publish-release` and `comment-released-issues`
 - Add `publish-release` and `comment-released-issues` CLI step definitions to `monochange.toml.template`
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #282](https://github.com/monochange/monochange/pull/282) _Introduced in:_ [`014491d`](https://github.com/monochange/monochange/commit/014491ddb0de1a562bd0ca6552bba9646baf7f42) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #282](https://github.com/monochange/monochange/pull/282) _Introduced in:_ [`014491d`](https://github.com/monochange/monochange/commit/014491ddb0de1a562bd0ca6552bba9646baf7f42) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Fix CLI help colors
 
@@ -1059,7 +1059,7 @@ Fix `--help` (`-h`) color output and unify CLI color palette.
 - Explicitly opt in to `ColorChoice::Auto` on the `Command` builder
 - Preserve plain text output in test and CI modes so existing snapshots stay stable
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #267](https://github.com/monochange/monochange/pull/267) _Introduced in:_ [`370d5a1`](https://github.com/monochange/monochange/commit/370d5a1d4655c14cf4340cec7886ddc8aa7bbd51) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #267](https://github.com/monochange/monochange/pull/267) _Introduced in:_ [`370d5a1`](https://github.com/monochange/monochange/commit/370d5a1d4655c14cf4340cec7886ddc8aa7bbd51) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Group CLI help commands consistently
 
@@ -1067,7 +1067,7 @@ Make `mc -h`, `mc --help`, and `mc help` render the same command overview so use
 
 The overview now separates built-in commands, generated `step:*` commands, and user-defined `monochange.toml` commands. Generated step commands are always listed, and detailed command help includes richer descriptions for step commands such as `step:publish-release`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #348](https://github.com/monochange/monochange/pull/348) _Introduced in:_ [`33e82e4`](https://github.com/monochange/monochange/commit/33e82e4df24e7c0a36af70f7a397bbadbf5ff9dd)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #348](https://github.com/monochange/monochange/pull/348) _Introduced in:_ [`33e82e4`](https://github.com/monochange/monochange/commit/33e82e4df24e7c0a36af70f7a397bbadbf5ff9dd)
 
 #### Add colored CLI help
 
@@ -1075,7 +1075,7 @@ Add beautiful colored CLI help with detailed examples
 
 The `mc help <command>` subcommand now renders detailed, formatted help with bordered headers, colored sections, multiple examples per command, tips, and cross-references. Running `mc help` shows an overview listing all commands. The standard `--help` flags also use ANSI colors via an anstyle theme. All colors respect NO_COLOR and TTY detection.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #265](https://github.com/monochange/monochange/pull/265) _Introduced in:_ [`8890d77`](https://github.com/monochange/monochange/commit/8890d77e8d54f81f8807588192441a3cd46bfbb8) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #265](https://github.com/monochange/monochange/pull/265) _Introduced in:_ [`8890d77`](https://github.com/monochange/monochange/commit/8890d77e8d54f81f8807588192441a3cd46bfbb8) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Expose resolved configuration in CLI templates
 
@@ -1101,7 +1101,7 @@ It prints JSON containing the canonical project root, the `monochange.toml` path
 
 This gives scripts and GitHub Actions a stable command for inspecting the exact configuration that `monochange` loaded while preserving the no-output default for configured workflow steps.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #343](https://github.com/monochange/monochange/pull/343) _Introduced in:_ [`fc627b3`](https://github.com/monochange/monochange/commit/fc627b38392bc32dc9402a64a5bcc95572a94c3c)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #343](https://github.com/monochange/monochange/pull/343) _Introduced in:_ [`fc627b3`](https://github.com/monochange/monochange/commit/fc627b38392bc32dc9402a64a5bcc95572a94c3c)
 
 #### Document ecosystem-level trusted publishing inheritance
 
@@ -1117,13 +1117,13 @@ trusted_publishing = false
 
 Use `[ecosystems.<name>.publish.trusted_publishing]` for shared repository, workflow, and environment metadata. Package-level publish settings override the ecosystem defaults for package-specific workflows or opt-outs.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #336](https://github.com/monochange/monochange/pull/336) _Introduced in:_ [`263a8d0`](https://github.com/monochange/monochange/commit/263a8d0bc0f61029392cbf45733d0a2fb24b8773) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #336](https://github.com/monochange/monochange/pull/336) _Introduced in:_ [`263a8d0`](https://github.com/monochange/monochange/commit/263a8d0bc0f61029392cbf45733d0a2fb24b8773) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Sync documented workflow commands with generated config
 
 Fix the generated `mc init` configuration so it no longer defines the reserved `[cli.validate]` command, restores the documented provider `release-pr` workflow command, and syncs the repository workflow examples with the config-defined commands documented in the README and guides.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #345](https://github.com/monochange/monochange/pull/345) _Introduced in:_ [`13e594b`](https://github.com/monochange/monochange/commit/13e594b62c751b3d6f2779446314d6d283c7e35b)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #345](https://github.com/monochange/monochange/pull/345) _Introduced in:_ [`13e594b`](https://github.com/monochange/monochange/commit/13e594b62c751b3d6f2779446314d6d283c7e35b)
 
 #### Document supported ecosystem capabilities
 
@@ -1131,7 +1131,7 @@ The documentation now includes a dedicated ecosystem guide that compares Cargo, 
 
 The guide also clarifies ecosystem publishing boundaries, including canonical public registry support and the external-mode escape hatch for private registries or custom publication flows.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #307](https://github.com/monochange/monochange/pull/307) _Introduced in:_ [`11c628c`](https://github.com/monochange/monochange/commit/11c628cd2afb7c9509c31a8cfc043be63a9f2a75) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #307](https://github.com/monochange/monochange/pull/307) _Introduced in:_ [`11c628c`](https://github.com/monochange/monochange/commit/11c628cd2afb7c9509c31a8cfc043be63a9f2a75) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Add Go ecosystem support
 
@@ -1179,7 +1179,7 @@ enabled = true
 - The full module path and relative directory path are stored as metadata for downstream tag resolution
 - Parse errors during discovery are treated as warnings, not hard errors
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #156](https://github.com/monochange/monochange/pull/156) _Introduced in:_ [`519f841`](https://github.com/monochange/monochange/commit/519f841929c6a06d5b3a578b206982d2d6cc1548) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#133](https://github.com/monochange/monochange/issues/133)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #156](https://github.com/monochange/monochange/pull/156) _Introduced in:_ [`519f841`](https://github.com/monochange/monochange/commit/519f841929c6a06d5b3a578b206982d2d6cc1548) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#133](https://github.com/monochange/monochange/issues/133)
 
 #### Add Python ecosystem support
 
@@ -1225,19 +1225,19 @@ lockfile_commands = [{ command = "uv lock" }]
 - PEP 503 name normalization for cross-package dependency matching
 - PEP 508 version specifier parsing with extras support
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #152](https://github.com/monochange/monochange/pull/152) _Introduced in:_ [`81b0882`](https://github.com/monochange/monochange/commit/81b0882525ab51d74b0e8cc2a0114aac0fdb3a7f) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#132](https://github.com/monochange/monochange/issues/132)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #152](https://github.com/monochange/monochange/pull/152) _Introduced in:_ [`81b0882`](https://github.com/monochange/monochange/commit/81b0882525ab51d74b0e8cc2a0114aac0fdb3a7f) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#132](https://github.com/monochange/monochange/issues/132)
 
 #### Add PyPI publishing support
 
 Add first-class PyPI publishing support for Python packages, including PyPI as the built-in Python registry, placeholder package generation, `uv build` / `uv publish` command generation, PyPI JSON API publication checks, trusted-publisher setup guidance, and rate-limit planning coverage.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #322](https://github.com/monochange/monochange/pull/322) _Introduced in:_ [`afe5959`](https://github.com/monochange/monochange/commit/afe595944146c3ec4c9798098c92c031d4279e6a) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #322](https://github.com/monochange/monochange/pull/322) _Introduced in:_ [`afe5959`](https://github.com/monochange/monochange/commit/afe595944146c3ec4c9798098c92c031d4279e6a) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Fix binary benchmark changeset fixtures
 
 Update generated binary benchmark changesets to include summary headings so the PR benchmark fixtures pass changeset validation.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #337](https://github.com/monochange/monochange/pull/337) _Introduced in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #337](https://github.com/monochange/monochange/pull/337) _Introduced in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Handle large release commit messages reliably
 
@@ -1245,25 +1245,25 @@ Release commit creation now streams the generated commit message through standar
 
 Git command spawning now reuses a stable path that contains `git`, and benchmark fixture git commands now use monochange's sanitized git command helper with automatic garbage collection disabled for deterministic synthetic history setup in CI.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #320](https://github.com/monochange/monochange/pull/320) _Introduced in:_ [`f41f985`](https://github.com/monochange/monochange/commit/f41f985288e1440b3b64c2fa9c1cda987925ef8a) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #320](https://github.com/monochange/monochange/pull/320) _Introduced in:_ [`f41f985`](https://github.com/monochange/monochange/commit/f41f985288e1440b3b64c2fa9c1cda987925ef8a) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Fix release merge blocker workflow
 
 Replace the release PR merge blocker action with an inline shell guard so normal pull requests are not blocked by missing action dependencies.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #337](https://github.com/monochange/monochange/pull/337) _Introduced in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #337](https://github.com/monochange/monochange/pull/337) _Introduced in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Update repository URLs
 
 Update repository references from `ifiokjr/monochange` to `monochange/monochange`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #284](https://github.com/monochange/monochange/pull/284) _Introduced in:_ [`021a6cb`](https://github.com/monochange/monochange/commit/021a6cbc86f812a7879b211e83ced5074dccf740) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #284](https://github.com/monochange/monochange/pull/284) _Introduced in:_ [`021a6cb`](https://github.com/monochange/monochange/commit/021a6cbc86f812a7879b211e83ced5074dccf740) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Default CLI output to markdown
 
 Default output format to markdown with termimad terminal rendering.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #263](https://github.com/monochange/monochange/pull/263) _Introduced in:_ [`020df1f`](https://github.com/monochange/monochange/commit/020df1f2d1bec0d8470fe1f4e734ee31e3e167bf) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #263](https://github.com/monochange/monochange/pull/263) _Introduced in:_ [`020df1f`](https://github.com/monochange/monochange/commit/020df1f2d1bec0d8470fe1f4e734ee31e3e167bf) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Publish GitHub releases through drafts
 
@@ -1271,7 +1271,7 @@ Default output format to markdown with termimad terminal rendering.
 - Update release automation to create draft GitHub releases, run the asset upload workflow against those drafts, then publish the drafts after assets are attached.
 - Add a global `--jq` filter for JSON-producing commands so automation can extract release tags and other fields directly from `--format json` output.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #325](https://github.com/monochange/monochange/pull/325) _Introduced in:_ [`bee06fe`](https://github.com/monochange/monochange/commit/bee06fed90e50cda3de695b973f415dd162eec29) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #325](https://github.com/monochange/monochange/pull/325) _Introduced in:_ [`bee06fe`](https://github.com/monochange/monochange/commit/bee06fed90e50cda3de695b973f415dd162eec29) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Add local-only telemetry events
 
@@ -1286,13 +1286,13 @@ MC_TELEMETRY_FILE=/tmp/mc-telemetry.jsonl mc validate
 
 The recorded events are limited to low-cardinality command and step metadata such as command name, step kind, duration, outcome, and sanitized error category. The local sink does not record package names, repository paths, repository URLs, branch names, tags, commit hashes, command strings, raw error messages, or release-note text.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #302](https://github.com/monochange/monochange/pull/302) _Introduced in:_ [`72a126c`](https://github.com/monochange/monochange/commit/72a126cf0789ffbf1c8866f043f307c9f570b088) _Last updated in:_ [`46abfea`](https://github.com/monochange/monochange/commit/46abfea87db6ffed185a0739f5e15c46532192d6) _Related issues:_ [#295](https://github.com/monochange/monochange/issues/295), [#296](https://github.com/monochange/monochange/issues/296), [#297](https://github.com/monochange/monochange/issues/297), [#298](https://github.com/monochange/monochange/issues/298), [#299](https://github.com/monochange/monochange/issues/299), [#300](https://github.com/monochange/monochange/issues/300)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #302](https://github.com/monochange/monochange/pull/302) _Introduced in:_ [`72a126c`](https://github.com/monochange/monochange/commit/72a126cf0789ffbf1c8866f043f307c9f570b088) _Last updated in:_ [`46abfea`](https://github.com/monochange/monochange/commit/46abfea87db6ffed185a0739f5e15c46532192d6) _Related issues:_ [#295](https://github.com/monochange/monochange/issues/295), [#296](https://github.com/monochange/monochange/issues/296), [#297](https://github.com/monochange/monochange/issues/297), [#298](https://github.com/monochange/monochange/issues/298), [#299](https://github.com/monochange/monochange/issues/299), [#300](https://github.com/monochange/monochange/issues/300)
 
 #### Improve migration tools
 
 Add `mc migrate audit` to report legacy release tooling, changelog providers, and CI migration signals before moving a repository to monochange.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #332](https://github.com/monochange/monochange/pull/332) _Introduced in:_ [`3f4c89b`](https://github.com/monochange/monochange/commit/3f4c89bd3813317f6a962c38116c74fb0f83e486) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Related issues:_ [#319](https://github.com/monochange/monochange/issues/319)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #332](https://github.com/monochange/monochange/pull/332) _Introduced in:_ [`3f4c89b`](https://github.com/monochange/monochange/commit/3f4c89bd3813317f6a962c38116c74fb0f83e486) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Related issues:_ [#319](https://github.com/monochange/monochange/issues/319)
 
 #### Publish CLI npm packages with trusted publishing
 
@@ -1316,13 +1316,13 @@ monochange's own CLI npm package workflow now publishes without `NODE_AUTH_TOKEN
 
 The publish script rejects long-lived npm token environment variables and verifies it is running from `monochange/monochange`'s `publish.yml` workflow with GitHub Actions OIDC context before invoking `npm publish --provenance`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #330](https://github.com/monochange/monochange/pull/330) _Introduced in:_ [`7b3ebab`](https://github.com/monochange/monochange/commit/7b3ebab32b002e8a48595553685d6aaf72434d61) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#309](https://github.com/monochange/monochange/issues/309)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #330](https://github.com/monochange/monochange/pull/330) _Introduced in:_ [`7b3ebab`](https://github.com/monochange/monochange/commit/7b3ebab32b002e8a48595553685d6aaf72434d61) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#309](https://github.com/monochange/monochange/issues/309)
 
 #### Add provider trust context detection
 
 The capability model distinguishes trusted-publishing support, CI identity detection, registry-side setup verification, setup automation, and registry-native provenance so future enforcement can avoid overstating unsupported provider or registry combinations.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #331](https://github.com/monochange/monochange/pull/331) _Introduced in:_ [`a9c24e5`](https://github.com/monochange/monochange/commit/a9c24e55bd72678f2a67af8fa470387afe722603) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#313](https://github.com/monochange/monochange/issues/313)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #331](https://github.com/monochange/monochange/pull/331) _Introduced in:_ [`a9c24e5`](https://github.com/monochange/monochange/commit/a9c24e55bd72678f2a67af8fa470387afe722603) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#313](https://github.com/monochange/monochange/issues/313)
 
 #### Add the publish bootstrap command
 
@@ -1330,7 +1330,7 @@ Add `mc publish-bootstrap --from <ref>` for release-record-scoped first-time pac
 
 The command uses the release record to choose package ids, runs placeholder publishing for that release package set, supports `--dry-run`, and can write a JSON bootstrap result artifact with `--output <path>`. Documentation now recommends rerunning `mc publish-readiness` after bootstrap before planning or publishing packages.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #318](https://github.com/monochange/monochange/pull/318) _Introduced in:_ [`cadb6fc`](https://github.com/monochange/monochange/commit/cadb6fccaac2ff9107db8b03bf6156762bc5a9b2) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #318](https://github.com/monochange/monochange/pull/318) _Introduced in:_ [`cadb6fc`](https://github.com/monochange/monochange/commit/cadb6fccaac2ff9107db8b03bf6156762bc5a9b2) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Add readiness-backed publish planning
 
@@ -1338,7 +1338,7 @@ The command uses the release record to choose package ids, runs placeholder publ
 
 Placeholder publish planning continues to reject readiness artifacts and should be run with `mc publish-plan --mode placeholder`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #305](https://github.com/monochange/monochange/pull/305) _Introduced in:_ [`e80c2b8`](https://github.com/monochange/monochange/commit/e80c2b8f1fd1df155e4aa05df8977f245f89bbc5) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #305](https://github.com/monochange/monochange/pull/305) _Introduced in:_ [`e80c2b8`](https://github.com/monochange/monochange/commit/e80c2b8f1fd1df155e4aa05df8977f245f89bbc5) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Harden publish planning guards
 
@@ -1358,7 +1358,7 @@ https://www.npmjs.com/package/<package>/access
 
 `mc publish-plan` also falls back to the crates.io sparse index when the crates.io API denies package lookups, which keeps rate-limit planning working in CI environments that return `403 Forbidden` from the API endpoint.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #264](https://github.com/monochange/monochange/pull/264) _Introduced in:_ [`e542f69`](https://github.com/monochange/monochange/commit/e542f694e15fe91a778c3a66dae66358fe0053b6) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #264](https://github.com/monochange/monochange/pull/264) _Introduced in:_ [`e542f69`](https://github.com/monochange/monochange/commit/e542f694e15fe91a778c3a66dae66358fe0053b6) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Add Cargo publish-readiness guards
 
@@ -1366,13 +1366,13 @@ Built-in crates.io publishing now fails readiness before registry mutation when 
 
 Workspace-inherited Cargo metadata is accepted, and already-published package versions remain non-blocking when the saved readiness artifact still matches current readiness.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #303](https://github.com/monochange/monochange/pull/303) _Introduced in:_ [`0527e2c`](https://github.com/monochange/monochange/commit/0527e2c253d37ee283b9116e83db2a23b03b42b8) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #303](https://github.com/monochange/monochange/pull/303) _Introduced in:_ [`0527e2c`](https://github.com/monochange/monochange/commit/0527e2c253d37ee283b9116e83db2a23b03b42b8) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Add initial publish readiness command
 
 Adds `mc publish-readiness` as a non-mutating preflight command for package registry publishing. The command reads a release record from `--from`, dry-runs registry publish checks for the selected package set, reports ready/already-published/unsupported package states, and can write a JSON readiness artifact with `--output`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #292](https://github.com/monochange/monochange/pull/292) _Introduced in:_ [`63cbbe7`](https://github.com/monochange/monochange/commit/63cbbe7c06b03c0f1ed215a4fc61e0a74b50e1c4) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #292](https://github.com/monochange/monochange/pull/292) _Introduced in:_ [`63cbbe7`](https://github.com/monochange/monochange/commit/63cbbe7c06b03c0f1ed215a4fc61e0a74b50e1c4) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Require publish readiness artifacts
 
@@ -1380,19 +1380,19 @@ Require real `mc publish` package-registry runs to pass a readiness artifact gen
 
 `mc publish-readiness` JSON artifacts now include schema metadata, release-record commit metadata, and a deterministic package-set fingerprint. `PublishPackages` validates the artifact before registry mutation and rejects missing, blocked, stale, malformed, duplicate, or package-mismatched readiness artifacts while leaving `--dry-run` publish previews artifact-free.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #301](https://github.com/monochange/monochange/pull/301) _Introduced in:_ [`97337aa`](https://github.com/monochange/monochange/commit/97337aad65e1f9dfc4d97fd381592b3bd57bc30a) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #301](https://github.com/monochange/monochange/pull/301) _Introduced in:_ [`97337aa`](https://github.com/monochange/monochange/commit/97337aad65e1f9dfc4d97fd381592b3bd57bc30a) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Harden publish readiness artifact freshness
 
 Adds a publish input fingerprint to `mc publish-readiness` artifacts. `mc publish` and readiness-backed `mc publish-plan` now reject artifacts when workspace config, package manifests, lockfiles, or registry/tooling inputs changed after the artifact was written.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #324](https://github.com/monochange/monochange/pull/324) _Introduced in:_ [`69f221d`](https://github.com/monochange/monochange/commit/69f221dc1f9b4823e8aa98ebdea6b84aaa57baeb) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #324](https://github.com/monochange/monochange/pull/324) _Introduced in:_ [`69f221d`](https://github.com/monochange/monochange/commit/69f221dc1f9b4823e8aa98ebdea6b84aaa57baeb) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Add publish resume support
 
 Add package publish result artifacts plus `mc publish --resume <path>` for retrying incomplete registry publishing after partial failures.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #323](https://github.com/monochange/monochange/pull/323) _Introduced in:_ [`8bca357`](https://github.com/monochange/monochange/commit/8bca35730a78f61c22dc71e473bc67a77210c4c6) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #323](https://github.com/monochange/monochange/pull/323) _Introduced in:_ [`8bca357`](https://github.com/monochange/monochange/commit/8bca35730a78f61c22dc71e473bc67a77210c4c6) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Attest GitHub release archives
 
@@ -1427,7 +1427,7 @@ gh attestation verify monochange-x86_64-unknown-linux-gnu-v1.2.3.tar.gz \
   --repo monochange/monochange
 ```
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #329](https://github.com/monochange/monochange/pull/329) _Introduced in:_ [`ebc26a2`](https://github.com/monochange/monochange/commit/ebc26a2b23eef84660d079fdb1d8d5ad68d3f20c) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#308](https://github.com/monochange/monochange/issues/308)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #329](https://github.com/monochange/monochange/pull/329) _Introduced in:_ [`ebc26a2`](https://github.com/monochange/monochange/commit/ebc26a2b23eef84660d079fdb1d8d5ad68d3f20c) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#308](https://github.com/monochange/monochange/issues/308)
 
 #### Add release branch policy enforcement
 
@@ -1508,7 +1508,7 @@ ProviderReleaseSettings {
 
 Callers constructing `ProviderReleaseSettings` directly should include the release branch policy fields or use `ProviderReleaseSettings::default()` to keep the default `main` branch policy.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #321](https://github.com/monochange/monochange/pull/321) _Introduced in:_ [`e888554`](https://github.com/monochange/monochange/commit/e888554ca981816b80f5135086e8b226ee8f0a20) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#310](https://github.com/monochange/monochange/issues/310)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #321](https://github.com/monochange/monochange/pull/321) _Introduced in:_ [`e888554`](https://github.com/monochange/monochange/commit/e888554ca981816b80f5135086e8b226ee8f0a20) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#310](https://github.com/monochange/monochange/issues/310)
 
 #### Ignore changelog-only updates in affected checks
 
@@ -1564,7 +1564,7 @@ Generated changelog sections also stay in reverse-chronological order:
 - previous release notes
 ```
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #278](https://github.com/monochange/monochange/pull/278) _Introduced in:_ [`61a0593`](https://github.com/monochange/monochange/commit/61a0593264c153d6174beb4124812f5055a194dc) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #278](https://github.com/monochange/monochange/pull/278) _Introduced in:_ [`61a0593`](https://github.com/monochange/monochange/commit/61a0593264c153d6174beb4124812f5055a194dc) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Tighten release PR CI guards
 
@@ -1608,13 +1608,13 @@ With that guard in place:
 - the `release-pr` job now runs only on pushes to `main`
 - the workflow passes `GH_TOKEN` to `mc release-pr` so the built-in GitHub provider can authenticate without extra wrapper scripting
 
-> _Owner:_ Ifiok Jr. _Review:_ [PR #337](https://github.com/monochange/monochange/pull/337) _Introduced in:_ [`8b73540`](https://github.com/monochange/monochange/commit/8b7354011d99194a74450ad6907bcff5978b8e28) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ Ifiok Jr. _Review:_ [PR #337](https://github.com/monochange/monochange/pull/337) _Introduced in:_ [`8b73540`](https://github.com/monochange/monochange/commit/8b7354011d99194a74450ad6907bcff5978b8e28) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Commit release PR messages from a file
 
 Commit generated release pull request messages from a temporary file and include detailed commit diagnostics when git cannot create the release commit.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #328](https://github.com/monochange/monochange/pull/328) _Introduced in:_ [`7c4f80a`](https://github.com/monochange/monochange/commit/7c4f80a217cf16716221d701ef3fe52c1ea65443) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #328](https://github.com/monochange/monochange/pull/328) _Introduced in:_ [`7c4f80a`](https://github.com/monochange/monochange/commit/7c4f80a217cf16716221d701ef3fe52c1ea65443) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Add no-verify support to release automation
 
@@ -1681,7 +1681,7 @@ git_push_branch_command(root, branch, no_verify)
 
 Provider-facing release helpers in `monochange_hosting`, `monochange_github`, `monochange_gitlab`, and `monochange_gitea` now forward that flag so a single `no_verify` choice applies consistently to commit creation and branch push operations.
 
-> _Owner:_ Ifiok Jr. _Review:_ [PR #337](https://github.com/monochange/monochange/pull/337) _Introduced in:_ [`8b73540`](https://github.com/monochange/monochange/commit/8b7354011d99194a74450ad6907bcff5978b8e28) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ Ifiok Jr. _Review:_ [PR #337](https://github.com/monochange/monochange/pull/337) _Introduced in:_ [`8b73540`](https://github.com/monochange/monochange/commit/8b7354011d99194a74450ad6907bcff5978b8e28) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Consolidate affected-package configuration
 
@@ -1703,7 +1703,7 @@ The Rust configuration model now exposes `ChangesetSettings::affected` with `Cha
 
 The `mc affected` policy command now reports `skipped` when it runs on a generated release pull request branch whose name starts with `source.pull_requests.branch_prefix`, allowing CI to ignore those branches.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #340](https://github.com/monochange/monochange/pull/340) _Introduced in:_ [`d5d8856`](https://github.com/monochange/monochange/commit/d5d8856b1522cd4ad70eeb06abd4d33ad7f0c9b6)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #340](https://github.com/monochange/monochange/pull/340) _Introduced in:_ [`d5d8856`](https://github.com/monochange/monochange/commit/d5d8856b1522cd4ad70eeb06abd4d33ad7f0c9b6)
 
 #### Expose built-in CLI steps as commands
 
@@ -1711,7 +1711,7 @@ Expose built-in CLI steps as immutable `step:*` commands and move default workfl
 
 Rename the `AffectedPackages` revision input from `since` to `from`, so the generated command now accepts `mc step:affected-packages --from <ref>`.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #290](https://github.com/monochange/monochange/pull/290) _Introduced in:_ [`ec09ba2`](https://github.com/monochange/monochange/commit/ec09ba234cdc81fb5468292651a7c7968ffe7677) _Last updated in:_ [`72fca4d`](https://github.com/monochange/monochange/commit/72fca4d87f53053dd103e577f871581031a5088d)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #290](https://github.com/monochange/monochange/pull/290) _Introduced in:_ [`ec09ba2`](https://github.com/monochange/monochange/commit/ec09ba234cdc81fb5468292651a7c7968ffe7677) _Last updated in:_ [`72fca4d`](https://github.com/monochange/monochange/commit/72fca4d87f53053dd103e577f871581031a5088d)
 
 #### enforce trusted publishing before registry publish commands
 
@@ -1732,13 +1732,13 @@ environment = "publisher"
 
 Run release publishing from the configured CI workflow, or set `publish.trusted_publishing = false` on an individual package when that package intentionally uses a manual publishing path.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #338](https://github.com/monochange/monochange/pull/338) _Introduced in:_ [`71dc3d0`](https://github.com/monochange/monochange/commit/71dc3d0632403a3a79f07fc58c1e656788a75cbd) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#312](https://github.com/monochange/monochange/issues/312)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #338](https://github.com/monochange/monochange/pull/338) _Introduced in:_ [`71dc3d0`](https://github.com/monochange/monochange/commit/71dc3d0632403a3a79f07fc58c1e656788a75cbd) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67) _Closed issues:_ [#312](https://github.com/monochange/monochange/issues/312)
 
 #### Document the generated CLI process
 
 Document the new CLI process where `mc init` generates editable workflow commands in `monochange.toml` and every built-in step is available directly through immutable `mc step:*` commands. The docs now clarify reserved command names such as `validate` and recommend `mc step:affected-packages --verify` for direct changeset-policy checks.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #291](https://github.com/monochange/monochange/pull/291) _Introduced in:_ [`74ac16a`](https://github.com/monochange/monochange/commit/74ac16af949ab07644c9b583774a00da2d95a7be) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #291](https://github.com/monochange/monochange/pull/291) _Introduced in:_ [`74ac16a`](https://github.com/monochange/monochange/commit/74ac16af949ab07644c9b583774a00da2d95a7be) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 #### Prefer verified GitHub release PR commits
 
@@ -1746,11 +1746,11 @@ When `[source.pull_requests].verified_commits = true`, `mc release-pr` publishes
 
 The setting defaults to `false`. If the API commit cannot be created, is not verified, or the branch changes before the replacement lands, monochange leaves the normal pushed git commit in place and continues with the release PR flow.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #306](https://github.com/monochange/monochange/pull/306) _Introduced in:_ [`f93547d`](https://github.com/monochange/monochange/commit/f93547d919cf5bcbffe61beb675fa053307520c8) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #306](https://github.com/monochange/monochange/pull/306) _Introduced in:_ [`f93547d`](https://github.com/monochange/monochange/commit/f93547d919cf5bcbffe61beb675fa053307520c8) _Last updated in:_ [`b33a82d`](https://github.com/monochange/monochange/commit/b33a82d8e26da20fb2dfbb94bc5f4040c27f2c67)
 
 ## [0.2.0](https://github.com/monochange/monochange/releases/tag/v0.2.0) (2026-04-21)
 
-### Breaking Change
+### 💥 Breaking Change
 
 #### replace changelog_sections with [changelog] section
 
@@ -1795,9 +1795,9 @@ Key changes:
 - Built-in defaults provide 13 sections and 13 types when `[changelog]` is empty
 - Bump-severity shorthand types (`minor`, `patch`, `major`, `none`) each get their own title-case section heading (Minor, Patch, Major, None) by default, instead of routing to semantic sections like Added/Fixed
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #259](https://github.com/monochange/monochange/pull/259) _Introduced in:_ [`c698d29`](https://github.com/monochange/monochange/commit/c698d29ffabefab418a0a750a06de3b1d6074561) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #259](https://github.com/monochange/monochange/pull/259) _Introduced in:_ [`c698d29`](https://github.com/monochange/monochange/commit/c698d29ffabefab418a0a750a06de3b1d6074561) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
-### Added
+### 🚀 Feature
 
 #### add `mc subagents` for repo-local agent generation
 
@@ -1823,7 +1823,7 @@ Generated agent instructions are now CLI-first and prefer `mc`, then `monochange
 
 `@monochange/skill` now teaches host agents to use `mc help subagents` / `mc subagents` instead of the removed `mc assist` flow.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #254](https://github.com/monochange/monochange/pull/254) _Introduced in:_ [`1b2b412`](https://github.com/monochange/monochange/commit/1b2b41237b194c608c3e521daefd3f15c2729f91) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #254](https://github.com/monochange/monochange/pull/254) _Introduced in:_ [`1b2b412`](https://github.com/monochange/monochange/commit/1b2b41237b194c608c3e521daefd3f15c2729f91) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### Add `mc skill` for project-local monochange skill installation through the upstream `skills add` workflow.
 
@@ -1845,17 +1845,17 @@ mc skill --list
 
 `mc skill` auto-detects `npx`, `pnpm dlx`, or `bunx`, forwards the remaining native `skills add` flags, and installs the monochange skill source into the current project by default.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #257](https://github.com/monochange/monochange/pull/257) _Introduced in:_ [`0a6937a`](https://github.com/monochange/monochange/commit/0a6937ac81dadbc6252e5eac60fd692335cee3a5) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #257](https://github.com/monochange/monochange/pull/257) _Introduced in:_ [`0a6937a`](https://github.com/monochange/monochange/commit/0a6937ac81dadbc6252e5eac60fd692335cee3a5) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add `caused_by` changeset context for dependency propagation
 
 You can now annotate dependency-only follow-up changesets with `caused_by`, use `mc change --caused-by ...` to author them, inspect the linkage in diagnostics output, and suppress matching automatic dependency propagation during release planning.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #245](https://github.com/monochange/monochange/pull/245) _Introduced in:_ [`8ec612b`](https://github.com/monochange/monochange/commit/8ec612beb9a8b8100037435695826042bc7361c4) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#208](https://github.com/monochange/monochange/issues/208)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #245](https://github.com/monochange/monochange/pull/245) _Introduced in:_ [`8ec612b`](https://github.com/monochange/monochange/commit/8ec612beb9a8b8100037435695826042bc7361c4) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#208](https://github.com/monochange/monochange/issues/208)
 
 #### Add advanced Dart workspace and Flutter lint rules.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #238](https://github.com/monochange/monochange/pull/238) _Introduced in:_ [`acb4faa`](https://github.com/monochange/monochange/commit/acb4faae2361ac75d01f20824ed85259ed5139a0) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#233](https://github.com/monochange/monochange/issues/233)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #238](https://github.com/monochange/monochange/pull/238) _Introduced in:_ [`acb4faa`](https://github.com/monochange/monochange/commit/acb4faae2361ac75d01f20824ed85259ed5139a0) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#233](https://github.com/monochange/monochange/issues/233)
 
 #### add the first Dart lint suite foundation
 
@@ -1868,15 +1868,15 @@ This foundation change adds:
 - Dart lint scaffolding support in `mc lint new`
 - tests covering managed Dart lint target collection and fixture filtering
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #235](https://github.com/monochange/monochange/pull/235) _Introduced in:_ [`5a7a4fe`](https://github.com/monochange/monochange/commit/5a7a4fed84603f51dd5d152d11e739f30dea2b64) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#230](https://github.com/monochange/monochange/issues/230)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #235](https://github.com/monochange/monochange/pull/235) _Introduced in:_ [`5a7a4fe`](https://github.com/monochange/monochange/commit/5a7a4fed84603f51dd5d152d11e739f30dea2b64) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#230](https://github.com/monochange/monochange/issues/230)
 
 #### Add the first Dart metadata and publishability lint rules.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #236](https://github.com/monochange/monochange/pull/236) _Introduced in:_ [`f4669e3`](https://github.com/monochange/monochange/commit/f4669e3110c68bb6384bc985e412822ce2a3ffe9) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#231](https://github.com/monochange/monochange/issues/231)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #236](https://github.com/monochange/monochange/pull/236) _Introduced in:_ [`f4669e3`](https://github.com/monochange/monochange/commit/f4669e3110c68bb6384bc985e412822ce2a3ffe9) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#231](https://github.com/monochange/monochange/issues/231)
 
 #### Add Dart SDK constraint and dependency hygiene lint rules.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #237](https://github.com/monochange/monochange/pull/237) _Introduced in:_ [`1192d15`](https://github.com/monochange/monochange/commit/1192d1576156c89804373f1ea6b69f94d887f255) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#232](https://github.com/monochange/monochange/issues/232)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #237](https://github.com/monochange/monochange/pull/237) _Introduced in:_ [`1192d15`](https://github.com/monochange/monochange/commit/1192d1576156c89804373f1ea6b69f94d887f255) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#232](https://github.com/monochange/monochange/issues/232)
 
 #### add MCP tools for change analysis and validation
 
@@ -1935,7 +1935,7 @@ mc mcp
 
 These tools integrate with the new `monochange_analysis` crate to provide intelligent, context-aware changeset recommendations.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #206](https://github.com/monochange/monochange/pull/206) _Introduced in:_ [`a417022`](https://github.com/monochange/monochange/commit/a417022f80f93d61add00b8087e0f80102a9fd52) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #206](https://github.com/monochange/monochange/pull/206) _Introduced in:_ [`a417022`](https://github.com/monochange/monochange/commit/a417022f80f93d61add00b8087e0f80102a9fd52) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### Add a package-scoped `mc analyze` CLI command for release-aware semantic analysis.
 
@@ -1943,7 +1943,7 @@ The command defaults `--release-ref` to the most recent tag for the selected pac
 
 `monochange_config` now reserves the built-in `analyze` command name so workspace CLI definitions cannot collide with the new built-in subcommand.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #256](https://github.com/monochange/monochange/pull/256) _Introduced in:_ [`75e3329`](https://github.com/monochange/monochange/commit/75e33295d17248f4daca6e7bc83988855a033a08) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #256](https://github.com/monochange/monochange/pull/256) _Introduced in:_ [`75e3329`](https://github.com/monochange/monochange/commit/75e33295d17248f4daca6e7bc83988855a033a08) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add visual status summary to benchmark CI comment sections
 
@@ -1963,7 +1963,7 @@ The command defaults `--release-ref` to the most recent tag for the selected pac
 - 🚨 over budget shown when any phase exceeds its configured budget
 - reviewers can expand only the fixture tables they need while keeping the rest of the comment compact
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #258](https://github.com/monochange/monochange/pull/258) _Introduced in:_ [`d1fa746`](https://github.com/monochange/monochange/commit/d1fa7467bb8bc207939cbf10a907c5dc8fe725d4) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #258](https://github.com/monochange/monochange/pull/258) _Introduced in:_ [`d1fa746`](https://github.com/monochange/monochange/commit/d1fa7467bb8bc207939cbf10a907c5dc8fe725d4) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add per-crate Codecov coverage flags and crate-specific coverage badges
 
@@ -1981,7 +1981,7 @@ monochange now uploads one Codecov coverage flag per public crate while keeping 
 - each published crate README now points its coverage badge at that crate’s own Codecov flag page, for example `?flag=monochange_core`
 - the repository keeps the overall workspace coverage upload and lowers the Codecov patch coverage status target to 95%
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #255](https://github.com/monochange/monochange/pull/255) _Introduced in:_ [`26e13ff`](https://github.com/monochange/monochange/commit/26e13fff071e93dc32fe071a5771232c980ebd46) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #255](https://github.com/monochange/monochange/pull/255) _Introduced in:_ [`26e13ff`](https://github.com/monochange/monochange/commit/26e13fff071e93dc32fe071a5771232c980ebd46) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add ecosystem-specific semantic analysis for MCP changeset workflows
 
@@ -2065,7 +2065,7 @@ Current analyzer coverage includes:
 
 `@monochange/skill` now documents the semantic-analysis-backed MCP workflows and the expanded cross-ecosystem validation guidance for assistant consumers.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #247](https://github.com/monochange/monochange/pull/247) _Introduced in:_ [`8c96c8f`](https://github.com/monochange/monochange/commit/8c96c8f0a3b9d44bf30148b5a83067d7ce3ab62b) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#243](https://github.com/monochange/monochange/issues/243) _Related issues:_ [#244](https://github.com/monochange/monochange/issues/244)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #247](https://github.com/monochange/monochange/pull/247) _Introduced in:_ [`8c96c8f`](https://github.com/monochange/monochange/commit/8c96c8f0a3b9d44bf30148b5a83067d7ce3ab62b) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#243](https://github.com/monochange/monochange/issues/243) _Related issues:_ [#244](https://github.com/monochange/monochange/issues/244)
 
 #### expand the agent-facing harness around diagnostics, lint metadata, and repo guidance
 
@@ -2084,13 +2084,13 @@ Current analyzer coverage includes:
 - the repository now keeps an explicit `ARCHITECTURE.md` map plus `docs/plans/` for active plans, completed plans, and tech-debt tracking
 - `docs:check` now verifies that the agent-facing docs stay aligned with the live MCP tool surface, and `lint:architecture` checks that provider/ecosystem dispatch stays inside the documented allowlist
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #251](https://github.com/monochange/monochange/pull/251) _Introduced in:_ [`47847db`](https://github.com/monochange/monochange/commit/47847db5d8e98e9b8284e72e5f94c184473b4ffd) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #251](https://github.com/monochange/monochange/pull/251) _Introduced in:_ [`47847db`](https://github.com/monochange/monochange/commit/47847db5d8e98e9b8284e72e5f94c184473b4ffd) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add mc check command and lint rule integration
 
 Add `mc check` CLI command that combines workspace validation with lint rule enforcement. Supports `--fix` for autofix, `--ecosystem` for filtering, and `--format` for output selection. The Validate step also runs lint rules and accepts a `fix` input. Includes the full `monochange_lint` crate with 5 Cargo and 6 NPM lint rules.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #207](https://github.com/monochange/monochange/pull/207) _Introduced in:_ [`a650862`](https://github.com/monochange/monochange/commit/a650862f2dc69b6538f6403bab5b66079f9c1304) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #207](https://github.com/monochange/monochange/pull/207) _Introduced in:_ [`a650862`](https://github.com/monochange/monochange/commit/a650862f2dc69b6538f6403bab5b66079f9c1304) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add lint include/exclude path filters with optional gitignore override
 
@@ -2106,7 +2106,7 @@ By default, monochange now skips gitignored manifests during linting while still
 
 The repository config and bundled linting docs now show how to exclude `examples/**` when example manifests would otherwise trigger false positives.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #248](https://github.com/monochange/monochange/pull/248) _Introduced in:_ [`b45cb78`](https://github.com/monochange/monochange/commit/b45cb787a75746a95799f957f01d92020d27f72f) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #248](https://github.com/monochange/monochange/pull/248) _Introduced in:_ [`b45cb78`](https://github.com/monochange/monochange/commit/b45cb787a75746a95799f957f01d92020d27f72f) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add built-in package publishing and placeholder bootstrap commands
 
@@ -2164,7 +2164,7 @@ mc publish-release --format json
 
 Built-in publishing also reports trusted-publishing status in text, markdown, and JSON output, including manual setup URLs when a registry still needs trust configured.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #205](https://github.com/monochange/monochange/pull/205) _Introduced in:_ [`3ed719e`](https://github.com/monochange/monochange/commit/3ed719e42d89d66b7db47528a69d1ecf1cdeada2) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #205](https://github.com/monochange/monochange/pull/205) _Introduced in:_ [`3ed719e`](https://github.com/monochange/monochange/commit/3ed719e42d89d66b7db47528a69d1ecf1cdeada2) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### improve npm and Deno semantic analysis with parser-backed JS/TS export extraction
 
@@ -2183,7 +2183,7 @@ This work also extracts the shared JavaScript and TypeScript export-analysis log
 
 The monochange skill documentation now also teaches the new-package rule: the first changeset for a newly introduced published package or crate should use a `major` bump for that new package entry.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #250](https://github.com/monochange/monochange/pull/250) _Introduced in:_ [`0dd8460`](https://github.com/monochange/monochange/commit/0dd846060614b2de9d3b2dfb5c1337075774b167) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Related issues:_ [#247](https://github.com/monochange/monochange/issues/247), [#249](https://github.com/monochange/monochange/issues/249)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #250](https://github.com/monochange/monochange/pull/250) _Introduced in:_ [`0dd8460`](https://github.com/monochange/monochange/commit/0dd846060614b2de9d3b2dfb5c1337075774b167) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Related issues:_ [#247](https://github.com/monochange/monochange/issues/247), [#249](https://github.com/monochange/monochange/issues/249)
 
 #### add a dedicated `mc versions` command
 
@@ -2220,7 +2220,7 @@ inputs = [
 steps = [{ type = "DisplayVersions" }]
 ```
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #229](https://github.com/monochange/monochange/pull/229) _Introduced in:_ [`f148184`](https://github.com/monochange/monochange/commit/f148184d69fc4dc8720cde8db22768a8c1def8f7) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #229](https://github.com/monochange/monochange/pull/229) _Introduced in:_ [`f148184`](https://github.com/monochange/monochange/commit/f148184d69fc4dc8720cde8db22768a8c1def8f7) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add publish rate-limit planning and batched publish metadata
 
@@ -2361,7 +2361,7 @@ This keeps config parsing, runtime enforcement, dry-run JSON, and library consum
 - standalone npm packages get stable root-relative ids such as `npm:packages/docs/package.json`
 - publish planning and other discovery-driven flows now keep both packages consistently across platforms
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #225](https://github.com/monochange/monochange/pull/225) _Introduced in:_ [`98013cb`](https://github.com/monochange/monochange/commit/98013cb86d5644a7327dc2ee5803d747d4a0372c) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #225](https://github.com/monochange/monochange/pull/225) _Introduced in:_ [`98013cb`](https://github.com/monochange/monochange/commit/98013cb86d5644a7327dc2ee5803d747d4a0372c) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add `mc tag-release` for post-merge release PR workflows
 
@@ -2417,9 +2417,9 @@ The generated GitHub workflow now refreshes the release PR on normal `main` push
 
 The bundled `@monochange/cli` documentation now describes this post-merge tagging flow as part of the recommended release PR workflow.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #220](https://github.com/monochange/monochange/pull/220) _Introduced in:_ [`cf5e581`](https://github.com/monochange/monochange/commit/cf5e58113adcda077dfff7c3dd8f5e7598e411d8) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#209](https://github.com/monochange/monochange/issues/209)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #220](https://github.com/monochange/monochange/pull/220) _Introduced in:_ [`cf5e581`](https://github.com/monochange/monochange/commit/cf5e58113adcda077dfff7c3dd8f5e7598e411d8) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#209](https://github.com/monochange/monochange/issues/209)
 
-### Changed
+### 📝 Changed
 
 #### centralize manifest lint configuration and split lint suites by ecosystem
 
@@ -2497,9 +2497,9 @@ This release also adds two new support crates:
 
 The Cargo and npm suites now live in `monochange_cargo::lints` and `monochange_npm::lints`, so ecosystem-specific parsing and rule behavior stay with their ecosystem adapters.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #228](https://github.com/monochange/monochange/pull/228) _Introduced in:_ [`94f06a0`](https://github.com/monochange/monochange/commit/94f06a057150d26e5f330e2e49a08f71eb12fc92) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #228](https://github.com/monochange/monochange/pull/228) _Introduced in:_ [`94f06a0`](https://github.com/monochange/monochange/commit/94f06a057150d26e5f330e2e49a08f71eb12fc92) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
-### Fixed
+### 🐛 Fixed
 
 #### align publish rate-limit plans with pending registry work
 
@@ -2525,7 +2525,7 @@ mc publish-plan --format json
 
 The `publishRateLimits` report now shrinks automatically on reruns, partial publishes, and placeholder bootstrap flows where some packages already exist. That keeps advisory warnings, optional enforcement, and CI batch plans aligned with the actual work left to publish.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #240](https://github.com/monochange/monochange/pull/240) _Introduced in:_ [`63fbe0d`](https://github.com/monochange/monochange/commit/63fbe0de9825f3139386b7a25cf4821156813301) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #240](https://github.com/monochange/monochange/pull/240) _Introduced in:_ [`63fbe0d`](https://github.com/monochange/monochange/commit/63fbe0de9825f3139386b7a25cf4821156813301) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### make manual trusted-publishing guidance more actionable
 
@@ -2537,7 +2537,7 @@ Improves CLI guidance for registries that still require manual trusted-publishin
 - package-publish text and markdown output now include a concrete next step telling users to finish registry setup and rerun `mc publish`
 - built-in publish prerequisite failures now tell users to complete registry setup and rerun the publish command
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #216](https://github.com/monochange/monochange/pull/216) _Introduced in:_ [`3ffb516`](https://github.com/monochange/monochange/commit/3ffb5165d643371be3315edf715a80b04f277144) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #216](https://github.com/monochange/monochange/pull/216) _Introduced in:_ [`3ffb516`](https://github.com/monochange/monochange/commit/3ffb5165d643371be3315edf715a80b04f277144) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### improve trusted-publishing preflight diagnostics for manual registries
 
@@ -2549,13 +2549,13 @@ Improves trusted-publishing diagnostics for registries that still require manual
 - manual-registry guidance now surfaces the resolved repository, workflow, and environment when monochange can infer them
 - manual-registry errors now explain when the GitHub context is incomplete and point to the exact `publish.trusted_publishing.*` field that still needs configuration
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #218](https://github.com/monochange/monochange/pull/218) _Introduced in:_ [`85bc41f`](https://github.com/monochange/monochange/commit/85bc41f72766a34981e25cf1ad73442e9e80c267) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #218](https://github.com/monochange/monochange/pull/218) _Introduced in:_ [`85bc41f`](https://github.com/monochange/monochange/commit/85bc41f72766a34981e25cf1ad73442e9e80c267) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
-### Refactor
+### 🔨 Refactor
 
 #### Adopt `declare_lint_rule` for Cargo lint metadata and clarify when lint authors should use it.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #239](https://github.com/monochange/monochange/pull/239) _Introduced in:_ [`f30f62f`](https://github.com/monochange/monochange/commit/f30f62f26c5e846448a94b2aa08b5b84d147a27a) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#234](https://github.com/monochange/monochange/issues/234)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #239](https://github.com/monochange/monochange/pull/239) _Introduced in:_ [`f30f62f`](https://github.com/monochange/monochange/commit/f30f62f26c5e846448a94b2aa08b5b84d147a27a) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2) _Closed issues:_ [#234](https://github.com/monochange/monochange/issues/234)
 
 #### align crate docs and readability with the workspace style guide
 
@@ -2600,13 +2600,13 @@ match existing {
 
 The result is more consistent crate documentation, less duplicated prose, and flatter control flow in a few high-traffic code paths.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #224](https://github.com/monochange/monochange/pull/224) _Introduced in:_ [`d0f76ed`](https://github.com/monochange/monochange/commit/d0f76ed56fa18e0ca9d9ec20fa9e44d413014db7) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #224](https://github.com/monochange/monochange/pull/224) _Introduced in:_ [`d0f76ed`](https://github.com/monochange/monochange/commit/d0f76ed56fa18e0ca9d9ec20fa9e44d413014db7) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
-### Testing
+### 🧪 Testing
 
 #### Fix CI race condition where tests that spawn `git` could fail under parallel `cargo llvm-cov` execution because skill command tests temporarily replace `PATH`. Capture the original `PATH` at process start and pass it explicitly to every git subprocess spawned by test helpers. Also reorder coverage job so Codecov uploads always complete before the patch threshold gate fails.
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #262](https://github.com/monochange/monochange/pull/262) _Introduced in:_ [`184ab4f`](https://github.com/monochange/monochange/commit/184ab4fab3cf96f58b14f905a66511c6d0a469aa) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #262](https://github.com/monochange/monochange/pull/262) _Introduced in:_ [`184ab4f`](https://github.com/monochange/monochange/commit/184ab4fab3cf96f58b14f905a66511c6d0a469aa) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add fixture-first integration coverage for manual trust diagnostics
 
@@ -2618,7 +2618,7 @@ The new integration tests cover:
 - missing workflow configuration guidance when monochange cannot resolve the GitHub workflow yet
 - placeholder-publish dry-run output in both text and JSON formats
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #221](https://github.com/monochange/monochange/pull/221) _Introduced in:_ [`c7a0209`](https://github.com/monochange/monochange/commit/c7a0209392b81f70b5d51b0b777db40487b8ac29) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #221](https://github.com/monochange/monochange/pull/221) _Introduced in:_ [`c7a0209`](https://github.com/monochange/monochange/commit/c7a0209392b81f70b5d51b0b777db40487b8ac29) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 #### add trusted-publishing messaging test coverage
 
@@ -2629,11 +2629,11 @@ The new tests cover:
 - manual registry setup guidance rendering in text and markdown output
 - preservation of explicit trusted-publishing context in manual-action outcomes
 
-> _Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #215](https://github.com/monochange/monochange/pull/215) _Introduced in:_ [`36c1d4e`](https://github.com/monochange/monochange/commit/36c1d4ec3c2daa675c233e388e161f339a77b6c2) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #215](https://github.com/monochange/monochange/pull/215) _Introduced in:_ [`36c1d4e`](https://github.com/monochange/monochange/commit/36c1d4ec3c2daa675c233e388e161f339a77b6c2) _Last updated in:_ [`2bd10ab`](https://github.com/monochange/monochange/commit/2bd10abcd34e0eca9f75cebdfafdf6347dc84ca2)
 
 ## [0.1.0](https://github.com/monochange/monochange/releases/tag/v0.1.0) (2026-04-13)
 
-### Breaking changes
+### 💥 Breaking Change
 
 #### 🚀 Initial public release of monochange
 
@@ -2666,4 +2666,4 @@ This first release includes:
 
 For complete feature details, architecture overview, and usage examples, see the [documentation](https://docs.rs/monochange).
 
-> _Owner:_ Ifiok Jr. _Introduced in:_ [`4542b5a`](https://github.com/monochange/monochange/commit/4542b5aee8b63a86c7ffc0ea9436090162a18056)
+_Owner:_ Ifiok Jr. _Introduced in:_ [`4542b5a`](https://github.com/monochange/monochange/commit/4542b5aee8b63a86c7ffc0ea9436090162a18056)

@@ -144,16 +144,16 @@ templates = [
 ]
 
 [changelog.sections]
-breaking = { heading = "Breaking Change", description = "Breaking changes that require consumer updates or migration", priority = 10 }
-feat = { heading = "Added", description = "New features, enhancements, and additions", priority = 20 }
-change = { heading = "Changed", description = "Changes to existing behavior, functionality, or API semantics", priority = 25 }
-fix = { heading = "Fixed", description = "Bug fixes and error corrections", priority = 30 }
-test = { heading = "Testing", description = "Test suite improvements and additions", priority = 40 }
-refactor = { heading = "Refactor", description = "Code refactoring with no functional changes", priority = 40 }
-docs = { heading = "Documentation", description = "Documentation updates and improvements", priority = 40 }
-security = { heading = "Security", description = "Security vulnerabilities, patches, and hardening", priority = 40 }
-perf = { heading = "Performance", description = "Performance optimizations and improvements", priority = 40 }
-other = { heading = "Other", description = "Miscellaneous changes not categorized elsewhere", priority = 50 }
+breaking = { heading = "💥 Breaking Change", description = "Breaking changes that require consumer updates or migration", priority = 10 }
+feat = { heading = "🚀 Feature", description = "New features, enhancements, and additions", priority = 20 }
+change = { heading = "📝 Changed", description = "Changes to existing behavior, functionality, or API semantics", priority = 25 }
+fix = { heading = "🐛 Fixed", description = "Bug fixes and error corrections", priority = 30 }
+test = { heading = "🧪 Testing", description = "Test suite improvements and additions", priority = 40 }
+refactor = { heading = "🔨 Refactor", description = "Code refactoring with no functional changes", priority = 40 }
+docs = { heading = "📖 Documentation", description = "Documentation updates and improvements", priority = 40 }
+security = { heading = "🔒 Security", description = "Security vulnerabilities, patches, and hardening", priority = 40 }
+perf = { heading = "⚡ Performance", description = "Performance optimizations and improvements", priority = 40 }
+other = { heading = "📦 Other", description = "Miscellaneous changes not categorized elsewhere", priority = 50 }
 
 [changelog.section_thresholds]
 collapse = 40
@@ -173,7 +173,6 @@ none = { bump = "none", section = "other", description = "Changes with no versio
 docs = { bump = "none", section = "docs", description = "Documentation updates and clarifications only" }
 security = { bump = "none", section = "security", description = "Security improvements, advisories, and vulnerability fixes" }
 perf = { bump = "none", section = "perf", description = "Performance and benchmarking improvements" }
-
 # =============================================================================
 # [package.*] — declare each release-managed package explicitly
 # =============================================================================
