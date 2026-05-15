@@ -80,17 +80,35 @@ fn config_artifact_fixtures_are_valid_json() -> Result<(), Box<dyn Error>> {
 		let raw: Value = serde_json::from_str(&text)?;
 		let source = json_object(&raw, "/source")?;
 
-		assert_eq!(json_str(&raw, "/source/provider")?, "github");
+		let provider = json_str(&raw, "/source/provider")?;
+		let valid_providers = ["github", "gitlab", "gitea", "forgejo"];
+		assert!(
+			valid_providers.contains(&provider),
+			"{name} has unexpected source provider `{provider}`"
+		);
 		assert!(!json_str(&raw, "/source/owner")?.is_empty());
 		assert!(!json_str(&raw, "/source/repo")?.is_empty());
 		for key in source.keys() {
 			assert!(
-				["provider", "owner", "repo", "host"].contains(&key.as_str()),
+				[
+					"provider",
+					"owner",
+					"repo",
+					"host",
+					"api_url",
+					"pull_requests",
+					"releases"
+				]
+				.contains(&key.as_str()),
 				"{name} includes unexpected source key `{key}`"
 			);
 		}
 		if source.contains_key("host") {
-			assert_eq!(json_str(&raw, "/source/host")?, "github.com");
+			let host = json_str(&raw, "/source/host")?;
+			assert!(
+				host.ends_with(".example.com") || host == "github.com",
+				"{name} has unexpected host `{host}`"
+			);
 		}
 	}
 

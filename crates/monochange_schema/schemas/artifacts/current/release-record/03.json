@@ -1,27 +1,29 @@
 {
 	"changedFiles": [
-		"Cargo.toml",
-		"crates/monochange_schema/Cargo.toml",
-		"crates/monochange_schema/schemas/artifacts/current/release-record/03.json"
+		"crates/ybmo_0/src/lib.rs"
 	],
+	"changelogs": [],
 	"changesets": [
 		{
-			"details": "Generated from deterministic proptest seed 225.",
+			"context": {
+				"host": "gitea.example.com",
+				"provider": "gitea"
+			},
+			"details": "Generated from deterministic proptest seed 13623607009219070259.",
 			"path": ".changeset/schema-artifact-3.md",
 			"summary": "Exercise schema artifact fixture 3",
 			"targets": [
 				{
-					"bump": "major",
 					"causedBy": [
-						"release-record-schema-compat"
+						"ybmo-schema-compat"
 					],
-					"changeType": "fix",
+					"changeType": "feature",
 					"evidenceRefs": [
-						"crates/monochange_schema/src/lib.rs"
+						"crates/ybmo_0/src/lib.rs"
 					],
-					"id": "monochange_schema",
+					"id": "ybmo_0",
 					"kind": "package",
-					"origin": "frontmatter"
+					"origin": ".changeset/schema-artifact-3.md"
 				}
 			]
 		}
@@ -32,20 +34,18 @@
 		".changeset/schema-artifact-3.md"
 	],
 	"kind": "monochange.releaseRecord",
+	"packagePublications": [],
 	"provider": {
-		"host": "github.com",
-		"kind": "github",
-		"owner": "aipi",
-		"repo": "schema-fixtures"
+		"host": null,
+		"kind": "gitea",
+		"owner": "ybmo",
+		"repo": "vjcz"
 	},
 	"releaseTargets": [
 		{
 			"id": "main",
 			"kind": "group",
-			"members": [
-				"monochange",
-				"monochange_core"
-			],
+			"members": [],
 			"release": true,
 			"tag": true,
 			"tagName": "v0.3.3",
@@ -53,18 +53,31 @@
 			"versionFormat": "primary"
 		},
 		{
-			"id": "monochange_schema",
+			"id": "ybmo_1",
 			"kind": "package",
 			"members": [],
-			"release": false,
-			"tag": false,
-			"tagName": "monochange_schema/v0.3.3",
+			"release": true,
+			"tag": true,
+			"tagName": "ybmo_1/v0.3.3",
+			"version": "0.3.3",
+			"versionFormat": "namespaced"
+		},
+		{
+			"id": "ybmo_2",
+			"kind": "package",
+			"members": [],
+			"release": true,
+			"tag": true,
+			"tagName": "ybmo_2/v0.3.3",
 			"version": "0.3.3",
 			"versionFormat": "namespaced"
 		}
 	],
 	"releasedPackages": [
-		"monochange"
+		"ybmo_0",
+		"ybmo_1",
+		"ybmo_2",
+		"ybmo_3"
 	],
 	"schemaVersion": "0.3",
 	"updatedChangelogs": [
@@ -73,6 +86,8 @@
 	"version": "0.3.3",
 	"versions": {
 		"main": "0.3.3",
-		"monochange_schema": "0.3.3"
+		"ybmo_0": "0.3.3",
+		"ybmo_1": "0.3.3",
+		"ybmo_2": "0.3.3"
 	}
 }

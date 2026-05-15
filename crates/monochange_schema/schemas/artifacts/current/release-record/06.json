@@ -1,27 +1,48 @@
 {
 	"changedFiles": [
-		"Cargo.toml",
-		"crates/monochange_schema/Cargo.toml",
-		"crates/monochange_schema/schemas/artifacts/current/release-record/06.json"
+		"crates/hail_0/src/lib.rs"
+	],
+	"changelogs": [
+		{
+			"format": "monochange",
+			"notes": {
+				"sections": [
+					{
+						"collapsed": false,
+						"entries": [
+							"fix: schema artifact 6"
+						],
+						"title": "Bug Fixes"
+					}
+				],
+				"summary": [
+					"Release 6"
+				],
+				"title": "v0.3.6"
+			},
+			"ownerId": "main",
+			"ownerKind": "group",
+			"path": "fixtures/changelog-6.md",
+			"rendered": "## Bug Fixes\n- fix: schema artifact 6"
+		}
 	],
 	"changesets": [
 		{
-			"details": "Generated from deterministic proptest seed 60.",
+			"details": "Generated from deterministic proptest seed 8430656067206529462.",
 			"path": ".changeset/schema-artifact-6.md",
 			"summary": "Exercise schema artifact fixture 6",
 			"targets": [
 				{
-					"bump": "major",
 					"causedBy": [
-						"release-record-schema-compat"
+						"hail-schema-compat"
 					],
-					"changeType": "fix",
+					"changeType": "feature",
 					"evidenceRefs": [
-						"crates/monochange_schema/src/lib.rs"
+						"crates/hail_0/src/lib.rs"
 					],
-					"id": "monochange_schema",
+					"id": "hail_0",
 					"kind": "package",
-					"origin": "frontmatter"
+					"origin": ".changeset/schema-artifact-6.md"
 				}
 			]
 		}
@@ -32,20 +53,18 @@
 		".changeset/schema-artifact-6.md"
 	],
 	"kind": "monochange.releaseRecord",
+	"packagePublications": [],
 	"provider": {
-		"host": "github.com",
-		"kind": "github",
-		"owner": "monochange",
-		"repo": "schema-fixtures"
+		"host": null,
+		"kind": "gitlab",
+		"owner": "hail",
+		"repo": "iityebtf"
 	},
 	"releaseTargets": [
 		{
 			"id": "main",
 			"kind": "group",
-			"members": [
-				"monochange",
-				"monochange_core"
-			],
+			"members": [],
 			"release": true,
 			"tag": true,
 			"tagName": "v0.3.6",
@@ -53,20 +72,21 @@
 			"versionFormat": "primary"
 		},
 		{
-			"id": "monochange_schema",
+			"id": "hail_1",
 			"kind": "package",
 			"members": [],
-			"release": false,
-			"tag": false,
-			"tagName": "monochange_schema/v0.3.6",
+			"release": true,
+			"tag": true,
+			"tagName": "hail_1/v0.3.6",
 			"version": "0.3.6",
 			"versionFormat": "namespaced"
 		}
 	],
 	"releasedPackages": [
-		"monochange",
-		"monochange_core",
-		"monochange_schema"
+		"hail_0",
+		"hail_1",
+		"hail_2",
+		"hail_3"
 	],
 	"schemaVersion": "0.3",
 	"updatedChangelogs": [
@@ -74,7 +94,9 @@
 	],
 	"version": "0.3.6",
 	"versions": {
-		"main": "0.3.6",
-		"monochange_schema": "0.3.6"
+		"hail_0": "0.3.6",
+		"hail_1": "0.3.6",
+		"hail_2": "0.3.6",
+		"main": "0.3.6"
 	}
 }

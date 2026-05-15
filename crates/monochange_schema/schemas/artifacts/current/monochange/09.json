@@ -1,19 +1,92 @@
 {
 	"defaults": {
-		"package_type": "cargo"
+		"changelog_version_title": "v{{version}} — mpuzou release",
+		"include_private": false,
+		"package_type": "cargo",
+		"parent_bump": "minor",
+		"strict_version_conflicts": true,
+		"warn_on_group_mismatch": true
+	},
+	"ecosystems": {
+		"cargo": {
+			"enabled": true,
+			"publish": {
+				"enabled": true
+			},
+			"roots": [
+				"crates/cargo"
+			]
+		}
+	},
+	"group": {
+		"main": {
+			"packages": [
+				"mpuzou_0",
+				"mpuzou_1"
+			],
+			"release": true,
+			"tag": true,
+			"version_format": "namespaced"
+		}
+	},
+	"lints": {
+		"rules": {
+			"no-unnecessary-releases": "error"
+		},
+		"scopes": [
+			"crates/mpuzou"
+		],
+		"use": [
+			"no-unnecessary-releases"
+		]
 	},
 	"package": {
-		"monochange": {
-			"path": "crates/monochange"
+		"mpuzou_0": {
+			"path": "crates/mpuzou_0",
+			"release": true,
+			"tag": true,
+			"type": "cargo",
+			"version_format": "namespaced"
 		},
-		"monochange_core": {
-			"path": "crates/monochange_core"
+		"mpuzou_1": {
+			"path": "crates/mpuzou_1",
+			"release": false,
+			"tag": false,
+			"type": "cargo",
+			"version_format": "namespaced"
+		},
+		"mpuzou_2": {
+			"path": "crates/mpuzou_2",
+			"release": false,
+			"tag": false,
+			"type": "cargo",
+			"version_format": "namespaced"
+		},
+		"mpuzou_3": {
+			"path": "crates/mpuzou_3",
+			"release": false,
+			"tag": false,
+			"type": "cargo",
+			"version_format": "namespaced"
 		}
 	},
 	"source": {
-		"host": "github.com",
-		"owner": "release-tools",
+		"api_url": "api.github.example.com",
+		"host": "github.example.com",
+		"owner": "mpuzou",
 		"provider": "github",
-		"repo": "release-kit"
+		"pull_requests": {
+			"auto_merge": false,
+			"base": "main",
+			"branch_prefix": "mpuzou/release",
+			"enabled": true,
+			"labels": [
+				"release",
+				"automated"
+			],
+			"title": "chore(release): prepare mpuzou release",
+			"verified_commits": false
+		},
+		"repo": "rrnozp"
 	}
 }
