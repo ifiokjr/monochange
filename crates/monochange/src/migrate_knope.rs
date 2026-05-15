@@ -37,8 +37,8 @@ pub(crate) struct KnopeConfig {
 	#[serde(default)]
 	workflows: Vec<KnopeWorkflow>,
 	/// Conventional-commit settings.
-	#[serde(default)]
-	changes: Option<KnopeChanges>,
+	#[serde(default, rename = "changes")]
+	_changes: Option<KnopeChanges>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -47,20 +47,20 @@ pub(crate) struct KnopeSinglePackage {
 	versioned_files: Vec<toml::Value>,
 	#[serde(default)]
 	changelog: Option<String>,
-	#[serde(default)]
-	scopes: Vec<String>,
-	#[serde(default)]
-	extra_changelog_sections: Vec<KnopeChangelogSection>,
+	#[serde(default, rename = "scopes")]
+	_scopes: Vec<String>,
+	#[serde(default, rename = "extra_changelog_sections")]
+	_extra_changelog_sections: Vec<KnopeChangelogSection>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct KnopePackageEntry {
 	#[serde(default)]
 	versioned_files: Vec<toml::Value>,
-	#[serde(default)]
-	changelog: Option<String>,
-	#[serde(default)]
-	scopes: Vec<String>,
+	#[serde(default, rename = "changelog")]
+	_changelog: Option<String>,
+	#[serde(default, rename = "scopes")]
+	_scopes: Vec<String>,
 	#[serde(default)]
 	extra_changelog_sections: Vec<KnopeChangelogSection>,
 }
@@ -88,8 +88,8 @@ pub(crate) struct KnopeStep {
 
 #[derive(Debug, Clone, Deserialize, Default)]
 pub(crate) struct KnopeChanges {
-	#[serde(default)]
-	ignore_conventional_commits: Option<bool>,
+	#[serde(default, rename = "ignore_conventional_commits")]
+	_ignore_conventional_commits: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

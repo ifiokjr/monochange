@@ -92,6 +92,9 @@ pub(crate) fn run_migration_command(
 			let report = migrate_release_records(root, record_matches.get_flag("dry-run"))?;
 			Ok(render_release_record_migration_report(&report, format))
 		}
+		Some(("knope", knope_matches)) => {
+			crate::migrate_knope::run_knope_migration(root, quiet, knope_matches)
+		}
 		Some(("audit", audit_matches)) => {
 			let format = audit_matches
 				.get_one::<String>("format")
