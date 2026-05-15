@@ -39,7 +39,7 @@ export default defineConfig({
 		? {
 				env: {
 					...process.env,
-					DATABASE_URL: process.env.DATABASE_URL ?? e2eDatabaseUrl,
+					DATABASE_URL: process.env.MONOCHANGE_APP_E2E_DATABASE_URL ?? e2eDatabaseUrl,
 					GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID ?? "",
 					GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET ?? "",
 					JWT_SECRET: process.env.JWT_SECRET ?? "playwright-e2e-secret",
