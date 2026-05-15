@@ -17,6 +17,9 @@ monochange_app_db = { workspace = true }
 monochange_core = { workspace = true }
 monochange_github = { workspace = true }
 reqwest = { workspace = true }
+secrecy = { workspace = true }
+secretspec = { workspace = true }
+secretspec-derive = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sqlx = { workspace = true }

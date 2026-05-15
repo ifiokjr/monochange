@@ -1,15 +1,20 @@
-//! Database connection pool and migration runner for monochange_app.
+//! SQLite database connection and migration runner for monochange_app.
 //!
-//! Uses sqlx for PostgreSQL connection pooling under Welds ORM.
+//! The app stores its state in a local SQLite database so development and
+//! production use the same database engine.
 
 #[cfg(test)]
 #[path = "__tests.rs"]
 mod tests;
 
-use sqlx::postgres::PgPoolOptions;
+use sqlx::sqlite::SqliteConnectOptions;
+use sqlx::sqlite::SqlitePoolOptions;
 use thiserror::Error;
 
 pub mod models;
+
+pub type DbPool = sqlx::SqlitePool;
+pub type DbClient = welds_connections::sqlite::SqliteClient;
 
 /// Database error type.
 #[derive(Debug, Error)]
@@ -21,26 +26,30 @@ pub enum DbError {
 	Migration(String),
 }
 
-/// Create a PostgreSQL connection pool.
-pub async fn create_pool(database_url: &str) -> Result<sqlx::PgPool, DbError> {
-	PgPoolOptions::new()
-		.max_connections(10)
-		.connect(database_url)
+/// Create a SQLite connection pool.
+pub async fn create_pool(database_url: &str) -> Result<DbPool, DbError> {
+	let options = database_url
+		.parse::<SqliteConnectOptions>()
+		.map_err(|error| DbError::Connection(error.to_string()))?
+		.create_if_missing(true)
+		.foreign_keys(true)
+		.journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
+		.busy_timeout(std::time::Duration::from_secs(5));
+
+	SqlitePoolOptions::new()
+		.max_connections(5)
+		.connect_with(options)
 		.await
-		.map_err(|e| DbError::Connection(e.to_string()))
+		.map_err(|error| DbError::Connection(error.to_string()))
 }
 
 /// Get a Welds client from the pool for ORM operations.
-pub async fn get_client(
-	pool: &sqlx::PgPool,
-) -> Result<welds_connections::postgres::PostgresClient, DbError> {
-	Ok(welds_connections::postgres::PostgresClient::from(
-		pool.clone(),
-	))
+pub async fn get_client(pool: &DbPool) -> Result<DbClient, DbError> {
+	Ok(welds_connections::sqlite::SqliteClient::from(pool.clone()))
 }
 
 /// Run database migrations.
-pub async fn run_migrations(pool: &sqlx::PgPool) -> Result<(), DbError> {
+pub async fn run_migrations(pool: &DbPool) -> Result<(), DbError> {
 	let client = get_client(pool).await?;
 
 	let migrations: &[welds::migrations::MigrationFn] =
@@ -48,7 +57,7 @@ pub async fn run_migrations(pool: &sqlx::PgPool) -> Result<(), DbError> {
 
 	welds::migrations::up(&client, migrations)
 		.await
-		.map_err(|e| DbError::Migration(e.to_string()))?;
+		.map_err(|error| DbError::Migration(error.to_string()))?;
 
 	Ok(())
 }
@@ -73,8 +82,8 @@ fn create_release_automation_tables(
 	))
 }
 
-struct CreateUsersTable;
-struct CreateReleaseAutomationTables;
+pub(crate) struct CreateUsersTable;
+pub(crate) struct CreateReleaseAutomationTables;
 
 fn sql_statements(sql: &str) -> Vec<String> {
 	sql.split(';')
@@ -89,55 +98,58 @@ impl welds::migrations::MigrationWriter for CreateUsersTable {
 		sql_statements(
 			r#"
             CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                github_id BIGINT NOT NULL UNIQUE,
-                github_login VARCHAR(255) NOT NULL,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                github_id INTEGER NOT NULL UNIQUE,
+                github_login TEXT NOT NULL,
                 github_avatar_url TEXT,
                 github_access_token TEXT NOT NULL,
-                email VARCHAR(255),
-                plan_tier VARCHAR(50) NOT NULL DEFAULT 'free',
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                email TEXT,
+                plan_tier TEXT NOT NULL DEFAULT 'free',
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
             );
 
             CREATE TABLE IF NOT EXISTS organizations (
-                id SERIAL PRIMARY KEY,
-                github_id BIGINT NOT NULL UNIQUE,
-                github_login VARCHAR(255) NOT NULL,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                github_id INTEGER NOT NULL UNIQUE,
+                github_login TEXT NOT NULL,
                 github_avatar_url TEXT,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
             );
 
             CREATE TABLE IF NOT EXISTS organization_members (
-                id SERIAL PRIMARY KEY,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-                role VARCHAR(50) NOT NULL DEFAULT 'member',
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                role TEXT NOT NULL DEFAULT 'member',
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                 UNIQUE(user_id, org_id)
             );
 
             CREATE TABLE IF NOT EXISTS installations (
-                id SERIAL PRIMARY KEY,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                github_installation_id BIGINT NOT NULL UNIQUE,
-                github_account_login VARCHAR(255) NOT NULL,
-                github_account_type VARCHAR(50) NOT NULL,
-                target_type VARCHAR(50) NOT NULL DEFAULT 'selected',
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                github_installation_id INTEGER NOT NULL UNIQUE,
+                github_account_login TEXT NOT NULL,
+                github_account_type TEXT NOT NULL,
+                target_type TEXT NOT NULL DEFAULT 'selected',
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
             );
 
             CREATE TABLE IF NOT EXISTS repositories (
-                id SERIAL PRIMARY KEY,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 installation_id INTEGER NOT NULL REFERENCES installations(id) ON DELETE CASCADE,
-                github_repo_id BIGINT NOT NULL UNIQUE,
-                github_full_name VARCHAR(512) NOT NULL,
-                github_private BOOLEAN NOT NULL DEFAULT false,
+                github_repo_id INTEGER NOT NULL UNIQUE,
+                github_full_name TEXT NOT NULL,
+                github_private INTEGER NOT NULL DEFAULT 0,
                 monochange_config_hash TEXT,
-                settings_json JSONB,
-                plan_tier VARCHAR(50) NOT NULL DEFAULT 'free',
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                settings_json TEXT,
+                plan_tier TEXT NOT NULL DEFAULT 'free',
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
             );
 
             CREATE INDEX IF NOT EXISTS idx_repos_installation ON repositories(installation_id);
@@ -150,51 +162,52 @@ impl welds::migrations::MigrationWriter for CreateUsersTable {
 	fn down_sql(&self, _syntax: welds::Syntax) -> Vec<String> {
 		sql_statements(
 			r#"
-            DROP TABLE IF EXISTS repositories CASCADE;
-            DROP TABLE IF EXISTS installations CASCADE;
-            DROP TABLE IF EXISTS organization_members CASCADE;
-            DROP TABLE IF EXISTS organizations CASCADE;
-            DROP TABLE IF EXISTS users CASCADE;
+            DROP TABLE IF EXISTS repositories;
+            DROP TABLE IF EXISTS installations;
+            DROP TABLE IF EXISTS organization_members;
+            DROP TABLE IF EXISTS organizations;
+            DROP TABLE IF EXISTS users;
         "#,
 		)
 	}
 }
+
 impl welds::migrations::MigrationWriter for CreateReleaseAutomationTables {
 	fn up_sql(&self, _syntax: welds::Syntax) -> Vec<String> {
 		sql_statements(
 			r#"
             CREATE TABLE IF NOT EXISTS release_schedules (
-                id SERIAL PRIMARY KEY,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 repository_id INTEGER NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
-                enabled BOOLEAN NOT NULL DEFAULT true,
+                enabled INTEGER NOT NULL DEFAULT 1,
                 cadence_json TEXT NOT NULL,
-                next_run_at TIMESTAMPTZ NOT NULL,
+                next_run_at TEXT NOT NULL,
                 window_batch_index INTEGER NOT NULL DEFAULT 0,
-                last_enqueued_at TIMESTAMPTZ,
-                base_ref VARCHAR(255) NOT NULL DEFAULT 'main',
+                last_enqueued_at TEXT,
+                base_ref TEXT NOT NULL DEFAULT 'main',
                 requested_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
             );
 
             CREATE TABLE IF NOT EXISTS release_jobs (
-                id VARCHAR(36) PRIMARY KEY,
+                id TEXT PRIMARY KEY,
                 schedule_id INTEGER NOT NULL REFERENCES release_schedules(id) ON DELETE CASCADE,
                 repository_id INTEGER NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
-                kind VARCHAR(64) NOT NULL,
-                status VARCHAR(32) NOT NULL,
-                run_after TIMESTAMPTZ NOT NULL,
-                scheduled_for TIMESTAMPTZ NOT NULL,
+                kind TEXT NOT NULL,
+                status TEXT NOT NULL,
+                run_after TEXT NOT NULL,
+                scheduled_for TEXT NOT NULL,
                 attempts INTEGER NOT NULL DEFAULT 0,
                 max_attempts INTEGER NOT NULL DEFAULT 5,
-                locked_by VARCHAR(255),
-                locked_until TIMESTAMPTZ,
-                idempotency_key VARCHAR(255) NOT NULL UNIQUE,
+                locked_by TEXT,
+                locked_until TEXT,
+                idempotency_key TEXT NOT NULL UNIQUE,
                 payload_json TEXT NOT NULL,
                 result_json TEXT,
                 last_error TEXT,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
             );
 
             CREATE INDEX IF NOT EXISTS idx_release_schedules_due ON release_schedules(enabled, next_run_at);
@@ -208,8 +221,8 @@ impl welds::migrations::MigrationWriter for CreateReleaseAutomationTables {
 	fn down_sql(&self, _syntax: welds::Syntax) -> Vec<String> {
 		sql_statements(
 			r#"
-            DROP TABLE IF EXISTS release_jobs CASCADE;
-            DROP TABLE IF EXISTS release_schedules CASCADE;
+            DROP TABLE IF EXISTS release_jobs;
+            DROP TABLE IF EXISTS release_schedules;
         "#,
 		)
 	}

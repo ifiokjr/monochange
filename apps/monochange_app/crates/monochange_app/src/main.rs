@@ -1,20 +1,21 @@
 //! monochange_app server binary.
 //!
 //! Starts an axum HTTP server with Leptos SSR integration,
-//! PostgreSQL connection pool, and JWT session management.
+//! SQLite connection pool, and JWT session management.
 //!
 //! ## Secret management
 //!
-//! Secrets are declared in `secretspec.toml` and loaded via the
-//! `secretspec run` CLI wrapper, which sets them as environment
-//! variables before starting the server.
+//! Secrets are declared in `secretspec.toml` and loaded in-process via
+//! the SecretSpec Rust SDK. Production uses the OnePassword provider;
+//! Docker injects only the 1Password service account token as a Docker
+//! secret.
 //!
 //! ```bash
 //! # Development (uses keyring provider with local defaults)
 //! secretspec run --profile development -- cargo leptos watch
 //!
-//! # Production (uses 1Password or other provider)
-//! secretspec run --profile production -- cargo leptos serve
+//! # Production (uses the SecretSpec SDK and 1Password provider)
+//! SECRETSPEC_PROFILE=production SECRETSPEC_PROVIDER=onepassword://monochange ./monochange_app
 //!
 //! # CI (uses environment variables)
 //! secretspec run --profile ci --provider env -- cargo leptos build
@@ -64,14 +65,16 @@ async fn main() -> Result<(), MonochangeError> {
 		)
 		.init();
 
-	// Secrets are loaded by `secretspec run` and exposed as env vars.
-	// In development, `secretspec.toml` has local defaults for DATABASE_URL and JWT_SECRET.
-	let database_url = std::env::var("DATABASE_URL")
-		.unwrap_or_else(|_| "postgresql://postgres:postgres@localhost:5432/monochange".to_string());
-	let jwt_secret = std::env::var("JWT_SECRET")
-		.unwrap_or_else(|_| "dev-secret-change-in-production".to_string());
-	let github_client_id = std::env::var("GITHUB_CLIENT_ID").unwrap_or_default();
-	let github_client_secret = std::env::var("GITHUB_CLIENT_SECRET").unwrap_or_default();
+	// Load typed application secrets through the SecretSpec SDK.
+	// In production, SECRETSPEC_PROVIDER points at OnePassword and the
+	// Docker entrypoint exposes OP_SERVICE_ACCOUNT_TOKEN from a Docker secret.
+	let resolved_secrets = monochange_app_api::load_app_secrets()
+		.map_err(|error| MonochangeError::Server(error.to_string()))?;
+	let secrets = resolved_secrets.secrets;
+	let database_url = secrets.database_url.clone().unwrap_or_else(|| {
+		std::env::var("DATABASE_URL")
+			.unwrap_or_else(|_| "sqlite://./monochange_app.sqlite3".to_string())
+	});
 
 	// Create database connection pool
 	info!("Connecting to database...");
@@ -88,18 +91,11 @@ async fn main() -> Result<(), MonochangeError> {
 
 	let automation_config = monochange_app_automation::AutomationRuntimeConfig::from_env()
 		.map_err(|error| MonochangeError::Server(error.to_string()))?;
-	let _automation_worker = monochange_app_automation::spawn_postgres_automation_worker(
-		pool.clone(),
-		automation_config,
-	);
+	let _automation_worker: Option<tokio::task::JoinHandle<()>> =
+		monochange_app_automation::spawn_sqlite_automation_worker(pool.clone(), automation_config);
 
 	// Create application state
-	let app_state = Arc::new(AppState::new(
-		pool,
-		jwt_secret,
-		github_client_id,
-		github_client_secret,
-	));
+	let app_state = Arc::new(AppState::new(pool, secrets));
 
 	// Leptos configuration
 	let conf = get_configuration(None).map_err(|e| MonochangeError::Server(e.to_string()))?;

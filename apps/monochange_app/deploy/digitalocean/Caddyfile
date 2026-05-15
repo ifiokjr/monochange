@@ -1,0 +1,3 @@
+{$MONOCHANGE_APP_DOMAIN} {
+	reverse_proxy app:3000
+}

@@ -1,4 +1,4 @@
-//! PostgreSQL adapter for the durable release job store.
+//! SQLite adapter for the durable release job store.
 
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -6,7 +6,7 @@ use chrono::Duration;
 use chrono::Utc;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use crate::AutomationError;
@@ -19,38 +19,24 @@ use crate::ReleaseJobStore;
 use crate::ReleaseRepository;
 use crate::ReleaseSchedule;
 
-/// PostgreSQL implementation of [`ReleaseJobStore`].
+/// SQLite implementation of [`ReleaseJobStore`].
 #[derive(Debug, Clone)]
-pub struct PostgresReleaseJobStore {
-	pool: PgPool,
-	schema: String,
+pub struct SqliteReleaseJobStore {
+	pool: SqlitePool,
 }
 
-impl PostgresReleaseJobStore {
-	/// Create a store using the `public` schema.
-	pub fn new(pool: PgPool) -> Self {
-		Self {
-			pool,
-			schema: "public".to_string(),
-		}
+impl SqliteReleaseJobStore {
+	pub fn new(pool: SqlitePool) -> Self {
+		Self { pool }
 	}
 
-	/// Create a store using a specific schema.
-	///
-	/// This is primarily useful for isolated integration tests.
-	pub fn with_schema(pool: PgPool, schema: impl Into<String>) -> Result<Self, AutomationError> {
-		let schema = schema.into();
-		validate_identifier(&schema)?;
-		Ok(Self { pool, schema })
-	}
-
-	fn table(&self, name: &str) -> String {
-		format!("{}.{}", self.schema, name)
+	fn table<'a>(&self, name: &'a str) -> &'a str {
+		name
 	}
 }
 
 #[async_trait]
-impl ReleaseJobStore for PostgresReleaseJobStore {
+impl ReleaseJobStore for SqliteReleaseJobStore {
 	async fn enqueue_due_schedules(&self, now: DateTime<Utc>) -> Result<usize, AutomationError> {
 		let mut tx = self.pool.begin().await.map_err(store_error)?;
 		let schedules = sqlx::query_as::<_, ScheduleRow>(&format!(
@@ -60,9 +46,8 @@ impl ReleaseJobStore for PostgresReleaseJobStore {
 			 FROM {} s \
 			 JOIN {} r ON r.id = s.repository_id \
 			 JOIN {} i ON i.id = r.installation_id \
-			 WHERE s.enabled = TRUE AND s.next_run_at <= $1 \
-			 ORDER BY s.next_run_at, s.id \
-			 FOR UPDATE SKIP LOCKED",
+			 WHERE s.enabled = 1 AND s.next_run_at <= $1 \
+			 ORDER BY s.next_run_at, s.id",
 			self.table("release_schedules"),
 			self.table("repositories"),
 			self.table("installations"),
@@ -119,8 +104,7 @@ impl ReleaseJobStore for PostgresReleaseJobStore {
 			 WHERE (((status = $1 OR status = $2) AND run_after <= $3) \
 			 OR (status = $4 AND locked_until IS NOT NULL AND locked_until <= $3)) \
 			 ORDER BY run_after, id \
-			 LIMIT 1 \
-			 FOR UPDATE SKIP LOCKED",
+			 LIMIT 1",
 			self.table("release_jobs"),
 		))
 		.bind(queued)
@@ -223,7 +207,7 @@ impl ReleaseJobStore for PostgresReleaseJobStore {
 }
 
 async fn insert_job(
-	tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+	tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
 	table: &str,
 	job: &ReleaseJob,
 ) -> Result<bool, AutomationError> {
@@ -338,20 +322,6 @@ impl JobRow {
 	}
 }
 
-fn validate_identifier(identifier: &str) -> Result<(), AutomationError> {
-	let valid = !identifier.is_empty()
-		&& identifier
-			.chars()
-			.all(|ch| ch == '_' || ch.is_ascii_alphanumeric());
-	if valid {
-		Ok(())
-	} else {
-		Err(AutomationError::store(format!(
-			"invalid postgres identifier {identifier:?}",
-		)))
-	}
-}
-
 fn to_json<T>(value: &T) -> Result<String, AutomationError>
 where
 	T: Serialize,
@@ -385,220 +355,4 @@ where
 
 fn store_error(error: impl std::fmt::Display) -> AutomationError {
 	AutomationError::store(error.to_string())
-}
-
-#[cfg(test)]
-mod tests {
-	use chrono::TimeZone;
-	use sqlx::Row;
-	use sqlx::postgres::PgPoolOptions;
-
-	use super::*;
-	use crate::DurationMinutes;
-	use crate::ReleaseCadence;
-
-	#[tokio::test]
-	async fn postgres_store_runs_durable_job_lifecycle() -> Result<(), Box<dyn std::error::Error>> {
-		if std::env::var("MONOCHANGE_APP_RUN_DB_TESTS").as_deref() != Ok("1") {
-			eprintln!("skipping postgres store test; set MONOCHANGE_APP_RUN_DB_TESTS=1");
-			return Ok(());
-		}
-
-		let database_url = std::env::var("MONOCHANGE_APP_AUTOMATION_DATABASE_URL")
-			.or_else(|_| std::env::var("DATABASE_URL"))?;
-		let pool = PgPoolOptions::new()
-			.max_connections(2)
-			.connect(&database_url)
-			.await?;
-		let schema = format!("mc_auto_test_{}", Uuid::new_v4().simple());
-		let result = async {
-			create_test_schema(&pool, &schema).await?;
-			run_lifecycle_assertions(&pool, &schema).await
-		}
-		.await;
-		let cleanup = sqlx::query(&format!("DROP SCHEMA IF EXISTS {schema} CASCADE"))
-			.execute(&pool)
-			.await;
-		cleanup?;
-		result
-	}
-
-	async fn run_lifecycle_assertions(
-		pool: &PgPool,
-		schema: &str,
-	) -> Result<(), Box<dyn std::error::Error>> {
-		let now = Utc.with_ymd_and_hms(2026, 5, 7, 12, 0, 0).unwrap();
-		let repository_id = seed_repository(pool, schema).await?;
-		let cadence = ReleaseCadence::Interval {
-			every: DurationMinutes::new_unchecked(60),
-		};
-		let cadence_json = serde_json::to_string(&cadence)?;
-		sqlx::query(&format!(
-			"INSERT INTO {schema}.release_schedules \
-			 (repository_id, enabled, cadence_json, next_run_at, base_ref, requested_by_user_id) \
-			 VALUES ($1, TRUE, $2, $3, 'main', NULL)",
-		))
-		.bind(repository_id)
-		.bind(cadence_json)
-		.bind(now)
-		.execute(pool)
-		.await?;
-
-		let store = PostgresReleaseJobStore::with_schema(pool.clone(), schema)?;
-		assert_eq!(store.enqueue_due_schedules(now).await?, 1);
-		assert_eq!(store.enqueue_due_schedules(now).await?, 0);
-
-		let next_run_at: DateTime<Utc> = sqlx::query_scalar(&format!(
-			"SELECT next_run_at FROM {schema}.release_schedules LIMIT 1",
-		))
-		.fetch_one(pool)
-		.await?;
-		assert_eq!(next_run_at, now + Duration::hours(1));
-
-		let job = store
-			.claim_next_job("worker-a", now, Duration::minutes(15))
-			.await?
-			.expect("queued job should be claimable");
-		assert_eq!(job.status, JobStatus::Running);
-		assert_eq!(job.attempts, 1);
-		assert_eq!(job.locked_by.as_deref(), Some("worker-a"));
-		assert_eq!(job.payload.repository.full_name, "monochange/demo");
-
-		store
-			.mark_retryable(
-				job.id,
-				"temporary github outage".to_string(),
-				now + Duration::minutes(5),
-			)
-			.await?;
-		assert_eq!(job_status(pool, schema, job.id).await?, "retryable");
-
-		let retry_job = store
-			.claim_next_job(
-				"worker-a",
-				now + Duration::minutes(5),
-				Duration::minutes(15),
-			)
-			.await?
-			.expect("retryable job should become claimable");
-		assert_eq!(retry_job.attempts, 2);
-
-		store
-			.mark_succeeded(
-				retry_job.id,
-				JobResult {
-					summary: "workflow dispatched".to_string(),
-					external_id: Some("workflow-run-456".to_string()),
-					url: Some("https://github.com/monochange/demo/actions/runs/456".to_string()),
-				},
-			)
-			.await?;
-		assert_eq!(job_status(pool, schema, retry_job.id).await?, "succeeded");
-		Ok(())
-	}
-
-	async fn create_test_schema(pool: &PgPool, schema: &str) -> Result<(), sqlx::Error> {
-		sqlx::query(&format!("CREATE SCHEMA {schema}"))
-			.execute(pool)
-			.await?;
-		sqlx::raw_sql(&format!(
-			r#"
-            CREATE TABLE {schema}.users (
-                id SERIAL PRIMARY KEY,
-                github_id BIGINT NOT NULL UNIQUE,
-                github_login VARCHAR(255) NOT NULL,
-                github_access_token TEXT NOT NULL
-            );
-
-            CREATE TABLE {schema}.installations (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL REFERENCES {schema}.users(id) ON DELETE CASCADE,
-                github_installation_id BIGINT NOT NULL UNIQUE,
-                github_account_login VARCHAR(255) NOT NULL,
-                github_account_type VARCHAR(50) NOT NULL,
-                target_type VARCHAR(50) NOT NULL DEFAULT 'selected'
-            );
-
-            CREATE TABLE {schema}.repositories (
-                id SERIAL PRIMARY KEY,
-                installation_id INTEGER NOT NULL REFERENCES {schema}.installations(id) ON DELETE CASCADE,
-                github_repo_id BIGINT NOT NULL UNIQUE,
-                github_full_name VARCHAR(512) NOT NULL,
-                github_private BOOLEAN NOT NULL DEFAULT false
-            );
-
-            CREATE TABLE {schema}.release_schedules (
-                id SERIAL PRIMARY KEY,
-                repository_id INTEGER NOT NULL REFERENCES {schema}.repositories(id) ON DELETE CASCADE,
-                enabled BOOLEAN NOT NULL DEFAULT true,
-                cadence_json TEXT NOT NULL,
-                next_run_at TIMESTAMPTZ NOT NULL,
-                window_batch_index INTEGER NOT NULL DEFAULT 0,
-                last_enqueued_at TIMESTAMPTZ,
-                base_ref VARCHAR(255) NOT NULL DEFAULT 'main',
-                requested_by_user_id INTEGER REFERENCES {schema}.users(id) ON DELETE SET NULL,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            );
-
-            CREATE TABLE {schema}.release_jobs (
-                id VARCHAR(36) PRIMARY KEY,
-                schedule_id INTEGER NOT NULL REFERENCES {schema}.release_schedules(id) ON DELETE CASCADE,
-                repository_id INTEGER NOT NULL REFERENCES {schema}.repositories(id) ON DELETE CASCADE,
-                kind VARCHAR(64) NOT NULL,
-                status VARCHAR(32) NOT NULL,
-                run_after TIMESTAMPTZ NOT NULL,
-                scheduled_for TIMESTAMPTZ NOT NULL,
-                attempts INTEGER NOT NULL DEFAULT 0,
-                max_attempts INTEGER NOT NULL DEFAULT 5,
-                locked_by VARCHAR(255),
-                locked_until TIMESTAMPTZ,
-                idempotency_key VARCHAR(255) NOT NULL UNIQUE,
-                payload_json TEXT NOT NULL,
-                result_json TEXT,
-                last_error TEXT,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            );
-        "#,
-		))
-		.execute(pool)
-		.await?;
-		Ok(())
-	}
-
-	async fn seed_repository(pool: &PgPool, schema: &str) -> Result<i32, sqlx::Error> {
-		let user_id: i32 = sqlx::query_scalar(&format!(
-			"INSERT INTO {schema}.users (github_id, github_login, github_access_token) \
-			 VALUES (1, 'octocat', 'oauth-token') RETURNING id",
-		))
-		.fetch_one(pool)
-		.await?;
-		let installation_id: i32 = sqlx::query_scalar(&format!(
-			"INSERT INTO {schema}.installations \
-			 (user_id, github_installation_id, github_account_login, github_account_type) \
-			 VALUES ($1, 99, 'monochange', 'Organization') RETURNING id",
-		))
-		.bind(user_id)
-		.fetch_one(pool)
-		.await?;
-		sqlx::query_scalar(&format!(
-			"INSERT INTO {schema}.repositories \
-			 (installation_id, github_repo_id, github_full_name, github_private) \
-			 VALUES ($1, 123, 'monochange/demo', false) RETURNING id",
-		))
-		.bind(installation_id)
-		.fetch_one(pool)
-		.await
-	}
-
-	async fn job_status(pool: &PgPool, schema: &str, job_id: Uuid) -> Result<String, sqlx::Error> {
-		sqlx::query(&format!(
-			"SELECT status FROM {schema}.release_jobs WHERE id = $1",
-		))
-		.bind(job_id.to_string())
-		.fetch_one(pool)
-		.await
-		.map(|row| row.get("status"))
-	}
 }

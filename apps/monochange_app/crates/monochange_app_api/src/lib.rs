@@ -9,6 +9,8 @@
 #[path = "__tests.rs"]
 mod tests;
 
+use std::sync::Arc;
+
 use axum::http::StatusCode;
 use chrono::Duration;
 use chrono::Utc;
@@ -20,6 +22,17 @@ use jsonwebtoken::decode;
 use jsonwebtoken::encode;
 use serde::Deserialize;
 use serde::Serialize;
+
+pub mod secrets {
+	secretspec_derive::declare_secrets!("../../secretspec.toml");
+}
+
+pub use secrets::SecretSpec as AppSecrets;
+
+/// Load application secrets through the SecretSpec SDK.
+pub fn load_app_secrets() -> Result<secretspec::Resolved<AppSecrets>, secretspec::SecretSpecError> {
+	secrets::SecretSpec::builder().load()
+}
 
 /// JWT claims stored in the session token.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,21 +88,22 @@ pub fn verify_token(secret: &str, token: &str) -> Result<Claims, StatusCode> {
 /// Application state shared across requests.
 #[derive(Clone)]
 pub struct AppState {
-	pub db: sqlx::PgPool,
+	pub db: monochange_app_db::DbPool,
+	pub secrets: Arc<AppSecrets>,
 	pub jwt_secret: String,
 	pub github_client_id: String,
 	pub github_client_secret: String,
 }
 
 impl AppState {
-	pub fn new(
-		db: sqlx::PgPool,
-		jwt_secret: String,
-		github_client_id: String,
-		github_client_secret: String,
-	) -> Self {
+	pub fn new(db: monochange_app_db::DbPool, secrets: AppSecrets) -> Self {
+		let jwt_secret = secrets.jwt_secret.clone().unwrap_or_default();
+		let github_client_id = secrets.github_client_id.clone().unwrap_or_default();
+		let github_client_secret = secrets.github_client_secret.clone().unwrap_or_default();
+
 		Self {
 			db,
+			secrets: Arc::new(secrets),
 			jwt_secret,
 			github_client_id,
 			github_client_secret,

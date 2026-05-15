@@ -2,7 +2,7 @@
 
 use std::time::Duration as StdDuration;
 
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 use tokio::task::JoinHandle;
 use tracing::error;
 use tracing::info;
@@ -10,8 +10,8 @@ use tracing::info;
 use crate::AutomationError;
 use crate::DryRunGitHubAutomationClient;
 use crate::DryRunReleasePlanner;
-use crate::PostgresReleaseJobStore;
 use crate::ReleaseWorker;
+use crate::SqliteReleaseJobStore;
 use crate::SystemClock;
 
 const AUTOMATION_ENV: &str = "MONOCHANGE_APP_AUTOMATION";
@@ -81,13 +81,13 @@ impl Default for AutomationRuntimeConfig {
 	}
 }
 
-/// Spawn the configured PostgreSQL-backed automation worker.
+/// Spawn the configured SQLite-backed automation worker.
 ///
 /// Returns `None` when automation is disabled. The current supported mode is
 /// dry-run so local app startup can exercise durable scheduling without GitHub
 /// credentials or repository writes.
-pub fn spawn_postgres_automation_worker(
-	pool: PgPool,
+pub fn spawn_sqlite_automation_worker(
+	pool: SqlitePool,
 	config: AutomationRuntimeConfig,
 ) -> Option<JoinHandle<()>> {
 	if !config.enabled {
@@ -100,7 +100,7 @@ pub fn spawn_postgres_automation_worker(
 	})
 }
 
-fn spawn_dry_run_worker(pool: PgPool, config: AutomationRuntimeConfig) -> JoinHandle<()> {
+fn spawn_dry_run_worker(pool: SqlitePool, config: AutomationRuntimeConfig) -> JoinHandle<()> {
 	tokio::spawn(async move {
 		info!(
 			worker_id = %config.worker_id,
@@ -109,7 +109,7 @@ fn spawn_dry_run_worker(pool: PgPool, config: AutomationRuntimeConfig) -> JoinHa
 		);
 
 		let worker = ReleaseWorker::new(
-			PostgresReleaseJobStore::new(pool),
+			SqliteReleaseJobStore::new(pool),
 			DryRunGitHubAutomationClient,
 			DryRunReleasePlanner,
 			SystemClock,

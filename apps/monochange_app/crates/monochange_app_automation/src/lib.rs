@@ -7,9 +7,9 @@
 pub mod cadence;
 pub mod dry_run;
 pub mod permissions;
-pub mod postgres_store;
 pub mod runtime;
 pub mod scheduler;
+pub mod sqlite_store;
 pub mod testing;
 
 #[cfg(test)]
@@ -25,10 +25,9 @@ pub use permissions::GitHubAppPermissions;
 pub use permissions::GitHubPermission;
 pub use permissions::PermissionLevel;
 pub use permissions::PermissionRequirement;
-pub use postgres_store::PostgresReleaseJobStore;
 pub use runtime::AutomationRuntimeConfig;
 pub use runtime::AutomationRuntimeMode;
-pub use runtime::spawn_postgres_automation_worker;
+pub use runtime::spawn_sqlite_automation_worker;
 pub use scheduler::AutomationError;
 pub use scheduler::AutomationErrorKind;
 pub use scheduler::Clock;
@@ -49,3 +48,4 @@ pub use scheduler::ReleaseSchedule;
 pub use scheduler::ReleaseWorker;
 pub use scheduler::SystemClock;
 pub use scheduler::WorkerTickOutcome;
+pub use sqlite_store::SqliteReleaseJobStore;

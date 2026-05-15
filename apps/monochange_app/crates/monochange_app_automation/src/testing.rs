@@ -1,4 +1,4 @@
-//! In-memory fakes for testing automation flows without GitHub, git, or Postgres.
+//! In-memory fakes for testing automation flows without GitHub, git, or SQLite.
 
 use std::collections::HashMap;
 use std::collections::VecDeque;

@@ -3,6 +3,7 @@
 #[cfg(test)]
 mod tests {
 	use rstest::rstest;
+	use welds::state::DbState;
 
 	use crate::models::*;
 
@@ -51,7 +52,7 @@ mod tests {
 	fn test_migration_writer_up_sql() {
 		use welds::migrations::MigrationWriter;
 		let writer = crate::CreateUsersTable;
-		let sql = writer.up_sql(welds::Syntax::Postgres);
+		let sql = writer.up_sql(welds::Syntax::Sqlite);
 		assert!(!sql.is_empty());
 		let combined = sql.join("\n");
 		assert!(combined.contains("CREATE TABLE IF NOT EXISTS users"));
@@ -65,7 +66,7 @@ mod tests {
 	fn test_migration_writer_down_sql() {
 		use welds::migrations::MigrationWriter;
 		let writer = crate::CreateUsersTable;
-		let sql = writer.down_sql(welds::Syntax::Postgres);
+		let sql = writer.down_sql(welds::Syntax::Sqlite);
 		let combined = sql.join("\n");
 		assert!(combined.contains("DROP TABLE IF EXISTS users"));
 		assert!(combined.contains("DROP TABLE IF EXISTS installations"));
@@ -76,18 +77,18 @@ mod tests {
 	fn test_release_automation_migration_writer_up_sql() {
 		use welds::migrations::MigrationWriter;
 		let writer = crate::CreateReleaseAutomationTables;
-		let sql = writer.up_sql(welds::Syntax::Postgres);
+		let sql = writer.up_sql(welds::Syntax::Sqlite);
 		let combined = sql.join("\n");
 		assert!(combined.contains("CREATE TABLE IF NOT EXISTS release_schedules"));
 		assert!(combined.contains("CREATE TABLE IF NOT EXISTS release_jobs"));
-		assert!(combined.contains("idempotency_key VARCHAR(255) NOT NULL UNIQUE"));
+		assert!(combined.contains("idempotency_key TEXT NOT NULL UNIQUE"));
 	}
 
 	#[rstest]
 	fn test_release_automation_migration_writer_down_sql() {
 		use welds::migrations::MigrationWriter;
 		let writer = crate::CreateReleaseAutomationTables;
-		let sql = writer.down_sql(welds::Syntax::Postgres);
+		let sql = writer.down_sql(welds::Syntax::Sqlite);
 		let combined = sql.join("\n");
 		assert!(combined.contains("DROP TABLE IF EXISTS release_jobs"));
 		assert!(combined.contains("DROP TABLE IF EXISTS release_schedules"));
@@ -98,10 +99,10 @@ mod tests {
 		use welds::migrations::MigrationWriter;
 
 		let statements = [
-			crate::CreateUsersTable.up_sql(welds::Syntax::Postgres),
-			crate::CreateUsersTable.down_sql(welds::Syntax::Postgres),
-			crate::CreateReleaseAutomationTables.up_sql(welds::Syntax::Postgres),
-			crate::CreateReleaseAutomationTables.down_sql(welds::Syntax::Postgres),
+			crate::CreateUsersTable.up_sql(welds::Syntax::Sqlite),
+			crate::CreateUsersTable.down_sql(welds::Syntax::Sqlite),
+			crate::CreateReleaseAutomationTables.up_sql(welds::Syntax::Sqlite),
+			crate::CreateReleaseAutomationTables.down_sql(welds::Syntax::Sqlite),
 		]
 		.concat();
 
@@ -125,13 +126,87 @@ mod tests {
 		let user_writer = crate::CreateUsersTable;
 		let automation_writer = crate::CreateReleaseAutomationTables;
 		let combined = [
-			user_writer.up_sql(welds::Syntax::Postgres),
-			automation_writer.up_sql(welds::Syntax::Postgres),
+			user_writer.up_sql(welds::Syntax::Sqlite),
+			automation_writer.up_sql(welds::Syntax::Sqlite),
 		]
 		.concat()
 		.join("\n");
 		assert!(combined.contains("CREATE INDEX IF NOT EXISTS"));
 		assert!(combined.contains("idx_release_jobs_due"));
+	}
+
+	// ── SQLite integration tests ──
+
+	#[tokio::test]
+	async fn sqlite_migrations_create_expected_timestamp_columns() {
+		let pool = crate::create_pool("sqlite::memory:")
+			.await
+			.unwrap_or_else(|error| panic!("create sqlite pool: {error}"));
+		crate::run_migrations(&pool)
+			.await
+			.unwrap_or_else(|error| panic!("run sqlite migrations: {error}"));
+
+		for table in [
+			"users",
+			"organizations",
+			"organization_members",
+			"installations",
+			"repositories",
+			"release_schedules",
+			"release_jobs",
+		] {
+			let columns: Vec<String> =
+				sqlx::query_scalar(&format!("SELECT name FROM pragma_table_info('{table}')"))
+					.fetch_all(&pool)
+					.await
+					.unwrap_or_else(|error| panic!("load columns for {table}: {error}"));
+			assert!(
+				columns.contains(&"created_at".to_string()),
+				"{table} should have created_at"
+			);
+			assert!(
+				columns.contains(&"updated_at".to_string()),
+				"{table} should have updated_at"
+			);
+		}
+	}
+
+	#[tokio::test]
+	async fn welds_timestamp_hooks_set_created_and_updated_at() {
+		let pool = crate::create_pool("sqlite::memory:")
+			.await
+			.unwrap_or_else(|error| panic!("create sqlite pool: {error}"));
+		crate::run_migrations(&pool)
+			.await
+			.unwrap_or_else(|error| panic!("run sqlite migrations: {error}"));
+		let client = crate::get_client(&pool)
+			.await
+			.unwrap_or_else(|error| panic!("create welds client: {error}"));
+
+		let stale =
+			chrono::DateTime::from_timestamp(0, 0).unwrap_or_else(|| panic!("valid timestamp"));
+		let mut user = DbState::new_uncreated(
+			User::builder()
+				.github_id(42)
+				.github_login("octocat")
+				.github_access_token("token")
+				.created_at(stale)
+				.updated_at(stale)
+				.build(),
+		);
+		user.save(&client)
+			.await
+			.unwrap_or_else(|error| panic!("save user: {error}"));
+		assert!(user.created_at > stale);
+		assert_eq!(user.created_at, user.updated_at);
+
+		let created_at = user.created_at;
+		user.github_login = "octocat-renamed".to_string();
+		user.save(&client)
+			.await
+			.unwrap_or_else(|error| panic!("update user: {error}"));
+		assert_eq!(user.created_at, created_at);
+		assert!(user.updated_at >= created_at);
 	}
 
 	// ── Error type tests ──

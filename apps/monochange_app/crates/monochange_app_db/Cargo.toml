@@ -15,6 +15,7 @@ serde_json = { workspace = true }
 sqlx = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+typed-builder = "0.23.2"
 uuid = { workspace = true }
 welds = { workspace = true }
 welds-connections = { workspace = true }
