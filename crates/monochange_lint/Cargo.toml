@@ -10,6 +10,7 @@ readme = "readme.md"
 repository = { workspace = true }
 rust-version = { workspace = true }
 description = "Ecosystem-agnostic manifest lint engine for monochange"
+keywords = ["lint", "manifest", "validation", "releases", "monorepo"]
 
 [dependencies]
 glob = { workspace = true, default-features = true }

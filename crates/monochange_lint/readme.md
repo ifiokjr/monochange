@@ -1,22 +1,44 @@
-# monochange_lint
+# `monochange_lint`
 
-Ecosystem-agnostic manifest lint engine for monochange.
+<br />
 
-## Purpose
+<!-- {=crateReadmeBadgeRow:"monochange_lint"} -->
 
-This crate runs lint suites contributed by ecosystem crates. It owns:
+[![Crates.io](https://img.shields.io/badge/crates.io-monochange**lint-orange?logo=rust)](https://crates.io/crates/monochange_lint) [![Docs.rs](https://img.shields.io/badge/docs.rs-monochange**lint-1f425f?logo=docs.rs)](https://docs.rs/monochange_lint/) [![CI](https://github.com/monochange/monochange/actions/workflows/ci.yml/badge.svg)](https://github.com/monochange/monochange/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/monochange/monochange/branch/main/graph/badge.svg?flag=monochange_lint)](https://codecov.io/gh/monochange/monochange?flag=monochange_lint) [![License](https://img.shields.io/badge/license-Unlicense-blue.svg)](https://opensource.org/license/unlicense)
 
-- lint suite registration
-- preset and rule discovery
-- workspace-wide lint execution
-- scoped `[lints]` configuration merging
+<!-- {/crateReadmeBadgeRow} -->
+
+<br />
+
+<!-- {=monochangeLintCrateDocs} -->
+
+`monochange_lint` runs ecosystem-agnostic manifest lint suites for `monochange`.
+
+Reach for this crate when you want to validate workspace manifests against configurable rules, discover preset and custom lint suites, or apply autofixes across packages.
+
+## Why use it?
+
+- centralize lint suite registration and execution in one engine
+- merge workspace-scoped and package-scoped `[lints]` configuration
+- run all registered suites in one pass instead of wiring each crate separately
+
+## Best for
+
+- enforcing manifest quality checks across multi-ecosystem monorepos
+- building custom lint suites that plug into the shared lint pipeline
+- applying autofixes for common manifest problems in CI
+
+## Public entry points
+
+- `lint_workspace(root, config)` runs all registered lint suites against the workspace
+- `discover_lint_suites()` lists available preset and custom suites
+- `apply_autofixes(root, diagnostics)` applies suggested fixes for reported diagnostics
+
+## Scope
+
+- lint suite registration and discovery
+- workspace-wide and scoped configuration merging
 - autofix application
+- ecosystem-agnostic rule dispatch
 
-It deliberately does **not** know how to parse Cargo, npm, Deno, or Dart manifests. That behavior now lives with the ecosystem crates themselves.
-
-## Related crates
-
-- `monochange_core::lint` — shared lint contracts and config types
-- `monochange_linting` — authoring macros and helpers
-- `monochange_cargo::lints` — Cargo manifest lint suite
-- `monochange_npm::lints` — npm-family manifest lint suite
+<!-- {/monochangeLintCrateDocs} -->
