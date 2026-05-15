@@ -48,8 +48,8 @@
 			],
 			"release": true,
 			"tag": true,
-			"tagName": "v0.2.9",
-			"version": "0.2.9",
+			"tagName": "v0.3.9",
+			"version": "0.3.9",
 			"versionFormat": "primary"
 		},
 		{
@@ -58,8 +58,8 @@
 			"members": [],
 			"release": false,
 			"tag": false,
-			"tagName": "monochange_schema/v0.2.9",
-			"version": "0.2.9",
+			"tagName": "monochange_schema/v0.3.9",
+			"version": "0.3.9",
 			"versionFormat": "namespaced"
 		}
 	],
@@ -67,13 +67,13 @@
 		"monochange",
 		"monochange_core"
 	],
-	"schemaVersion": "0.2",
+	"schemaVersion": "0.3",
 	"updatedChangelogs": [
 		"fixtures/changelog-9.md"
 	],
-	"version": "0.2.9",
+	"version": "0.3.9",
 	"versions": {
-		"main": "0.2.9",
-		"monochange_schema": "0.2.9"
+		"main": "0.3.9",
+		"monochange_schema": "0.3.9"
 	}
 }

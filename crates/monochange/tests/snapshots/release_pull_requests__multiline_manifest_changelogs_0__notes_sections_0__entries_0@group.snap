@@ -2,7 +2,5 @@
 source: crates/monochange/tests/release_pull_requests.rs
 expression: contents
 ---
-> [!NOTE]
-> *core*
-
 #### add feature
+_Packages:_ _core_

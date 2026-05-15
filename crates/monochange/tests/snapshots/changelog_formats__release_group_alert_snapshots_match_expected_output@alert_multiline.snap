@@ -11,12 +11,9 @@ This changelog is managed by [monochange](https://github.com/monochange/monochan
 ## 1.1.0 ([DATE])
 
 Grouped release for `sdk`.
-
-### Minor
-
-> [!NOTE]
-> *core*
+### 🚀 Feature
 
 #### explain grouped changelog formatting
+_Packages:_ _core_
 
 This release note needs more than one line.

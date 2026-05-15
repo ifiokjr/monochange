@@ -32,6 +32,7 @@
 //! ```rust
 //! use monochange_core::render_release_notes;
 //! use monochange_core::ChangelogFormat;
+//! use monochange_core::ChangelogStyle;
 //! use monochange_core::ReleaseNotesDocument;
 //! use monochange_core::ReleaseNotesSection;
 //!
@@ -45,7 +46,11 @@
 //!     }],
 //! };
 //!
-//! let rendered = render_release_notes(ChangelogFormat::KeepAChangelog, &notes);
+//! let rendered = render_release_notes(
+//!     ChangelogFormat::KeepAChangelog,
+//!     &notes,
+//!     &ChangelogStyle::default(),
+//! );
 //!
 //! assert!(rendered.contains("## 1.2.3"));
 //! assert!(rendered.contains("### Features"));
@@ -1195,6 +1200,216 @@ impl Default for ChangelogSectionThresholds {
 	}
 }
 
+/// How to format section headings in rendered changelogs.
+/// Note: Section headings are plain strings — include emoji directly in the `heading` field
+/// of `ChangelogSectionDef` if desired (e.g. `"🚀 Added"`, `"🐛 Fixed"`).
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum SectionSeparator {
+	/// Insert a blank line between sections.
+	#[default]
+	BlankLine,
+	/// Insert a thematic break (`---`) between sections.
+	ThematicBreak,
+	/// No separator between sections.
+	None,
+}
+
+/// How to render multi-package labels in changelog entries.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum PackageLabelStyle {
+	/// Render labels as emphasized package names.
+	Badge,
+	/// Render labels inline with the entry.
+	/// Single label: `- **my-pkg**: entry`
+	/// Multiple labels: `**_pkg-a_, _pkg-b_**: entry`
+	#[default]
+	Inline,
+	/// Omit package labels entirely.
+	Omit,
+}
+
+/// Where to place package labels relative to a changelog entry.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum PackageLabelPlacement {
+	/// Place package labels after the change heading/title and before the change body.
+	#[default]
+	AfterHeading,
+	/// Place package labels after the full rendered change.
+	AfterChange,
+}
+/// How to render metadata lines (owner, review link, etc.) in changelog entries.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum MetadataStyle {
+	/// Render metadata as block-quote lines: `> _Owner:_ @user`
+	Blockquote,
+	/// Render metadata as plain lines: `_Owner:_ @user`
+	#[default]
+	Plain,
+	/// Omit metadata entirely.
+	Omit,
+}
+
+/// How to render collapsed (low-priority) sections in changelogs.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum CollapsedSectionStyle {
+	/// Use HTML `<details>/<summary>` collapsible sections.
+	#[default]
+	Details,
+	/// Render as regular `### heading` sections with no collapse.
+	Plain,
+}
+
+/// Rendering style options for changelog output.
+///
+/// Controls visual formatting of changelogs: section separators, package labels,
+/// metadata lines, and collapsed section rendering. These are purely presentation
+/// concerns; data-level configuration (sections, types, thresholds) lives in
+/// `ChangelogSettings`.
+///
+/// A `ChangelogStyle::rules()` method produces a human-readable description of
+/// the active style, suitable for feeding to an AI agent when reformatting
+/// existing changelogs.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+#[derive(Default)]
+pub struct ChangelogStyle {
+	#[serde(default)]
+	pub section_separator: SectionSeparator,
+	#[serde(default)]
+	pub package_label_style: PackageLabelStyle,
+	#[serde(default)]
+	pub package_label_placement: PackageLabelPlacement,
+	#[serde(default)]
+	pub metadata_style: MetadataStyle,
+	#[serde(default)]
+	pub collapsed_section_style: CollapsedSectionStyle,
+}
+
+impl ChangelogStyle {
+	/// Return this style with release notes-specific overrides applied.
+	#[must_use]
+	pub fn with_release_notes_overrides(&self, overrides: &ReleaseNotesStyleOverrides) -> Self {
+		Self {
+			section_separator: overrides
+				.section_separator
+				.unwrap_or(self.section_separator),
+			package_label_style: overrides
+				.package_label_style
+				.unwrap_or(self.package_label_style),
+			package_label_placement: overrides
+				.package_label_placement
+				.unwrap_or(self.package_label_placement),
+			metadata_style: overrides.metadata_style.unwrap_or(self.metadata_style),
+			collapsed_section_style: overrides
+				.collapsed_section_style
+				.unwrap_or(self.collapsed_section_style),
+		}
+	}
+
+	/// Return a human-readable description of the active style rules.
+	///
+	/// The output is designed to be handed to an AI agent that rewrites
+	/// changelogs to match this style.
+	#[must_use]
+	pub fn rules(&self) -> String {
+		let separator_rule = match self.section_separator {
+			SectionSeparator::BlankLine => "Separate sections with a single blank line.",
+			SectionSeparator::ThematicBreak => "Separate sections with a thematic break (---).",
+			SectionSeparator::None => "Do not add any separator between sections.",
+		};
+		let label_rule = match self.package_label_style {
+			PackageLabelStyle::Badge => {
+				"When a change touches multiple packages, render package labels as emphasized package names."
+			}
+			PackageLabelStyle::Inline => {
+				"When a change touches multiple packages, render labels inline: **_pkg-a_, _pkg-b_**: entry. For a single package label: - **pkg**: entry."
+			}
+			PackageLabelStyle::Omit => "Omit package labels from changelog entries.",
+		};
+		let placement_rule = match self.package_label_placement {
+			PackageLabelPlacement::AfterHeading => {
+				"Place package labels after the change heading/title and before the change body."
+			}
+			PackageLabelPlacement::AfterChange => {
+				"Place package labels after the rendered change entry."
+			}
+		};
+		let metadata_rule = match self.metadata_style {
+			MetadataStyle::Blockquote => {
+				"Render metadata lines (owner, review link, commit links, issues) as block-quote lines prefixed with >."
+			}
+			MetadataStyle::Plain => {
+				"Render metadata lines (owner, review link, commit links, issues) as plain text — no block-quote prefix."
+			}
+			MetadataStyle::Omit => "Omit metadata lines entirely from changelog entries.",
+		};
+		let collapsed_rule = match self.collapsed_section_style {
+			CollapsedSectionStyle::Details => {
+				"Render collapsed (low-priority) sections inside HTML <details>/<summary> elements."
+			}
+			CollapsedSectionStyle::Plain => {
+				"Render collapsed sections as regular ### headings, no HTML collapse."
+			}
+		};
+		format!(
+			"Changelog style rules:\n\
+			 - {separator_rule}\n\
+			 - {label_rule}\n\
+			 - {placement_rule}\n\
+			 - {metadata_rule}\n\
+			 - {collapsed_rule}"
+		)
+	}
+
+	#[must_use]
+	pub fn is_default(&self) -> bool {
+		self == &Self::default()
+	}
+}
+
+/// Release notes-specific style overrides.
+///
+/// Any unset field inherits from the base `ChangelogStyle` configured under
+/// `[changelog.style]`.
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ReleaseNotesStyleOverrides {
+	pub section_separator: Option<SectionSeparator>,
+	pub package_label_style: Option<PackageLabelStyle>,
+	pub package_label_placement: Option<PackageLabelPlacement>,
+	pub metadata_style: Option<MetadataStyle>,
+	pub collapsed_section_style: Option<CollapsedSectionStyle>,
+}
+
+impl ReleaseNotesStyleOverrides {
+	#[must_use]
+	pub fn resolve(&self, style: &ChangelogStyle) -> ChangelogStyle {
+		style.with_release_notes_overrides(self)
+	}
+
+	#[must_use]
+	pub fn is_default(&self) -> bool {
+		self == &Self::default()
+	}
+}
+
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ChangelogType {
@@ -1224,6 +1439,10 @@ pub struct ChangelogSettings {
 	pub section_thresholds: ChangelogSectionThresholds,
 	#[serde(default)]
 	pub types: BTreeMap<String, ChangelogType>,
+	#[serde(default)]
+	pub style: ChangelogStyle,
+	#[serde(default)]
+	pub release_notes: ReleaseNotesStyleOverrides,
 }
 
 impl Default for ChangelogSettings {
@@ -1238,33 +1457,17 @@ impl ChangelogSettings {
 	pub fn defaults() -> Self {
 		let mut sections = BTreeMap::new();
 		sections.insert(
-			"major".to_string(),
-			ChangelogSectionDef {
-				heading: "Major".to_string(),
-				description: Some("Major version bumps".to_string()),
-				priority: 5,
-			},
-		);
-		sections.insert(
 			"breaking".to_string(),
 			ChangelogSectionDef {
-				heading: "Breaking Change".to_string(),
+				heading: "💥 Breaking Change".to_string(),
 				description: Some("API changes requiring migration".to_string()),
 				priority: 10,
 			},
 		);
 		sections.insert(
-			"minor".to_string(),
-			ChangelogSectionDef {
-				heading: "Minor".to_string(),
-				description: Some("Minor version bumps".to_string()),
-				priority: 15,
-			},
-		);
-		sections.insert(
 			"feat".to_string(),
 			ChangelogSectionDef {
-				heading: "Added".to_string(),
+				heading: "🚀 Feature".to_string(),
 				description: Some("New features added".to_string()),
 				priority: 20,
 			},
@@ -1272,7 +1475,7 @@ impl ChangelogSettings {
 		sections.insert(
 			"change".to_string(),
 			ChangelogSectionDef {
-				heading: "Changed".to_string(),
+				heading: "📝 Changed".to_string(),
 				description: Some("Changes to existing functionality".to_string()),
 				priority: 25,
 			},
@@ -1280,23 +1483,15 @@ impl ChangelogSettings {
 		sections.insert(
 			"fix".to_string(),
 			ChangelogSectionDef {
-				heading: "Fixed".to_string(),
+				heading: "🐛 Fixed".to_string(),
 				description: Some("Bug fixes".to_string()),
 				priority: 30,
 			},
 		);
 		sections.insert(
-			"patch".to_string(),
-			ChangelogSectionDef {
-				heading: "Patch".to_string(),
-				description: Some("Patch version bumps".to_string()),
-				priority: 35,
-			},
-		);
-		sections.insert(
 			"test".to_string(),
 			ChangelogSectionDef {
-				heading: "Testing".to_string(),
+				heading: "🧪 Testing".to_string(),
 				description: Some("Changes that only modify tests".to_string()),
 				priority: 40,
 			},
@@ -1304,7 +1499,7 @@ impl ChangelogSettings {
 		sections.insert(
 			"refactor".to_string(),
 			ChangelogSectionDef {
-				heading: "Refactor".to_string(),
+				heading: "🔨 Refactor".to_string(),
 				description: Some("Code refactoring without functional changes".to_string()),
 				priority: 40,
 			},
@@ -1312,7 +1507,7 @@ impl ChangelogSettings {
 		sections.insert(
 			"docs".to_string(),
 			ChangelogSectionDef {
-				heading: "Documentation".to_string(),
+				heading: "📖 Documentation".to_string(),
 				description: Some("Changes that only modify documentation".to_string()),
 				priority: 40,
 			},
@@ -1320,7 +1515,7 @@ impl ChangelogSettings {
 		sections.insert(
 			"security".to_string(),
 			ChangelogSectionDef {
-				heading: "Security".to_string(),
+				heading: "🔒 Security".to_string(),
 				description: Some("Security-related changes".to_string()),
 				priority: 40,
 			},
@@ -1328,7 +1523,7 @@ impl ChangelogSettings {
 		sections.insert(
 			"perf".to_string(),
 			ChangelogSectionDef {
-				heading: "Performance".to_string(),
+				heading: "⚡ Performance".to_string(),
 				description: Some("Performance improvements".to_string()),
 				priority: 40,
 			},
@@ -1336,7 +1531,7 @@ impl ChangelogSettings {
 		sections.insert(
 			"none".to_string(),
 			ChangelogSectionDef {
-				heading: "None".to_string(),
+				heading: "🔖 None".to_string(),
 				description: Some("No version bump".to_string()),
 				priority: 50,
 			},
@@ -1355,7 +1550,7 @@ impl ChangelogSettings {
 			"major".to_string(),
 			ChangelogType {
 				bump: BumpSeverity::Major,
-				section: "major".to_string(),
+				section: "breaking".to_string(),
 				description: Some("Major version bump".to_string()),
 			},
 		);
@@ -1371,7 +1566,7 @@ impl ChangelogSettings {
 			"minor".to_string(),
 			ChangelogType {
 				bump: BumpSeverity::Minor,
-				section: "minor".to_string(),
+				section: "feat".to_string(),
 				description: Some("Minor version bump".to_string()),
 			},
 		);
@@ -1395,7 +1590,7 @@ impl ChangelogSettings {
 			"patch".to_string(),
 			ChangelogType {
 				bump: BumpSeverity::Patch,
-				section: "patch".to_string(),
+				section: "fix".to_string(),
 				description: Some("Patch version bump".to_string()),
 			},
 		);
@@ -1450,6 +1645,8 @@ impl ChangelogSettings {
 			sections,
 			section_thresholds: ChangelogSectionThresholds::default(),
 			types,
+			style: ChangelogStyle::default(),
+			release_notes: ReleaseNotesStyleOverrides::default(),
 		}
 	}
 }
@@ -2898,14 +3095,21 @@ pub struct CliCommandDefinition {
 
 /// Render release notes in the selected changelog format.
 #[must_use]
-pub fn render_release_notes(format: ChangelogFormat, document: &ReleaseNotesDocument) -> String {
+pub fn render_release_notes(
+	format: ChangelogFormat,
+	document: &ReleaseNotesDocument,
+	style: &ChangelogStyle,
+) -> String {
 	match format {
-		ChangelogFormat::Monochange => render_monochange_release_notes(document),
-		ChangelogFormat::KeepAChangelog => render_keep_a_changelog_release_notes(document),
+		ChangelogFormat::Monochange => render_monochange_release_notes(document, style),
+		ChangelogFormat::KeepAChangelog => render_keep_a_changelog_release_notes(document, style),
 	}
 }
 
-fn render_monochange_release_notes(document: &ReleaseNotesDocument) -> String {
+fn render_monochange_release_notes(
+	document: &ReleaseNotesDocument,
+	style: &ChangelogStyle,
+) -> String {
 	let mut lines = vec![format!("## {}", document.title), String::new()];
 	for (index, paragraph) in document.summary.iter().enumerate() {
 		if index > 0 {
@@ -2913,15 +3117,26 @@ fn render_monochange_release_notes(document: &ReleaseNotesDocument) -> String {
 		}
 		lines.push(paragraph.clone());
 	}
+	let mut first_non_empty = true;
 	for section in &document.sections {
 		if section.entries.is_empty() {
 			continue;
 		}
-		if !lines.last().is_some_and(String::is_empty) {
-			lines.push(String::new());
+		if first_non_empty {
+			first_non_empty = false;
+		} else {
+			match style.section_separator {
+				SectionSeparator::BlankLine => lines.push(String::new()),
+				SectionSeparator::ThematicBreak => {
+					lines.push(String::new());
+					lines.push("---".to_string());
+					lines.push(String::new());
+				}
+				SectionSeparator::None => {}
+			}
 		}
 		if section.collapsed {
-			push_collapsed_release_note_section(&mut lines, section);
+			push_collapsed_release_note_section(&mut lines, section, style);
 			continue;
 		}
 		lines.push(format!("### {}", section.title));
@@ -2931,7 +3146,10 @@ fn render_monochange_release_notes(document: &ReleaseNotesDocument) -> String {
 	lines.join("\n")
 }
 
-fn render_keep_a_changelog_release_notes(document: &ReleaseNotesDocument) -> String {
+fn render_keep_a_changelog_release_notes(
+	document: &ReleaseNotesDocument,
+	style: &ChangelogStyle,
+) -> String {
 	let mut lines = vec![format!("## {}", document.title), String::new()];
 	for (index, paragraph) in document.summary.iter().enumerate() {
 		if index > 0 {
@@ -2939,15 +3157,26 @@ fn render_keep_a_changelog_release_notes(document: &ReleaseNotesDocument) -> Str
 		}
 		lines.push(paragraph.clone());
 	}
+	let mut first_non_empty = true;
 	for section in &document.sections {
 		if section.entries.is_empty() {
 			continue;
 		}
-		if !lines.last().is_some_and(String::is_empty) {
-			lines.push(String::new());
+		if first_non_empty {
+			first_non_empty = false;
+		} else {
+			match style.section_separator {
+				SectionSeparator::BlankLine => lines.push(String::new()),
+				SectionSeparator::ThematicBreak => {
+					lines.push(String::new());
+					lines.push("---".to_string());
+					lines.push(String::new());
+				}
+				SectionSeparator::None => {}
+			}
 		}
 		if section.collapsed {
-			push_collapsed_release_note_section(&mut lines, section);
+			push_collapsed_release_note_section(&mut lines, section, style);
 			continue;
 		}
 		lines.push(format!("### {}", section.title));
@@ -2957,15 +3186,28 @@ fn render_keep_a_changelog_release_notes(document: &ReleaseNotesDocument) -> Str
 	lines.join("\n")
 }
 
-fn push_collapsed_release_note_section(lines: &mut Vec<String>, section: &ReleaseNotesSection) {
-	lines.push("<details>".to_string());
-	lines.push(format!(
-		"<summary><strong>{}</strong></summary>",
-		section.title
-	));
-	lines.push(String::new());
-	push_release_note_entries(lines, &section.entries);
-	lines.push("</details>".to_string());
+fn push_collapsed_release_note_section(
+	lines: &mut Vec<String>,
+	section: &ReleaseNotesSection,
+	style: &ChangelogStyle,
+) {
+	match style.collapsed_section_style {
+		CollapsedSectionStyle::Details => {
+			lines.push("<details>".to_string());
+			lines.push(format!(
+				"<summary><strong>{}</strong></summary>",
+				section.title
+			));
+			lines.push(String::new());
+			push_release_note_entries(lines, &section.entries);
+			lines.push("</details>".to_string());
+		}
+		CollapsedSectionStyle::Plain => {
+			lines.push(format!("### {}", section.title));
+			lines.push(String::new());
+			push_release_note_entries(lines, &section.entries);
+		}
+	}
 }
 
 fn push_release_note_entries(lines: &mut Vec<String>, entries: &[String]) {

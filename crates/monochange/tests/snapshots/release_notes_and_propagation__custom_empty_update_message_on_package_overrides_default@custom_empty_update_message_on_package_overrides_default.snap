@@ -11,21 +11,16 @@ This changelog is managed by [monochange](https://github.com/monochange/monochan
 ## 1.1.0 ([DATE])
 
 Grouped release for `sdk`.
-
 ### Changed
-
-> [!NOTE]
-> *core*
 
 This entry appears in changelog via `group.sdk.changelog.text`
 
 ### Features
 - **core**: add core feature
-
-> [!NOTE]
-> *app*
+_Packages:_ _core_
 
 This entry appears in changelog via `group.sdk.changelog.text`
 
 ### Features
 - **app**: No changes were recorded for some group members; as a result, package changelogs were synchronized to version 1.1.0.
+_Packages:_ _app_

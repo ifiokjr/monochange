@@ -25,7 +25,10 @@ use monochange_core::HostedReviewRequestKind;
 use monochange_core::HostedReviewRequestRef;
 use monochange_core::HostingCapabilities;
 use monochange_core::HostingProviderKind;
+use monochange_core::MetadataStyle;
 use monochange_core::PackageDefinition;
+use monochange_core::PackageLabelPlacement;
+use monochange_core::PackageLabelStyle;
 use monochange_core::PackageRecord;
 use monochange_core::PackageType;
 use monochange_core::PlannedVersionGroup;
@@ -586,7 +589,8 @@ fn rendered_changeset_context_and_signal_mapping_cover_hosted_metadata() {
 		}),
 	};
 
-	let rendered = build_rendered_changeset_context(tempdir.path(), &changeset);
+	let rendered =
+		build_rendered_changeset_context(tempdir.path(), &changeset, MetadataStyle::Blockquote);
 	assert!(
 		rendered
 			.context
@@ -726,15 +730,79 @@ fn render_helpers_cover_actor_labels_links_sections_and_templates() {
 
 	let mut multi_label_change = sample_change("pkg-a", "pkg-a", ".changeset/a.md");
 	multi_label_change.package_labels = vec!["pkg-a".to_string(), "pkg-b".to_string()];
-	let block = format_group_labeled_entry(&multi_label_change, "#### Summary\n\nMore");
-	assert!(block.contains("> [!NOTE]"));
-	assert!(block.contains("*pkg-a*, *pkg-b*"));
+	let block = format_group_labeled_entry(
+		&multi_label_change,
+		"#### Summary\n\nMore",
+		PackageLabelStyle::Badge,
+		PackageLabelPlacement::AfterHeading,
+	);
+	assert!(block.contains("_Packages:_ *pkg-a*, *pkg-b*"));
+	assert_eq!(
+		format_group_labeled_entry(
+			&multi_label_change,
+			"#### Summary\n\nMore",
+			PackageLabelStyle::Badge,
+			PackageLabelPlacement::AfterChange
+		),
+		"#### Summary\n\nMore\n_Packages:_ *pkg-a*, *pkg-b*"
+	);
 
 	let mut single_label_change = sample_change("pkg-a", "pkg-a", ".changeset/a.md");
 	single_label_change.package_labels = vec!["pkg-a".to_string()];
 	assert_eq!(
-		format_group_labeled_entry(&single_label_change, "- Added release note support"),
+		format_group_labeled_entry(
+			&single_label_change,
+			"- Added release note support",
+			PackageLabelStyle::Inline,
+			PackageLabelPlacement::AfterHeading
+		),
 		"- **pkg-a**: Added release note support"
+	);
+	assert_eq!(
+		format_group_labeled_entry(
+			&single_label_change,
+			"- Added release note support",
+			PackageLabelStyle::Badge,
+			PackageLabelPlacement::AfterHeading
+		),
+		"- **pkg-a**: Added release note support"
+	);
+	assert_eq!(
+		format_group_labeled_entry(
+			&single_label_change,
+			"- Added release note support",
+			PackageLabelStyle::Omit,
+			PackageLabelPlacement::AfterHeading
+		),
+		"- Added release note support"
+	);
+	assert_eq!(
+		format_metadata_line(MetadataStyle::Blockquote, "Owner: @octocat"),
+		"> Owner: @octocat"
+	);
+	assert_eq!(
+		format_metadata_line(MetadataStyle::Plain, "Owner: @octocat"),
+		"Owner: @octocat"
+	);
+	assert_eq!(
+		format_metadata_line(MetadataStyle::Omit, "Owner: @octocat"),
+		""
+	);
+
+	let mut empty_summary_change = sample_change("pkg-a", "pkg-a", ".changeset/a.md");
+	empty_summary_change.summary.clear();
+	empty_summary_change.details = None;
+	empty_summary_change.context = None;
+	assert_eq!(
+		render_change_entry(
+			&empty_summary_change,
+			"pkg-a",
+			"1.2.3",
+			&[],
+			PackageLabelStyle::Inline,
+			PackageLabelPlacement::AfterHeading
+		),
+		"- "
 	);
 
 	let rendered = apply_change_template(
@@ -1484,7 +1552,11 @@ fn render_release_notes_document_includes_section_headings_in_markdown() {
 	assert_eq!(document.sections[1].title, "Bug Fixes");
 
 	// Now render to markdown and verify headings appear
-	let markdown = render_release_notes(monochange_core::ChangelogFormat::Monochange, &document);
+	let markdown = render_release_notes(
+		monochange_core::ChangelogFormat::Monochange,
+		&document,
+		&monochange_core::ChangelogStyle::default(),
+	);
 	assert!(
 		markdown.contains("### Features"),
 		"rendered markdown should include ### Features heading"
@@ -1544,8 +1616,11 @@ fn keep_a_changelog_format_always_includes_section_headings() {
 
 	let document = build_release_notes_document("sdk", "1.0.0", Vec::new(), &settings, &changes);
 
-	let markdown =
-		render_release_notes(monochange_core::ChangelogFormat::KeepAChangelog, &document);
+	let markdown = render_release_notes(
+		monochange_core::ChangelogFormat::KeepAChangelog,
+		&document,
+		&monochange_core::ChangelogStyle::default(),
+	);
 
 	// Keep-a-changelog always includes section headings, even for single section
 	assert!(
@@ -1571,7 +1646,11 @@ fn monochange_format_includes_heading_for_single_changed_section() {
 
 	let document = build_release_notes_document("sdk", "1.0.0", Vec::new(), &settings, &changes);
 
-	let markdown = render_release_notes(monochange_core::ChangelogFormat::Monochange, &document);
+	let markdown = render_release_notes(
+		monochange_core::ChangelogFormat::Monochange,
+		&document,
+		&monochange_core::ChangelogStyle::default(),
+	);
 
 	// Monochange format includes section headings even when the only section is
 	// the default `Changed` bucket.
@@ -1617,7 +1696,11 @@ fn monochange_format_includes_heading_for_custom_single_section() {
 
 	let document = build_release_notes_document("sdk", "1.0.0", Vec::new(), &settings, &changes);
 
-	let markdown = render_release_notes(monochange_core::ChangelogFormat::Monochange, &document);
+	let markdown = render_release_notes(
+		monochange_core::ChangelogFormat::Monochange,
+		&document,
+		&monochange_core::ChangelogStyle::default(),
+	);
 
 	// Single custom section with non-"Changed" title should include heading
 	assert!(

@@ -12,10 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## 1.1.0 ([DATE])
 
 Grouped release for `sdk`.
-
-### Minor
-
-> [!NOTE]
-> *core*
+### 🚀 Feature
 
 #### add keep a changelog support
+_Packages:_ _core_

@@ -5,10 +5,7 @@ expression: contents
 ## 1.1.0 ([DATE])
 
 Grouped release for `sdk`.
-
-### Minor
-
-> [!NOTE]
-> *core*
+### 🚀 Feature
 
 #### add release command
+_Packages:_ _core_

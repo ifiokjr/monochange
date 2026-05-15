@@ -80,6 +80,7 @@ Reach for this crate when you are building ecosystem adapters, release planners,
 ```rust
 use monochange_core::render_release_notes;
 use monochange_core::ChangelogFormat;
+use monochange_core::ChangelogStyle;
 use monochange_core::ReleaseNotesDocument;
 use monochange_core::ReleaseNotesSection;
 
@@ -93,7 +94,11 @@ let notes = ReleaseNotesDocument {
     }],
 };
 
-let rendered = render_release_notes(ChangelogFormat::KeepAChangelog, &notes);
+let rendered = render_release_notes(
+    ChangelogFormat::KeepAChangelog,
+    &notes,
+    &ChangelogStyle::default(),
+);
 
 assert!(rendered.contains("## 1.2.3"));
 assert!(rendered.contains("### Features"));

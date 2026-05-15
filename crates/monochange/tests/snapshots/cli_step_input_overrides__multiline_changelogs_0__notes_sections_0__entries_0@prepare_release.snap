@@ -2,7 +2,5 @@
 source: crates/monochange/tests/cli_step_input_overrides.rs
 expression: contents
 ---
-> [!NOTE]
-> *core*
-
 #### add core feature
+_Packages:_ _core_

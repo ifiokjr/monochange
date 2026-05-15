@@ -4,6 +4,6 @@ expression: contents
 ---
 ## core [1.0.1](https://codeberg.org/org/monochange/releases/tag/core/v1.0.1) ([DATE])
 
-### Patch
+### 🐛 Fixed
 
 #### add gitea fixture coverage
