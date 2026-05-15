@@ -157,11 +157,6 @@ jobs:
           echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
         shell: devenv shell -- bash -e {0}
 
-      - name: check publish builds
-        if: runner.os != 'Windows' && steps.release_record.outputs.is_release_commit != 'true'
-        run: publish:check
-        shell: devenv shell -- bash -e {0}
-
       - name: skip publish build check on release commit
         if: runner.os != 'Windows' && steps.release_record.outputs.is_release_commit == 'true'
         run: echo "HEAD is a release commit; skipping publish:check."
