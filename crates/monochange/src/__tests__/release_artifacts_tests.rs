@@ -1486,6 +1486,23 @@ fn build_hosted_commit_request_reports_bad_repository_and_file_read_errors() {
 }
 
 #[test]
+fn git_current_branch_reports_process_and_status_errors() {
+	let missing_root = PathBuf::from("/definitely/missing/monochange/git/root");
+	let error = match git_current_branch(&missing_root) {
+		Ok(branch) => panic!("expected missing root error, got {branch}"),
+		Err(error) => error.to_string(),
+	};
+	assert!(error.contains("failed to resolve current branch"));
+
+	let tmp = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let error = match git_current_branch(tmp.path()) {
+		Ok(branch) => panic!("expected non-git root error, got {branch}"),
+		Err(error) => error.to_string(),
+	};
+	assert_eq!(error, "config error: failed to resolve current branch");
+}
+
+#[test]
 fn build_hosted_commit_request_falls_back_to_current_branch() {
 	let tmp = tempdir().unwrap();
 	let root = tmp.path();
