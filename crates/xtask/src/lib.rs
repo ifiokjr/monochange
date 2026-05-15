@@ -10,6 +10,7 @@ use proptest::test_runner::Config;
 use proptest::test_runner::RngAlgorithm;
 use proptest::test_runner::TestRng;
 use proptest::test_runner::TestRunner;
+use serde_json::Map;
 use serde_json::Value;
 use serde_json::json;
 
@@ -156,13 +157,33 @@ struct GeneratedFile {
 const CURRENT_ARTIFACT_FIXTURE_COUNT: usize = 10;
 
 #[derive(Clone, Debug)]
-struct ArtifactVariant {
-	seed: u8,
-	owner: &'static str,
-	repo: &'static str,
-	package_count: usize,
-	dry_run: bool,
+struct ReleaseRecordVariant {
+	seed: u64,
+	provider_kind: String,
+	owner: String,
+	repo: String,
 	with_host: bool,
+	command: String,
+	release_target_count: usize,
+	version_format: String,
+	bump: Option<String>,
+	change_type: Option<String>,
+	with_caused_by: bool,
+	with_changeset_context: bool,
+	released_package_count: usize,
+	changed_file_count: usize,
+	with_changelogs: bool,
+	with_publications: bool,
+}
+
+#[derive(Clone, Debug)]
+struct ConfigVariant {
+	provider_kind: String,
+	owner: String,
+	repo: String,
+	with_host: bool,
+	ecosystem: String,
+	package_count: usize,
 }
 
 /// Core schema generation logic with configurable output directories.
@@ -308,42 +329,99 @@ fn artifact_files(
 	version_dir: &str,
 	schema_version: &str,
 ) -> Vec<GeneratedFile> {
-	let variants = current_artifact_variants();
+	let release_variants = current_release_record_variants();
+	let config_variants = current_config_variants();
 	let artifacts_version_dir = artifacts_dir.join(version_dir);
 	let mut files = Vec::with_capacity(CURRENT_ARTIFACT_FIXTURE_COUNT * 2);
-	for (index, variant) in variants.iter().enumerate() {
+	for (index, variant) in release_variants.iter().enumerate() {
 		let name = format!("{:02}.json", index + 1);
 		files.push(GeneratedFile {
 			path: artifacts_version_dir.join("release-record").join(&name),
 			contents: release_record_artifact_fixture(schema_version, index + 1, variant),
 		});
+	}
+	for (index, variant) in config_variants.iter().enumerate() {
+		let name = format!("{:02}.json", index + 1);
 		files.push(GeneratedFile {
-			path: artifacts_version_dir.join("monochange").join(name),
+			path: artifacts_version_dir.join("monochange").join(&name),
 			contents: config_artifact_fixture(index + 1, variant),
 		});
 	}
 	files
 }
 
-fn current_artifact_variants() -> Vec<ArtifactVariant> {
+fn current_release_record_variants() -> Vec<ReleaseRecordVariant> {
+	let snake_case_id = prop::collection::vec(prop::char::range('a', 'z'), 3..=12)
+		.prop_map(|chars| chars.into_iter().collect::<String>());
+	let snake_case_id2 = prop::collection::vec(prop::char::range('a', 'z'), 3..=12)
+		.prop_map(|chars| chars.into_iter().collect::<String>());
 	let strategy = (
-		0u8..=u8::MAX,
-		prop::sample::select(&["monochange", "aipi", "schema-lab", "release-tools"]),
-		prop::sample::select(&["monochange", "workspace", "release-kit", "schema-fixtures"]),
-		1usize..=3,
-		any::<bool>(),
-		any::<bool>(),
+		(
+			any::<u64>(),
+			prop::sample::select(&["github", "gitlab", "gitea", "forgejo"][..]),
+			snake_case_id,
+			snake_case_id2,
+			any::<bool>(),
+		),
+		(
+			prop::sample::select(
+				&[
+					"mc release --commit",
+					"mc release --dry-run",
+					"mc step:release",
+				][..],
+			),
+			1_usize..=3,
+			prop::sample::select(&["primary", "namespaced"][..]),
+			prop::option::of(prop::sample::select(
+				&["none", "patch", "minor", "major"][..],
+			)),
+			prop::option::of(prop::sample::select(
+				&["fix", "feature", "breaking", "refactor", "docs", "chore"][..],
+			)),
+		),
+		(
+			any::<bool>(),
+			any::<bool>(),
+			1_usize..=5,
+			1_usize..=5,
+			any::<bool>(),
+			any::<bool>(),
+		),
 	)
-		.prop_map(|(seed, owner, repo, package_count, dry_run, with_host)| {
-			ArtifactVariant {
-				seed,
-				owner,
-				repo,
-				package_count,
-				dry_run,
-				with_host,
-			}
-		});
+		.prop_map(
+			|(
+				(seed, provider_kind, owner, repo, with_host),
+				(command, release_target_count, version_format, bump, change_type),
+				(
+					with_caused_by,
+					with_changeset_context,
+					released_package_count,
+					changed_file_count,
+					with_changelogs,
+					with_publications,
+				),
+			)| {
+				ReleaseRecordVariant {
+					seed,
+					provider_kind: provider_kind.to_string(),
+					owner,
+					repo,
+					with_host,
+					command: command.to_string(),
+					release_target_count,
+					version_format: version_format.to_string(),
+					bump: bump.map(String::from),
+					change_type: change_type.map(String::from),
+					with_caused_by,
+					with_changeset_context,
+					released_package_count,
+					changed_file_count,
+					with_changelogs,
+					with_publications,
+				}
+			},
+		);
 	let mut runner = TestRunner::new_with_rng(
 		Config::default(),
 		TestRng::from_seed(RngAlgorithm::ChaCha, b"monochange-current-artifact-seed"),
@@ -353,7 +431,48 @@ fn current_artifact_variants() -> Vec<ArtifactVariant> {
 			strategy
 				.new_tree(&mut runner)
 				.unwrap_or_else(|error| {
-					panic!("generate current artifact fixture variant: {error}")
+					panic!("generate current release record artifact fixture variant: {error}")
+				})
+				.current()
+		})
+		.collect()
+}
+
+fn current_config_variants() -> Vec<ConfigVariant> {
+	let snake_case_id = prop::collection::vec(prop::char::range('a', 'z'), 3..=12)
+		.prop_map(|chars| chars.into_iter().collect::<String>());
+	let snake_case_id2 = prop::collection::vec(prop::char::range('a', 'z'), 3..=12)
+		.prop_map(|chars| chars.into_iter().collect::<String>());
+	let strategy = (
+		prop::sample::select(&["github", "gitlab", "gitea", "forgejo"][..]),
+		snake_case_id,
+		snake_case_id2,
+		any::<bool>(),
+		prop::sample::select(&["cargo", "npm", "deno", "dart", "flutter", "python", "go"][..]),
+		1_usize..=5,
+	)
+		.prop_map(
+			|(provider_kind, owner, repo, with_host, ecosystem, package_count)| {
+				ConfigVariant {
+					provider_kind: provider_kind.to_string(),
+					owner,
+					repo,
+					with_host,
+					ecosystem: ecosystem.to_string(),
+					package_count,
+				}
+			},
+		);
+	let mut runner = TestRunner::new_with_rng(
+		Config::default(),
+		TestRng::from_seed(RngAlgorithm::ChaCha, b"monochange-current-artifact-seed"),
+	);
+	(0..CURRENT_ARTIFACT_FIXTURE_COUNT)
+		.map(|_| {
+			strategy
+				.new_tree(&mut runner)
+				.unwrap_or_else(|error| {
+					panic!("generate current config artifact fixture variant: {error}")
 				})
 				.current()
 		})
@@ -363,128 +482,250 @@ fn current_artifact_variants() -> Vec<ArtifactVariant> {
 fn release_record_artifact_fixture(
 	version: &str,
 	fixture_index: usize,
-	variant: &ArtifactVariant,
+	variant: &ReleaseRecordVariant,
 ) -> String {
-	let mut value: Value = serde_json::from_str(
-		&monochange_schema::release_record::populated_artifact_json(version),
-	)
-	.unwrap_or_else(|error| panic!("parse release-record artifact fixture template: {error}"));
-	let release_version = format!("{version}.{fixture_index}");
-	let changed_file_name = format!("{fixture_index:02}.json");
-	let command = if variant.dry_run {
-		"mc release --dry-run"
-	} else {
-		"mc release --commit"
-	};
-	let packages = ["monochange", "monochange_core", "monochange_schema"];
-	let released_packages = packages
-		.iter()
-		.take(variant.package_count)
-		.copied()
-		.collect::<Vec<_>>();
-	let object = value
-		.as_object_mut()
-		.expect("release-record fixture object");
-	object.insert(
+	let mut root = Map::new();
+	root.insert("schemaVersion".to_string(), json!(version));
+	root.insert("kind".to_string(), json!("monochange.releaseRecord"));
+	root.insert(
 		"createdAt".to_string(),
 		json!(format!("2026-01-{fixture_index:02}T00:00:00Z")),
 	);
-	object.insert("command".to_string(), json!(command));
-	object.insert("version".to_string(), json!(release_version));
-	object.insert("releasedPackages".to_string(), json!(released_packages));
-	object.insert(
-		"changedFiles".to_string(),
-		json!([
-			"Cargo.toml",
-			"crates/monochange_schema/Cargo.toml",
-			format!(
-				"crates/monochange_schema/schemas/artifacts/current/release-record/{changed_file_name}"
-			),
-		]),
+	root.insert("command".to_string(), json!(&variant.command));
+
+	// release targets
+	let mut release_targets = Vec::new();
+	for i in 0..variant.release_target_count {
+		let mut target = Map::new();
+		let (id, kind): (String, &str) = if i == 0 {
+			("main".to_string(), "group")
+		} else {
+			(format!("{}_{}", variant.owner, i), "package")
+		};
+		target.insert("id".to_string(), json!(id));
+		target.insert("kind".to_string(), json!(kind));
+		let ver = format!("{version}.{fixture_index}");
+		target.insert("version".to_string(), json!(ver));
+		let vfmt = if i == 0 {
+			"primary"
+		} else {
+			&variant.version_format
+		};
+		target.insert("versionFormat".to_string(), json!(vfmt));
+		target.insert("tag".to_string(), json!(true));
+		target.insert("release".to_string(), json!(true));
+		let tag_name = if id == "main" {
+			format!("v{version}.{fixture_index}")
+		} else {
+			format!("{id}/v{version}.{fixture_index}")
+		};
+		target.insert("tagName".to_string(), json!(tag_name));
+		target.insert("members".to_string(), json!(Vec::<String>::new()));
+		release_targets.push(Value::Object(target));
+	}
+	root.insert("releaseTargets".to_string(), json!(release_targets));
+
+	// released packages
+	let released_packages: Vec<String> = (0..variant.released_package_count)
+		.map(|i| format!("{}_{}", variant.owner, i))
+		.collect();
+	root.insert("releasedPackages".to_string(), json!(released_packages));
+
+	// changed files
+	let changed_files: Vec<String> = (0..variant.changed_file_count)
+		.map(|i| format!("crates/{}_{}/src/lib.rs", variant.owner, i))
+		.collect();
+	root.insert("changedFiles".to_string(), json!(changed_files));
+
+	// provider — always present
+	{
+		let mut provider = Map::new();
+		provider.insert("kind".to_string(), json!(&variant.provider_kind));
+		provider.insert("owner".to_string(), json!(&variant.owner));
+		provider.insert("repo".to_string(), json!(&variant.repo));
+		if variant.with_host {
+			provider.insert(
+				"host".to_string(),
+				json!(format!("{}.example.com", variant.provider_kind)),
+			);
+		} else {
+			provider.insert("host".to_string(), Value::Null);
+		}
+		root.insert("provider".to_string(), Value::Object(provider));
+	}
+
+	// version (nullable)
+	root.insert(
+		"version".to_string(),
+		json!(format!("{version}.{fixture_index}")),
 	);
-	object.insert(
-		"updatedChangelogs".to_string(),
-		json!([format!("fixtures/changelog-{fixture_index}.md")]),
+
+	// versions object
+	let mut versions = Map::new();
+	versions.insert(
+		"main".to_string(),
+		json!(format!("{version}.{fixture_index}")),
 	);
-	object.insert(
-		"deletedChangesets".to_string(),
-		json!([format!(".changeset/schema-artifact-{fixture_index}.md")]),
-	);
-	if let Some(versions) = object.get_mut("versions").and_then(Value::as_object_mut) {
+	for i in 0..variant.released_package_count.min(3) {
 		versions.insert(
-			"main".to_string(),
-			json!(format!("{version}.{fixture_index}")),
-		);
-		versions.insert(
-			"monochange_schema".to_string(),
+			format!("{}_{}", variant.owner, i),
 			json!(format!("{version}.{fixture_index}")),
 		);
 	}
-	if let Some(targets) = object
-		.get_mut("releaseTargets")
-		.and_then(Value::as_array_mut)
-	{
-		for target in targets {
-			if let Some(target) = target.as_object_mut() {
-				target.insert(
+	root.insert("versions".to_string(), Value::Object(versions));
+
+	// changesets — targets is an array of PreparedChangesetTarget objects
+	let mut changeset = Map::new();
+	changeset.insert(
+		"path".to_string(),
+		json!(format!(".changeset/schema-artifact-{fixture_index}.md")),
+	);
+	changeset.insert(
+		"summary".to_string(),
+		json!(format!("Exercise schema artifact fixture {fixture_index}")),
+	);
+	changeset.insert(
+		"details".to_string(),
+		json!(format!(
+			"Generated from deterministic proptest seed {}.",
+			variant.seed
+		)),
+	);
+
+	// Build the changeset target entry
+	let mut cs_target = Map::new();
+	cs_target.insert("id".to_string(), json!(format!("{}_0", variant.owner)));
+	cs_target.insert("kind".to_string(), json!("package"));
+	cs_target.insert(
+		"origin".to_string(),
+		json!(format!(".changeset/schema-artifact-{fixture_index}.md")),
+	);
+	if let Some(ref bump) = variant.bump {
+		cs_target.insert("bump".to_string(), json!(bump));
+	}
+	if let Some(ref change_type) = variant.change_type {
+		cs_target.insert("changeType".to_string(), json!(change_type));
+	}
+	if variant.with_caused_by {
+		cs_target.insert(
+			"causedBy".to_string(),
+			json!([format!("{}-schema-compat", variant.owner)]),
+		);
+	}
+	cs_target.insert(
+		"evidenceRefs".to_string(),
+		json!([format!("crates/{}_0/src/lib.rs", variant.owner)]),
+	);
+
+	changeset.insert("targets".to_string(), json!([Value::Object(cs_target)]));
+
+	if variant.with_changeset_context {
+		let mut context = Map::new();
+		context.insert("provider".to_string(), json!(&variant.provider_kind));
+		context.insert(
+			"host".to_string(),
+			json!(format!("{}.example.com", variant.provider_kind)),
+		);
+		changeset.insert("context".to_string(), Value::Object(context));
+	}
+	root.insert("changesets".to_string(), json!([Value::Object(changeset)]));
+
+	// changelogs — ReleaseManifestChangelog objects
+	if variant.with_changelogs {
+		let mut changelog = Map::new();
+		changelog.insert("ownerId".to_string(), json!("main"));
+		changelog.insert("ownerKind".to_string(), json!("group"));
+		changelog.insert(
+			"path".to_string(),
+			json!(format!("fixtures/changelog-{fixture_index}.md")),
+		);
+		changelog.insert("format".to_string(), json!("monochange"));
+		let mut notes = Map::new();
+		notes.insert(
+			"title".to_string(),
+			json!(format!("v{version}.{fixture_index}")),
+		);
+		notes.insert(
+			"summary".to_string(),
+			json!([format!("Release {fixture_index}")]),
+		);
+		notes.insert("sections".to_string(), json!([{ "title": "Bug Fixes", "entries": [format!("fix: schema artifact {fixture_index}")], "collapsed": false }]));
+		changelog.insert("notes".to_string(), Value::Object(notes));
+		changelog.insert(
+			"rendered".to_string(),
+			json!(format!(
+				"## Bug Fixes\n- fix: schema artifact {fixture_index}"
+			)),
+		);
+		root.insert("changelogs".to_string(), json!([Value::Object(changelog)]));
+	} else {
+		root.insert("changelogs".to_string(), json!(Vec::<String>::new()));
+	}
+
+	// packagePublications
+	if variant.with_publications {
+		let publications: Vec<Value> = (0..variant.released_package_count)
+			.map(|i| {
+				let mut pub_entry = Map::new();
+				pub_entry.insert("ecosystem".to_string(), json!("cargo"));
+				pub_entry.insert(
+					"package".to_string(),
+					json!(format!("{}_{}", variant.owner, i)),
+				);
+				pub_entry.insert(
 					"version".to_string(),
 					json!(format!("{version}.{fixture_index}")),
 				);
-				if let Some(id) = target.get("id").and_then(Value::as_str) {
-					let tag_name = if id == "main" {
-						format!("v{version}.{fixture_index}")
-					} else {
-						format!("{id}/v{version}.{fixture_index}")
-					};
-					target.insert("tagName".to_string(), json!(tag_name));
-				}
-			}
-		}
-	}
-	if let Some(changesets) = object.get_mut("changesets").and_then(Value::as_array_mut)
-		&& let Some(changeset) = changesets.first_mut().and_then(Value::as_object_mut)
-	{
-		changeset.insert(
-			"path".to_string(),
-			json!(format!(".changeset/schema-artifact-{fixture_index}.md")),
-		);
-		changeset.insert(
-			"summary".to_string(),
-			json!(format!("Exercise schema artifact fixture {fixture_index}")),
-		);
-		changeset.insert(
-			"details".to_string(),
-			json!(format!(
-				"Generated from deterministic proptest seed {}.",
-				variant.seed
-			)),
+				Value::Object(pub_entry)
+			})
+			.collect();
+		root.insert("packagePublications".to_string(), json!(publications));
+	} else {
+		root.insert(
+			"packagePublications".to_string(),
+			json!(Vec::<String>::new()),
 		);
 	}
-	if let Some(provider) = object.get_mut("provider").and_then(Value::as_object_mut) {
-		provider.insert("owner".to_string(), json!(variant.owner));
-		provider.insert("repo".to_string(), json!(variant.repo));
-	}
-	serde_json::to_string_pretty(&value)
+
+	// deletedChangesets
+	root.insert(
+		"deletedChangesets".to_string(),
+		json!([format!(".changeset/schema-artifact-{fixture_index}.md")]),
+	);
+
+	// updatedChangelogs
+	root.insert(
+		"updatedChangelogs".to_string(),
+		json!([format!("fixtures/changelog-{fixture_index}.md")]),
+	);
+
+	serde_json::to_string_pretty(&Value::Object(root))
 		.unwrap_or_else(|error| panic!("serialize release-record artifact fixture: {error}"))
 }
 
-fn config_artifact_fixture(_fixture_index: usize, variant: &ArtifactVariant) -> String {
-	let mut source = serde_json::Map::new();
-	source.insert("provider".to_string(), json!("github"));
-	source.insert("owner".to_string(), json!(variant.owner));
-	source.insert("repo".to_string(), json!(variant.repo));
+fn config_artifact_fixture(_fixture_index: usize, variant: &ConfigVariant) -> String {
+	let mut source = Map::new();
+	source.insert("provider".to_string(), json!(&variant.provider_kind));
+	source.insert("owner".to_string(), json!(&variant.owner));
+	source.insert("repo".to_string(), json!(&variant.repo));
 	if variant.with_host {
-		source.insert("host".to_string(), json!("github.com"));
+		source.insert(
+			"host".to_string(),
+			json!(format!("{}.example.com", variant.provider_kind)),
+		);
 	}
-	let mut defaults = serde_json::Map::new();
-	defaults.insert("package_type".to_string(), json!("cargo"));
-	let mut packages = serde_json::Map::new();
-	let package_names = ["monochange", "monochange_core", "monochange_schema"];
-	for pkg_name in package_names.iter().take(variant.package_count) {
-		let mut pkg = serde_json::Map::new();
+
+	let mut defaults = Map::new();
+	defaults.insert("package_type".to_string(), json!(&variant.ecosystem));
+
+	let mut packages = Map::new();
+	for i in 0..variant.package_count {
+		let pkg_name = format!("{}_{}", variant.owner, i);
+		let mut pkg = Map::new();
 		pkg.insert("path".to_string(), json!(format!("crates/{pkg_name}")));
-		packages.insert(pkg_name.to_string(), json!(pkg));
+		packages.insert(pkg_name, Value::Object(pkg));
 	}
+
 	serde_json::to_string_pretty(&json!({
 		"source": Value::Object(source),
 		"defaults": Value::Object(defaults),

@@ -1,18 +1,25 @@
 {
 	"defaults": {
-		"package_type": "cargo"
+		"package_type": "go"
 	},
 	"package": {
-		"monochange": {
-			"path": "crates/monochange"
+		"mzwxlqcha_0": {
+			"path": "crates/mzwxlqcha_0"
 		},
-		"monochange_core": {
-			"path": "crates/monochange_core"
+		"mzwxlqcha_1": {
+			"path": "crates/mzwxlqcha_1"
+		},
+		"mzwxlqcha_2": {
+			"path": "crates/mzwxlqcha_2"
+		},
+		"mzwxlqcha_3": {
+			"path": "crates/mzwxlqcha_3"
 		}
 	},
 	"source": {
-		"owner": "release-tools",
-		"provider": "github",
-		"repo": "monochange"
+		"host": "forgejo.example.com",
+		"owner": "mzwxlqcha",
+		"provider": "forgejo",
+		"repo": "wyduxhjrbw"
 	}
 }

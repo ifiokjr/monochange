@@ -1,22 +1,28 @@
 {
 	"defaults": {
-		"package_type": "cargo"
+		"package_type": "dart"
 	},
 	"package": {
-		"monochange": {
-			"path": "crates/monochange"
+		"wdvqshrxtrsr_0": {
+			"path": "crates/wdvqshrxtrsr_0"
 		},
-		"monochange_core": {
-			"path": "crates/monochange_core"
+		"wdvqshrxtrsr_1": {
+			"path": "crates/wdvqshrxtrsr_1"
 		},
-		"monochange_schema": {
-			"path": "crates/monochange_schema"
+		"wdvqshrxtrsr_2": {
+			"path": "crates/wdvqshrxtrsr_2"
+		},
+		"wdvqshrxtrsr_3": {
+			"path": "crates/wdvqshrxtrsr_3"
+		},
+		"wdvqshrxtrsr_4": {
+			"path": "crates/wdvqshrxtrsr_4"
 		}
 	},
 	"source": {
-		"host": "github.com",
-		"owner": "schema-lab",
-		"provider": "github",
-		"repo": "workspace"
+		"host": "gitea.example.com",
+		"owner": "wdvqshrxtrsr",
+		"provider": "gitea",
+		"repo": "ookn"
 	}
 }

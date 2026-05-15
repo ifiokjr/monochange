@@ -1,21 +1,18 @@
 {
 	"defaults": {
-		"package_type": "cargo"
+		"package_type": "dart"
 	},
 	"package": {
-		"monochange": {
-			"path": "crates/monochange"
+		"odell_0": {
+			"path": "crates/odell_0"
 		},
-		"monochange_core": {
-			"path": "crates/monochange_core"
-		},
-		"monochange_schema": {
-			"path": "crates/monochange_schema"
+		"odell_1": {
+			"path": "crates/odell_1"
 		}
 	},
 	"source": {
-		"owner": "schema-lab",
-		"provider": "github",
-		"repo": "schema-fixtures"
+		"owner": "odell",
+		"provider": "forgejo",
+		"repo": "jlmpjuthg"
 	}
 }

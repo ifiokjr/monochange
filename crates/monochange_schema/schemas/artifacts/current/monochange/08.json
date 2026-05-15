@@ -1,19 +1,25 @@
 {
 	"defaults": {
-		"package_type": "cargo"
+		"package_type": "go"
 	},
 	"package": {
-		"monochange": {
-			"path": "crates/monochange"
+		"lngscapy_0": {
+			"path": "crates/lngscapy_0"
 		},
-		"monochange_core": {
-			"path": "crates/monochange_core"
+		"lngscapy_1": {
+			"path": "crates/lngscapy_1"
+		},
+		"lngscapy_2": {
+			"path": "crates/lngscapy_2"
+		},
+		"lngscapy_3": {
+			"path": "crates/lngscapy_3"
 		}
 	},
 	"source": {
-		"host": "github.com",
-		"owner": "monochange",
+		"host": "github.example.com",
+		"owner": "lngscapy",
 		"provider": "github",
-		"repo": "monochange"
+		"repo": "xfphohp"
 	}
 }

@@ -1,19 +1,21 @@
 {
 	"defaults": {
-		"package_type": "cargo"
+		"package_type": "npm"
 	},
 	"package": {
-		"monochange": {
-			"path": "crates/monochange"
+		"buailzizye_0": {
+			"path": "crates/buailzizye_0"
 		},
-		"monochange_core": {
-			"path": "crates/monochange_core"
+		"buailzizye_1": {
+			"path": "crates/buailzizye_1"
+		},
+		"buailzizye_2": {
+			"path": "crates/buailzizye_2"
 		}
 	},
 	"source": {
-		"host": "github.com",
-		"owner": "release-tools",
-		"provider": "github",
-		"repo": "release-kit"
+		"owner": "buailzizye",
+		"provider": "gitlab",
+		"repo": "wsk"
 	}
 }

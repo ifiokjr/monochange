@@ -1,21 +1,24 @@
 {
 	"defaults": {
-		"package_type": "cargo"
+		"package_type": "deno"
 	},
 	"package": {
-		"monochange": {
-			"path": "crates/monochange"
+		"tct_0": {
+			"path": "crates/tct_0"
 		},
-		"monochange_core": {
-			"path": "crates/monochange_core"
+		"tct_1": {
+			"path": "crates/tct_1"
 		},
-		"monochange_schema": {
-			"path": "crates/monochange_schema"
+		"tct_2": {
+			"path": "crates/tct_2"
+		},
+		"tct_3": {
+			"path": "crates/tct_3"
 		}
 	},
 	"source": {
-		"owner": "monochange",
-		"provider": "github",
-		"repo": "schema-fixtures"
+		"owner": "tct",
+		"provider": "forgejo",
+		"repo": "teeyk"
 	}
 }

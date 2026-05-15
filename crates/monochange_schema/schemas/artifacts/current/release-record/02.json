@@ -1,79 +1,100 @@
 {
 	"changedFiles": [
-		"Cargo.toml",
-		"crates/monochange_schema/Cargo.toml",
-		"crates/monochange_schema/schemas/artifacts/current/release-record/02.json"
+		"crates/zuvuuep_0/src/lib.rs",
+		"crates/zuvuuep_1/src/lib.rs"
+	],
+	"changelogs": [
+		{
+			"format": "monochange",
+			"notes": {
+				"sections": [
+					{
+						"collapsed": false,
+						"entries": [
+							"fix: schema artifact 2"
+						],
+						"title": "Bug Fixes"
+					}
+				],
+				"summary": [
+					"Release 2"
+				],
+				"title": "v0.2.2"
+			},
+			"ownerId": "main",
+			"ownerKind": "group",
+			"path": "fixtures/changelog-2.md",
+			"rendered": "## Bug Fixes\n- fix: schema artifact 2"
+		}
 	],
 	"changesets": [
 		{
-			"details": "Generated from deterministic proptest seed 195.",
+			"details": "Generated from deterministic proptest seed 17460654867111333396.",
 			"path": ".changeset/schema-artifact-2.md",
 			"summary": "Exercise schema artifact fixture 2",
 			"targets": [
 				{
-					"bump": "major",
-					"causedBy": [
-						"release-record-schema-compat"
-					],
-					"changeType": "fix",
 					"evidenceRefs": [
-						"crates/monochange_schema/src/lib.rs"
+						"crates/zuvuuep_0/src/lib.rs"
 					],
-					"id": "monochange_schema",
+					"id": "zuvuuep_0",
 					"kind": "package",
-					"origin": "frontmatter"
+					"origin": ".changeset/schema-artifact-2.md"
 				}
 			]
 		}
 	],
-	"command": "mc release --commit",
+	"command": "mc step:release",
 	"createdAt": "2026-01-02T00:00:00Z",
 	"deletedChangesets": [
 		".changeset/schema-artifact-2.md"
 	],
 	"kind": "monochange.releaseRecord",
+	"packagePublications": [],
 	"provider": {
-		"host": "github.com",
-		"kind": "github",
-		"owner": "aipi",
-		"repo": "schema-fixtures"
+		"host": null,
+		"kind": "gitea",
+		"owner": "zuvuuep",
+		"repo": "ijkuqa"
 	},
 	"releaseTargets": [
 		{
 			"id": "main",
 			"kind": "group",
-			"members": [
-				"monochange",
-				"monochange_core"
-			],
+			"members": [],
 			"release": true,
 			"tag": true,
-			"tagName": "v0.3.2",
-			"version": "0.3.2",
+			"tagName": "v0.2.2",
+			"version": "0.2.2",
 			"versionFormat": "primary"
 		},
 		{
-			"id": "monochange_schema",
+			"id": "zuvuuep_1",
 			"kind": "package",
 			"members": [],
-			"release": false,
-			"tag": false,
-			"tagName": "monochange_schema/v0.3.2",
-			"version": "0.3.2",
-			"versionFormat": "namespaced"
+			"release": true,
+			"tag": true,
+			"tagName": "zuvuuep_1/v0.2.2",
+			"version": "0.2.2",
+			"versionFormat": "primary"
 		}
 	],
 	"releasedPackages": [
-		"monochange",
-		"monochange_core"
+		"zuvuuep_0",
+		"zuvuuep_1",
+		"zuvuuep_2",
+		"zuvuuep_3",
+		"zuvuuep_4"
 	],
-	"schemaVersion": "0.3",
+	"schemaVersion": "0.2",
 	"updatedChangelogs": [
 		"fixtures/changelog-2.md"
 	],
-	"version": "0.3.2",
+	"version": "0.2.2",
 	"versions": {
-		"main": "0.3.2",
-		"monochange_schema": "0.3.2"
+		"main": "0.2.2",
+		"zuvuuep_0": "0.2.2",
+		"zuvuuep_1": "0.2.2",
+		"zuvuuep_2": "0.2.2"
 	}
 }

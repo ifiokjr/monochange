@@ -1,79 +1,84 @@
 {
 	"changedFiles": [
-		"Cargo.toml",
-		"crates/monochange_schema/Cargo.toml",
-		"crates/monochange_schema/schemas/artifacts/current/release-record/08.json"
+		"crates/etvegios_0/src/lib.rs",
+		"crates/etvegios_1/src/lib.rs",
+		"crates/etvegios_2/src/lib.rs"
 	],
+	"changelogs": [],
 	"changesets": [
 		{
-			"details": "Generated from deterministic proptest seed 118.",
+			"details": "Generated from deterministic proptest seed 4223947513850232377.",
 			"path": ".changeset/schema-artifact-8.md",
 			"summary": "Exercise schema artifact fixture 8",
 			"targets": [
 				{
-					"bump": "major",
-					"causedBy": [
-						"release-record-schema-compat"
-					],
-					"changeType": "fix",
+					"bump": "patch",
+					"changeType": "refactor",
 					"evidenceRefs": [
-						"crates/monochange_schema/src/lib.rs"
+						"crates/etvegios_0/src/lib.rs"
 					],
-					"id": "monochange_schema",
+					"id": "etvegios_0",
 					"kind": "package",
-					"origin": "frontmatter"
+					"origin": ".changeset/schema-artifact-8.md"
 				}
 			]
 		}
 	],
-	"command": "mc release --dry-run",
+	"command": "mc release --commit",
 	"createdAt": "2026-01-08T00:00:00Z",
 	"deletedChangesets": [
 		".changeset/schema-artifact-8.md"
 	],
 	"kind": "monochange.releaseRecord",
+	"packagePublications": [
+		{
+			"ecosystem": "cargo",
+			"package": "etvegios_0",
+			"version": "0.2.8"
+		},
+		{
+			"ecosystem": "cargo",
+			"package": "etvegios_1",
+			"version": "0.2.8"
+		},
+		{
+			"ecosystem": "cargo",
+			"package": "etvegios_2",
+			"version": "0.2.8"
+		}
+	],
 	"provider": {
-		"host": "github.com",
-		"kind": "github",
-		"owner": "monochange",
-		"repo": "monochange"
+		"host": null,
+		"kind": "gitea",
+		"owner": "etvegios",
+		"repo": "bpagq"
 	},
 	"releaseTargets": [
 		{
 			"id": "main",
 			"kind": "group",
-			"members": [
-				"monochange",
-				"monochange_core"
-			],
+			"members": [],
 			"release": true,
 			"tag": true,
-			"tagName": "v0.3.8",
-			"version": "0.3.8",
+			"tagName": "v0.2.8",
+			"version": "0.2.8",
 			"versionFormat": "primary"
-		},
-		{
-			"id": "monochange_schema",
-			"kind": "package",
-			"members": [],
-			"release": false,
-			"tag": false,
-			"tagName": "monochange_schema/v0.3.8",
-			"version": "0.3.8",
-			"versionFormat": "namespaced"
 		}
 	],
 	"releasedPackages": [
-		"monochange",
-		"monochange_core"
+		"etvegios_0",
+		"etvegios_1",
+		"etvegios_2"
 	],
-	"schemaVersion": "0.3",
+	"schemaVersion": "0.2",
 	"updatedChangelogs": [
 		"fixtures/changelog-8.md"
 	],
-	"version": "0.3.8",
+	"version": "0.2.8",
 	"versions": {
-		"main": "0.3.8",
-		"monochange_schema": "0.3.8"
+		"etvegios_0": "0.2.8",
+		"etvegios_1": "0.2.8",
+		"etvegios_2": "0.2.8",
+		"main": "0.2.8"
 	}
 }

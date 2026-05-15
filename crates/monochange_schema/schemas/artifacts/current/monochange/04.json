@@ -1,15 +1,25 @@
 {
 	"defaults": {
-		"package_type": "cargo"
+		"package_type": "dart"
 	},
 	"package": {
-		"monochange": {
-			"path": "crates/monochange"
+		"qgf_0": {
+			"path": "crates/qgf_0"
+		},
+		"qgf_1": {
+			"path": "crates/qgf_1"
+		},
+		"qgf_2": {
+			"path": "crates/qgf_2"
+		},
+		"qgf_3": {
+			"path": "crates/qgf_3"
 		}
 	},
 	"source": {
-		"owner": "monochange",
-		"provider": "github",
-		"repo": "monochange"
+		"host": "forgejo.example.com",
+		"owner": "qgf",
+		"provider": "forgejo",
+		"repo": "lehbmoagmuf"
 	}
 }

@@ -1,18 +1,16 @@
 {
 	"defaults": {
-		"package_type": "cargo"
+		"package_type": "dart"
 	},
 	"package": {
-		"monochange": {
-			"path": "crates/monochange"
-		},
-		"monochange_core": {
-			"path": "crates/monochange_core"
+		"cvjxjm_0": {
+			"path": "crates/cvjxjm_0"
 		}
 	},
 	"source": {
-		"owner": "aipi",
+		"host": "github.example.com",
+		"owner": "cvjxjm",
 		"provider": "github",
-		"repo": "schema-fixtures"
+		"repo": "gwt"
 	}
 }

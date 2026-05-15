@@ -1,15 +1,25 @@
 {
 	"defaults": {
-		"package_type": "cargo"
+		"package_type": "npm"
 	},
 	"package": {
-		"monochange": {
-			"path": "crates/monochange"
+		"imwmkuepi_0": {
+			"path": "crates/imwmkuepi_0"
+		},
+		"imwmkuepi_1": {
+			"path": "crates/imwmkuepi_1"
+		},
+		"imwmkuepi_2": {
+			"path": "crates/imwmkuepi_2"
+		},
+		"imwmkuepi_3": {
+			"path": "crates/imwmkuepi_3"
 		}
 	},
 	"source": {
-		"owner": "aipi",
-		"provider": "github",
-		"repo": "schema-fixtures"
+		"host": "gitlab.example.com",
+		"owner": "imwmkuepi",
+		"provider": "gitlab",
+		"repo": "aza"
 	}
 }

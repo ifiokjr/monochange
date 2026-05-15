@@ -1,18 +1,28 @@
 {
 	"defaults": {
-		"package_type": "cargo"
+		"package_type": "python"
 	},
 	"package": {
-		"monochange": {
-			"path": "crates/monochange"
+		"buol_0": {
+			"path": "crates/buol_0"
 		},
-		"monochange_core": {
-			"path": "crates/monochange_core"
+		"buol_1": {
+			"path": "crates/buol_1"
+		},
+		"buol_2": {
+			"path": "crates/buol_2"
+		},
+		"buol_3": {
+			"path": "crates/buol_3"
+		},
+		"buol_4": {
+			"path": "crates/buol_4"
 		}
 	},
 	"source": {
-		"owner": "monochange",
-		"provider": "github",
-		"repo": "release-kit"
+		"host": "gitlab.example.com",
+		"owner": "buol",
+		"provider": "gitlab",
+		"repo": "obhrym"
 	}
 }
