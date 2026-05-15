@@ -1,5 +1,7 @@
 #![allow(clippy::disallowed_methods)]
 use std::fs;
+use std::process::Command;
+use std::time::Duration;
 
 use monochange_core::ChangelogSettings;
 use monochange_core::GroupChangelogInclude;
@@ -1305,4 +1307,713 @@ fn validate_release_record_file_fast_path_reports_error_for_unreadable_file() {
 	// Cleanup.
 	permissions.set_mode(0o644);
 	let _ = fs::set_permissions(&path, permissions);
+}
+
+fn run_git(root: &Path, args: &[&str]) {
+	let output = Command::new("git")
+		.args(args)
+		.current_dir(root)
+		.output()
+		.unwrap_or_else(|error| panic!("run git {args:?}: {error}"));
+	assert!(
+		output.status.success(),
+		"git {args:?} failed: stdout={} stderr={}",
+		String::from_utf8_lossy(&output.stdout),
+		String::from_utf8_lossy(&output.stderr)
+	);
+}
+
+fn initialize_git_repo(root: &Path) {
+	run_git(root, &["init", "-b", "release-branch"]);
+	run_git(root, &["config", "user.email", "monochange@example.com"]);
+	run_git(root, &["config", "user.name", "monochange"]);
+	fs::write(root.join("README.md"), "initial\n").unwrap();
+	run_git(root, &["add", "README.md"]);
+	run_git(
+		root,
+		&["-c", "commit.gpgsign=false", "commit", "-m", "initial"],
+	);
+}
+
+#[test]
+fn build_hosted_commit_request_uses_github_context_and_release_files() {
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+	initialize_git_repo(root);
+	fs::create_dir_all(root.join("packages/pkg-a")).unwrap();
+	fs::write(
+		root.join("packages/pkg-a/package.json"),
+		"{\"version\":\"1.2.3\"}\n",
+	)
+	.unwrap();
+
+	let prepared = PreparedReleaseCommit {
+		message: CommitMessage {
+			subject: "chore(release): prepare release".to_string(),
+			body: Some("Release notes".to_string()),
+		},
+		tracked_paths: vec![PathBuf::from("packages/pkg-a/package.json")],
+	};
+
+	let request = build_hosted_commit_request_for_github(
+		root,
+		&prepared,
+		false,
+		"monochange/example-repo",
+		Some("release/pr-1"),
+		None,
+	)
+	.unwrap();
+
+	assert_eq!(request.provider, "github");
+	assert_eq!(request.owner, "monochange");
+	assert_eq!(request.repository, "example-repo");
+	assert_eq!(request.branch, "release/pr-1");
+	assert_eq!(request.subject, "chore(release): prepare release");
+	assert_eq!(request.body, "Release notes");
+	assert_eq!(request.files.len(), 1);
+	assert_eq!(request.files[0].path, "packages/pkg-a/package.json");
+	assert_eq!(
+		request.files[0].content.as_deref(),
+		Some("{\"version\":\"1.2.3\"}\n")
+	);
+	assert!(!request.base_commit.is_empty());
+	assert!(!request.dry_run);
+}
+
+#[test]
+fn build_hosted_commit_request_marks_deleted_release_files() {
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+	initialize_git_repo(root);
+	let prepared = PreparedReleaseCommit {
+		message: CommitMessage {
+			subject: "chore(release): prepare release".to_string(),
+			body: None,
+		},
+		tracked_paths: vec![PathBuf::from(".changeset/removed.md")],
+	};
+
+	let request = build_hosted_commit_request_for_github(
+		root,
+		&prepared,
+		true,
+		"monochange/example-repo",
+		None,
+		Some("release/fallback"),
+	)
+	.unwrap();
+
+	assert_eq!(request.branch, "release/fallback");
+	assert_eq!(request.body, "");
+	assert_eq!(request.files.len(), 1);
+	assert_eq!(request.files[0].path, ".changeset/removed.md");
+	assert_eq!(request.files[0].content, None);
+	assert!(request.dry_run);
+}
+
+#[test]
+fn build_hosted_commit_request_reports_missing_github_repository() {
+	let tmp = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tmp.path();
+	initialize_git_repo(root);
+	let prepared = PreparedReleaseCommit {
+		message: CommitMessage {
+			subject: "chore(release): prepare release".to_string(),
+			body: None,
+		},
+		tracked_paths: Vec::new(),
+	};
+
+	let _guard = crate::tests::TEST_ENV_LOCK
+		.lock()
+		.unwrap_or_else(|error| panic!("test env lock poisoned: {error}"));
+	temp_env::with_var("GITHUB_REPOSITORY", None::<&str>, || {
+		let error = match build_hosted_commit_request(root, &prepared, true) {
+			Ok(_) => panic!("expected missing repository error"),
+			Err(error) => error.to_string(),
+		};
+		assert!(error.contains("hosted CommitRelease requires GITHUB_REPOSITORY"));
+	});
+}
+
+#[test]
+fn build_hosted_commit_request_reports_bad_repository_and_file_read_errors() {
+	let tmp = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tmp.path();
+	initialize_git_repo(root);
+	let prepared = PreparedReleaseCommit {
+		message: CommitMessage {
+			subject: "chore(release): prepare release".to_string(),
+			body: None,
+		},
+		tracked_paths: Vec::new(),
+	};
+	let error = match build_hosted_commit_request_for_github(
+		root,
+		&prepared,
+		true,
+		"monochange",
+		None,
+		Some("release/pr"),
+	) {
+		Ok(_) => panic!("expected bad repository error"),
+		Err(error) => error.to_string(),
+	};
+	assert!(error.contains("GITHUB_REPOSITORY must use `owner/repo` format"));
+
+	fs::create_dir_all(root.join("release-dir"))
+		.unwrap_or_else(|error| panic!("create release dir: {error}"));
+	let prepared = PreparedReleaseCommit {
+		message: CommitMessage {
+			subject: "chore(release): prepare release".to_string(),
+			body: None,
+		},
+		tracked_paths: vec![PathBuf::from("release-dir")],
+	};
+	let error = match build_hosted_commit_request_for_github(
+		root,
+		&prepared,
+		true,
+		"monochange/example-repo",
+		None,
+		Some("release/pr"),
+	) {
+		Ok(_) => panic!("expected file read error"),
+		Err(error) => error.to_string(),
+	};
+	assert!(error.contains("read hosted commit file `release-dir`"));
+}
+
+#[test]
+fn build_hosted_commit_request_falls_back_to_current_branch() {
+	let tmp = tempdir().unwrap();
+	let root = tmp.path();
+	initialize_git_repo(root);
+	let prepared = PreparedReleaseCommit {
+		message: CommitMessage {
+			subject: "chore(release): prepare release".to_string(),
+			body: None,
+		},
+		tracked_paths: Vec::new(),
+	};
+
+	let request = build_hosted_commit_request_for_github(
+		root,
+		&prepared,
+		true,
+		"monochange/example-repo",
+		Some(""),
+		Some(""),
+	)
+	.unwrap();
+
+	assert_eq!(request.branch, "release-branch");
+}
+
+fn hosted_commit_request_fixture() -> HostedCommitRequest {
+	HostedCommitRequest {
+		provider: "github",
+		owner: "monochange".to_string(),
+		repository: "monochange".to_string(),
+		branch: "feat/release".to_string(),
+		base_commit: "0123456789abcdef0123456789abcdef01234567".to_string(),
+		subject: "chore(release): prepare release".to_string(),
+		body: "Release notes".to_string(),
+		files: vec![HostedCommitFile {
+			path: "CHANGELOG.md".to_string(),
+			content: Some("# Changelog".to_string()),
+		}],
+		dry_run: false,
+	}
+}
+
+fn with_env_var<T>(name: &str, value: Option<&str>, run: impl FnOnce() -> T) -> T {
+	let _guard = crate::tests::TEST_ENV_LOCK
+		.lock()
+		.unwrap_or_else(|error| panic!("test env lock: {error}"));
+	temp_env::with_var(name, value, run)
+}
+
+#[test]
+fn hosted_commit_bearer_token_uses_token_auth_and_reports_missing_token() {
+	with_env_var("MONOCHANGE_TOKEN", Some("monochange-secret"), || {
+		let options = HostedCommitOptions {
+			auth: monochange_core::HostedCommitAuth::Token,
+			url: None,
+			oidc_audience: None,
+		};
+		assert_eq!(
+			hosted_commit_bearer_token(&options).unwrap_or_else(|error| panic!("token: {error}")),
+			"monochange-secret",
+		);
+	});
+
+	with_env_var("MONOCHANGE_TOKEN", None, || {
+		let options = HostedCommitOptions {
+			auth: monochange_core::HostedCommitAuth::Token,
+			url: None,
+			oidc_audience: None,
+		};
+		let error = match hosted_commit_bearer_token(&options) {
+			Ok(token) => panic!("missing token should fail, got {token}"),
+			Err(error) => error.to_string(),
+		};
+		assert!(error.contains("requires MONOCHANGE_TOKEN"));
+	});
+}
+
+#[test]
+fn send_hosted_commit_request_posts_json_and_parses_response() {
+	let listener = std::net::TcpListener::bind("127.0.0.1:0")
+		.unwrap_or_else(|error| panic!("bind mock server: {error}"));
+	let address = listener
+		.local_addr()
+		.unwrap_or_else(|error| panic!("local address: {error}"));
+	let server = std::thread::spawn(move || {
+		let (mut stream, _) = listener
+			.accept()
+			.unwrap_or_else(|error| panic!("accept request: {error}"));
+		stream
+			.set_read_timeout(Some(Duration::from_millis(500)))
+			.unwrap_or_else(|error| panic!("set read timeout: {error}"));
+		let mut buffer = [0_u8; 8192];
+		use std::io::Read as _;
+		use std::io::Write as _;
+		let bytes_read = stream
+			.read(&mut buffer)
+			.unwrap_or_else(|error| panic!("read request: {error}"));
+		let request = String::from_utf8_lossy(&buffer[..bytes_read]);
+		assert!(request.contains("POST /api/release-commits HTTP/1.1"));
+		assert!(request.contains("authorization: Bearer monochange-secret"));
+		assert!(request.contains("chore(release): prepare release"));
+		let body = "{\"commit\":\"abc123\",\"status\":\"completed\"}";
+		let response = format!(
+			"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+			body.len(),
+		);
+		stream
+			.write_all(response.as_bytes())
+			.unwrap_or_else(|error| panic!("write response: {error}"));
+	});
+
+	with_env_var("MONOCHANGE_TOKEN", Some("monochange-secret"), || {
+		let options = HostedCommitOptions {
+			auth: monochange_core::HostedCommitAuth::Token,
+			url: Some(format!("http://{address}/")),
+			oidc_audience: None,
+		};
+		let response = send_hosted_commit_request(&hosted_commit_request_fixture(), &options)
+			.unwrap_or_else(|error| panic!("hosted response: {error}"));
+		assert_eq!(response.commit.as_deref(), Some("abc123"));
+		assert_eq!(response.status.as_deref(), Some("completed"));
+	});
+
+	server
+		.join()
+		.unwrap_or_else(|error| panic!("mock server join: {error:?}"));
+}
+
+fn single_request_server(response_body: &'static str) -> (String, std::thread::JoinHandle<String>) {
+	let listener = std::net::TcpListener::bind("127.0.0.1:0")
+		.unwrap_or_else(|error| panic!("bind mock server: {error}"));
+	let address = listener
+		.local_addr()
+		.unwrap_or_else(|error| panic!("local address: {error}"));
+	let server = std::thread::spawn(move || {
+		let (mut stream, _) = listener
+			.accept()
+			.unwrap_or_else(|error| panic!("accept request: {error}"));
+		stream
+			.set_read_timeout(Some(Duration::from_millis(500)))
+			.unwrap_or_else(|error| panic!("set read timeout: {error}"));
+		let mut buffer = [0_u8; 8192];
+		use std::io::Read as _;
+		use std::io::Write as _;
+		let bytes_read = stream
+			.read(&mut buffer)
+			.unwrap_or_else(|error| panic!("read request: {error}"));
+		let request = String::from_utf8_lossy(&buffer[..bytes_read]).to_string();
+		let response = format!(
+			"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response_body}",
+			response_body.len(),
+		);
+		stream
+			.write_all(response.as_bytes())
+			.unwrap_or_else(|error| panic!("write response: {error}"));
+		request
+	});
+	(format!("http://{address}"), server)
+}
+
+fn single_status_request_server(
+	status: &'static str,
+	response_body: &'static str,
+) -> (String, std::thread::JoinHandle<String>) {
+	let listener = std::net::TcpListener::bind("127.0.0.1:0")
+		.unwrap_or_else(|error| panic!("bind mock server: {error}"));
+	let address = listener
+		.local_addr()
+		.unwrap_or_else(|error| panic!("local address: {error}"));
+	let server = std::thread::spawn(move || {
+		let (mut stream, _) = listener
+			.accept()
+			.unwrap_or_else(|error| panic!("accept request: {error}"));
+		stream
+			.set_read_timeout(Some(Duration::from_millis(500)))
+			.unwrap_or_else(|error| panic!("set read timeout: {error}"));
+		let mut buffer = [0_u8; 8192];
+		use std::io::Read as _;
+		use std::io::Write as _;
+		let bytes_read = stream
+			.read(&mut buffer)
+			.unwrap_or_else(|error| panic!("read request: {error}"));
+		let request = String::from_utf8_lossy(&buffer[..bytes_read]).to_string();
+		let response = format!(
+			"HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response_body}",
+			response_body.len(),
+		);
+		stream
+			.write_all(response.as_bytes())
+			.unwrap_or_else(|error| panic!("write response: {error}"));
+		request
+	});
+	(format!("http://{address}"), server)
+}
+
+#[test]
+fn send_hosted_commit_request_reports_request_http_and_json_errors() {
+	let request = hosted_commit_request_fixture();
+	let listener = std::net::TcpListener::bind("127.0.0.1:0")
+		.unwrap_or_else(|error| panic!("bind dropped server: {error}"));
+	let dropped_url = format!(
+		"http://{}",
+		listener
+			.local_addr()
+			.unwrap_or_else(|error| panic!("dropped server address: {error}"))
+	);
+	drop(listener);
+
+	with_env_var("MONOCHANGE_TOKEN", Some("monochange-secret"), || {
+		let options = HostedCommitOptions {
+			auth: monochange_core::HostedCommitAuth::Token,
+			url: Some(dropped_url),
+			oidc_audience: None,
+		};
+		let error = match send_hosted_commit_request(&request, &options) {
+			Ok(_) => panic!("expected request failure"),
+			Err(error) => error.to_string(),
+		};
+		assert!(error.contains("hosted CommitRelease request failed"));
+	});
+
+	let (url, server) = single_status_request_server("500 Internal Server Error", "server down");
+	with_env_var("MONOCHANGE_TOKEN", Some("monochange-secret"), || {
+		let options = HostedCommitOptions {
+			auth: monochange_core::HostedCommitAuth::Token,
+			url: Some(url),
+			oidc_audience: None,
+		};
+		let error = match send_hosted_commit_request(&request, &options) {
+			Ok(_) => panic!("expected HTTP failure"),
+			Err(error) => error.to_string(),
+		};
+		assert!(error.contains("hosted CommitRelease failed with HTTP 500"));
+	});
+	server
+		.join()
+		.unwrap_or_else(|error| panic!("mock server join: {error:?}"));
+
+	let (url, server) = single_request_server("not-json");
+	with_env_var("MONOCHANGE_TOKEN", Some("monochange-secret"), || {
+		let options = HostedCommitOptions {
+			auth: monochange_core::HostedCommitAuth::Token,
+			url: Some(url),
+			oidc_audience: None,
+		};
+		let error = match send_hosted_commit_request(&request, &options) {
+			Ok(_) => panic!("expected invalid JSON failure"),
+			Err(error) => error.to_string(),
+		};
+		assert!(error.contains("hosted CommitRelease response was invalid JSON"));
+	});
+	server
+		.join()
+		.unwrap_or_else(|error| panic!("mock server join: {error:?}"));
+}
+
+#[test]
+fn github_actions_oidc_token_reports_missing_token_and_http_error() {
+	let options = HostedCommitOptions {
+		auth: monochange_core::HostedCommitAuth::Oidc,
+		url: None,
+		oidc_audience: Some("monochange.dev".to_string()),
+	};
+	let _guard = crate::tests::TEST_ENV_LOCK
+		.lock()
+		.unwrap_or_else(|error| panic!("test env lock poisoned: {error}"));
+	temp_env::with_vars(
+		[
+			(
+				"ACTIONS_ID_TOKEN_REQUEST_URL",
+				Some("http://127.0.0.1/oidc"),
+			),
+			("ACTIONS_ID_TOKEN_REQUEST_TOKEN", None::<&str>),
+		],
+		|| {
+			let error = match github_actions_oidc_token(&options) {
+				Ok(token) => panic!("missing request token should fail, got {token}"),
+				Err(error) => error.to_string(),
+			};
+			assert!(error.contains("requires ACTIONS_ID_TOKEN_REQUEST_TOKEN"));
+		},
+	);
+
+	let (url, server) = single_status_request_server("403 Forbidden", "forbidden");
+	temp_env::with_vars(
+		[
+			("ACTIONS_ID_TOKEN_REQUEST_URL", Some(url.as_str())),
+			("ACTIONS_ID_TOKEN_REQUEST_TOKEN", Some("github-token")),
+		],
+		|| {
+			let error = match github_actions_oidc_token(&options) {
+				Ok(token) => panic!("OIDC HTTP error should fail, got {token}"),
+				Err(error) => error.to_string(),
+			};
+			assert!(error.contains("GitHub Actions OIDC request failed with HTTP 403"));
+		},
+	);
+	server
+		.join()
+		.unwrap_or_else(|error| panic!("mock server join: {error:?}"));
+}
+
+#[test]
+fn hosted_commit_release_returns_dry_run_report_without_posting() {
+	let tmp = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tmp.path();
+	initialize_git_repo(root);
+	let manifest = minimal_manifest_with_target("pkg-a", "1.2.3");
+	let context = CliContext {
+		root: root.to_path_buf(),
+		dry_run: true,
+		quiet: false,
+		show_diff: false,
+		inputs: BTreeMap::new(),
+		last_step_inputs: BTreeMap::new(),
+		prepared_release: None,
+		prepared_file_diffs: Vec::new(),
+		release_manifest_path: None,
+		release_requests: Vec::new(),
+		release_results: Vec::new(),
+		release_request: None,
+		release_request_result: None,
+		release_commit_report: None,
+		package_publish_report: None,
+		rate_limit_report: None,
+		issue_comment_plans: Vec::new(),
+		issue_comment_results: Vec::new(),
+		changeset_policy_evaluation: None,
+		changeset_diagnostics: None,
+		retarget_report: None,
+		step_outputs: BTreeMap::new(),
+		command_logs: Vec::new(),
+	};
+	let options = HostedCommitOptions {
+		auth: monochange_core::HostedCommitAuth::Token,
+		url: Some("http://127.0.0.1:9".to_string()),
+		oidc_audience: None,
+	};
+
+	temp_env::with_var("GITHUB_REPOSITORY", Some("monochange/monochange"), || {
+		let report = hosted_commit_release(root, &context, None, &manifest, true, &options)
+			.unwrap_or_else(|error| panic!("hosted dry run: {error}"));
+		assert_eq!(report.status, "dry_run");
+		assert!(report.commit.is_none());
+		assert!(report.dry_run);
+		assert!(report.subject.contains("chore(release): prepare release"));
+	});
+}
+
+#[test]
+fn hosted_commit_bearer_token_auto_prefers_oidc_when_actions_env_exists() {
+	let (url, server) = single_request_server("{\"value\":\"oidc-token\"}");
+	let options = HostedCommitOptions {
+		auth: monochange_core::HostedCommitAuth::Auto,
+		url: None,
+		oidc_audience: Some("custom-audience".to_string()),
+	};
+	temp_env::with_vars(
+		[
+			("ACTIONS_ID_TOKEN_REQUEST_URL", Some(url.as_str())),
+			(
+				"ACTIONS_ID_TOKEN_REQUEST_TOKEN",
+				Some("actions-request-token"),
+			),
+			("MONOCHANGE_TOKEN", Some("fallback-token")),
+		],
+		|| {
+			let token = hosted_commit_bearer_token(&options)
+				.unwrap_or_else(|error| panic!("oidc token: {error}"));
+			assert_eq!(token, "oidc-token");
+		},
+	);
+	let request = server
+		.join()
+		.unwrap_or_else(|error| panic!("mock server join: {error:?}"));
+	assert!(request.contains("GET /?audience=custom-audience HTTP/1.1"));
+	assert!(request.contains("authorization: Bearer actions-request-token"));
+}
+
+#[test]
+fn hosted_commit_bearer_token_oidc_auth_uses_github_actions_token() {
+	let (url, server) = single_request_server("{\"value\":\"oidc-token\"}");
+	let options = HostedCommitOptions {
+		auth: monochange_core::HostedCommitAuth::Oidc,
+		url: None,
+		oidc_audience: Some("monochange.dev".to_string()),
+	};
+	let _guard = crate::tests::TEST_ENV_LOCK
+		.lock()
+		.unwrap_or_else(|error| panic!("test env lock poisoned: {error}"));
+	temp_env::with_vars(
+		[
+			("ACTIONS_ID_TOKEN_REQUEST_URL", Some(url.as_str())),
+			("ACTIONS_ID_TOKEN_REQUEST_TOKEN", Some("github-token")),
+		],
+		|| {
+			let token = hosted_commit_bearer_token(&options)
+				.unwrap_or_else(|error| panic!("OIDC token: {error}"));
+			assert_eq!(token, "oidc-token");
+		},
+	);
+	server
+		.join()
+		.unwrap_or_else(|error| panic!("mock server join: {error:?}"));
+}
+
+#[test]
+fn hosted_commit_bearer_token_auto_falls_back_to_monochange_token() {
+	let options = HostedCommitOptions {
+		auth: monochange_core::HostedCommitAuth::Auto,
+		url: None,
+		oidc_audience: None,
+	};
+	temp_env::with_vars(
+		[
+			("ACTIONS_ID_TOKEN_REQUEST_URL", None::<&str>),
+			("ACTIONS_ID_TOKEN_REQUEST_TOKEN", None::<&str>),
+			("MONOCHANGE_TOKEN", Some("fallback-token")),
+		],
+		|| {
+			let token = hosted_commit_bearer_token(&options)
+				.unwrap_or_else(|error| panic!("fallback token: {error}"));
+			assert_eq!(token, "fallback-token");
+		},
+	);
+}
+
+#[test]
+fn github_actions_oidc_token_reports_http_and_json_errors() {
+	let (error_url, error_server) = single_request_server("not-json");
+	let options = HostedCommitOptions {
+		auth: monochange_core::HostedCommitAuth::Oidc,
+		url: None,
+		oidc_audience: None,
+	};
+	temp_env::with_vars(
+		[
+			("ACTIONS_ID_TOKEN_REQUEST_URL", Some(error_url.as_str())),
+			(
+				"ACTIONS_ID_TOKEN_REQUEST_TOKEN",
+				Some("actions-request-token"),
+			),
+		],
+		|| {
+			let error = match github_actions_oidc_token(&options) {
+				Ok(token) => panic!("expected invalid json error, got token {token}"),
+				Err(error) => error.to_string(),
+			};
+			assert!(error.contains("response was invalid JSON"));
+		},
+	);
+	error_server
+		.join()
+		.unwrap_or_else(|error| panic!("mock server join: {error:?}"));
+
+	temp_env::with_vars(
+		[
+			("ACTIONS_ID_TOKEN_REQUEST_URL", None::<&str>),
+			(
+				"ACTIONS_ID_TOKEN_REQUEST_TOKEN",
+				Some("actions-request-token"),
+			),
+		],
+		|| {
+			let error = match github_actions_oidc_token(&options) {
+				Ok(token) => panic!("missing OIDC URL should fail, got {token}"),
+				Err(error) => error.to_string(),
+			};
+			assert!(error.contains("requires ACTIONS_ID_TOKEN_REQUEST_URL"));
+		},
+	);
+}
+
+#[test]
+fn hosted_commit_release_posts_in_non_dry_run_and_defaults_status() {
+	let tmp = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tmp.path();
+	initialize_git_repo(root);
+	let manifest = minimal_manifest_with_target("pkg-a", "1.2.3");
+	let context = CliContext {
+		root: root.to_path_buf(),
+		dry_run: false,
+		quiet: false,
+		show_diff: false,
+		inputs: BTreeMap::new(),
+		last_step_inputs: BTreeMap::new(),
+		prepared_release: None,
+		prepared_file_diffs: Vec::new(),
+		release_manifest_path: None,
+		release_requests: Vec::new(),
+		release_results: Vec::new(),
+		release_request: None,
+		release_request_result: None,
+		release_commit_report: None,
+		package_publish_report: None,
+		rate_limit_report: None,
+		issue_comment_plans: Vec::new(),
+		issue_comment_results: Vec::new(),
+		changeset_policy_evaluation: None,
+		changeset_diagnostics: None,
+		retarget_report: None,
+		step_outputs: BTreeMap::new(),
+		command_logs: Vec::new(),
+	};
+	let (url, server) = single_request_server("{\"commit\":\"abc123\"}");
+	let options = HostedCommitOptions {
+		auth: monochange_core::HostedCommitAuth::Token,
+		url: Some(url),
+		oidc_audience: None,
+	};
+
+	temp_env::with_vars(
+		[
+			("GITHUB_REPOSITORY", Some("monochange/monochange")),
+			("MONOCHANGE_TOKEN", Some("monochange-secret")),
+		],
+		|| {
+			let report = hosted_commit_release(root, &context, None, &manifest, true, &options)
+				.unwrap_or_else(|error| panic!("hosted commit release: {error}"));
+			assert_eq!(report.commit.as_deref(), Some("abc123"));
+			assert_eq!(report.status, "completed");
+			assert!(!report.dry_run);
+		},
+	);
+
+	let request = server
+		.join()
+		.unwrap_or_else(|error| panic!("mock server join: {error:?}"));
+	assert!(request.contains("POST /api/release-commits HTTP/1.1"));
+	assert!(request.contains("authorization: Bearer monochange-secret"));
 }
