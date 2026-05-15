@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,6 +9,7 @@ const artifactsDir =
 	process.env.MONOCHANGE_APP_ARTIFACTS_DIR ?? join(tmpdir(), "monochange-app-playwright");
 const baseURL = process.env.MONOCHANGE_APP_BASE_URL ?? "http://127.0.0.1:3000";
 const e2eDatabaseUrl = `sqlite://${join(artifactsDir, "monochange_app_e2e.sqlite3")}`;
+mkdirSync(artifactsDir, { recursive: true });
 const browserChannel =
 	process.env.PLAYWRIGHT_BROWSER_CHANNEL ?? (process.env.CI ? undefined : "chrome");
 const startLocalServer = process.env.MONOCHANGE_APP_SKIP_WEB_SERVER !== "1";
