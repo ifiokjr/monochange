@@ -76,6 +76,7 @@ Built-in `mc step:*` commands are different: they are generated directly from th
 
 | Step                    | Use it when you want to…                                                  | Requires previous step?          | Typical follow-up                                                                           |
 | ----------------------- | ------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------- |
+| `Config`                | inspect resolved configuration and workspace metadata                     | no                               | `Validate`, `Discover`, custom diagnostics                                                  |
 | `Validate`              | fail fast on invalid config, groups, or changesets                        | no                               | CI gate or local preflight                                                                  |
 | `Discover`              | inspect normalized package discovery across ecosystems                    | no                               | local inspection, debug commands                                                            |
 | `CreateChangeFile`      | author a `.changeset/*.md` file from CLI inputs                           | no                               | run independently, or before planning                                                       |
@@ -87,7 +88,10 @@ Built-in `mc step:*` commands are different: they are generated directly from th
 | `OpenReleaseRequest`    | create or update a hosted release PR/MR                                   | `PrepareRelease` + `[source]`    | provider review, follow-up `Command` steps                                                  |
 | `PlanPublishRateLimits` | plan package-registry publish work against known rate limits              | no                               | `PublishPackages`, `PlaceholderPublish`                                                     |
 | `PlaceholderPublish`    | publish `0.0.0` placeholder versions for missing registry packages        | no                               | normally before `PublishPackages`                                                           |
+| `ReleaseRecord`         | inspect release state embedded in a tag or commit                         | committed release record         | `PublishReadiness`, `TagRelease`, publish debugging                                         |
+| `PublishReadiness`      | check registry publishability without publishing packages                 | committed release record         | `PlaceholderPublish`, `PlanPublishRateLimits`, `PublishPackages`                            |
 | `PublishPackages`       | publish package versions to registries using built-in ecosystem workflows | prepared or HEAD release state   | custom `Command` steps using `publish.*`                                                    |
+| `TagRelease`            | create release tags declared by a release record                          | committed release record         | hosted release/publish jobs                                                                 |
 | `CommentReleasedIssues` | post release follow-up comments to closed issues                          | `PrepareRelease` + GitHub source | normally after `PublishRelease`                                                             |
 | `AffectedPackages`      | evaluate changeset coverage for changed files                             | no                               | CI enforcement, custom failure messaging                                                    |
 | `DiagnoseChangesets`    | inspect changeset context, commit provenance, and linked review metadata  | no                               | local debugging, CI inspection                                                              |
@@ -111,6 +115,7 @@ That means composition is explicit:
 In practice, most workflows fit one of four patterns:
 
 1. **validation / inspection**
+   - `Config`
    - `Validate`
    - `Discover`
    - `DisplayVersions`
@@ -121,7 +126,11 @@ In practice, most workflows fit one of four patterns:
 3. **release preparation and publication**
    - `PrepareRelease`
    - then one or more of `CommitRelease`, `PublishRelease`, `OpenReleaseRequest`, `CommentReleasedIssues`, `Command`
-4. **post-release repair**
+4. **post-merge release state**
+   - `ReleaseRecord`
+   - `PublishReadiness`
+   - `TagRelease`
+5. **post-release repair**
    - `RetargetRelease`
    - optionally followed by `Command`
 
@@ -144,7 +153,7 @@ Use `--progress-format auto|unicode|ascii|json` or `MONOCHANGE_PROGRESS_FORMAT` 
 - `ascii` forces the human renderer with ASCII-safe symbols
 - `json` emits newline-delimited progress events for automation and benchmarks
 
-`PrepareRelease` and `DisplayVersions` steps also report per-phase timings when they compute release state. Those timings power the benchmark phase-budget checks for `mc release --dry-run` and `mc release`.
+`PrepareRelease` and `DisplayVersions` steps also report per-phase timings when they compute release state. Those timings power the benchmark phase-budget checks for `mc step:prepare-release --dry-run` and workflow commands that include a `PrepareRelease` step.
 
 See [Progress output](../progress-output.md) for the full renderer behavior and JSON event shape.
 
@@ -193,6 +202,7 @@ Those namespaces are the main reason to prefer built-in steps over reimplementin
 
 ## Pages in this section
 
+- [Config](18-config.md)
 - [Validate](01-validate.md)
 - [Discover](02-discover.md)
 - [CreateChangeFile](03-create-change-file.md)
@@ -210,3 +220,6 @@ Those namespaces are the main reason to prefer built-in steps over reimplementin
 - [DisplayVersions](14-display-versions.md)
 - [PlaceholderPublish](15-placeholder-publish.md)
 - [PublishPackages](16-publish-packages.md)
+- [ReleaseRecord](19-release-record.md)
+- [PublishReadiness](20-publish-readiness.md)
+- [TagRelease](21-tag-release.md)

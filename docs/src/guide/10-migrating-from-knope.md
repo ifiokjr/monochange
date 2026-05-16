@@ -366,10 +366,10 @@ If your knope config uses conventional commits alongside changesets:
 ignore_conventional_commits = false # or absent
 ```
 
-Switch to changeset-only workflows. Use `mc change` to create changesets:
+Switch to changeset-only workflows. Use `mc step:create-change-file` to create changesets:
 
 ```bash
-mc change --package my_crate --bump minor --reason "add new feature"
+mc step:create-change-file --package my_crate --bump minor --reason "add new feature"
 ```
 
 ### knope `scopes`
@@ -619,5 +619,5 @@ type = "CreateChangeFile"
 - [ ] Update `.changeset/*.md` frontmatter keys to use declared package/group ids
 - [ ] Update CI workflows from `knope <command>` to `mc <command>`
 - [ ] Run `mc step:validate` to check config and changesets
-- [ ] Run `mc release --dry-run` to verify the release plan
+- [ ] Run `mc step:prepare-release --dry-run` to verify the release plan
 - [ ] Remove knope from your dependencies and install monochange

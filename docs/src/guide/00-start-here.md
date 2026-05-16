@@ -54,7 +54,7 @@ This checks `monochange.toml` and your `.changeset/*.md` files together.
 ## 4. Discover package ids
 
 ```bash
-mc discover --format json
+mc step:discover --format json
 ```
 
 Look for the package ids you will use in changesets and CLI commands.
@@ -64,7 +64,7 @@ If you do not know which id to target later, rerun discovery and copy one direct
 ## 5. Create one change file
 
 ```bash
-mc change --package <id> --bump patch --reason "describe the change"
+mc step:create-change-file --package <id> --bump patch --reason "describe the change"
 ```
 
 Most first changes should target a package id.
@@ -84,7 +84,7 @@ A typical generated file looks like this:
 If the same package changed for a more specific reason, you can add more context right away:
 
 ```bash
-mc change \
+mc step:create-change-file \
   --package <id> \
   --bump minor \
   --reason "add release preview improvements" \
@@ -94,15 +94,15 @@ mc change \
 ## 6. Preview the release plan safely
 
 ```bash
-mc release --dry-run
+mc step:prepare-release --dry-run
 ```
 
-By default this now renders a human-friendly markdown preview in the terminal. Use `--format json` when you want structured output for tooling, `--format text` when you explicitly want the older plain-text rendering, or `mc versions` when you only need the planned package and group versions. `mc versions` is read-only, so it will not update release files.
+By default this now renders a human-friendly markdown preview in the terminal. Use `--format json` when you want structured output for tooling, `--format text` when you explicitly want the older plain-text rendering, or `mc step:display-versions` when you only need the planned package and group versions. `mc step:display-versions` is read-only, so it will not update release files.
 
 When you want to see the exact file patch without mutating the workspace, add `--diff`:
 
 ```bash
-mc release --dry-run --diff
+mc step:prepare-release --dry-run --diff
 ```
 
 When you want to inspect changeset provenance before releasing, add a diagnostics pass:
@@ -130,7 +130,7 @@ If you need a silent safety check, run `mc release --quiet`. Quiet mode suppress
 
 - `mc init` says a config already exists: keep the existing `monochange.toml` and continue with `mc step:validate`, or pass `--force` to regenerate.
 - `mc step:validate` reports problems: fix the reported config or changeset issue, then rerun `mc step:validate`.
-- `mc change` rejects your target: rerun `mc discover --format json` and copy a valid package id.
+- `mc step:create-change-file` rejects your target: rerun `mc step:discover --format json` and copy a valid package id.
 - You are not sure what to do next: continue with [Your first release plan](./02-setup.md).
 
 ## Next steps

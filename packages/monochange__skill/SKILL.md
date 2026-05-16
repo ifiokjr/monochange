@@ -46,7 +46,7 @@ Agents should optimize for safety and traceability: inspect config first, prefer
 
 The command inventory in this skill is based on `crates/monochange/src/cli.rs`, `crates/monochange_core/src/lib.rs`, and the CLI help snapshot `crates/monochange/tests/snapshots/cli_help__help_overview_lists_all_commands@help_overview_lists_all_commands.snap`.
 
-Built-in commands in the current CLI:
+Built-in binary and step commands worth remembering:
 
 - `mc init` — create a starter `monochange.toml` from discovered manifests.
 - `mc populate` — add missing configurable workflow definitions to an existing config.
@@ -74,9 +74,12 @@ Built-in step commands:
 - `mc step:verify-release-branch`
 - `mc step:publish-release`
 - `mc step:placeholder-publish`
+- `mc step:release-record`
+- `mc step:publish-readiness`
 - `mc step:publish-packages`
 - `mc step:plan-publish-rate-limits`
 - `mc step:open-release-request`
+- `mc step:tag-release`
 - `mc step:comment-released-issues`
 - `mc step:affected-packages`
 - `mc step:diagnose-changesets`

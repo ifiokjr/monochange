@@ -27,9 +27,9 @@ Reach for this crate when you want one API and CLI surface that discovers packag
 ```bash
 mc init
 mc skill -a pi -y
-mc discover --format json
-mc change --package monochange --bump patch --reason "describe the change"
-mc release --dry-run --format json
+mc step:discover --format json
+mc step:create-change-file --package monochange --bump patch --reason "describe the change"
+mc step:prepare-release --dry-run --format json
 mc mcp
 ```
 
@@ -293,7 +293,7 @@ Reach for this crate when you want to preview or publish GitHub releases and rel
 
 ## Best for
 
-- building GitHub release automation on top of `mc release`
+- building GitHub release automation on top of `mc step:prepare-release` and `mc step:publish-release`
 - previewing would-be GitHub releases and release PRs in CI before publishing
 - converting grouped or package release targets into repository automation payloads
 
@@ -383,7 +383,7 @@ Reach for this crate when you want to preview or publish Gitea releases and rele
 
 ## Best for
 
-- building Gitea release automation on top of `mc release`
+- building Gitea release automation on top of `mc step:prepare-release` and `mc step:publish-release`
 - previewing would-be Gitea releases and release PRs in CI before publishing
 - self-hosted Gitea instances that need the same release workflow as GitHub or GitLab
 
@@ -410,7 +410,7 @@ Reach for this crate when you want to preview or publish GitLab releases and mer
 
 ## Best for
 
-- building GitLab release automation on top of `mc release`
+- building GitLab release automation on top of `mc step:prepare-release` and `mc step:publish-release`
 - previewing would-be GitLab releases and merge requests in CI before publishing
 - self-hosted GitLab instances that need the same release workflow as GitHub
 
@@ -754,7 +754,7 @@ Reach for this crate when you want to preview or publish Forgejo releases and re
 
 ## Best for
 
-- building Forgejo release automation on top of `mc release`
+- building Forgejo release automation on top of `mc step:prepare-release` and `mc step:publish-release`
 - previewing would-be Forgejo releases and release PRs in CI before publishing
 - self-hosted Forgejo instances that need the same release workflow as GitHub or GitLab
 

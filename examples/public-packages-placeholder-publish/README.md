@@ -14,7 +14,7 @@ This is a repo-shaped example for reserving public package names before the real
 ```bash
 mc step:validate
 mc check
-mc release --dry-run --diff
+mc step:prepare-release --dry-run --diff
 ```
 
 ## Recommended publish preview
@@ -22,7 +22,7 @@ mc release --dry-run --diff
 When you want to inspect the placeholder plan without publishing anything:
 
 ```bash
-mc placeholder-publish --dry-run --format json
+mc step:placeholder-publish --dry-run --format json
 ```
 
 ## Why this example is opinionated

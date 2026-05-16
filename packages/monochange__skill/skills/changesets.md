@@ -9,7 +9,7 @@ A good changeset answers three questions: what public behavior changed, who is a
 Prefer the repository's configured workflow if present:
 
 ```bash
-mc change --package @acme/api --bump minor --type feat --reason "Add webhook delivery filters"
+mc step:create-change-file --package @acme/api --bump minor --type feat --reason "Add webhook delivery filters"
 ```
 
 If `mc change` is not configured, use the step command directly:

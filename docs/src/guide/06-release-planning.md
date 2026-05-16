@@ -5,16 +5,16 @@ Create a changeset with the CLI:
 <!-- {=releaseChangesAddCommand} -->
 
 ```bash
-mc change --package sdk-core --bump minor --reason "public API addition"
-mc change --package sdk-core --bump patch --type security --reason "rotate signing keys" --details "Roll the signing key before the release window closes."
-mc change --package sdk-core --bump none --type docs --reason "clarify migration guidance" --output .changeset/sdk-core-docs.md
-mc change --package sdk-core --bump major --version 2.0.0 --reason "break the public API" --output .changeset/sdk-core-major.md
+mc step:create-change-file --package sdk-core --bump minor --reason "public API addition"
+mc step:create-change-file --package sdk-core --bump patch --type security --reason "rotate signing keys" --details "Roll the signing key before the release window closes."
+mc step:create-change-file --package sdk-core --bump none --type docs --reason "clarify migration guidance" --output .changeset/sdk-core-docs.md
+mc step:create-change-file --package sdk-core --bump major --version 2.0.0 --reason "break the public API" --output .changeset/sdk-core-major.md
 ```
 
 Or use interactive mode to select packages, bumps, and options from a guided wizard:
 
 ```bash
-mc change -i
+mc step:create-change-file -i
 ```
 
 Interactive mode automatically prevents conflicting selections (a group and one of its members) and lets you pick per-package bumps and optional explicit versions.
@@ -97,7 +97,7 @@ When `version` is provided without `bump`, the bump is inferred from the current
 When a dependent package changes only because another package moved first, author that context explicitly with `caused_by`:
 
 ```bash
-mc change --package sdk-config --bump none --caused-by sdk-core --reason "dependency-only follow-up"
+mc step:create-change-file --package sdk-config --bump none --caused-by sdk-core --reason "dependency-only follow-up"
 ```
 
 ```markdown
@@ -153,19 +153,19 @@ Generate a plan directly when you want to inspect the raw planner output:
 <!-- {=projectPlanCommand} -->
 
 ```bash
-mc release --dry-run --format json
+mc step:prepare-release --dry-run --format json
 ```
 
 <!-- {/projectPlanCommand} -->
 
-For human-readable local output, `mc release --dry-run` now defaults to terminal-friendly markdown. Use `--format text` when you want the older plain-text style, or keep `--format json` for automation.
+For human-readable local output, `mc step:prepare-release --dry-run` now defaults to terminal-friendly markdown. Use `--format text` when you want the older plain-text style, or keep `--format json` for automation.
 
 Preferred repository command flow:
 
 <!-- {=projectDryRunCommand} -->
 
 ```bash
-mc release --dry-run --format json
+mc step:prepare-release --dry-run --format json
 ```
 
 <!-- {/projectDryRunCommand} -->
@@ -173,8 +173,8 @@ mc release --dry-run --format json
 When you want a reviewable patch-style preview of the filesystem changes without mutating the workspace, add `--diff`:
 
 ```bash
-mc release --dry-run --diff
-mc release --dry-run --format json --diff
+mc step:prepare-release --dry-run --diff
+mc step:prepare-release --dry-run --format json --diff
 ```
 
 Markdown and text output render unified diffs directly in the terminal. JSON output wraps the normal manifest payload under `manifest` and adds `fileDiffs` entries for each changed file.
@@ -183,35 +183,35 @@ A good planning loop looks like this:
 
 ```bash
 mc step:validate
-mc discover --format json
+mc step:discover --format json
 mc step:diagnose-changesets --format json
-mc release --dry-run --diff
+mc step:prepare-release --dry-run --diff
 ```
 
 Use each command for a different question:
 
 - `mc step:validate` — is the config and changeset set valid?
-- `mc discover --format json` — which package ids, groups, and dependency edges exist?
+- `mc step:discover --format json` — which package ids, groups, and dependency edges exist?
 - `mc step:diagnose-changesets --format json` — who introduced these changesets and what review context is attached?
-- `mc release --dry-run --diff` — what exact files would change if I prepared the release now?
+- `mc step:prepare-release --dry-run --diff` — what exact files would change if I prepared the release now?
 
 ### Compare preview modes
 
 Use the preview mode that matches the decision you are trying to make:
 
-| Command                                     | Best for                                      |
-| ------------------------------------------- | --------------------------------------------- |
-| `mc release --dry-run`                      | Human review in the terminal                  |
-| `mc release --dry-run --diff`               | Human review plus exact file patches          |
-| `mc release --dry-run --format json`        | Automation, scripts, MCP clients              |
-| `mc release --dry-run --format json --diff` | Automation that also needs file patch details |
+| Command                                                  | Best for                                      |
+| -------------------------------------------------------- | --------------------------------------------- |
+| `mc step:prepare-release --dry-run`                      | Human review in the terminal                  |
+| `mc step:prepare-release --dry-run --diff`               | Human review plus exact file patches          |
+| `mc step:prepare-release --dry-run --format json`        | Automation, scripts, MCP clients              |
+| `mc step:prepare-release --dry-run --format json --diff` | Automation that also needs file patch details |
 
 When you want command semantics without any command-line noise, add `--quiet`. Quiet mode suppresses stdout/stderr and uses dry-run behavior for release-oriented commands so the workspace stays unchanged.
 
 <!-- {=projectReleaseCommand} -->
 
 ```bash
-mc release
+mc step:prepare-release
 ```
 
 <!-- {/projectReleaseCommand} -->
@@ -315,15 +315,15 @@ Current planning rules:
 
 <!-- {=releasePlanningRules} -->
 
-- `mc change` defaults `--bump` to `patch`; use `--bump none` when you want a type-only or version-only entry, and pass `--version` to pin an explicit release version
+- `mc step:create-change-file` defaults `--bump` to `patch`; use `--bump none` when you want a type-only or version-only entry, and pass `--version` to pin an explicit release version
 - markdown change files use package/group ids as the only top-level frontmatter keys, with scalar shorthand for `none`/`patch`/`minor`/`major` or configured change types, plus object syntax for `bump`, `version`, `type`, and `caused_by`
 - when `version` is given without `bump`, the bump is inferred by comparing the current and target versions
 - explicit versions from grouped members propagate to the group version; conflicts take the highest semver or fail when `defaults.strict_version_conflicts = true`
 - prefer package ids over group ids in authored changesets when possible; direct package changes still propagate to dependents and synchronize configured groups
 - optional change `type` values can route entries into custom changelog sections, and configured section `default_bump` values let scalar type shorthand imply the desired semver behavior
 - `caused_by` references package or group ids and suppresses only the matching dependency-propagation records; use object syntax whenever you need it
-- `mc change` accepts repeated `--caused-by <id>` flags, and `--bump none` is the right fit when you want to acknowledge an affected package without forcing a user-facing version bump
-- `mc change` can write to a deterministic path with `--output ...`
+- `mc step:create-change-file` accepts repeated `--caused-by <id>` flags, and `--bump none` is the right fit when you want to acknowledge an affected package without forcing a user-facing version bump
+- `mc step:create-change-file` can write to a deterministic path with `--output ...`
 - change templates support detailed multi-line release-note entries through `{{ details }}`, compact metadata blocks through `{{ context }}`, and fine-grained linked metadata like `{{ change_owner_link }}`, `{{ review_request_link }}`, and `{{ closed_issue_links }}`
 - dependents default to the configured `parent_bump`, including packages outside a changed version group when they depend on a synchronized member
 - computed compatibility evidence can still escalate both the changed crate and its dependents when provider analysis produces it
@@ -352,4 +352,4 @@ Across release-oriented commands, global `--quiet` suppresses stdout/stderr and 
 
 ## Concurrency
 
-`mc release` is designed for sequential execution. Do not run multiple `mc release` commands concurrently on the same workspace — there is no file locking, so concurrent runs could produce duplicate changelog entries, inconsistent version files, or corrupted release records. If you need parallel release preparation across workspaces, use separate working copies.
+`mc step:prepare-release` is designed for sequential execution. Do not run multiple `mc step:prepare-release` commands concurrently on the same workspace — there is no file locking, so concurrent runs could produce duplicate changelog entries, inconsistent version files, or corrupted release records. If you need parallel release preparation across workspaces, use separate working copies.

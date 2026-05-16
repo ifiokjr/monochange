@@ -87,11 +87,11 @@ You only need a `[cli.*]` entry if you want a repository-specific alias that wra
 
 A typical agent workflow looks like this:
 
-1. `mc discover --format json` — understand the workspace package graph
+1. `mc step:discover --format json` — understand the workspace package graph
 2. `mc step:diagnose-changesets --format json` — see all pending changesets, linked PRs, and introduced commits
-3. `mc release --dry-run --format json` — preview the computed release plan
-4. `mc change ...` — add, update, or remove changesets as needed
-5. `mc release` — execute the release when everything looks correct
+3. `mc step:prepare-release --dry-run --format json` — preview the computed release plan
+4. `mc step:create-change-file ...` — add, update, or remove changesets as needed
+5. `mc step:prepare-release` — execute the release when everything looks correct
 
 Because `mc step:diagnose-changesets` and `monochange_diagnostics` return stable, workspace-relative paths and structured JSON, agents can parse the output without needing to read raw markdown files directly. Each changeset record includes enough context — who introduced it, which PR it belongs to, which issues it closes — for an agent to make targeted decisions about whether to proceed with a release or request changes.
 

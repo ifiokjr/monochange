@@ -14,7 +14,7 @@ This is a repo-shaped example for teams that want discovery, changelogs, changes
 ```bash
 mc step:validate
 mc check
-mc release --dry-run --diff
+mc step:prepare-release --dry-run --diff
 ```
 
 ## Why this example is opinionated

@@ -1,6 +1,6 @@
 # Repairable releases
 
-`mc repair-release` is for the stressful moment right after a release when you discover that a few follow-up commits still need to be part of that release.
+`mc step:retarget-release` is for the stressful moment right after a release when you discover that a few follow-up commits still need to be part of that release.
 
 If you have **not created the tags yet** and only need the initial post-merge tag creation step, use `mc step:tag-release --from HEAD` instead. `repair-release` is the follow-up tool for moving an already-created release tag set.
 
@@ -69,11 +69,11 @@ That lets you inspect a release directly from its tag or from later fix commits.
 
 ## Repairing a recent release
 
-Use `mc repair-release` when you want to move a recent release forward to a later commit.
+Use `mc step:retarget-release` when you want to move a recent release forward to a later commit.
 
 ```bash
-mc repair-release --from v1.2.3 --target HEAD --dry-run
-mc repair-release --from v1.2.3 --target HEAD
+mc step:retarget-release --from v1.2.3 --target HEAD --dry-run
+mc step:retarget-release --from v1.2.3 --target HEAD
 ```
 
 The command does the heavy lifting for you:
@@ -98,7 +98,7 @@ Use dry-run to see:
 - whether hosted-release sync will run
 
 ```bash
-mc repair-release --from v1.2.3 --target HEAD --dry-run --format json
+mc step:retarget-release --from v1.2.3 --target HEAD --dry-run --format json
 ```
 
 ## Example workflow
@@ -117,13 +117,13 @@ mc step:release-record --from v1.2.3
 5. You preview the repair:
 
 ```bash
-mc repair-release --from v1.2.3 --target HEAD --dry-run
+mc step:retarget-release --from v1.2.3 --target HEAD --dry-run
 ```
 
 6. You execute the repair:
 
 ```bash
-mc repair-release --from v1.2.3 --target HEAD
+mc step:retarget-release --from v1.2.3 --target HEAD
 ```
 
 ## What `repair-release` changes
@@ -162,7 +162,7 @@ If you are under pressure, the rule of thumb is simple:
 The user-facing command is:
 
 ```bash
-mc repair-release --from v1.2.3 --target HEAD
+mc step:retarget-release --from v1.2.3 --target HEAD
 ```
 
 The underlying built-in step is `RetargetRelease`.

@@ -91,6 +91,6 @@ assertContains("ARCHITECTURE.md", "docs/plans/README.md");
 assertContains("ARCHITECTURE.md", "crates/monochange_core");
 assertContains("docs/plans/README.md", "docs/plans/active/");
 assertContains(".templates/guides.t.md", "mc step:diagnose-changesets --format json");
-assertContains(".templates/guides.t.md", "mc release --dry-run --format json");
+assertContains(".templates/guides.t.md", "mc step:prepare-release --dry-run --format json");
 
 console.log("agent-facing documentation checks passed");

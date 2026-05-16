@@ -24,7 +24,7 @@ Reach for this crate when you want to preview or publish Forgejo releases and re
 
 ## Best for
 
-- building Forgejo release automation on top of `mc release`
+- building Forgejo release automation on top of `mc step:prepare-release` and `mc step:publish-release`
 - previewing would-be Forgejo releases and release PRs in CI before publishing
 - self-hosted Forgejo instances that need the same release workflow as GitHub or GitLab
 

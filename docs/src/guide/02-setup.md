@@ -2,7 +2,7 @@
 
 Use this guide after installation when you want one local, beginner-safe walkthrough.
 
-You will stop at `mc release --dry-run --format json`, so nothing is published.
+You will stop at `mc step:prepare-release --dry-run --format json`, so nothing is published.
 
 ## 1. Generate a starter config with `mc init`
 
@@ -112,7 +112,7 @@ If validation fails, fix the reported problem first, then rerun `mc step:validat
 
 ```bash
 mc step:validate
-mc discover --format json
+mc step:discover --format json
 ```
 
 <!-- {/projectDiscoverCommand} -->
@@ -124,7 +124,7 @@ If you are unsure what id to use later, rerun discovery and copy one from the ou
 ## 4. Create one change file
 
 ```bash
-mc change --package <id> --bump patch --reason "describe the change"
+mc step:create-change-file --package <id> --bump patch --reason "describe the change"
 ```
 
 Most changes should target a package id.
@@ -136,7 +136,7 @@ monochange will propagate bumps to dependents and synchronize configured groups 
 <!-- {=projectDryRunCommand} -->
 
 ```bash
-mc release --dry-run --format json
+mc step:prepare-release --dry-run --format json
 ```
 
 <!-- {/projectDryRunCommand} -->
@@ -147,10 +147,10 @@ You get a concrete preview of the release plan without publishing anything or op
 
 When you are ready to move beyond planning:
 
-- use `mc placeholder-publish --dry-run --format json` if some packages still need a bootstrap `0.0.0` release so they exist in their registries first
-- use `mc publish --dry-run --format json` to preview built-in package publication to `crates.io`, `npm`, `jsr`, or `pub.dev`
-- before real package publication, optionally write a readiness artifact with `mc step:publish-readiness --from HEAD --output .monochange/readiness.json` for preflight review, then run `mc publish`
-- use `mc publish-release --dry-run --format json` only for hosted/provider releases such as GitHub releases
+- use `mc step:placeholder-publish --dry-run --format json` if some packages still need a bootstrap `0.0.0` release so they exist in their registries first
+- use `mc step:publish-packages --dry-run --format json` to preview built-in package publication to `crates.io`, `npm`, `jsr`, or `pub.dev`
+- before real package publication, optionally write a readiness artifact with `mc step:publish-readiness --from HEAD --output .monochange/readiness.json` for preflight review, then run `mc step:publish-packages`
+- use `mc step:publish-release --dry-run --format json` only for hosted/provider releases such as GitHub releases
 
 ## Package ids vs. group ids
 
@@ -175,9 +175,9 @@ mc init --force
 
 Fix the reported issue first. `mc step:validate` is the fastest way to get back to a known-good workspace.
 
-### `mc change` says the package id is unknown
+### `mc step:create-change-file` says the package id is unknown
 
-Run `mc discover --format json` again and copy an id directly from the output.
+Run `mc step:discover --format json` again and copy an id directly from the output.
 
 ### You are not ready to hand-edit config yet
 

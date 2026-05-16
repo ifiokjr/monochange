@@ -33,9 +33,9 @@ Reach for this crate when you want one API and CLI surface that discovers packag
 ```bash
 mc init
 mc skill -a pi -y
-mc discover --format json
-mc change --package monochange --bump patch --reason "describe the change"
-mc release --dry-run --format json
+mc step:discover --format json
+mc step:create-change-file --package monochange --bump patch --reason "describe the change"
+mc step:prepare-release --dry-run --format json
 mc mcp
 ```
 

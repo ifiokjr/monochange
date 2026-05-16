@@ -12,21 +12,21 @@ This repository uses `devenv` for a reproducible shell.
 devenv shell
 install:all
 mc step:validate
-mc discover --format json
-mc change --package monochange --bump minor --reason "add release planning"
+mc step:discover --format json
+mc step:create-change-file --package monochange --bump minor --reason "add release planning"
 mc step:diagnose-changesets --format json
-mc release --dry-run --format json
-mc publish-release --dry-run --format json
-mc release-pr --dry-run --format json
+mc step:prepare-release --dry-run --format json
+mc step:publish-release --dry-run --format json
+mc step:open-release-request --dry-run --format json
 mc step:release-record --from v1.2.3
 mc step:tag-release --from HEAD --dry-run --format json
 mc step:publish-readiness --from HEAD --output .monochange/readiness.json
 mc step:placeholder-publish --from HEAD --output .monochange/bootstrap-result.json
 mc step:publish-readiness --from HEAD --output .monochange/readiness.json
-mc publish-plan --readiness .monochange/readiness.json --format json
-mc publish --output .monochange/publish-result.json
-mc repair-release --from v1.2.3 --target HEAD --dry-run
-mc release
+mc step:plan-publish-rate-limits --readiness .monochange/readiness.json --format json
+mc step:publish-packages --output .monochange/publish-result.json
+mc step:retarget-release --from v1.2.3 --target HEAD --dry-run
+mc step:prepare-release
 ```
 
 <!-- {/repoDevEnvironmentSetupCode} -->
@@ -57,7 +57,7 @@ mc --help
 docs:check
 docs:update
 mc step:validate
-mc change --package monochange --bump patch --reason "describe the change"
+mc step:create-change-file --package monochange --bump patch --reason "describe the change"
 lint:all
 test:all
 coverage:all

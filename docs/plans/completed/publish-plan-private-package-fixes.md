@@ -10,7 +10,7 @@ Completed in PR #264: https://github.com/monochange/monochange/pull/264
 
 ## Goal
 
-Fix publish planning so disabled or private packages never appear in publish batches, make placeholder publishing treat any existing registry version as already bootstrapped, correct npm trusted-publishing setup URLs, and harden crates.io lookups so transient API behavior does not break `mc publish-plan`.
+Fix publish planning so disabled or private packages never appear in publish batches, make placeholder publishing treat any existing registry version as already bootstrapped, correct npm trusted-publishing setup URLs, and harden crates.io lookups so transient API behavior does not break `mc step:plan-publish-rate-limits`.
 
 ## Scope
 
@@ -50,4 +50,4 @@ Validation completed for PR #264. The key targeted coverage lives in `crates/mon
 ## Notes
 
 - Favor fixture-first coverage for workspace/discovery scenarios.
-- Keep the publish filtering logic aligned between `mc publish` and `mc publish-plan`.
+- Keep the publish filtering logic aligned between `mc step:publish-packages` and `mc step:plan-publish-rate-limits`.

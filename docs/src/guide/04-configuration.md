@@ -230,7 +230,7 @@ Private registries and custom publication flows are still external. For those pa
 
 ### Placeholder publishing
 
-`mc placeholder-publish` exists for the bootstrap case where a package must already exist in the registry before you can finish automation setup such as trusted publishing.
+`mc step:placeholder-publish` exists for the bootstrap case where a package must already exist in the registry before you can finish automation setup such as trusted publishing.
 
 For each managed package with built-in publishing enabled, monochange:
 
@@ -270,7 +270,7 @@ dependency_fields = ["dependencies", "optional-dependencies", "group.dependencie
 dependency_fields = []
 ```
 
-The same resolved policy is used by `mc plan-release-publish` and `mc publish`.
+The same resolved policy is used by `mc step:plan-publish-rate-limits` and `mc step:publish-packages`.
 
 ### Trusted publishing
 
@@ -452,7 +452,7 @@ Key rules:
 
 ## Lockfile commands
 
-By default monochange rewrites supported lockfiles directly from the release plan. That keeps normal `mc release` runs close to `--dry-run` speed instead of launching package managers just to rewrite workspace version strings.
+By default monochange rewrites supported lockfiles directly from the release plan. That keeps normal `mc step:prepare-release` runs close to `--dry-run` speed instead of launching package managers just to rewrite workspace version strings.
 
 Built-in direct lockfile updates cover:
 
@@ -465,7 +465,7 @@ For Python projects, monochange infers package-manager lockfile commands instead
 
 If you configure `lockfile_commands` for an ecosystem, monochange stops using the built-in direct updater for that ecosystem and those commands fully own lockfile refresh. Use that escape hatch only when your workspace needs package-manager-side regeneration beyond version rewrites.
 
-For Cargo specifically, monochange no longer falls back to `cargo generate-lockfile` automatically when a lockfile looks incomplete. That keeps `mc release` on the fast path and leaves the final dependency-resolution refresh under your control: either configure `[ecosystems.cargo].lockfile_commands` explicitly or run `cargo generate-lockfile` / `cargo check` yourself afterwards.
+For Cargo specifically, monochange no longer falls back to `cargo generate-lockfile` automatically when a lockfile looks incomplete. That keeps `mc step:prepare-release` on the fast path and leaves the final dependency-resolution refresh under your control: either configure `[ecosystems.cargo].lockfile_commands` explicitly or run `cargo generate-lockfile` / `cargo check` yourself afterwards.
 
 If you want to measure that tradeoff before opting into a refresh command, run the `prepare_release_apply_cargo_lockfile_refresh` Criterion benchmark. It compares the default `direct_rewrite` path against an explicit `full_refresh_command` run on the same synthetic Cargo workspace.
 
@@ -674,11 +674,11 @@ CLI command interpolation variables:
 
 <!-- {/configurationWorkflowVariables} -->
 
-Performance tip: keep the default `mc release` path focused on built-in steps such as `PrepareRelease`. Arbitrary `Command` steps shell out to external tools, so expensive follow-up work like formatting, validation, publishing, or pushes should usually be gated behind an explicit input such as `when = "{{ inputs.commit }}"` if you want local release preparation to stay sub-second.
+Performance tip: keep the default `mc step:prepare-release` path focused on built-in steps such as `PrepareRelease`. Arbitrary `Command` steps shell out to external tools, so expensive follow-up work like formatting, validation, publishing, or pushes should usually be gated behind an explicit input such as `when = "{{ inputs.commit }}"` if you want local release preparation to stay sub-second.
 
 `RetargetRelease` is intentionally different from `PrepareRelease`-driven steps. It operates from git history plus source/provider information, discovers the durable `ReleaseRecord`, and then exposes structured `retarget.*` outputs for later command steps.
 
-See [Repairable releases](./12-repairable-releases.md) for when to use `mc repair-release` versus publishing a new patch release.
+See [Repairable releases](./12-repairable-releases.md) for when to use `mc step:retarget-release` versus publishing a new patch release.
 
 ## GitHub release settings
 
@@ -737,6 +737,10 @@ trigger = "release_pr_merge"
 release_targets = ["sdk"]
 requires = ["main"]
 ```
+
+`changeset_context_timeout_seconds` bounds hosted-source enrichment for linked changeset context. The default is `120`; set a positive value and expect monochange to keep the release moving with a warning if provider context enrichment times out.
+
+When enrichment times out, monochange logs a `"timed out enriching changeset context"` warning and continues preparing the release without the linked PR context. Background enrichment tasks are cancelled immediately on timeout so the CLI does not hang after the main step finishes.
 
 <!-- {/configurationGitHubSnippet} -->
 
@@ -853,7 +857,7 @@ Current implementation notes:
 - live GitHub release and release-request publishing uses `octocrab` with `GITHUB_TOKEN` / `GH_TOKEN`; GitLab and Gitea use direct HTTP APIs
 - release-request publishing still uses local `git` for branch, commit, and push operations before provider API updates when not in dry-run mode
 - changeset policy commands currently apply only to the GitHub provider and expect `[changesets.affected]`, a `changed_paths` command input, and reusable diagnostics for GitHub Actions consumption
-- supported command steps today are `Validate`, `Discover`, `CreateChangeFile`, `PrepareRelease`, `CommitRelease`, `PublishRelease`, `OpenReleaseRequest`, `CommentReleasedIssues`, `AffectedPackages`, `DiagnoseChangesets`, `RetargetRelease`, and `Command`
+- supported command steps today are documented in the [CLI step reference](../reference/cli-steps/00-index.md); prefer `mc step:<kebab-name>` in generic examples and reserve top-level aliases for repositories that define matching `[cli.*]` workflows
 - see the [CLI step reference](../reference/cli-steps/00-index.md) for detailed per-step guidance, prerequisites, and composition examples
 
 <!-- {/configurationCurrentStatus} -->

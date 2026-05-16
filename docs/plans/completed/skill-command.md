@@ -1,5 +1,9 @@
 # `mc skill` subcommand
 
+## Status
+
+Completed and merged. The built-in `mc skill` command now installs the packaged monochange skill bundle through the upstream `skills add` workflow.
+
 ## Goal
 
 Add a built-in `mc skill` command that installs the monochange skill bundle into the current project through the upstream `skills add` workflow.
@@ -50,4 +54,3 @@ Add a built-in `mc skill` command that installs the monochange skill bundle into
 
 - `mc skill` should stay thin and let the upstream `skills` CLI own the interactive install UX.
 - The command should prefer local project installation by default, while still allowing forwarded upstream flags such as `-g`, `-a`, `--skill`, `--copy`, `--list`, `--all`, and `-y`.
-- After rebasing `feat/skill-command` onto the latest `main`, `devenv shell coverage:patch` completed successfully but reported `PATCH_COVERAGE 0/0 (100.00%)` because the branch no longer had committed diff hunks yet; committed patch coverage should be rechecked again after the feature commit is created.

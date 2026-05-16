@@ -69,7 +69,7 @@ Example:
 
 ## Benchmark integration
 
-The binary benchmark workflow uses `--progress-format json` to extract `PrepareRelease` phase timings for both `mc release --dry-run` and `mc release`.
+The binary benchmark workflow uses `--progress-format json` to extract `PrepareRelease` phase timings for both `mc step:prepare-release --dry-run` and workflow commands that include a `PrepareRelease` step.
 
 Those timings are summarized and compared against `scripts/benchmark-phase-budgets.json`, which lets pull requests fail when real release-path regressions exceed the configured budget.
 

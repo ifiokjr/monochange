@@ -523,7 +523,7 @@ For repository work:
 ```bash
 mc step:validate
 mc check
-mc release --dry-run --diff
+mc step:prepare-release --dry-run --diff
 ```
 
 If you changed shared docs too:

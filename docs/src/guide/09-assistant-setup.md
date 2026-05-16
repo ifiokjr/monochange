@@ -107,11 +107,11 @@ Keep instructions like these close to your project guidance:
 
 - Read `monochange.toml` before proposing release workflow changes.
 - Run `mc step:validate` before and after release-affecting edits.
-- Use `mc discover --format json` to inspect package ids, group ownership, and dependency edges.
+- Use `mc step:discover --format json` to inspect package ids, group ownership, and dependency edges.
 - Use `mc step:diagnose-changesets --format json` or `monochange_diagnostics` for a structured view of all pending changesets with git and review context.
 - Use `monochange_lint_catalog` and `monochange_lint_explain` when you need lint metadata without shelling out.
-- Prefer `mc change` plus `.changeset/*.md` files over ad hoc release notes.
-- Use `mc release --dry-run --format json` before mutating release state.
+- Prefer `mc step:create-change-file` plus `.changeset/*.md` files over ad hoc release notes.
+- Use `mc step:prepare-release --dry-run --format json` before mutating release state.
 
 <!-- {/assistantRepoGuidance} -->
 

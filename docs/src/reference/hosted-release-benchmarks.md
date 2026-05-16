@@ -2,7 +2,7 @@
 
 The default binary benchmark workflow uses synthetic local fixtures so every pull request can run quickly in CI.
 
-When you need to measure hosted-provider overhead for the real `mc release` path, use a dedicated hosted fixture repository instead. That lets the benchmark include GitHub request cost, realistic history shape, and changesets that actually arrived through pull requests.
+When you need to measure hosted-provider overhead for the real `mc step:prepare-release` path, use a dedicated hosted fixture repository instead. That lets the benchmark include GitHub request cost, realistic history shape, and changesets that actually arrived through pull requests.
 
 ## Create the fixture repository
 
@@ -62,7 +62,7 @@ This produces the same markdown summary format as the CI benchmark comment, but 
 
 Focus on:
 
-- the overall `mc release` delta between `main` and the PR binary
+- the overall `mc step:prepare-release` delta between `main` and the PR binary
 - the `prepare release total` row in the phase table
 - hosted-specific phases such as `enrich changeset context via github`
 

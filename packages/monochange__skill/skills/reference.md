@@ -30,11 +30,9 @@ mc step:diagnose-changesets --format json
 mc step:prepare-release --dry-run --format json
 ```
 
-If configured aliases exist, users may prefer:
+If configured aliases exist, users may prefer repository-native wrappers. Confirm them with `mc help` first:
 
 ```bash
-mc discover --format json
-mc step:diagnose-changesets --format json
 mc release --dry-run --format json
 mc release --dry-run --diff
 ```
@@ -59,11 +57,11 @@ Current built-in package publishing is release-record oriented:
 ```bash
 mc step:publish-readiness --from HEAD --output readiness.json
 mc step:placeholder-publish --from HEAD --output bootstrap.json
-mc publish-plan --readiness readiness.json --format json   # only if configured in this repo
-mc publish --output publish-result.json                    # only if configured in this repo
+mc step:plan-publish-rate-limits --readiness readiness.json --format json
+mc step:publish-packages --output publish-result.json
 ```
 
-`mc step:publish-readiness` and `mc step:placeholder-publish` are built in. `mc publish-plan` and `mc publish` are user-defined workflows when present.
+All four commands above are built-in step commands. Top-level aliases such as `mc publish-plan` or `mc publish` are user-defined workflows when present.
 
 Use `mode = "external"` for private/custom registries or when existing CI handles package publication.
 

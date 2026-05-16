@@ -26,9 +26,11 @@
 
 - [Manifest linting with `mc check`](reference/linting.md)
 - [Progress output](reference/progress-output.md)
+- [CLI command surface](reference/cli-commands.md)
 - [Telemetry](reference/telemetry.md)
 - [Hosted release benchmarks](reference/hosted-release-benchmarks.md)
 - [CLI step reference](reference/cli-steps/00-index.md)
+  - [Config](reference/cli-steps/18-config.md)
   - [Validate](reference/cli-steps/01-validate.md)
   - [Discover](reference/cli-steps/02-discover.md)
   - [CreateChangeFile](reference/cli-steps/03-create-change-file.md)
@@ -46,3 +48,6 @@
   - [DisplayVersions](reference/cli-steps/14-display-versions.md)
   - [PlaceholderPublish](reference/cli-steps/15-placeholder-publish.md)
   - [PublishPackages](reference/cli-steps/16-publish-packages.md)
+  - [ReleaseRecord](reference/cli-steps/19-release-record.md)
+  - [PublishReadiness](reference/cli-steps/20-publish-readiness.md)
+  - [TagRelease](reference/cli-steps/21-tag-release.md)

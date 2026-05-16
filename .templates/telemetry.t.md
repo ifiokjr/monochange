@@ -35,7 +35,7 @@ MC_TELEMETRY=local MC_TELEMETRY_FILE=/tmp/mc-telemetry.jsonl mc step:validate
 Setting only `MC_TELEMETRY_FILE` also enables the local sink for that command:
 
 ```sh
-MC_TELEMETRY_FILE=/tmp/mc-telemetry.jsonl mc discover
+MC_TELEMETRY_FILE=/tmp/mc-telemetry.jsonl mc step:discover
 ```
 
 Disable telemetry explicitly with any of:

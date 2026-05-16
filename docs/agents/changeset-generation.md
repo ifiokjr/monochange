@@ -773,7 +773,7 @@ Agent detects code changes (via PR, commit, or manual trigger)
 Command:
 
 ```bash
-mc publish-plan --format json
+mc step:plan-publish-rate-limits --format json
 ```
 
 **Before (output):**
@@ -789,7 +789,7 @@ mc publish-plan --format json
 ```
 ````
 
-Do not repeat the same `mc publish-plan --format json` invocation in both sections.
+Do not repeat the same `mc step:plan-publish-rate-limits --format json` invocation in both sections.
 
 ### Example 1: Library with new API
 

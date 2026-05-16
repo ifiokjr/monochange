@@ -29,7 +29,7 @@ All supported ecosystems feed the same planner. After discovery, monochange can:
 - normalize dependency edges into one graph
 - apply `[group.<id>]` version synchronization rules
 - propagate dependent bumps through internal dependency edges
-- update native manifests during `mc release`
+- update native manifests during `mc step:prepare-release`
 - update extra `versioned_files` entries, including regex-managed files
 - render changelogs and release notes from `.changeset/*.md`
 - create durable release records and post-merge tags

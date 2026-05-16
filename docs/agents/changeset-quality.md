@@ -47,12 +47,12 @@ Example body:
 
 When the invocation is unchanged but the output changes, prefer a structure like this:
 
-> #### update `mc publish-plan --format json` batch filtering
+> #### update `mc step:plan-publish-rate-limits --format json` batch filtering
 >
 > Command:
 >
 > ```bash
-> mc publish-plan --format json
+> mc step:plan-publish-rate-limits --format json
 > ```
 >
 > **Before (output):**
@@ -67,7 +67,7 @@ When the invocation is unchanged but the output changes, prefer a structure like
 > { "publishRateLimits": { "batches": ["public"] } }
 > ```
 >
-> Do not repeat the same `mc publish-plan --format json` command in both sections.
+> Do not repeat the same `mc step:plan-publish-rate-limits --format json` command in both sections.
 
 When a command is **removed**, explain what users should do instead:
 

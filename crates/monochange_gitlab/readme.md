@@ -24,7 +24,7 @@ Reach for this crate when you want to preview or publish GitLab releases and mer
 
 ## Best for
 
-- building GitLab release automation on top of `mc release`
+- building GitLab release automation on top of `mc step:prepare-release` and `mc step:publish-release`
 - previewing would-be GitLab releases and merge requests in CI before publishing
 - self-hosted GitLab instances that need the same release workflow as GitHub
 

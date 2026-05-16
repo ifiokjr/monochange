@@ -24,7 +24,7 @@ Reach for this crate when you want to preview or publish GitHub releases and rel
 
 ## Best for
 
-- building GitHub release automation on top of `mc release`
+- building GitHub release automation on top of `mc step:prepare-release` and `mc step:publish-release`
 - previewing would-be GitHub releases and release PRs in CI before publishing
 - converting grouped or package release targets into repository automation payloads
 

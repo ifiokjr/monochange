@@ -2,11 +2,10 @@
 
 ## Status
 
-- Branch: `feat/async-migration`
+- Status: completed and merged via PR #440.
+- Historical branch: `feat/async-migration`
 - PR: <https://github.com/monochange/monochange/pull/440>
-- Main benchmark ref: `4cf0b0349fc4aa5f5775d6a6db624c6cd18b7a39`
-- PR benchmark ref: `463cd512779cb2add55434c07079568728d90b79` plus local diagnose follow-up changes
-- Benchmark workdir: `/tmp/monochange-async-perf-20260513`
+- Historical benchmark workdir: `/tmp/monochange-async-perf-20260513`
 - Hosted benchmark report: <https://htmlpreview.github.io/?https://gist.github.com/ifiokjr/6d59be48cc190d0808c768878f9c7c4a/raw/index.html>
 - Gist with raw reports: <https://gist.github.com/ifiokjr/6d59be48cc190d0808c768878f9c7c4a>
 
@@ -17,7 +16,7 @@
   - Re-applied pre-existing unstaged local work after the rebase.
   - Pushed rebase adjustments in `6aaebc7b fix: finalize async migration rebase adjustments`.
   - Fixed failing checks in `9c767aff fix: resolve async migration check failures`.
-  - Verified the PR checks are passing; remaining `mergeStateStatus: BLOCKED` appears to be branch protection or review policy rather than failing CI.
+  - PR checks passed and the branch merged through the merge queue.
 - Local quality gates run successfully:
   - `git diff --check`
   - `devenv shell -- lint:format`
@@ -82,16 +81,16 @@
 
 Measured with `hyperfine --warmup 1 --runs 6`.
 
-| Fixture                                            | Command                     |      main |       PR | PR/main | Reduction |
-| :------------------------------------------------- | :-------------------------- | --------: | -------: | ------: | --------: |
-| Baseline, 20 packages / 50 changesets / 50 commits | `mc step:validate`          |   37.5 ms |  25.4 ms |   0.68× |     32.3% |
-| Baseline, 20 packages / 50 changesets / 50 commits | `mc discover --format json` |   31.2 ms |  16.4 ms |   0.53× |     47.4% |
-| Baseline, 20 packages / 50 changesets / 50 commits | `mc release --dry-run`      |  316.6 ms | 131.8 ms |   0.42× |     58.4% |
-| Baseline, 20 packages / 50 changesets / 50 commits | `mc release`                |  345.9 ms | 148.9 ms |   0.43× |     57.0% |
-| Large, 200 packages / 500 changesets / 500 commits | `mc step:validate`          |  595.1 ms | 475.3 ms |   0.80× |     20.1% |
-| Large, 200 packages / 500 changesets / 500 commits | `mc discover --format json` |  548.0 ms | 380.7 ms |   0.69× |     30.5% |
-| Large, 200 packages / 500 changesets / 500 commits | `mc release --dry-run`      | 2769.8 ms | 708.6 ms |   0.26× |     74.4% |
-| Large, 200 packages / 500 changesets / 500 commits | `mc release`                | 3021.1 ms | 784.6 ms |   0.26× |     74.0% |
+| Fixture                                            | Command                             |      main |       PR | PR/main | Reduction |
+| :------------------------------------------------- | :---------------------------------- | --------: | -------: | ------: | --------: |
+| Baseline, 20 packages / 50 changesets / 50 commits | `mc step:validate`                  |   37.5 ms |  25.4 ms |   0.68× |     32.3% |
+| Baseline, 20 packages / 50 changesets / 50 commits | `mc step:discover --format json`    |   31.2 ms |  16.4 ms |   0.53× |     47.4% |
+| Baseline, 20 packages / 50 changesets / 50 commits | `mc step:prepare-release --dry-run` |  316.6 ms | 131.8 ms |   0.42× |     58.4% |
+| Baseline, 20 packages / 50 changesets / 50 commits | `mc release`                        |  345.9 ms | 148.9 ms |   0.43× |     57.0% |
+| Large, 200 packages / 500 changesets / 500 commits | `mc step:validate`                  |  595.1 ms | 475.3 ms |   0.80× |     20.1% |
+| Large, 200 packages / 500 changesets / 500 commits | `mc step:discover --format json`    |  548.0 ms | 380.7 ms |   0.69× |     30.5% |
+| Large, 200 packages / 500 changesets / 500 commits | `mc step:prepare-release --dry-run` | 2769.8 ms | 708.6 ms |   0.26× |     74.4% |
+| Large, 200 packages / 500 changesets / 500 commits | `mc release`                        | 3021.1 ms | 784.6 ms |   0.26× |     74.0% |
 
 Top-level CLI benchmark violations: `0`.
 
@@ -182,7 +181,7 @@ Peak memory sampling with `/usr/bin/time -l` for `step:diagnose-changesets` impr
    - The low-gain follow-up rerun now shows this command faster than `main`; remaining work is to isolate prepare-release and serialization costs for additional headroom.
 4. Large-fixture `mc step:validate` still spends roughly `0.49 s` on the PR branch.
    - Next work: identify whether validation repeatedly loads manifests or performs serial registry/source checks that can be cached or batched.
-5. Release phase timings do not fully explain the wall-clock `mc release` / `mc release --dry-run` durations.
+5. Release phase timings do not fully explain the wall-clock `mc release` / `mc step:prepare-release --dry-run` durations.
    - Next work: add or inspect outer phase spans around command startup, fixture setup, workflow orchestration, and subprocess boundaries so the remaining wall time is attributable.
 6. Memory usage has targeted spot checks but not broad benchmark coverage yet.
    - Next work: add peak RSS measurements for the benchmarked command matrix, then target allocation-heavy structures with borrowed data, streaming iteration, or smaller owned summaries.

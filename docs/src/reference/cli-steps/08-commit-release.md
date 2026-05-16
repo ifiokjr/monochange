@@ -4,7 +4,7 @@
 
 `CommitRelease` turns an already prepared release into a local git commit.
 
-The step uses monochange's release-commit format and embeds a durable `ReleaseRecord` in the commit body. That record is what later powers release inspection and repair workflows such as `mc step:release-record` and `mc repair-release`.
+The step uses monochange's release-commit format and embeds a durable `ReleaseRecord` in the commit body. That record is what later powers release inspection and repair workflows such as `mc step:release-record` and `mc step:retarget-release`.
 
 Think of it as the step that makes a prepared release durable in git history.
 

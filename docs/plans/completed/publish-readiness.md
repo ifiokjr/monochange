@@ -5,12 +5,12 @@
 Completed in PR #324: https://github.com/monochange/monochange/pull/324
 
 - Merge commit: `69f221dc1f9b4823e8aa98ebdea6b84aaa57baeb`
-- Previous publish-readiness slices shipped `mc step:publish-readiness`, readiness enforcement in `mc publish`, Cargo readiness blockers, readiness-backed publish planning, `mc step:placeholder-publish`, and package publish resume artifacts.
+- Previous publish-readiness slices shipped `mc step:publish-readiness`, readiness enforcement in `mc step:publish-packages`, Cargo readiness blockers, readiness-backed publish planning, `mc step:placeholder-publish`, and package publish resume artifacts.
 - This completed slice added deeper freshness checks for readiness artifacts by fingerprinting publish inputs that affect registry behavior.
 
 ## Problem
 
-A readiness artifact already proves that a release record and package set were ready at the time the artifact was written. It did not explicitly prove that the workspace publish inputs stayed unchanged afterward. A workflow could generate readiness, then alter `monochange.toml`, a package manifest, a lockfile, `.npmrc`, Cargo config, or another publish tooling input before `mc publish --readiness <path>` consumed the artifact.
+A readiness artifact already proves that a release record and package set were ready at the time the artifact was written. It did not explicitly prove that the workspace publish inputs stayed unchanged afterward. A workflow could generate readiness, then alter `monochange.toml`, a package manifest, a lockfile, `.npmrc`, Cargo config, or another publish tooling input before `mc step:publish-packages --readiness <path>` consumed the artifact.
 
 ## Scope
 
@@ -21,7 +21,7 @@ This slice extends readiness artifacts so they include a deterministic `inputFin
 - root and package lockfiles,
 - root publish tooling files such as `.npmrc`, `.cargo/config.toml`, `.cargo/config`, `rust-toolchain.toml`, `rust-toolchain`, workspace `Cargo.toml`, `pnpm-workspace.yaml`, Python tooling config, Deno config, and pubspec files.
 
-`mc publish` and readiness-backed `mc publish-plan` rebuild current readiness and reject saved artifacts whose publish input fingerprint no longer matches.
+`mc step:publish-packages` and readiness-backed `mc step:plan-publish-rate-limits` rebuild current readiness and reject saved artifacts whose publish input fingerprint no longer matches.
 
 ## Non-goals for this slice
 

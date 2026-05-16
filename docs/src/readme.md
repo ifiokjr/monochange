@@ -49,13 +49,13 @@ mc step:validate
 Discover the package ids you will use in commands and changesets:
 
 ```bash
-mc discover --format json
+mc step:discover --format json
 ```
 
 Create one change file for a package id:
 
 ```bash
-mc change --package <id> --bump patch --reason "describe the change"
+mc step:create-change-file --package <id> --bump patch --reason "describe the change"
 ```
 
 Most changes should target a package id. Use group ids only when the change is intentionally owned by the whole group.
@@ -63,28 +63,28 @@ Most changes should target a package id. Use group ids only when the change is i
 When a package is only changing because another dependency or version group moved first, author that context explicitly instead of relying on anonymous propagation:
 
 ```bash
-mc change --package <dependent-id> --bump none --caused-by <upstream-id> --reason "dependency-only follow-up"
+mc step:create-change-file --package <dependent-id> --bump none --caused-by <upstream-id> --reason "dependency-only follow-up"
 ```
 
 Preview the release plan safely:
 
 ```bash
-mc release --dry-run --format json
+mc step:prepare-release --dry-run --format json
 ```
 
 Add `--diff` when you want unified file previews for version and changelog updates without mutating the workspace:
 
 ```bash
-mc release --dry-run --diff
+mc step:prepare-release --dry-run --diff
 ```
 
 This first run is safe: nothing is published. Stop here until you are ready to prepare release files locally.
 
-When you are ready to prepare the release locally, run `mc release`.
+When you are ready to prepare the release locally, run `mc step:prepare-release`.
 
 <!-- {/projectCoreWorkflow} -->
 
-For human-readable local output, `mc release --dry-run` now defaults to terminal-friendly markdown. Use `--format json` for automation, `--format text` when you explicitly want the older plain-text rendering, `mc versions` when you only need planned package and group versions, and `--quiet` when you want dry-run behavior without stdout/stderr output. `mc versions` is a dedicated non-mutating summary command and also supports `--format markdown` and `--format json`.
+For human-readable local output, `mc step:prepare-release --dry-run` now defaults to terminal-friendly markdown. Use `--format json` for automation, `--format text` when you explicitly want the older plain-text rendering, `mc step:display-versions` when you only need planned package and group versions, and `--quiet` when you want dry-run behavior without stdout/stderr output. `mc step:display-versions` is a dedicated non-mutating summary command and also supports `--format markdown` and `--format json`.
 
 This book is maintained with `mdt` so shared content blocks stay synchronized across pages. See the [Configuration reference](guide/04-configuration.md#shared-documentation) for how template updates work.
 
@@ -122,27 +122,27 @@ Recent `monochange` improvements made package publishing guidance and diagnostic
 
 These are common commands for repositories using monochange. With the current CLI model, workflow names such as `discover`, `change`, `release`, `publish`, and `affected` come from optional `[cli.*]` tables in `monochange.toml`; binary commands such as `check`, `init`, and `mcp` stay built in, while typed built-in operations such as validation are exposed as immutable `mc step:*` commands.
 
-| Goal                             | Command                                                     | Use it when                                                                                              |
-| -------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Validate config and changesets   | `mc step:validate`                                          | You changed `monochange.toml` or `.changeset/*.md` files                                                 |
-| Inspect package ids and groups   | `mc discover --format json`                                 | You need the normalized workspace model                                                                  |
-| Create release intent            | `mc change --package <id> --bump <severity> --reason "..."` | You need a new `.changeset/*.md` file                                                                    |
-| Audit pending release context    | `mc step:diagnose-changesets --format json`                 | You need git provenance, PR/MR links, or related issues                                                  |
-| Preview the release plan         | `mc release --dry-run --diff`                               | You want changelog/version patches without mutating the repo                                             |
-| Create a durable release commit  | `mc commit-release`                                         | You want a monochange-managed release commit with an embedded `ReleaseRecord`                            |
-| Open or update a release request | `mc release-pr`                                             | You want a long-lived release PR/MR branch updated from current release state                            |
-| Inspect a past release commit    | `mc step:release-record --from <ref>`                       | You need the durable release declaration from git history                                                |
-| Check package publish readiness  | `mc step:publish-readiness --from HEAD --output <path>`     | You want a non-mutating preflight report before package publication                                      |
-| Plan ready package publishing    | `mc publish-plan --readiness <path>`                        | You want rate-limit batches that exclude non-ready package work                                          |
-| Publish packages to registries   | `mc publish --output <path>`                                | You want `cargo publish`, `npm publish`, `deno publish`, or `dart pub publish` style package publication |
-| Bootstrap release packages       | `mc step:placeholder-publish --from HEAD --output <path>`   | You need a release-record-scoped placeholder bootstrap artifact before rerunning readiness               |
-| Create post-merge release tags   | `mc step:tag-release --from HEAD`                           | You merged a monochange release commit and now need to create and push its declared tag set              |
-| Repair a recent release          | `mc repair-release --from <tag> --target <commit>`          | You need to retarget a just-created release to a later commit                                            |
-| Publish hosted/provider releases | `mc publish-release`                                        | You want GitHub/GitLab/Gitea release objects from prepared release state                                 |
+| Goal                             | Command                                                                      | Use it when                                                                                              |
+| -------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Validate config and changesets   | `mc step:validate`                                                           | You changed `monochange.toml` or `.changeset/*.md` files                                                 |
+| Inspect package ids and groups   | `mc step:discover --format json`                                             | You need the normalized workspace model                                                                  |
+| Create release intent            | `mc step:create-change-file --package <id> --bump <severity> --reason "..."` | You need a new `.changeset/*.md` file                                                                    |
+| Audit pending release context    | `mc step:diagnose-changesets --format json`                                  | You need git provenance, PR/MR links, or related issues                                                  |
+| Preview the release plan         | `mc step:prepare-release --dry-run --diff`                                   | You want changelog/version patches without mutating the repo                                             |
+| Create a durable release commit  | `mc step:commit-release`                                                     | You want a monochange-managed release commit with an embedded `ReleaseRecord`                            |
+| Open or update a release request | `mc step:open-release-request`                                               | You want a long-lived release PR/MR branch updated from current release state                            |
+| Inspect a past release commit    | `mc step:release-record --from <ref>`                                        | You need the durable release declaration from git history                                                |
+| Check package publish readiness  | `mc step:publish-readiness --from HEAD --output <path>`                      | You want a non-mutating preflight report before package publication                                      |
+| Plan ready package publishing    | `mc step:plan-publish-rate-limits --readiness <path>`                        | You want rate-limit batches that exclude non-ready package work                                          |
+| Publish packages to registries   | `mc step:publish-packages --output <path>`                                   | You want `cargo publish`, `npm publish`, `deno publish`, or `dart pub publish` style package publication |
+| Bootstrap release packages       | `mc step:placeholder-publish --from HEAD --output <path>`                    | You need a release-record-scoped placeholder bootstrap artifact before rerunning readiness               |
+| Create post-merge release tags   | `mc step:tag-release --from HEAD`                                            | You merged a monochange release commit and now need to create and push its declared tag set              |
+| Repair a recent release          | `mc step:retarget-release --from <tag> --target <commit>`                    | You need to retarget a just-created release to a later commit                                            |
+| Publish hosted/provider releases | `mc step:publish-release`                                                    | You want GitHub/GitLab/Gitea release objects from prepared release state                                 |
 
 <!-- {/projectCommandAutomationMatrix} -->
 
-`mc step:publish-readiness` performs non-mutating registry checks before `mc publish`. For built-in Cargo publishes to crates.io it also verifies current manifest publishability: `publish = false` blocks publishing, `publish = [...]` must include `crates-io`, `description` must be set, and either `license` or `license-file` must be set. Workspace-inherited Cargo metadata is accepted, and already-published versions remain non-blocking in readiness reports. The artifact fingerprints `monochange.toml`, package manifests, lockfiles, and registry/tooling files, so rerun `mc step:publish-readiness` after those inputs change. `mc publish-plan --readiness <path>` validates the artifact for planning and limits rate-limit batches to package ids that are ready in both the artifact and the fresh local readiness check. `mc publish` publishes directly from prepared release or `HEAD` release state and does not require the readiness artifact. If readiness shows missing first-time registry packages, run `mc step:placeholder-publish --from HEAD --output .monochange/bootstrap-result.json`, then rerun readiness before real publishing.
+`mc step:publish-readiness` performs non-mutating registry checks before `mc step:publish-packages`. For built-in Cargo publishes to crates.io it also verifies current manifest publishability: `publish = false` blocks publishing, `publish = [...]` must include `crates-io`, `description` must be set, and either `license` or `license-file` must be set. Workspace-inherited Cargo metadata is accepted, and already-published versions remain non-blocking in readiness reports. The artifact fingerprints `monochange.toml`, package manifests, lockfiles, and registry/tooling files, so rerun `mc step:publish-readiness` after those inputs change. `mc step:plan-publish-rate-limits --readiness <path>` validates the artifact for planning and limits rate-limit batches to package ids that are ready in both the artifact and the fresh local readiness check. `mc step:publish-packages` publishes directly from prepared release or `HEAD` release state and does not require the readiness artifact. If readiness shows missing first-time registry packages, run `mc step:placeholder-publish --from HEAD --output .monochange/bootstrap-result.json`, then rerun readiness before real publishing.
 
 ## What monochange can do today
 
@@ -159,7 +159,7 @@ These are common commands for repositories using monochange. With the current CL
 - preview or publish provider releases and release requests from typed command steps and shared release data
 - inspect durable release records from tags or descendant commits with `mc step:release-record`
 - create post-merge release tags from a merged release commit with `mc step:tag-release --from HEAD`
-- repair a recent source/provider release by retargeting its release tags with `mc repair-release`
+- repair a recent source/provider release by retargeting its release tags with `mc step:retarget-release`
 - inspect changeset context and review metadata with `mc step:diagnose-changesets` for both human and automation workflows
 - apply Rust semver evidence when provided
 - expose a bundled assistant skill plus a stdio MCP server with `mc mcp`

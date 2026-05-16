@@ -6,10 +6,10 @@ This branch should be measured against the current non-async `main` branch with 
 
 Use the existing CLI benchmark harness in `scripts/benchmark-cli.mjs`. It creates deterministic fixture repositories and measures these command paths with `hyperfine`:
 
-- `mc validate`
-- `mc discover --format json`
-- `mc release --dry-run`
-- `mc release`
+- `mc step:validate`
+- `mc step:discover --format json`
+- `mc step:prepare-release --dry-run`
+- `mc step:prepare-release` (the built-in step, equivalent to a typical `mc release` workflow command)
 
 The two bundled scenarios are intentionally different:
 

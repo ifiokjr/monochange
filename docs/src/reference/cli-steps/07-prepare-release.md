@@ -68,7 +68,7 @@ It can produce:
 
 Built-in release-oriented commands now default their human-readable `format` input to `markdown`. Use `text` when you explicitly want the older plain-text style, or `json` for automation.
 
-When you only need the resolved package and group versions, use the dedicated [`DisplayVersions`](14-display-versions.md) step or the built-in `mc versions` command instead of overloading `PrepareRelease`.
+When you only need the resolved package and group versions, use the dedicated [`DisplayVersions`](14-display-versions.md) step or the built-in `mc step:display-versions` command instead of overloading `PrepareRelease`.
 
 It also fills the shorthand template values commonly used by `Command` steps:
 
@@ -147,11 +147,11 @@ When you do need to split the workflow across separate commands, monochange can 
 The default path is automatic:
 
 ```bash
-mc release
-mc release-pr --dry-run
+mc step:prepare-release
+mc step:open-release-request --dry-run
 ```
 
-`mc release` stores the prepared state in `.monochange/prepared-release-cache.json`, and later commands with a `PrepareRelease` step reuse it when the git `HEAD`, workspace status, tracked release inputs, and relevant configuration still match.
+`mc step:prepare-release` stores the prepared state in `.monochange/prepared-release-cache.json`, and later commands with a `PrepareRelease` step reuse it when the git `HEAD`, workspace status, tracked release inputs, and relevant configuration still match.
 
 That `.monochange/` directory is meant for local monochange artifacts. Keep it gitignored so reusable prepared state, the cached release manifest, and other local release metadata do not pollute reviewable commits.
 
@@ -159,7 +159,7 @@ If you need to pass the artifact between explicit jobs or custom commands, use `
 
 ```bash
 mc release --prepared-release /tmp/release-plan.json
-mc release-pr --prepared-release /tmp/release-plan.json --format json
+mc step:open-release-request --prepared-release /tmp/release-plan.json --format json
 ```
 
 If the artifact is stale, monochange falls back to a fresh `PrepareRelease` run instead of trusting outdated release data.

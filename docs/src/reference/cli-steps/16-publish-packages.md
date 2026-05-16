@@ -74,7 +74,7 @@ Use `PlaceholderPublish` instead when you need to bootstrap a package that does 
 - `package` — optional repeated package ids used to filter the publish set
 - `group` — optional repeated group ids; all packages in each group are added to the publish set
 - `ecosystem` — optional repeated ecosystem names (`cargo`, `npm`, `deno`, `dart`, `flutter`, `python`, `go`); only packages targeting the selected ecosystems are published
-- `resume` — optional path to a JSON result artifact from an earlier real `mc publish` run; completed package versions are skipped and failed or pending work is retried
+- `resume` — optional path to a JSON result artifact from an earlier real `mc step:publish-packages` run; completed package versions are skipped and failed or pending work is retried
 - `output` — optional path where monochange writes the package publish result JSON artifact for retry/resume workflows
 
 ## Step-level `when` condition
@@ -141,7 +141,7 @@ help_text = "Ecosystems to publish (cargo, npm, deno, dart, flutter, python, go)
 [[cli.publish.inputs]]
 name = "resume"
 type = "path"
-help_text = "JSON result artifact from an earlier mc publish run; completed package versions are skipped"
+help_text = "JSON result artifact from an earlier mc step:publish-packages run; completed package versions are skipped"
 
 [[cli.publish.inputs]]
 name = "output"
@@ -164,10 +164,10 @@ Use `mc step:publish-readiness` when you want a reviewable preflight report, the
 
 ```bash
 mc step:publish-readiness --from HEAD --output .monochange/readiness.json
-mc publish --output .monochange/publish-result.json
+mc step:publish-packages --output .monochange/publish-result.json
 ```
 
-The readiness artifact is informational for `PublishPackages`; it is not required by `mc publish`. If a real publish fails after writing `.monochange/publish-result.json`, fix the registry/auth issue and rerun with `mc publish --resume .monochange/publish-result.json --output .monochange/publish-result.json`.
+The readiness artifact is informational for `PublishPackages`; it is not required by `mc step:publish-packages`. If a real publish fails after writing `.monochange/publish-result.json`, fix the registry/auth issue and rerun with `mc step:publish-packages --resume .monochange/publish-result.json --output .monochange/publish-result.json`.
 
 ### Publish only a specific package
 
@@ -217,7 +217,7 @@ Because `PublishPackages` understands:
 ## Common mistakes
 
 - confusing `PublishPackages` with `PublishRelease`: the former publishes to package registries, the latter creates hosted provider releases (such as GitHub releases)
-- assuming `mc publish` consumes the JSON file from `mc step:publish-readiness`; use readiness for preflight review or `mc publish-plan --readiness`, not as a `PublishPackages` input
+- assuming `mc step:publish-packages` consumes the JSON file from `mc step:publish-readiness`; use readiness for preflight review or `mc step:plan-publish-rate-limits --readiness`, not as a `PublishPackages` input
 - omitting `output` in CI, which makes partial registry failures harder to resume safely
 - expecting development-only dependency cycles to block publishing; only publish-relevant dependency kinds participate in cycle validation
 - running `PublishPackages` without rate-limit planning: use `PlanPublishRateLimits` first when you are unsure about registry windows

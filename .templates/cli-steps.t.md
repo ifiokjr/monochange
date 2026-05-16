@@ -72,6 +72,7 @@ Built-in `mc step:*` commands are different: they are generated directly from th
 
 | Step                    | Use it when you want to…                                                  | Requires previous step?          | Typical follow-up                                                                           |
 | ----------------------- | ------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------- |
+| `Config`                | inspect resolved configuration and workspace metadata                     | no                               | `Validate`, `Discover`, custom diagnostics                                                  |
 | `Validate`              | fail fast on invalid config, groups, or changesets                        | no                               | CI gate or local preflight                                                                  |
 | `Discover`              | inspect normalized package discovery across ecosystems                    | no                               | local inspection, debug commands                                                            |
 | `CreateChangeFile`      | author a `.changeset/*.md` file from CLI inputs                           | no                               | run independently, or before planning                                                       |
@@ -83,7 +84,10 @@ Built-in `mc step:*` commands are different: they are generated directly from th
 | `OpenReleaseRequest`    | create or update a hosted release PR/MR                                   | `PrepareRelease` + `[source]`    | provider review, follow-up `Command` steps                                                  |
 | `PlanPublishRateLimits` | plan package-registry publish work against known rate limits              | no                               | `PublishPackages`, `PlaceholderPublish`                                                     |
 | `PlaceholderPublish`    | publish `0.0.0` placeholder versions for missing registry packages        | no                               | normally before `PublishPackages`                                                           |
+| `ReleaseRecord`         | inspect release state embedded in a tag or commit                         | committed release record         | `PublishReadiness`, `TagRelease`, publish debugging                                         |
+| `PublishReadiness`      | check registry publishability without publishing packages                 | committed release record         | `PlaceholderPublish`, `PlanPublishRateLimits`, `PublishPackages`                            |
 | `PublishPackages`       | publish package versions to registries using built-in ecosystem workflows | prepared or HEAD release state   | custom `Command` steps using `publish.*`                                                    |
+| `TagRelease`            | create release tags declared by a release record                          | committed release record         | hosted release/publish jobs                                                                 |
 | `CommentReleasedIssues` | post release follow-up comments to closed issues                          | `PrepareRelease` + GitHub source | normally after `PublishRelease`                                                             |
 | `AffectedPackages`      | evaluate changeset coverage for changed files                             | no                               | CI enforcement, custom failure messaging                                                    |
 | `DiagnoseChangesets`    | inspect changeset context, commit provenance, and linked review metadata  | no                               | local debugging, CI inspection                                                              |
@@ -537,7 +541,7 @@ help_text = "Ecosystems to publish (cargo, npm, deno, dart, flutter, python, go)
 [[cli.publish.inputs]]
 name = "resume"
 type = "path"
-help_text = "JSON result artifact from an earlier mc publish run; completed package versions are skipped"
+help_text = "JSON result artifact from an earlier mc step:publish-packages run; completed package versions are skipped"
 
 [[cli.publish.inputs]]
 name = "output"

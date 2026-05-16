@@ -69,13 +69,13 @@ mc step:validate
 Discover the package ids you will use in commands and changesets:
 
 ```bash
-mc discover --format json
+mc step:discover --format json
 ```
 
 Create one change file for a package id:
 
 ```bash
-mc change --package <id> --bump patch --reason "describe the change"
+mc step:create-change-file --package <id> --bump patch --reason "describe the change"
 ```
 
 Most changes should target a package id. Use group ids only when the change is intentionally owned by the whole group.
@@ -83,28 +83,28 @@ Most changes should target a package id. Use group ids only when the change is i
 When a package is only changing because another dependency or version group moved first, author that context explicitly instead of relying on anonymous propagation:
 
 ```bash
-mc change --package <dependent-id> --bump none --caused-by <upstream-id> --reason "dependency-only follow-up"
+mc step:create-change-file --package <dependent-id> --bump none --caused-by <upstream-id> --reason "dependency-only follow-up"
 ```
 
 Preview the release plan safely:
 
 ```bash
-mc release --dry-run --format json
+mc step:prepare-release --dry-run --format json
 ```
 
 Add `--diff` when you want unified file previews for version and changelog updates without mutating the workspace:
 
 ```bash
-mc release --dry-run --diff
+mc step:prepare-release --dry-run --diff
 ```
 
 This first run is safe: nothing is published. Stop here until you are ready to prepare release files locally.
 
-When you are ready to prepare the release locally, run `mc release`.
+When you are ready to prepare the release locally, run `mc step:prepare-release`.
 
 <!-- {/projectCoreWorkflow} -->
 
-If you do not know which package id to target, rerun `mc discover --format json` and copy an id directly from the output.
+If you do not know which package id to target, rerun `mc step:discover --format json` and copy an id directly from the output.
 
 ## Next steps
 
@@ -135,13 +135,13 @@ If you do not know which package id to target, rerun `mc discover --format json`
 
 monochange can promote one prepared release into several source-provider automation flows without changing the underlying release-plan model.
 
-- `mc release --dry-run --format json` refreshes the cached manifest and shows downstream automation data, including authored changesets plus linked release context metadata
-- `mc publish-release --dry-run --format json` previews provider release payloads before publishing
-- `mc release-pr --dry-run --format json` previews the release branch, commit, and release-request body
-- when `[source.pull_requests].verified_commits = true` and `mc release-pr` runs on GitHub Actions for the configured GitHub repository, the GitHub provider pushes a normal release branch commit first, then attempts to replace it with a Git Database API commit that GitHub reports as verified; if verification or the API update fails, the normal pushed commit remains in place
+- `mc step:prepare-release --dry-run --format json` refreshes the cached manifest and shows downstream automation data, including authored changesets plus linked release context metadata
+- `mc step:publish-release --dry-run --format json` previews provider release payloads before publishing
+- `mc step:open-release-request --dry-run --format json` previews the release branch, commit, and release-request body
+- when `[source.pull_requests].verified_commits = true` and `mc step:open-release-request` runs on GitHub Actions for the configured GitHub repository, the GitHub provider pushes a normal release branch commit first, then attempts to replace it with a Git Database API commit that GitHub reports as verified; if verification or the API update fails, the normal pushed commit remains in place
 - `mc step:release-record --from <tag>` inspects the durable release declaration stored in the release commit body
 - `mc step:tag-release --from HEAD --dry-run --format json` previews the post-merge release tag set declared by that durable record
-- `mc repair-release --from <tag> --dry-run` previews a release-retarget plan before mutating tags
+- `mc step:retarget-release --from <tag> --dry-run` previews a release-retarget plan before mutating tags
 - changelog templates can render linked change owners, review requests, commits, and closed issues through `{{ context }}` or fine-grained metadata variables
 - `mc step:affected-packages --format json --verify --changed-paths ...` evaluates pull-request changeset policy from CI-supplied paths and labels without requiring a config-defined wrapper command
 - `mc step:diagnose-changesets --format json` shows all discovered changeset context or restricts to explicit inputs
@@ -218,7 +218,7 @@ See [Advanced: Assistant setup and MCP](docs/src/guide/09-assistant-setup.md) fo
 - preview or publish provider releases and release requests from typed command steps and shared release data
 - inspect durable release records from tags or descendant commits with `mc step:release-record`
 - create post-merge release tags from a merged release commit with `mc step:tag-release --from HEAD`
-- repair a recent source/provider release by retargeting its release tags with `mc repair-release`
+- repair a recent source/provider release by retargeting its release tags with `mc step:retarget-release`
 - inspect changeset context and review metadata with `mc step:diagnose-changesets` for both human and automation workflows
 - apply Rust semver evidence when provided
 - expose a bundled assistant skill plus a stdio MCP server with `mc mcp`
@@ -282,21 +282,21 @@ Enter the reproducible development shell and install workspace tooling:
 devenv shell
 install:all
 mc step:validate
-mc discover --format json
-mc change --package monochange --bump minor --reason "add release planning"
+mc step:discover --format json
+mc step:create-change-file --package monochange --bump minor --reason "add release planning"
 mc step:diagnose-changesets --format json
-mc release --dry-run --format json
-mc publish-release --dry-run --format json
-mc release-pr --dry-run --format json
+mc step:prepare-release --dry-run --format json
+mc step:publish-release --dry-run --format json
+mc step:open-release-request --dry-run --format json
 mc step:release-record --from v1.2.3
 mc step:tag-release --from HEAD --dry-run --format json
 mc step:publish-readiness --from HEAD --output .monochange/readiness.json
 mc step:placeholder-publish --from HEAD --output .monochange/bootstrap-result.json
 mc step:publish-readiness --from HEAD --output .monochange/readiness.json
-mc publish-plan --readiness .monochange/readiness.json --format json
-mc publish --output .monochange/publish-result.json
-mc repair-release --from v1.2.3 --target HEAD --dry-run
-mc release
+mc step:plan-publish-rate-limits --readiness .monochange/readiness.json --format json
+mc step:publish-packages --output .monochange/publish-result.json
+mc step:retarget-release --from v1.2.3 --target HEAD --dry-run
+mc step:prepare-release
 ```
 
 <!-- {/repoDevEnvironmentSetupCode} -->
