@@ -12,6 +12,35 @@ mc --help
 
 Then continue with [Start here](./00-start-here.md) or [Your first release plan](./02-setup.md).
 
+## Alternative: Nix / devenv
+
+If you use [devenv](https://devenv.sh/) or the Nix package manager, monochange is available via the [ifiokjr/nixpkgs](https://github.com/ifiokjr/nixpkgs) flake:
+
+```nix
+# flake.nix
+inputs = {
+  ifiokjr-nixpkgs.url = "github:ifiokjr/nixpkgs";
+};
+```
+
+Then add monochange to your devenv packages:
+
+```nix
+# devenv.nix
+let
+  extra = inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.system};
+in
+{
+  packages = [ extra.monochange ];
+}
+```
+
+Or run directly without adding to your flake:
+
+```bash
+nix run github:ifiokjr/nixpkgs#monochange
+```
+
 ## Alternative: Cargo
 
 If you prefer to install from Rust tooling instead:
