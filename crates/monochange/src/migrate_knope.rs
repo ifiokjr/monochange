@@ -654,8 +654,13 @@ jobs:
 }
 
 fn generate_setup_mc_action() -> String {
-	r"name: setup-mc
+	r#"name: setup-mc
 description: Install the monochange CLI
+inputs:
+  version:
+    description: 'monochange version to install'
+    required: false
+    default: 'latest'
 runs:
   using: composite
   steps:
@@ -663,9 +668,27 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        curl -fsSL https://get.monochange.dev/install.sh | sh -s -- -y
+        MC_VERSION='${{ inputs.version }}'
+        if [ "$MC_VERSION" = 'latest' ]; then
+          MC_VERSION=$(curl -fsSL https://api.github.com/repos/monochange/monochange/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
+        fi
+        ARCH=$(uname -m)
+        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+        case "$ARCH" in
+          x86_64)   RUST_ARCH="x86_64" ;;
+          aarch64)  RUST_ARCH="aarch64" ;;
+          *)        echo "Unsupported architecture: $ARCH"; exit 1 ;;
+        esac
+        case "$OS" in
+          linux)   RUST_OS="unknown-linux-gnu" ;;
+          darwin)  RUST_OS="apple-darwin" ;;
+          *)       echo "Unsupported OS: $OS"; exit 1 ;;
+        esac
+        TARBALL="monochange-${RUST_ARCH}-${RUST_OS}-v${MC_VERSION}.tar.gz"
+        curl -fsSL "https://github.com/monochange/monochange/releases/download/v${MC_VERSION}/${TARBALL}" | tar xz -C /usr/local/bin
+        ln -sf /usr/local/bin/monochange /usr/local/bin/mc
         mc --version
-".to_string()
+"#.to_string()
 }
 
 fn format_toml_array(items: &[String]) -> String {
