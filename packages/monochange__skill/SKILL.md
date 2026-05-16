@@ -59,6 +59,7 @@ Built-in binary and step commands worth remembering:
 - `mc lint` — list or explain lint rules and presets.
 - `mc mcp` — run the stdio MCP server.
 - `mc step:validate` — validate `monochange.toml` and changeset targets.
+- `mc step:config --format json` — print resolved configuration as JSON for scripting.
 - `mc step:publish-readiness` — verify publishability from a release record without publishing.
 - `mc step:placeholder-publish` — publish first-time placeholder versions for packages in a release record.
 
