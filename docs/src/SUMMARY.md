@@ -29,6 +29,7 @@
 - [CLI command surface](reference/cli-commands.md)
 - [Telemetry](reference/telemetry.md)
 - [Hosted release benchmarks](reference/hosted-release-benchmarks.md)
+- [Async performance comparison](reference/async-performance-comparison.md)
 - [CLI step reference](reference/cli-steps/00-index.md)
   - [Config](reference/cli-steps/18-config.md)
   - [Validate](reference/cli-steps/01-validate.md)

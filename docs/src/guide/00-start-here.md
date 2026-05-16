@@ -124,7 +124,7 @@ A good first-time mental model is:
 
 That is why most beginner flows should start with package ids, not groups.
 
-If you need a silent safety check, run `mc release --quiet`. Quiet mode suppresses stdout/stderr and keeps release-oriented commands in dry-run behavior.
+If you need a silent safety check, run `mc step:prepare-release --dry-run --quiet`. Quiet mode suppresses stdout/stderr and keeps release-oriented commands in dry-run behavior. If your repository defines a `[cli.release]` workflow, `mc release --quiet` also works.
 
 ## If you hit a problem
 

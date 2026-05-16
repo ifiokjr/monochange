@@ -26,4 +26,4 @@ The step reports the tag names and target commit. JSON output includes a flat ta
 
 ## Composition notes
 
-`TagRelease` reads release state from a release record and does not require a previous `PrepareRelease` step. Pair it with `ReleaseRecord` for inspection and `PublishReadiness` before package publishing.
+`TagRelease` reads release state from a release record and does not require a previous [`PrepareRelease`](07-prepare-release.md) step. Pair it with [`ReleaseRecord`](19-release-record.md) for inspection and [`PublishReadiness`](20-publish-readiness.md) before package publishing.

@@ -436,7 +436,7 @@ A typical knope CI workflow runs `knope release` or `knope document-change`:
 
 ### monochange GitHub Actions
 
-Replace with the equivalent monochange command:
+Replace with the equivalent monochange command (assuming a `[cli.release]` workflow or using `mc step:prepare-release` directly):
 
 ```yaml
 # After

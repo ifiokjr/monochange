@@ -23,4 +23,4 @@ The report groups packages by readiness state, including ready, already publishe
 
 ## Composition notes
 
-`PublishReadiness` reads release state from a release record. Run it after a release commit exists. If first-time packages are missing from registries, run `PlaceholderPublish`, then rerun `PublishReadiness` before planning or publishing packages.
+`PublishReadiness` reads release state from a release record. Run it after a release commit exists. If first-time packages are missing from registries, run [`PlaceholderPublish`](15-placeholder-publish.md), then rerun `PublishReadiness` before [`PlanPublishRateLimits`](09-plan-publish-rate-limits.md) or [`PublishPackages`](16-publish-packages.md).

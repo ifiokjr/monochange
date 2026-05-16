@@ -19,4 +19,4 @@ The JSON output includes the workspace root and resolved configuration after def
 
 ## Composition notes
 
-`Config` is standalone. It does not create release state for later steps, but it is a good first step in diagnostic workflows that then branch into `Validate`, `Discover`, or custom `Command` steps.
+`Config` is standalone. It does not create release state for later steps, but it is a good first step in diagnostic workflows that then branch into [`Validate`](01-validate.md), [`Discover`](02-discover.md), or custom `Command` steps.

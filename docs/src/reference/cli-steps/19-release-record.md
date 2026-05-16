@@ -22,4 +22,4 @@ The step reports the discovered release record, release targets, package version
 
 ## Composition notes
 
-`ReleaseRecord` is standalone and reads committed release state. It does not require a previous `PrepareRelease` step. Use it before `PublishReadiness`, `PlaceholderPublish`, `PublishPackages`, or `TagRelease` when a workflow starts from an already-committed release.
+`ReleaseRecord` is standalone and reads committed release state. It does not require a previous [`PrepareRelease`](07-prepare-release.md) step. Use it before [`PublishReadiness`](20-publish-readiness.md), [`PlaceholderPublish`](15-placeholder-publish.md), [`PublishPackages`](16-publish-packages.md), or [`TagRelease`](21-tag-release.md) when a workflow starts from an already-committed release.
