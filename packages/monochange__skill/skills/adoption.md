@@ -259,6 +259,21 @@ jobs:
 
 ### 4. `.github/actions/setup-mc/action.yml` — Reusable setup
 
+For repositories using [devenv](https://devenv.sh/), add monochange via the [ifiokjr/nixpkgs](https://github.com/ifiokjr/nixpkgs) flake instead of the curl installer:
+
+```nix
+# flake.nix
+inputs.ifiokjr-nixpkgs.url = "github:ifiokjr/nixpkgs";
+
+# devenv.nix
+let extra = inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.system};
+in {
+  packages = [ extra.monochange ];
+}
+```
+
+For repositories not using devenv:
+
 ```yaml
 name: setup-mc
 description: Install the monochange CLI
@@ -384,7 +399,7 @@ When an AI agent creates migration PRs, follow this workflow:
    - Configure `[defaults]` and `[defaults.changelog]`
 4. **Convert** changeset files to monochange format (add `# heading` to body)
 5. **Create** GitHub Actions workflows (release.yml, publish.yml, changeset-policy.yml, setup-mc action)
-6. **Remove** old tooling (knope.toml, knope from devenv, old CI references)
+6. **Remove** old tooling (knope.toml, knope from devenv/nixpkgs overlay, old CI references)
 7. **Validate** with `mc step:validate` and `mc check`
 8. **Create** PR with migration checklist in the description
 

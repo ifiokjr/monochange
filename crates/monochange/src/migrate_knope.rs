@@ -358,13 +358,11 @@ fn derive_package_ids_from_versioned_files(files: &[toml::Value]) -> Vec<String>
 		};
 		if !s.is_empty() && !ids.iter().any(|id| s.contains(id)) {
 			// Try to extract a crate name from the path
-			if let Some(name) = s.strip_suffix("/Cargo.toml") {
-				if let Some(crate_name) = name.split('/').next_back() {
-					if !ids.contains(&crate_name.to_string()) {
+			if let Some(name) = s.strip_suffix("/Cargo.toml")
+				&& let Some(crate_name) = name.split('/').next_back()
+					&& !ids.contains(&crate_name.to_string()) {
 						ids.push(crate_name.to_string());
 					}
-				}
-			}
 		}
 	}
 	if ids.is_empty() {
@@ -375,12 +373,11 @@ fn derive_package_ids_from_versioned_files(files: &[toml::Value]) -> Vec<String>
 
 fn derive_path_from_versioned_files(files: &[toml::Value]) -> String {
 	for file in files {
-		if let Some(s) = file.as_str() {
-			if s.ends_with("/Cargo.toml") || s.ends_with("/package.json") || s.ends_with("/pubspec.yaml") {
-				if let Some(parent) = s.rsplit_once('/') {
-					return parent.0.to_string();
-				}
-			}
+		if let Some(s) = file.as_str()
+			&& (s.ends_with("/Cargo.toml") || s.ends_with("/package.json") || s.ends_with("/pubspec.yaml"))
+			&& let Some(parent) = s.rsplit_once('/')
+		{
+			return parent.0.to_string();
 		}
 	}
 	".".to_string()
@@ -461,7 +458,7 @@ pub(crate) fn convert_changeset_text(text: &str) -> String {
 	// Ensure body starts with a heading
 	let trimmed_body = body.trim_start();
 	let new_body = if trimmed_body.starts_with('#') {
-		body.to_string()
+		body.clone()
 	} else {
 		let heading = extract_heading_from_frontmatter(&new_frontmatter);
 		format!("# {heading}\n\n{body}")
@@ -512,38 +509,23 @@ fn generate_ci_workflows(
 	config: &KnopeConfig,
 	messages: &mut Vec<String>,
 ) -> Vec<(String, String)> {
-	let mut files = Vec::new();
-
-	// release.yml
-	files.push((
-		".github/workflows/release.yml".to_string(),
-		generate_release_yml(config),
-	));
-
-	// publish.yml
-	files.push((
-		".github/workflows/publish.yml".to_string(),
-		generate_publish_yml(config),
-	));
-
-	// changeset-policy.yml
-	files.push((
-		".github/workflows/changeset-policy.yml".to_string(),
-		generate_changeset_policy_yml(),
-	));
-
-	// setup-mc action
-	files.push((
-		".github/actions/setup-mc/action.yml".to_string(),
-		generate_setup_mc_action(),
-	));
+	let files = vec![
+		// release.yml
+		(".github/workflows/release.yml".to_string(), generate_release_yml(config)),
+		// publish.yml
+		(".github/workflows/publish.yml".to_string(), generate_publish_yml(config)),
+		// changeset-policy.yml
+		(".github/workflows/changeset-policy.yml".to_string(), generate_changeset_policy_yml()),
+		// setup-mc action
+		(".github/actions/setup-mc/action.yml".to_string(), generate_setup_mc_action()),
+	];
 
 	messages.push("generated 4 CI workflow files".to_string());
 	files
 }
 
 fn generate_release_yml(_config: &KnopeConfig) -> String {
-	r#"name: release
+	r"name: release
 
 on:
   push:
@@ -567,7 +549,7 @@ jobs:
       - run: mc release-pr
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-"#.to_string()
+".to_string()
 }
 
 fn generate_publish_yml(config: &KnopeConfig) -> String {
@@ -581,15 +563,15 @@ fn generate_publish_yml(config: &KnopeConfig) -> String {
 	};
 
 	let publish_steps = match eco {
-		"cargo" => r#"      - uses: rust-lang/crates-io-auth-action@v1
+		"cargo" => r"      - uses: rust-lang/crates-io-auth-action@v1
         id: crates-oidc
       - run: mc step:publish-readiness --from HEAD --format json
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
       - run: mc step:publish-packages --all --format json
         env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}"#,
-		"npm" => r#"      - uses: pnpm/action-setup@v6
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}",
+		"npm" => r"      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - uses: actions/setup-node@v6
@@ -600,12 +582,12 @@ fn generate_publish_yml(config: &KnopeConfig) -> String {
       - run: pnpm -r publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true"#,
-		"dart" => r#"      - uses: dart-lang/setup-dart@v1
+          NPM_CONFIG_PROVENANCE: true",
+		"dart" => r"      - uses: dart-lang/setup-dart@v1
         with:
           sdk: stable
       - run: dart pub get
-      - run: melos publish --no-dry-run"#,
+      - run: melos publish --no-dry-run",
 		_ => "      # TODO: add publish steps for your ecosystem",
 	};
 
@@ -672,7 +654,7 @@ jobs:
 }
 
 fn generate_setup_mc_action() -> String {
-	r#"name: setup-mc
+	r"name: setup-mc
 description: Install the monochange CLI
 runs:
   using: composite
@@ -683,7 +665,7 @@ runs:
         set -euo pipefail
         curl -fsSL https://get.monochange.dev/install.sh | sh -s -- -y
         mc --version
-"#.to_string()
+".to_string()
 }
 
 fn format_toml_array(items: &[String]) -> String {

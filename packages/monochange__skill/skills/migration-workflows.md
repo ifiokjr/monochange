@@ -267,6 +267,21 @@ jobs:
 
 ### setup-mc/action.yml
 
+For repositories using devenv, add monochange to your nix flake inputs and devenv.nix instead of the curl-based installer:
+
+```nix
+# In flake.nix, add:
+inputs.ifiokjr-nixpkgs.url = "github:ifiokjr/nixpkgs";
+
+# In devenv.nix, add:
+let extra = inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.system};
+in {
+  packages = [ extra.monochange ];
+}
+```
+
+For repositories not using devenv:
+
 ```yaml
 name: setup-mc
 description: Install the monochange CLI
