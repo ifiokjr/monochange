@@ -516,11 +516,9 @@ fn generate_ci_workflows(
 		(".github/workflows/publish.yml".to_string(), generate_publish_yml(config)),
 		// changeset-policy.yml
 		(".github/workflows/changeset-policy.yml".to_string(), generate_changeset_policy_yml()),
-		// setup-mc action
-		(".github/actions/setup-mc/action.yml".to_string(), generate_setup_mc_action()),
 	];
 
-	messages.push("generated 4 CI workflow files".to_string());
+	messages.push("generated 3 CI workflow files".to_string());
 	files
 }
 
@@ -545,8 +543,13 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - uses: ./.github/actions/setup-mc
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - run: nix profile add --accept-flake-config nixpkgs#cachix && cachix use devenv && nix profile add nixpkgs#devenv
+        shell: bash
       - run: mc release-pr
+        shell: devenv shell -- bash -e {0}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ".to_string()
@@ -566,9 +569,11 @@ fn generate_publish_yml(config: &KnopeConfig) -> String {
 		"cargo" => r"      - uses: rust-lang/crates-io-auth-action@v1
         id: crates-oidc
       - run: mc step:publish-readiness --from HEAD --format json
+        shell: devenv shell -- bash -e {0}
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
       - run: mc step:publish-packages --all --format json
+        shell: devenv shell -- bash -e {0}
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}",
 		"npm" => r"      - uses: pnpm/action-setup@v6
@@ -614,7 +619,11 @@ jobs:
         with:
           ref: ${{{{ inputs.tag }}}}
           fetch-depth: 0
-      - uses: ./.github/actions/setup-mc
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{{{ secrets.GITHUB_TOKEN }}}}
+      - run: nix profile add --accept-flake-config nixpkgs#cachix && cachix use devenv && nix profile add nixpkgs#devenv
+        shell: bash
 {publish_steps}
 "#
 	)
@@ -636,10 +645,15 @@ jobs:
       pull-requests: read
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-mc
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{{{ secrets.GITHUB_TOKEN }}}}
+      - run: nix profile add --accept-flake-config nixpkgs#cachix && cachix use devenv && nix profile add nixpkgs#devenv
+        shell: bash
       - uses: tj-actions/changed-files@v46
         id: changed
       - name: run changeset policy
+        shell: devenv shell -- bash -e {0}
         env:
           CHANGED_FILES: ${{ steps.changed.outputs.all_changed_files }}
           PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels.*.name) }}
@@ -653,43 +667,6 @@ jobs:
 "#.to_string()
 }
 
-fn generate_setup_mc_action() -> String {
-	r#"name: setup-mc
-description: Install the monochange CLI
-inputs:
-  version:
-    description: 'monochange version to install'
-    required: false
-    default: 'latest'
-runs:
-  using: composite
-  steps:
-    - name: install mc
-      shell: bash
-      run: |
-        set -euo pipefail
-        MC_VERSION='${{ inputs.version }}'
-        if [ "$MC_VERSION" = 'latest' ]; then
-          MC_VERSION=$(curl -fsSL https://api.github.com/repos/monochange/monochange/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
-        fi
-        ARCH=$(uname -m)
-        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-        case "$ARCH" in
-          x86_64)   RUST_ARCH="x86_64" ;;
-          aarch64)  RUST_ARCH="aarch64" ;;
-          *)        echo "Unsupported architecture: $ARCH"; exit 1 ;;
-        esac
-        case "$OS" in
-          linux)   RUST_OS="unknown-linux-gnu" ;;
-          darwin)  RUST_OS="apple-darwin" ;;
-          *)       echo "Unsupported OS: $OS"; exit 1 ;;
-        esac
-        TARBALL="monochange-${RUST_ARCH}-${RUST_OS}-v${MC_VERSION}.tar.gz"
-        curl -fsSL "https://github.com/monochange/monochange/releases/download/v${MC_VERSION}/${TARBALL}" | tar xz -C /usr/local/bin
-        ln -sf /usr/local/bin/monochange /usr/local/bin/mc
-        mc --version
-"#.to_string()
-}
 
 fn format_toml_array(items: &[String]) -> String {
 	format!(

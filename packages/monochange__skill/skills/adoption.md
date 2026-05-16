@@ -143,9 +143,14 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - uses: monochange/setup-mc@v1
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - run: nix profile add --accept-flake-config nixpkgs#cachix && cachix use devenv && nix profile add nixpkgs#devenv
+        shell: bash
       - name: create or update release PR
         run: mc release-pr
+        shell: devenv shell -- bash -e {0}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -181,7 +186,11 @@ jobs:
         with:
           ref: ${{ inputs.tag }}
           fetch-depth: 0
-      - uses: monochange/setup-mc@v1
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - run: nix profile add --accept-flake-config nixpkgs#cachix && cachix use devenv && nix profile add nixpkgs#devenv
+        shell: bash
       - name: get crates.io OIDC token
         uses: rust-lang/crates-io-auth-action@v1
         id: crates-oidc
@@ -189,10 +198,12 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
         run: mc step:publish-readiness --from HEAD --format json
+        shell: devenv shell -- bash -e {0}
       - name: publish cargo packages
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
         run: mc step:publish-packages --all --format json
+        shell: devenv shell -- bash -e {0}
 ```
 
 #### npm with provenance
@@ -241,13 +252,18 @@ jobs:
       pull-requests: read
     steps:
       - uses: actions/checkout@v6
-      - uses: monochange/setup-mc@v1
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - run: nix profile add --accept-flake-config nixpkgs#cachix && cachix use devenv && nix profile add nixpkgs#devenv
+        shell: bash
       - uses: tj-actions/changed-files@v46
         id: changed
       - name: run changeset policy
         env:
           CHANGED_FILES: ${{ steps.changed.outputs.all_changed_files }}
           PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        shell: devenv shell -- bash -e {0}
         run: |
           set -euo pipefail
           mapfile -t labels < <(jq -r '.[]' <<<"$PR_LABELS_JSON")
@@ -257,59 +273,28 @@ jobs:
           mc "${args[@]}"
 ```
 
-### 4. `.github/actions/setup-mc/action.yml` — Reusable setup
+### Add monochange to devenv
 
-For repositories using [devenv](https://devenv.sh/), add monochange via the [ifiokjr/nixpkgs](https://github.com/ifiokjr/nixpkgs) flake instead of the curl installer:
+Add monochange to the project's `devenv.yaml` and `devenv.nix` so it's available in both local development and CI:
+
+#### `devenv.yaml`
+
+```yaml
+inputs:
+  ifiokjr-nixpkgs:
+    url: github:ifiokjr/nixpkgs
+```
+
+#### `devenv.nix`
 
 ```nix
-# flake.nix
-inputs.ifiokjr-nixpkgs.url = "github:ifiokjr/nixpkgs";
-
-# devenv.nix
 let extra = inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.system};
 in {
   packages = [ extra.monochange ];
 }
 ```
 
-For repositories not using devenv:
-
-```yaml
-name: setup-mc
-description: Install the monochange CLI
-inputs:
-  mc-version:
-    description: 'monochange version to install'
-    required: false
-    default: 'latest'
-runs:
-  using: composite
-  steps:
-    - name: install mc
-      shell: bash
-      run: |
-        set -euo pipefail
-        MC_VERSION='${{ inputs.mc-version || "latest" }}'
-        if [ "$MC_VERSION" = 'latest' ]; then
-          MC_VERSION=$(curl -fsSL https://api.github.com/repos/monochange/monochange/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
-        fi
-        ARCH=$(uname -m)
-        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-        case "$ARCH" in
-          x86_64)  RUST_ARCH="x86_64" ;;
-          aarch64) RUST_ARCH="aarch64" ;;
-          *)       echo "Unsupported architecture: $ARCH"; exit 1 ;;
-        esac
-        case "$OS" in
-          linux)   RUST_OS="unknown-linux-gnu" ;;
-          darwin)  RUST_OS="apple-darwin" ;;
-          *)       echo "Unsupported OS: $OS"; exit 1 ;;
-        esac
-        TARBALL="monochange-${RUST_ARCH}-${RUST_OS}-v${MC_VERSION}.tar.gz"
-        curl -fsSL "https://github.com/monochange/monochange/releases/download/v${MC_VERSION}/${TARBALL}" | tar xz -C /usr/local/bin
-        ln -sf /usr/local/bin/monochange /usr/local/bin/mc
-        mc --version
-```
+This makes `mc` available in `devenv shell`. All CI workflows run `mc` commands with `shell: devenv shell -- bash -e {0}` so the binary is on PATH.
 
 ## Binary release for Rust CLIs
 
@@ -421,7 +406,7 @@ When an AI agent creates migration PRs, follow this workflow:
    - Set `[source]` with provider, owner, repo
    - Configure `[defaults]` and `[defaults.changelog]`
 4. **Convert** changeset files to monochange format (add `# heading` to body)
-5. **Create** GitHub Actions workflows (release.yml, publish.yml, changeset-policy.yml, setup-mc action)
+5. **Create** GitHub Actions workflows (release.yml, publish.yml, changeset-policy.yml, monochange in devenv packages)
 6. **Remove** old tooling (knope.toml, knope from devenv/nixpkgs overlay, old CI references)
 7. **Validate** with `mc step:validate` and `mc check`
 8. **Create** PR with migration checklist in the description
