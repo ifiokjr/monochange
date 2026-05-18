@@ -45,6 +45,7 @@ in
 
   # disable dotenv since it interferes with variable interpolation in the shell
   dotenv.disableHint = true;
+  apple.sdk = null;
 
   git-hooks = {
     hooks = {
