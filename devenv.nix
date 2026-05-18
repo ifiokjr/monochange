@@ -45,7 +45,6 @@ in
 
   # disable dotenv since it interferes with variable interpolation in the shell
   dotenv.disableHint = true;
-  apple.sdk = null;
 
   git-hooks = {
     hooks = {
@@ -358,10 +357,8 @@ in
     "lint:test" = {
       exec = ''
         set -euo pipefail
-        gitleaks detect --verbose --redact
 
-        # lint:all;
-        # test:all;
+        ${pkgs.gitleaks}/bin/gitleaks detect --verbose --redact;
       '';
       description = "Used for the pre push checks";
       binary = "bash";
