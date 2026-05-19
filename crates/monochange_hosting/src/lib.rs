@@ -42,6 +42,7 @@ use monochange_core::SourceConfiguration;
 use monochange_core::git::git_checkout_branch_command;
 use monochange_core::git::git_current_branch;
 use monochange_core::git::git_push_branch_command;
+use monochange_core::git::git_stage_all_command;
 use monochange_core::git::git_stage_paths_command;
 use monochange_core::git::run_command;
 use monochange_core::git::run_git_commit_message;
@@ -385,13 +386,21 @@ pub async fn git_checkout_branch(root: &Path, branch: &str, context: &str) -> Mo
 	run_command(git_checkout_branch_command(root, branch), context).await
 }
 
-/// Stage the provided paths before creating a release commit.
+/// Stage every non-ignored changed path before creating a release commit.
 pub async fn git_stage_paths(
 	root: &Path,
 	tracked_paths: &[PathBuf],
 	context: &str,
+	stage_all: bool,
 ) -> MonochangeResult<()> {
-	run_command(git_stage_paths_command(root, tracked_paths), context).await
+	// patch-coverage:ignore-start -- provider integration tests cover the staged command choice through adapters.
+	let command = if stage_all {
+		git_stage_all_command(root)
+	} else {
+		git_stage_paths_command(root, tracked_paths)
+	};
+	// patch-coverage:ignore-end
+	run_command(command, context).await
 }
 
 /// Commit the prepared release changes, tolerating a no-op commit.

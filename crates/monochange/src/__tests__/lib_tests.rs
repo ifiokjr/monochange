@@ -1996,6 +1996,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 				always_run: false,
 				no_verify: false,
 				update_release_json: false,
+				stage_all: false,
 				inputs: BTreeMap::from([(
 					"format".to_string(),
 					monochange_core::CliStepInputValue::String("json".to_string()),
@@ -2015,6 +2016,7 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 				when: None,
 				always_run: false,
 				no_verify: false,
+				stage_all: false,
 				inputs: BTreeMap::from([(
 					"format".to_string(),
 					monochange_core::CliStepInputValue::String("json".to_string()),
@@ -5864,6 +5866,7 @@ async fn find_release_record_files_at_commit_falls_back_to_tree_when_parent_is_m
 	let source_root = source.path();
 	git_in_temp_repo(source_root, &["init"]);
 	git_in_temp_repo(source_root, &["config", "user.name", "monochange Tests"]);
+	git_in_temp_repo(source_root, &["config", "commit.gpgsign", "false"]);
 	git_in_temp_repo(
 		source_root,
 		&["config", "user.email", "monochange-tests@example.com"],
@@ -7039,6 +7042,7 @@ async fn execute_cli_command_release_follow_up_steps_require_prepare_release() {
 				when: None,
 				always_run: false,
 				no_verify: false,
+				stage_all: false,
 				inputs: BTreeMap::new(),
 			},
 			"`OpenReleaseRequest` requires a previous `PrepareRelease` step or a reusable prepared release artifact",
@@ -7194,6 +7198,7 @@ async fn execute_cli_command_publish_and_request_steps_require_source_configurat
 				when: None,
 				always_run: false,
 				no_verify: false,
+				stage_all: false,
 				inputs: BTreeMap::new(),
 			},
 			"`OpenReleaseRequest` requires `[source]` configuration",
@@ -7362,6 +7367,7 @@ async fn execute_cli_command_prepare_release_writes_default_manifest_cache_and_f
 				when: None,
 				always_run: false,
 				no_verify: false,
+				stage_all: false,
 				inputs: text_format_step_inputs(),
 			},
 		],
@@ -8793,6 +8799,7 @@ async fn execute_cli_command_commit_release_requires_prepare_release() {
 			always_run: false,
 			no_verify: false,
 			update_release_json: false,
+			stage_all: false,
 			inputs: BTreeMap::new(),
 		}],
 		dry_run: false,
@@ -13033,7 +13040,7 @@ async fn build_source_release_requests_and_change_request_cover_forgejo_dispatch
 
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let publish_error = temp_env::async_with_vars([("FORGEJO_TOKEN", Some("invalid\n"))], async {
-		crate::publish_source_change_request(&source, tempdir.path(), &request, &[], true)
+		crate::publish_source_change_request(&source, tempdir.path(), &request, &[], true, false)
 			.await
 			.err()
 			.unwrap_or_else(|| panic!("expected invalid git repository error"))

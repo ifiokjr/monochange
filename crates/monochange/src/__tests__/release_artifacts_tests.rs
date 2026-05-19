@@ -760,6 +760,7 @@ async fn release_manifest_and_source_helpers_cover_provider_specific_paths() {
 		&build_source_change_request(&source, &manifest),
 		&manifest.changed_files,
 		false,
+		false,
 	)
 	.await
 	{
@@ -772,6 +773,7 @@ async fn release_manifest_and_source_helpers_cover_provider_specific_paths() {
 		tempdir.path(),
 		&build_source_change_request(&github, &manifest),
 		&manifest.changed_files,
+		false,
 		false,
 	)
 	.await
@@ -797,6 +799,7 @@ async fn release_manifest_and_source_helpers_cover_provider_specific_paths() {
 			commit_message: build_release_commit_message(Some(&gitea), &manifest),
 		},
 		&manifest.changed_files,
+		false,
 		false,
 	)
 	.await

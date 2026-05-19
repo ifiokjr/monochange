@@ -414,6 +414,7 @@ pub async fn publish_release_pull_request(
 	request: &SourceChangeRequest,
 	tracked_paths: &[PathBuf],
 	no_verify: bool,
+	stage_all: bool,
 ) -> MonochangeResult<SourceChangeRequestOutcome> {
 	let lookup_source = source.clone();
 	let lookup_request = request.clone();
@@ -430,7 +431,13 @@ pub async fn publish_release_pull_request(
 		"prepare release merge request branch",
 	)
 	.await?;
-	git_stage_paths(root, tracked_paths, "stage release merge request files").await?;
+	git_stage_paths(
+		root,
+		tracked_paths,
+		"stage release merge request files",
+		stage_all,
+	)
+	.await?;
 	git_commit_paths(
 		root,
 		&request.commit_message,

@@ -714,6 +714,7 @@ fn publish_release_pull_request_create_branch_is_covered_without_etest() {
 				&request,
 				&[PathBuf::from("release.txt")],
 				false,
+				false,
 			))
 			.unwrap_or_else(|error| panic!("publish merge request: {error}"))
 	});
@@ -759,6 +760,7 @@ fn publish_release_pull_request_creates_merge_request_and_pushes_branch() {
 				&repo,
 				&request,
 				&[PathBuf::from("release.txt")],
+				false,
 				false,
 			))
 			.unwrap_or_else(|error| panic!("publish merge request: {error}"))
@@ -1020,6 +1022,7 @@ fn publish_release_pull_request_skips_push_when_existing_merge_request_matches_l
 				&repo,
 				&request,
 				&[PathBuf::from("release.txt")],
+				false,
 				false,
 			))
 			.unwrap_or_else(|error| panic!("publish merge request: {error}"))

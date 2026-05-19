@@ -1656,6 +1656,7 @@ fn publish_release_pull_request_falls_back_when_verified_commit_is_unavailable()
 					&request,
 					&[PathBuf::from("release.txt")],
 					false,
+					false,
 				))
 				.unwrap_or_else(|error| panic!("publish pull request: {error}"))
 		},
@@ -1975,6 +1976,7 @@ fn publish_release_pull_request_skips_push_when_existing_pull_request_matches_lo
 				&request,
 				&[PathBuf::from("release.txt")],
 				false,
+				true,
 			))
 			.unwrap_or_else(|error| panic!("publish pull request: {error}"))
 	});
@@ -1999,7 +2001,9 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 	git(&repo, &["config", "commit.gpgsign", "false"]);
 	fs::write(repo.join("release.txt"), "before\n")
 		.unwrap_or_else(|error| panic!("write release file: {error}"));
-	git(&repo, &["add", "release.txt"]);
+	fs::write(repo.join("pnpm-lock.yaml"), "lockfileVersion: '9.0'\n")
+		.unwrap_or_else(|error| panic!("write lockfile: {error}"));
+	git(&repo, &["add", "release.txt", "pnpm-lock.yaml"]);
 	git(&repo, &["commit", "-m", "initial"]);
 	git(&repo, &["branch", "-M", "main"]);
 	git(
@@ -2010,6 +2014,13 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 	must_ok(
 		fs::write(repo.join("release.txt"), "after\n"),
 		"update release file",
+	);
+	must_ok(
+		fs::write(
+			repo.join("pnpm-lock.yaml"),
+			"lockfileVersion: '9.0'\npackages: {}\n",
+		),
+		"update lockfile",
 	);
 
 	must_ok(
@@ -2027,7 +2038,11 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 	must_ok(
 		tokio::runtime::Runtime::new()
 			.unwrap()
-			.block_on(git_stage_paths(&repo, &[PathBuf::from("release.txt")])),
+			.block_on(git_stage_paths(
+				&repo,
+				&[PathBuf::from("release.txt")],
+				true,
+			)),
 		"stage paths",
 	);
 	tokio::runtime::Runtime::new().unwrap().block_on(git_commit_paths(
@@ -2051,6 +2066,12 @@ fn git_helpers_prepare_commit_and_push_release_branch() {
 		&["rev-parse", "--verify", "monochange/release/release"],
 	);
 	assert!(!branch.trim().is_empty());
+	let committed_files = git_output(
+		&repo,
+		&["diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"],
+	);
+	assert!(committed_files.contains("release.txt"));
+	assert!(committed_files.contains("pnpm-lock.yaml"));
 	let commit_body = git_output(&repo, &["log", "-1", "--pretty=%B"]);
 	assert!(commit_body.contains("## monochange Release Record"));
 	assert!(commit_body.contains("<!-- monochange:release-record:start -->"));
@@ -2092,6 +2113,7 @@ fn git_stage_paths_skips_missing_untracked_paths_and_ignored_untracked_files() {
 					PathBuf::from(".monochange/local/release-manifest.json"),
 					PathBuf::from(".changeset/missing.md"),
 				],
+				false,
 			)),
 		"stage paths",
 	);

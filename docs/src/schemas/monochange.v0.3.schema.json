@@ -512,6 +512,10 @@
 							"default": false,
 							"type": "boolean"
 						},
+						"stage_all": {
+							"default": false,
+							"type": "boolean"
+						},
 						"type": {
 							"const": "CommitRelease",
 							"type": "string"
@@ -733,6 +737,10 @@
 							]
 						},
 						"no_verify": {
+							"default": false,
+							"type": "boolean"
+						},
+						"stage_all": {
 							"default": false,
 							"type": "boolean"
 						},
@@ -1460,7 +1468,7 @@
 			"type": "object"
 		},
 		"SectionSeparator": {
-			"description": "How to format section headings in rendered changelogs.\nNote: Section headings are plain strings — include emoji directly in the `heading` field\nof `ChangelogSectionDef` if desired (e.g. `\"🚀 Added\"`, `\"🐛 Fixed\"`).",
+			"description": "How to format section headings in rendered changelogs.\nNote: Section headings are plain strings \u2014 include emoji directly in the `heading` field\nof `ChangelogSectionDef` if desired (e.g. `\"\ud83d\ude80 Added\"`, `\"\ud83d\udc1b Fixed\"`).",
 			"oneOf": [
 				{
 					"const": "blank_line",

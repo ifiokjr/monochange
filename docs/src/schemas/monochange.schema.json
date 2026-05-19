@@ -512,6 +512,10 @@
 							"default": false,
 							"type": "boolean"
 						},
+						"stage_all": {
+							"default": false,
+							"type": "boolean"
+						},
 						"type": {
 							"const": "CommitRelease",
 							"type": "string"
@@ -733,6 +737,10 @@
 							]
 						},
 						"no_verify": {
+							"default": false,
+							"type": "boolean"
+						},
+						"stage_all": {
 							"default": false,
 							"type": "boolean"
 						},

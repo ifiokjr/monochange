@@ -660,6 +660,7 @@ fn publish_release_pull_request_create_branch_is_covered_without_etest() {
 				&request,
 				&[PathBuf::from("release.txt")],
 				false,
+				false,
 			))
 			.unwrap_or_else(|error| panic!("publish pull request: {error}"))
 	});
@@ -713,6 +714,7 @@ fn publish_release_pull_request_creates_pull_request_and_labels() {
 				&repo,
 				&request,
 				&[PathBuf::from("release.txt")],
+				false,
 				false,
 			))
 			.unwrap_or_else(|error| panic!("publish pull request: {error}"))
@@ -991,6 +993,7 @@ fn publish_release_pull_request_skips_push_when_existing_pull_request_matches_lo
 				&repo,
 				&request,
 				&[PathBuf::from("release.txt")],
+				false,
 				false,
 			))
 			.unwrap_or_else(|error| panic!("publish pull request: {error}"))

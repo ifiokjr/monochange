@@ -5414,6 +5414,7 @@ fn validate_cli_runtime_requirements_enforce_source_features() {
 				when: None,
 				always_run: false,
 				no_verify: false,
+				stage_all: false,
 				inputs: BTreeMap::new(),
 			}],
 		)],

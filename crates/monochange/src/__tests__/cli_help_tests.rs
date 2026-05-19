@@ -35,6 +35,24 @@ fn paint_impl_color_on_and_off() {
 }
 
 #[test]
+fn input_description_explains_stage_all() {
+	let input = monochange_core::CliInputDefinition {
+		name: "stage_all".to_string(),
+		kind: monochange_core::CliInputKind::Boolean,
+		required: false,
+		short: None,
+		choices: Vec::new(),
+		default: None,
+		help_text: None,
+	};
+
+	assert_eq!(
+		input_description(&input),
+		"Stage every non-ignored working-tree change before the release commit"
+	);
+}
+
+#[test]
 fn render_single_command_help_minimal() {
 	let help = CommandHelp {
 		name: "minimal",
