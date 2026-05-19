@@ -136,6 +136,7 @@ use monochange_core::git::git_current_branch;
 use monochange_core::git::git_error_detail;
 use monochange_core::git::git_head_commit;
 use monochange_core::git::git_push_branch_command;
+use monochange_core::git::git_stage_all_command;
 use monochange_core::git::git_stage_paths_command;
 use monochange_core::git::run_command;
 use monochange_core::git::run_git_commit_message;
@@ -1137,6 +1138,7 @@ pub async fn publish_release_pull_request(
 	request: &GitHubPullRequestRequest,
 	tracked_paths: &[PathBuf],
 	no_verify: bool,
+	stage_all: bool,
 ) -> MonochangeResult<GitHubPullRequestOutcome> {
 	let lookup_source = source.clone();
 	let lookup_request = request.clone();
@@ -1145,7 +1147,7 @@ pub async fn publish_release_pull_request(
 			async move { lookup_existing_pull_request(&lookup_source, &lookup_request).await },
 		);
 	git_checkout_branch(root, &request.head_branch).await?;
-	git_stage_paths(root, tracked_paths).await?;
+	git_stage_paths(root, tracked_paths, stage_all).await?;
 	git_commit_paths(root, &request.commit_message, no_verify).await?;
 	let mut head_commit = git_head_commit(root).await?;
 	let existing = join_existing_pull_request_lookup(existing_pull_request).await?;
@@ -1881,16 +1883,21 @@ async fn git_checkout_branch(root: &Path, branch: &str) -> MonochangeResult<()> 
 	.await
 }
 
-async fn git_stage_paths(root: &Path, tracked_paths: &[PathBuf]) -> MonochangeResult<()> {
+async fn git_stage_paths(
+	root: &Path,
+	tracked_paths: &[PathBuf],
+	stage_all: bool,
+) -> MonochangeResult<()> {
 	let stageable_paths = resolve_stageable_release_paths(root, tracked_paths).await?;
 	if stageable_paths.is_empty() {
 		return Ok(());
 	}
-	run_command(
-		git_stage_paths_command(root, &stageable_paths),
-		"stage release pull request files",
-	)
-	.await
+	let command = if stage_all {
+		git_stage_all_command(root)
+	} else {
+		git_stage_paths_command(root, &stageable_paths)
+	};
+	run_command(command, "stage release pull request files").await
 }
 
 async fn resolve_stageable_release_paths(

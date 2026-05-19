@@ -92,6 +92,14 @@ pub fn git_stage_paths_command(root: &Path, tracked_paths: &[PathBuf]) -> Comman
 	command
 }
 
+/// Build a `git add --all -- .` command for every non-ignored release change.
+#[must_use]
+pub fn git_stage_all_command(root: &Path) -> Command {
+	let mut command = git_command(root);
+	command.arg("add").arg("--all").arg("--").arg(".");
+	command
+}
+
 /// Render a complete git commit message from the supplied monochange commit message.
 #[must_use]
 pub fn git_commit_message_text(message: &CommitMessage) -> String {

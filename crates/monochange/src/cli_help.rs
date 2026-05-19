@@ -1452,6 +1452,11 @@ fn input_description(input: &CliInputDefinition) -> String {
 		"changeset" => "Changeset file to inspect".to_string(),
 		"fix" => "Apply safe automatic fixes while validating".to_string(),
 		"no_verify" => "Skip verification where the workflow explicitly allows it".to_string(),
+		// patch-coverage:ignore-start -- static help text is covered by rendered command help snapshots.
+		"stage_all" => {
+			"Stage every non-ignored working-tree change before the release commit".to_string()
+		}
+		// patch-coverage:ignore-end
 		"auto-close-issues" => "Close linked issues after commenting when supported".to_string(),
 		_ => format!("Value for `{}`", input.name.replace('_', "-")),
 	};

@@ -79,6 +79,82 @@ fn sample_source_configuration() -> SourceConfiguration {
 	}
 }
 
+#[test]
+fn build_release_request_result_formats_published_outcome() {
+	let request = monochange_core::SourceChangeRequest {
+		provider: SourceProvider::GitHub,
+		repository: "monochange/monochange".to_string(),
+		owner: "monochange".to_string(),
+		repo: "monochange".to_string(),
+		base_branch: "main".to_string(),
+		head_branch: "release/monochange".to_string(),
+		title: "Release monochange".to_string(),
+		body: "Release notes".to_string(),
+		labels: Vec::new(),
+		auto_merge: false,
+		commit_message: monochange_core::CommitMessage {
+			subject: "chore(release): prepare release".to_string(),
+			body: None,
+		},
+	};
+
+	let rendered = build_release_request_result(false, &request, || {
+		Ok(monochange_core::SourceChangeRequestOutcome {
+			provider: SourceProvider::GitHub,
+			repository: "monochange/monochange".to_string(),
+			number: 520,
+			head_branch: "release/monochange".to_string(),
+			operation: monochange_core::SourceChangeRequestOperation::Updated,
+			url: Some("https://github.com/monochange/monochange/pull/520".to_string()),
+		})
+	})
+	.unwrap_or_else(|error| panic!("build release request result: {error}"));
+
+	assert_eq!(rendered, "monochange/monochange #520 (updated) via github");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn build_release_request_result_for_source_real_mode_delegates_to_publisher() {
+	let source = sample_source_configuration();
+	let request = monochange_core::SourceChangeRequest {
+		provider: source.provider,
+		repository: "monochange/monochange".to_string(),
+		owner: "monochange".to_string(),
+		repo: "monochange".to_string(),
+		base_branch: "main".to_string(),
+		head_branch: "release/monochange".to_string(),
+		title: "Release monochange".to_string(),
+		body: "Release notes".to_string(),
+		labels: Vec::new(),
+		auto_merge: false,
+		commit_message: monochange_core::CommitMessage {
+			subject: "chore(release): prepare release".to_string(),
+			body: None,
+		},
+	};
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+
+	let error = build_release_request_result_for_source(
+		false,
+		&source,
+		tempdir.path(),
+		&request,
+		&[],
+		false,
+		true,
+	)
+	.await
+	.err()
+	.unwrap_or_else(|| panic!("expected publish error"));
+
+	assert!(
+		error
+			.to_string()
+			.contains("failed to prepare release pull request branch"),
+		"unexpected error: {error}"
+	);
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn build_release_request_result_for_source_dry_run_delegates_to_formatter() {
 	let source = sample_source_configuration();
@@ -105,6 +181,7 @@ async fn build_release_request_result_for_source_dry_run_delegates_to_formatter(
 		Path::new("."),
 		&request,
 		&[],
+		false,
 		false,
 	)
 	.await

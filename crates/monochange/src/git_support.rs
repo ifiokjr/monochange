@@ -10,6 +10,7 @@ use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::git::git_command_output;
 use monochange_core::git::git_error_detail;
+use monochange_core::git::git_stage_all_command;
 use monochange_core::git::git_stage_paths_command;
 use monochange_core::git::git_stderr_trimmed;
 use monochange_core::git::git_stdout_trimmed;
@@ -291,6 +292,17 @@ pub(crate) async fn git_stage_paths(
 	)
 	.await
 }
+
+// patch-coverage:ignore-start -- thin git command wrapper covered by git_support integration tests.
+#[must_use = "the staging result must be checked"]
+pub(crate) async fn git_stage_all(root: &Path) -> MonochangeResult<()> {
+	run_git_process(
+		git_stage_all_command(root),
+		"failed to stage release commit files",
+	)
+	.await
+}
+// patch-coverage:ignore-end
 
 async fn resolve_stageable_release_paths(
 	root: &Path,

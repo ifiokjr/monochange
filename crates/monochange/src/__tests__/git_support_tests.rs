@@ -87,6 +87,60 @@ async fn git_commit_paths_supports_large_commit_message_bodies() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn git_stage_all_stages_non_ignored_changes_only() {
+	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+	let root = tempdir.path();
+	init_git_repo(root);
+	fs::write(
+		root.join(".gitignore"),
+		"ignored.txt
+",
+	)
+	.unwrap_or_else(|error| panic!("write gitignore: {error}"));
+	fs::write(
+		root.join("tracked.txt"),
+		"initial
+",
+	)
+	.unwrap_or_else(|error| panic!("write tracked: {error}"));
+	git(root, &["add", "."]);
+	git(root, &["commit", "-m", "initial"]);
+
+	fs::write(
+		root.join("tracked.txt"),
+		"updated
+",
+	)
+	.unwrap_or_else(|error| panic!("update tracked: {error}"));
+	fs::write(
+		root.join("untracked.txt"),
+		"new
+",
+	)
+	.unwrap_or_else(|error| panic!("write untracked: {error}"));
+	fs::write(
+		root.join("ignored.txt"),
+		"ignored
+",
+	)
+	.unwrap_or_else(|error| panic!("write ignored: {error}"));
+
+	git_stage_all(root)
+		.await
+		.unwrap_or_else(|error| panic!("git stage all: {error}"));
+
+	assert_eq!(
+		git_output(root, &["diff", "--cached", "--name-only"]),
+		"tracked.txt
+untracked.txt"
+	);
+	assert_eq!(
+		git_output(root, &["status", "--short", "--ignored", "ignored.txt"]),
+		"!! ignored.txt"
+	);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn git_stage_paths_returns_ok_when_all_paths_are_non_stageable() {
 	let tempdir = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 	let root = tempdir.path();
