@@ -2384,6 +2384,8 @@ pub enum CliStepDefinition {
 		hosted_url: Option<String>,
 		#[serde(default)]
 		oidc_audience: Option<String>,
+		#[serde(default)]
+		stage_all: bool,
 		#[serde(
 			default,
 			deserialize_with = "deserialize_cli_step_inputs",
@@ -2488,6 +2490,8 @@ pub enum CliStepDefinition {
 		always_run: bool,
 		#[serde(default)]
 		no_verify: bool,
+		#[serde(default)]
+		stage_all: bool,
 		#[serde(
 			default,
 			deserialize_with = "deserialize_cli_step_inputs",
@@ -2859,6 +2863,7 @@ impl CliStepDefinition {
 					"hosted_auth",
 					"hosted_url",
 					"oidc_audience",
+					"stage_all",
 				])
 			}
 			Self::VerifyReleaseBranch { .. } => Some(&["from"]),
@@ -2869,7 +2874,7 @@ impl CliStepDefinition {
 				Some(&["format", "from-ref", "auto-close-issues"])
 			}
 			Self::PublishRelease { .. } => Some(&["format", "from-ref", "draft"]),
-			Self::OpenReleaseRequest { .. } => Some(&["format", "no_verify"]),
+			Self::OpenReleaseRequest { .. } => Some(&["format", "no_verify", "stage_all"]),
 			Self::PlaceholderPublish { .. } => Some(&["format", "package", "show-all"]),
 			Self::PublishPackages { .. } => {
 				Some(&[
@@ -2973,6 +2978,7 @@ impl CliStepDefinition {
 					"no_verify" | "update_release_json" => Some(CliInputKind::Boolean),
 					"commit_backend" | "hosted_auth" => Some(CliInputKind::Choice),
 					"hosted_url" | "oidc_audience" => Some(CliInputKind::String),
+					"stage_all" => Some(CliInputKind::Boolean),
 					_ => None,
 				}
 			}
@@ -3005,7 +3011,7 @@ impl CliStepDefinition {
 			Self::OpenReleaseRequest { .. } => {
 				match name {
 					"format" => Some(CliInputKind::Choice),
-					"no_verify" => Some(CliInputKind::Boolean),
+					"no_verify" | "stage_all" => Some(CliInputKind::Boolean),
 					_ => None,
 				}
 			}
@@ -4818,6 +4824,7 @@ pub fn all_step_variants() -> Vec<CliStepDefinition> {
 			hosted_auth: HostedCommitAuth::default(),
 			hosted_url: None,
 			oidc_audience: None,
+			stage_all: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::VerifyReleaseBranch {
@@ -4855,6 +4862,7 @@ pub fn all_step_variants() -> Vec<CliStepDefinition> {
 			when: None,
 			always_run: false,
 			no_verify: false,
+			stage_all: false,
 			inputs: BTreeMap::new(),
 		},
 		CliStepDefinition::CommentReleasedIssues {

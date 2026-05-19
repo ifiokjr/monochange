@@ -2661,6 +2661,7 @@ dependencies = [
 name = "monochange_core"
 version = "0.5.1"
 dependencies = [
+ "async-trait",
  "ignore",
  "monochange_schema",
  "semver",
@@ -2668,6 +2669,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.18",
+ "tokio",
  "tracing",
 ]
 
@@ -2675,6 +2677,7 @@ dependencies = [
 name = "monochange_github"
 version = "0.5.1"
 dependencies = [
+ "async-trait",
  "monochange_core",
  "monochange_publish",
  "octocrab",
@@ -2706,6 +2709,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "tokio",
  "tracing",
  "urlencoding",
 ]

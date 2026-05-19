@@ -2074,6 +2074,7 @@ async fn execute_cli_command_with_options_commit_release_uses_hosted_backend() {
 			hosted_auth: HostedCommitAuth::Token,
 			hosted_url: Some("https://monochange.example".to_string()),
 			oidc_audience: Some("monochange.example".to_string()),
+			stage_all: false,
 			inputs: BTreeMap::new(),
 		}],
 		dry_run: false,
