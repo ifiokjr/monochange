@@ -4,7 +4,10 @@ use super::*;
 fn convert_changeset_adds_heading_to_body() {
 	let input = "---\nmy_crate: minor\n---\nAdd new LSP feature.\n";
 	let result = convert_changeset_text(input);
-	assert!(result.contains("# New feature"), "heading was not added: {result}");
+	assert!(
+		result.contains("# New feature"),
+		"heading was not added: {result}"
+	);
 	assert!(result.contains("Add new LSP feature"), "body was lost");
 }
 
@@ -13,15 +16,24 @@ fn convert_changeset_preserves_existing_heading() {
 	let input = "---\nmy_crate: minor\n---\n# Add new LSP feature\n\nDetails here.\n";
 	let result = convert_changeset_text(input);
 	assert!(result.contains("# Add new LSP feature"));
-	assert!(!result.contains("# New feature"), "should not add duplicate heading");
+	assert!(
+		!result.contains("# New feature"),
+		"should not add duplicate heading"
+	);
 }
 
 #[test]
 fn convert_changeset_replaces_default_with_main() {
 	let input = "---\ndefault: minor\n---\nAdd new feature.\n";
 	let result = convert_changeset_text(input);
-	assert!(result.contains("main: minor"), "default not replaced with main");
-	assert!(!result.contains("default: minor"), "default should be replaced");
+	assert!(
+		result.contains("main: minor"),
+		"default not replaced with main"
+	);
+	assert!(
+		!result.contains("default: minor"),
+		"default should be replaced"
+	);
 }
 
 #[test]

@@ -82,71 +82,71 @@ jobs:
 Add after `release-pr` job:
 
 ```yaml
-  upload-assets:
-    needs: release-pr
-    if: startsWith(github.ref_name, 'v') || startsWith(inputs.tag, 'v')
-    permissions:
-      attestations: write
-      contents: write
-      id-token: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: aarch64-apple-darwin
-            os: macos-14
-          - target: x86_64-apple-darwin
-            os: macos-latest
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-          - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
-          - target: x86_64-unknown-linux-musl
-            os: ubuntu-latest
-          - target: aarch64-unknown-linux-musl
-            os: ubuntu-latest
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-          - target: aarch64-pc-windows-msvc
-            os: windows-latest
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: taiki-e/upload-rust-binary-action@v1
-        with:
-          bin: YOUR_BINARY_NAME
-          manifest-path: crates/your_cli/Cargo.toml
-          archive: $bin-$target-$tag
-          target: ${{ matrix.target }}
-          tar: all
-          zip: windows
-          token: ${{ secrets.GITHUB_TOKEN }}
-          checksum: sha256,sha512
+upload-assets:
+  needs: release-pr
+  if: startsWith(github.ref_name, 'v') || startsWith(inputs.tag, 'v')
+  permissions:
+    attestations: write
+    contents: write
+    id-token: write
+  strategy:
+    fail-fast: false
+    matrix:
+      include:
+        - target: aarch64-apple-darwin
+          os: macos-14
+        - target: x86_64-apple-darwin
+          os: macos-latest
+        - target: x86_64-unknown-linux-gnu
+          os: ubuntu-latest
+        - target: aarch64-unknown-linux-gnu
+          os: ubuntu-latest
+        - target: x86_64-unknown-linux-musl
+          os: ubuntu-latest
+        - target: aarch64-unknown-linux-musl
+          os: ubuntu-latest
+        - target: x86_64-pc-windows-msvc
+          os: windows-latest
+        - target: aarch64-pc-windows-msvc
+          os: windows-latest
+  runs-on: ${{ matrix.os }}
+  steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+    - uses: dtolnay/rust-toolchain@stable
+    - uses: taiki-e/upload-rust-binary-action@v1
+      with:
+        bin: YOUR_BINARY_NAME
+        manifest-path: crates/your_cli/Cargo.toml
+        archive: $bin-$target-$tag
+        target: ${{ matrix.target }}
+        tar: all
+        zip: windows
+        token: ${{ secrets.GITHUB_TOKEN }}
+        checksum: sha256,sha512
 
-  attest-assets:
-    needs: upload-assets
-    runs-on: ubuntu-latest
-    permissions:
-      attestations: write
-      contents: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v6
-      - name: download release assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          asset_dir="$RUNNER_TEMP/release-assets"
-          mkdir -p "$asset_dir"
-          gh release download "${{ github.ref_name }}" \
-            --pattern 'YOUR_BINARY-*' \
-            --dir "$asset_dir"
-      - uses: actions/attest-build-provenance@v3
-        with:
-          subject-path: ${{ runner.temp }}/release-assets/*
+attest-assets:
+  needs: upload-assets
+  runs-on: ubuntu-latest
+  permissions:
+    attestations: write
+    contents: write
+    id-token: write
+  steps:
+    - uses: actions/checkout@v6
+    - name: download release assets
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        asset_dir="$RUNNER_TEMP/release-assets"
+        mkdir -p "$asset_dir"
+        gh release download "${{ github.ref_name }}" \
+          --pattern 'YOUR_BINARY-*' \
+          --dir "$asset_dir"
+    - uses: actions/attest-build-provenance@v3
+      with:
+        subject-path: ${{ runner.temp }}/release-assets/*
 ```
 
 ### publish.yml — crates.io with OIDC

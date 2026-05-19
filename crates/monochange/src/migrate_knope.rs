@@ -9,10 +9,10 @@ use std::fs;
 use std::path::Path;
 
 use clap::ArgMatches;
-use serde::{Deserialize, Serialize};
-
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
+use serde::Deserialize;
+use serde::Serialize;
 
 use crate::OutputFormat;
 use crate::parse_output_format;
@@ -132,7 +132,9 @@ pub(crate) fn run_knope_migration(
 	let generate_ci = knope_matches.get_flag("ci");
 	let format = knope_matches
 		.get_one::<String>("format")
-		.map_or(OutputFormat::Text, |v| parse_output_format(v).unwrap_or(OutputFormat::Text));
+		.map_or(OutputFormat::Text, |v| {
+			parse_output_format(v).unwrap_or(OutputFormat::Text)
+		});
 
 	let knope_path = root.join("knope.toml");
 	if !knope_path.exists() {
@@ -141,13 +143,11 @@ pub(crate) fn run_knope_migration(
 		));
 	}
 
-	let knope_text = fs::read_to_string(&knope_path).map_err(|error| {
-		MonochangeError::Io(format!("read knope.toml: {error}"))
-	})?;
+	let knope_text = fs::read_to_string(&knope_path)
+		.map_err(|error| MonochangeError::Io(format!("read knope.toml: {error}")))?;
 
-	let knope_config: KnopeConfig = toml::from_str(&knope_text).map_err(|error| {
-		MonochangeError::Config(format!("parse knope.toml: {error}"))
-	})?;
+	let knope_config: KnopeConfig = toml::from_str(&knope_text)
+		.map_err(|error| MonochangeError::Config(format!("parse knope.toml: {error}")))?;
 
 	let mut messages = Vec::new();
 
@@ -155,9 +155,8 @@ pub(crate) fn run_knope_migration(
 	let monochange_toml = translate_knope_config(&knope_config, &mut messages);
 
 	if !dry_run {
-		fs::write(root.join("monochange.toml"), &monochange_toml).map_err(|error| {
-			MonochangeError::Io(format!("write monochange.toml: {error}"))
-		})?;
+		fs::write(root.join("monochange.toml"), &monochange_toml)
+			.map_err(|error| MonochangeError::Io(format!("write monochange.toml: {error}")))?;
 	}
 
 	// 2. Convert changesets
@@ -304,7 +303,9 @@ fn translate_knope_config(config: &KnopeConfig, messages: &mut Vec<String>) -> S
 					if let Some(ref cmd) = step.command {
 						// Skip manual git steps — monochange handles git internally
 						if cmd.starts_with("git ")
-							&& (cmd.contains("add") || cmd.contains("commit") || cmd.contains("push"))
+							&& (cmd.contains("add")
+								|| cmd.contains("commit")
+								|| cmd.contains("push"))
 						{
 							continue;
 						}
@@ -360,9 +361,10 @@ fn derive_package_ids_from_versioned_files(files: &[toml::Value]) -> Vec<String>
 			// Try to extract a crate name from the path
 			if let Some(name) = s.strip_suffix("/Cargo.toml")
 				&& let Some(crate_name) = name.split('/').next_back()
-					&& !ids.contains(&crate_name.to_string()) {
-						ids.push(crate_name.to_string());
-					}
+				&& !ids.contains(&crate_name.to_string())
+			{
+				ids.push(crate_name.to_string());
+			}
 		}
 	}
 	if ids.is_empty() {
@@ -374,7 +376,9 @@ fn derive_package_ids_from_versioned_files(files: &[toml::Value]) -> Vec<String>
 fn derive_path_from_versioned_files(files: &[toml::Value]) -> String {
 	for file in files {
 		if let Some(s) = file.as_str()
-			&& (s.ends_with("/Cargo.toml") || s.ends_with("/package.json") || s.ends_with("/pubspec.yaml"))
+			&& (s.ends_with("/Cargo.toml")
+				|| s.ends_with("/package.json")
+				|| s.ends_with("/pubspec.yaml"))
 			&& let Some(parent) = s.rsplit_once('/')
 		{
 			return parent.0.to_string();
@@ -397,12 +401,11 @@ fn convert_changesets(
 	let mut converted = 0usize;
 	let mut unchanged = 0usize;
 
-	for entry in fs::read_dir(&changeset_dir).map_err(|error| {
-		MonochangeError::Io(format!("read .changeset dir: {error}"))
-	})? {
-		let entry = entry.map_err(|error| {
-			MonochangeError::Io(format!("read .changeset entry: {error}"))
-		})?;
+	for entry in fs::read_dir(&changeset_dir)
+		.map_err(|error| MonochangeError::Io(format!("read .changeset dir: {error}")))?
+	{
+		let entry = entry
+			.map_err(|error| MonochangeError::Io(format!("read .changeset entry: {error}")))?;
 		let path = entry.path();
 		if path.extension().and_then(|e| e.to_str()) != Some("md") {
 			continue;
@@ -511,11 +514,20 @@ fn generate_ci_workflows(
 ) -> Vec<(String, String)> {
 	let files = vec![
 		// release.yml
-		(".github/workflows/release.yml".to_string(), generate_release_yml(config)),
+		(
+			".github/workflows/release.yml".to_string(),
+			generate_release_yml(config),
+		),
 		// publish.yml
-		(".github/workflows/publish.yml".to_string(), generate_publish_yml(config)),
+		(
+			".github/workflows/publish.yml".to_string(),
+			generate_publish_yml(config),
+		),
 		// changeset-policy.yml
-		(".github/workflows/changeset-policy.yml".to_string(), generate_changeset_policy_yml()),
+		(
+			".github/workflows/changeset-policy.yml".to_string(),
+			generate_changeset_policy_yml(),
+		),
 	];
 
 	messages.push("generated 3 CI workflow files".to_string());
@@ -566,7 +578,8 @@ fn generate_publish_yml(config: &KnopeConfig) -> String {
 	};
 
 	let publish_steps = match eco {
-		"cargo" => r"      - uses: rust-lang/crates-io-auth-action@v1
+		"cargo" => {
+			r"      - uses: rust-lang/crates-io-auth-action@v1
         id: crates-oidc
       - run: mc step:publish-readiness --from HEAD --format json
         shell: devenv shell -- bash -e {0}
@@ -575,8 +588,10 @@ fn generate_publish_yml(config: &KnopeConfig) -> String {
       - run: mc step:publish-packages --all --format json
         shell: devenv shell -- bash -e {0}
         env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}",
-		"npm" => r"      - uses: pnpm/action-setup@v6
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}"
+		}
+		"npm" => {
+			r"      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - uses: actions/setup-node@v6
@@ -587,12 +602,15 @@ fn generate_publish_yml(config: &KnopeConfig) -> String {
       - run: pnpm -r publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true",
-		"dart" => r"      - uses: dart-lang/setup-dart@v1
+          NPM_CONFIG_PROVENANCE: true"
+		}
+		"dart" => {
+			r"      - uses: dart-lang/setup-dart@v1
         with:
           sdk: stable
       - run: dart pub get
-      - run: melos publish --no-dry-run",
+      - run: melos publish --no-dry-run"
+		}
 		_ => "      # TODO: add publish steps for your ecosystem",
 	};
 
@@ -667,11 +685,14 @@ jobs:
 "#.to_string()
 }
 
-
 fn format_toml_array(items: &[String]) -> String {
 	format!(
 		"[{}]",
-		items.iter().map(|s| format!("\"{s}\"")).collect::<Vec<_>>().join(", ")
+		items
+			.iter()
+			.map(|s| format!("\"{s}\""))
+			.collect::<Vec<_>>()
+			.join(", ")
 	)
 }
 
@@ -681,27 +702,30 @@ fn format_toml_array(items: &[String]) -> String {
 
 fn render_knope_migration_report(report: &KnopeMigrationReport, format: OutputFormat) -> String {
 	match format {
-		OutputFormat::Json => {
-			serde_json::to_string_pretty(report).unwrap_or_default()
-		}
-		OutputFormat::Markdown | OutputFormat::Text => {
-			text_knope_migration_report(report)
-		}
+		OutputFormat::Json => serde_json::to_string_pretty(report).unwrap_or_default(),
+		OutputFormat::Markdown | OutputFormat::Text => text_knope_migration_report(report),
 	}
 }
 
 fn text_knope_migration_report(report: &KnopeMigrationReport) -> String {
 	let mut out = String::new();
-	let action = if report.dry_run { "would migrate" } else { "migrated" };
+	let action = if report.dry_run {
+		"would migrate"
+	} else {
+		"migrated"
+	};
 	let _ = writeln!(
 		out,
 		"knope migration: {action} config + {}/{} changeset(s)",
-		report.changesets_converted,
-		report.changesets_scanned,
+		report.changesets_converted, report.changesets_scanned,
 	);
 	let _ = writeln!(out, "  unchanged: {}", report.changesets_unchanged);
 	if report.ci_generated {
-		let ci_action = if report.dry_run { "would generate" } else { "generated" };
+		let ci_action = if report.dry_run {
+			"would generate"
+		} else {
+			"generated"
+		};
 		let _ = writeln!(out, "  ci: {ci_action} 4 workflow files");
 	}
 	for msg in &report.messages {

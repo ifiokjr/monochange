@@ -34,24 +34,25 @@ See the dedicated guide: [Migrating from knope](../../docs/src/guide/10-migratin
 
 Key translations:
 
-| knope | monochange |
-|-------|-----------|
-| `knope.toml` | `monochange.toml` |
-| `[package]` with `versioned_files` | `[package.<id>]` with `path` |
-| `[[workflows]]` arrays | `[cli.<command>]` map entries |
-| `[github]` | `[source]` (provider-neutral) |
-| `scopes` | Not needed — use package IDs in changesets |
-| `knope release` | `mc release-pr` (opens/updates PR) |
-| `knope forced-release` | Automatic on PR merge |
-| `knope document-change` | `mc step:create-change-file` or `mc change` |
-| `default: minor` (lockstep) | Group ID in changeset (e.g., `main: minor`) |
-| `app: patch` (scoped) | Package ID in changeset (e.g., `my_app: patch`) |
+| knope                              | monochange                                      |
+| ---------------------------------- | ----------------------------------------------- |
+| `knope.toml`                       | `monochange.toml`                               |
+| `[package]` with `versioned_files` | `[package.<id>]` with `path`                    |
+| `[[workflows]]` arrays             | `[cli.<command>]` map entries                   |
+| `[github]`                         | `[source]` (provider-neutral)                   |
+| `scopes`                           | Not needed — use package IDs in changesets      |
+| `knope release`                    | `mc release-pr` (opens/updates PR)              |
+| `knope forced-release`             | Automatic on PR merge                           |
+| `knope document-change`            | `mc step:create-change-file` or `mc change`     |
+| `default: minor` (lockstep)        | Group ID in changeset (e.g., `main: minor`)     |
+| `app: patch` (scoped)              | Package ID in changeset (e.g., `my_app: patch`) |
 
 ### From NOPE / Atlassian changesets
 
 NOPE changesets use YAML frontmatter similar to monochange, but the body format differs:
 
 **Before** (NOPE):
+
 ```markdown
 ---
 my_crate: minor
@@ -61,6 +62,7 @@ Add new LSP feature.
 ```
 
 **After** (monochange):
+
 ```markdown
 ---
 my_crate: minor
@@ -209,29 +211,29 @@ jobs:
 #### npm with provenance
 
 ```yaml
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 10
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm -r publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
+- uses: actions/setup-node@v6
+  with:
+    node-version: 24
+    registry-url: https://registry.npmjs.org
+- uses: pnpm/action-setup@v6
+  with:
+    version: 10
+- run: pnpm install --frozen-lockfile
+- run: pnpm -r publish --access public --no-git-checks
+  env:
+    NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    NPM_CONFIG_PROVENANCE: true
 ```
 
 #### pub.dev with OIDC
 
 ```yaml
-      - uses: dart-lang/setup-dart@v1
-        with:
-          sdk: stable
-      - run: dart pub get
-      - run: melos publish --no-dry-run
-        # Requires OIDC publisher setup at https://dart.dev/tools/pub/automated-publishing
+- uses: dart-lang/setup-dart@v1
+  with:
+    sdk: stable
+- run: dart pub get
+- run: melos publish --no-dry-run
+  # Requires OIDC publisher setup at https://dart.dev/tools/pub/automated-publishing
 ```
 
 ### 3. `.github/workflows/changeset-policy.yml` — PR coverage
@@ -301,71 +303,71 @@ This makes `mc` available in `devenv shell`. All CI workflows run `mc` commands 
 Rust CLI binaries need cross-compilation + GitHub Release upload + npm platform packages. Add this to `release.yml`:
 
 ```yaml
-  upload-assets:
-    if: startsWith(inputs.tag || github.ref_name, 'v')
-    permissions:
-      attestations: write
-      contents: write
-      id-token: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: aarch64-apple-darwin
-            os: macos-14
-          - target: x86_64-apple-darwin
-            os: macos-latest
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-          - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
-          - target: x86_64-unknown-linux-musl
-            os: ubuntu-latest
-          - target: aarch64-unknown-linux-musl
-            os: ubuntu-latest
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-          - target: aarch64-pc-windows-msvc
-            os: windows-latest
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: taiki-e/upload-rust-binary-action@v1
-        with:
-          bin: YOUR_BINARY_NAME
-          manifest-path: crates/your_cli/Cargo.toml
-          ref: refs/tags/${{ inputs.tag || github.ref_name }}
-          archive: $bin-$target-$tag
-          target: ${{ matrix.target }}
-          tar: all
-          zip: windows
-          token: ${{ secrets.GITHUB_TOKEN }}
-          checksum: sha256,sha512
+upload-assets:
+  if: startsWith(inputs.tag || github.ref_name, 'v')
+  permissions:
+    attestations: write
+    contents: write
+    id-token: write
+  strategy:
+    fail-fast: false
+    matrix:
+      include:
+        - target: aarch64-apple-darwin
+          os: macos-14
+        - target: x86_64-apple-darwin
+          os: macos-latest
+        - target: x86_64-unknown-linux-gnu
+          os: ubuntu-latest
+        - target: aarch64-unknown-linux-gnu
+          os: ubuntu-latest
+        - target: x86_64-unknown-linux-musl
+          os: ubuntu-latest
+        - target: aarch64-unknown-linux-musl
+          os: ubuntu-latest
+        - target: x86_64-pc-windows-msvc
+          os: windows-latest
+        - target: aarch64-pc-windows-msvc
+          os: windows-latest
+  runs-on: ${{ matrix.os }}
+  steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+    - uses: dtolnay/rust-toolchain@stable
+    - uses: taiki-e/upload-rust-binary-action@v1
+      with:
+        bin: YOUR_BINARY_NAME
+        manifest-path: crates/your_cli/Cargo.toml
+        ref: refs/tags/${{ inputs.tag || github.ref_name }}
+        archive: $bin-$target-$tag
+        target: ${{ matrix.target }}
+        tar: all
+        zip: windows
+        token: ${{ secrets.GITHUB_TOKEN }}
+        checksum: sha256,sha512
 
-  attest-assets:
-    needs: upload-assets
-    runs-on: ubuntu-latest
-    permissions:
-      attestations: write
-      contents: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v6
-      - name: download release assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          asset_dir="$RUNNER_TEMP/release-assets"
-          mkdir -p "$asset_dir"
-          gh release download "${{ inputs.tag || github.ref_name }}" \
-            --pattern 'YOUR_BINARY_PREFIX-*' \
-            --dir "$asset_dir"
-      - uses: actions/attest-build-provenance@v3
-        with:
-          subject-path: ${{ runner.temp }}/release-assets/*
+attest-assets:
+  needs: upload-assets
+  runs-on: ubuntu-latest
+  permissions:
+    attestations: write
+    contents: write
+    id-token: write
+  steps:
+    - uses: actions/checkout@v6
+    - name: download release assets
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        asset_dir="$RUNNER_TEMP/release-assets"
+        mkdir -p "$asset_dir"
+        gh release download "${{ inputs.tag || github.ref_name }}" \
+          --pattern 'YOUR_BINARY_PREFIX-*' \
+          --dir "$asset_dir"
+    - uses: actions/attest-build-provenance@v3
+      with:
+        subject-path: ${{ runner.temp }}/release-assets/*
 ```
 
 ## Trusted publishing setup per-registry

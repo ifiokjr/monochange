@@ -1,6 +1,6 @@
 ---
 monochange: minor
-@monochange/skill: minor
+"@monochange/skill": minor
 monochange_schema: minor
 monochange_core: minor
 monochange_config: minor
