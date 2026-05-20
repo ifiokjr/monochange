@@ -31,6 +31,25 @@ monochange --help
 mc --help
 ```
 
+If you use [devenv](https://devenv.sh/), add monochange via the [ifiokjr/nixpkgs](https://github.com/ifiokjr/nixpkgs) overlay:
+
+```nix
+# flake.nix
+inputs.ifiokjr-nixpkgs.url = "github:ifiokjr/nixpkgs";
+
+# devenv.nix
+let extra = inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.system};
+in {
+  packages = [ extra.monochange ];
+}
+```
+
+Or run directly:
+
+```bash
+nix run github:ifiokjr/nixpkgs#monochange
+```
+
 ## 2. Generate a starter config
 
 Run `mc init` at the repository root:

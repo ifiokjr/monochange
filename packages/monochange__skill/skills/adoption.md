@@ -42,3 +42,9 @@ A good initial adoption has:
 - `[changesets.affected]` if CI checks changeset coverage.
 - `[lints]` if `mc check` should enforce manifest rules.
 - `[cli.*]` workflows for common team commands.
+
+## Installation
+
+- **npm**: `npm install -g @monochange/cli`
+- **Cargo**: `cargo install monochange`
+- **Nix / devenv**: Available via [ifiokjr/nixpkgs](https://github.com/ifiokjr/nixpkgs) flake. Add `inputs.ifiokjr-nixpkgs` to your flake.nix and reference `inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.system}.monochange` in your devenv packages. Or run directly: `nix run github:ifiokjr/nixpkgs#monochange`.
