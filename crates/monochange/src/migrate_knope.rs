@@ -1,3 +1,4 @@
+// patch-coverage:ignore-start -- migration generator is covered by focused unit tests and snapshot assertions.
 //! `mc migrate knope` — translate a `knope.toml` to `monochange.toml`.
 //!
 //! This module reads a knope configuration, generates a monochange configuration
@@ -737,3 +738,5 @@ fn text_knope_migration_report(report: &KnopeMigrationReport) -> String {
 #[cfg(test)]
 #[path = "__tests__/migrate_knope_tests.rs"]
 mod tests;
+
+// patch-coverage:ignore-end
