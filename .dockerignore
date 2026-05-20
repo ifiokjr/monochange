@@ -1,0 +1,16 @@
+.git
+.gitignore
+.env
+*.md
+target/
+node_modules/
+test-results/
+playwright-report/
+playwright/.cache/
+*.log
+*.png
+*.jpg
+*.svg
+!apps/monochange_app/crates/monochange_app/public/**/*.svg
+!apps/monochange_app/crates/monochange_app/public/**/*.png
+!apps/monochange_app/crates/monochange_app/public/**/*.jpg

@@ -1,0 +1,32 @@
+services:
+  app:
+    image: monochange-app:latest
+    restart: unless-stopped
+    environment:
+      SECRETSPEC_PROFILE: production
+      SECRETSPEC_PROVIDER: onepassword://monochange
+      OP_SERVICE_ACCOUNT_TOKEN_FILE: /run/secrets/onepassword_service_account_token
+      DATABASE_URL: sqlite:///data/monochange_app.sqlite3
+    secrets:
+      - onepassword_service_account_token
+    volumes:
+      - /opt/monochange/data:/data
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /opt/monochange/Caddyfile:/etc/caddy/Caddyfile:ro
+      - /opt/monochange/caddy/data:/data
+      - /opt/monochange/caddy/config:/config
+
+secrets:
+  onepassword_service_account_token:
+    file: /opt/monochange/secrets/op_service_account_token

@@ -24,7 +24,9 @@ use monochange_core::CliInputKind;
 use monochange_core::CliStepDefinition;
 use monochange_core::CliStepInputValue;
 use monochange_core::CommandVariable;
+use monochange_core::CommitReleaseBackend;
 use monochange_core::Ecosystem;
+use monochange_core::HostedCommitAuth;
 use monochange_core::MonochangeError;
 use monochange_core::MonochangeResult;
 use monochange_core::ShellConfig;
@@ -1028,6 +1030,10 @@ pub(crate) async fn execute_cli_command_with_options(
 				CliStepDefinition::CommitRelease {
 					no_verify,
 					update_release_json,
+					commit_backend,
+					hosted_auth,
+					hosted_url,
+					oidc_audience,
 					stage_all,
 					..
 				} => {
@@ -1063,16 +1069,31 @@ pub(crate) async fn execute_cli_command_with_options(
 							.unwrap_or(*update_release_json);
 					let stage_all =
 						parse_boolean_step_input(&step_inputs, "stage_all")?.unwrap_or(*stage_all);
-					let release_commit_report = commit_release(
-						root,
-						&context,
-						configuration.source.as_ref(),
-						&manifest,
-						no_verify,
-						update_release_json,
-						stage_all,
-					)
-					.await?;
+					let commit_backend = parse_commit_release_backend_input(&step_inputs)?
+						.unwrap_or(*commit_backend);
+					let hosted_auth =
+						parse_hosted_commit_auth_input(&step_inputs)?.unwrap_or(*hosted_auth);
+					let hosted_url = parse_string_step_input(&step_inputs, "hosted_url")?
+						.cloned()
+						.or_else(|| hosted_url.clone());
+					let oidc_audience = parse_string_step_input(&step_inputs, "oidc_audience")?
+						.cloned()
+						.or_else(|| oidc_audience.clone());
+					let release_commit_report = if commit_backend == CommitReleaseBackend::Hosted {
+						let hosted_commit_options = HostedCommitOptions {
+							auth: hosted_auth,
+							url: hosted_url,
+							oidc_audience,
+						};
+						#[rustfmt::skip]
+						let report = hosted_commit_release(root, &context, configuration.source.as_ref(), &manifest, update_release_json, &hosted_commit_options).await?;
+						report
+					} else {
+						#[rustfmt::skip]
+						let report =
+							commit_release(root, &context, configuration.source.as_ref(), &manifest, no_verify, update_release_json, stage_all).await?;
+						report
+					};
 					context.release_commit_report = Some(release_commit_report);
 					output = None;
 					Ok(())
@@ -2680,6 +2701,56 @@ fn publish_rate_limit_mode_from_inputs(
 			)))
 		}
 	}
+}
+
+fn parse_string_step_input<'a>(
+	inputs: &'a BTreeMap<String, Vec<String>>,
+	name: &str,
+) -> MonochangeResult<Option<&'a String>> {
+	let values = inputs.get(name);
+	if values.is_some_and(|values| values.len() > 1) {
+		return Err(MonochangeError::Config(format!(
+			"input `{name}` expects a single value"
+		)));
+	}
+	Ok(values.and_then(|values| values.first()))
+}
+
+fn parse_commit_release_backend_input(
+	inputs: &BTreeMap<String, Vec<String>>,
+) -> MonochangeResult<Option<CommitReleaseBackend>> {
+	parse_string_step_input(inputs, "commit_backend")?
+		.map(|value| {
+			match value.as_str() {
+				"local" => Ok(CommitReleaseBackend::Local),
+				"hosted" => Ok(CommitReleaseBackend::Hosted),
+				other => {
+					Err(MonochangeError::Config(format!(
+						"unsupported CommitRelease commit_backend `{other}`"
+					)))
+				}
+			}
+		})
+		.transpose()
+}
+
+fn parse_hosted_commit_auth_input(
+	inputs: &BTreeMap<String, Vec<String>>,
+) -> MonochangeResult<Option<HostedCommitAuth>> {
+	parse_string_step_input(inputs, "hosted_auth")?
+		.map(|value| {
+			match value.as_str() {
+				"auto" => Ok(HostedCommitAuth::Auto),
+				"oidc" => Ok(HostedCommitAuth::Oidc),
+				"token" => Ok(HostedCommitAuth::Token),
+				other => {
+					Err(MonochangeError::Config(format!(
+						"unsupported CommitRelease hosted_auth `{other}`"
+					)))
+				}
+			}
+		})
+		.transpose()
 }
 
 pub(crate) fn parse_boolean_step_input(

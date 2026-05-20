@@ -135,6 +135,7 @@ pub(crate) use cli_runtime::template_value_to_input_values;
 use command_wizard::run_command_wizard;
 use git_support::git_commit_paths;
 use git_support::git_head_commit;
+use git_support::git_stage_all;
 use git_support::git_stage_paths;
 #[cfg(test)]
 pub(crate) use git_support::read_git_commit_message;

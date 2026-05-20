@@ -41,9 +41,13 @@ in
   enterShell = ''
     set -euo pipefail
     export PATH="$DEVENV_PROFILE/bin:$PATH"
+    export PATH="$HOME/.cargo/bin:$PATH"
+    if [ -z "''${DATABASE_URL:-}" ]; then
+      export DATABASE_URL="sqlite://$PWD/.devenv/state/monochange_app.sqlite3"
+    fi
   '';
 
-  # disable dotenv since it interferes with variable interpolation in the shell
+  # disable dotenv since it breaks the variable interpolation supported by `direnv`
   dotenv.disableHint = true;
 
   git-hooks = {
@@ -79,6 +83,18 @@ in
   };
 
   scripts = {
+    "tailwindcss" = {
+      exec = ''
+        set -euo pipefail
+        app_tailwind="$DEVENV_ROOT/apps/monochange_app/node_modules/.bin/tailwindcss"
+        if [ -x "$app_tailwind" ]; then
+          exec "$app_tailwind" "$@"
+        fi
+        exec pnpm --dir "$DEVENV_ROOT/apps/monochange_app" exec tailwindcss "$@"
+      '';
+      description = "Run the monochange app Tailwind CSS CLI.";
+      binary = "bash";
+    };
     "monochange" = {
       exec = ''
         set -euo pipefail

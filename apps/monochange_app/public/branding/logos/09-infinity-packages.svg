@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+  <defs>
+    <linearGradient id="g9" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0c8ee7"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <!-- Infinity loop -->
+  <path d="M120 120 C120 80, 90 60, 70 60 C40 60, 20 80, 20 120 C20 160, 40 180, 70 180 C90 180, 120 160, 120 120 C120 80, 150 60, 170 60 C200 60, 220 80, 220 120 C220 160, 200 180, 170 180 C150 180, 120 160, 120 120" 
+        stroke="url(#g9)" stroke-width="8" fill="none" stroke-linecap="round"/>
+  <!-- Package nodes inside loops -->
+  <circle cx="50" cy="110" r="8" fill="#0c8ee7" opacity="0.8"/>
+  <circle cx="70" cy="130" r="6" fill="#0c8ee7" opacity="0.5"/>
+  <circle cx="170" cy="110" r="8" fill="#f59e0b" opacity="0.8"/>
+  <circle cx="190" cy="130" r="6" fill="#f59e0b" opacity="0.5"/>
+  <!-- Center version point -->
+  <circle cx="120" cy="120" r="10" fill="url(#g9)"/>
+  <text x="120" y="125" text-anchor="middle" font-family="Inter, sans-serif" font-weight="800" font-size="10" fill="white">v</text>
+</svg>

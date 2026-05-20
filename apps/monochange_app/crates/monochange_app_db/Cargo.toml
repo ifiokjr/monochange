@@ -1,0 +1,23 @@
+[package]
+name = "monochange_app_db"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+repository.workspace = true
+description = "Database models and migrations for the monochange web app"
+
+[dependencies]
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+typed-builder = "0.23.2"
+uuid = { workspace = true }
+welds = { workspace = true }
+welds-connections = { workspace = true }
+[dev-dependencies]
+rstest = { workspace = true }

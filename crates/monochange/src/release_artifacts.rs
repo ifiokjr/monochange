@@ -8,7 +8,6 @@ use std::io::IsTerminal;
 use similar::TextDiff;
 
 use super::*;
-use crate::git_support::git_stage_all;
 
 #[cfg(test)]
 thread_local! {
@@ -1923,6 +1922,64 @@ fn deduplicate_overlapping_release_records(
 	Ok(())
 }
 
+struct PreparedReleaseCommit {
+	message: CommitMessage,
+	tracked_paths: Vec<PathBuf>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct HostedCommitOptions {
+	pub(crate) auth: monochange_core::HostedCommitAuth,
+	pub(crate) url: Option<String>,
+	pub(crate) oidc_audience: Option<String>,
+}
+
+#[derive(Serialize)]
+struct HostedCommitRequest {
+	provider: &'static str,
+	owner: String,
+	repository: String,
+	branch: String,
+	base_commit: String,
+	subject: String,
+	body: String,
+	files: Vec<HostedCommitFile>,
+	dry_run: bool,
+}
+
+#[derive(Serialize)]
+struct HostedCommitFile {
+	path: String,
+	content: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct HostedCommitResponse {
+	commit: Option<String>,
+	status: Option<String>,
+}
+
+fn prepare_release_commit(
+	root: &Path,
+	context: &CliContext,
+	source: Option<&SourceConfiguration>,
+	manifest: &ReleaseManifest,
+	update_release_json: bool,
+) -> MonochangeResult<PreparedReleaseCommit> {
+	let tracked_paths = tracked_release_pull_request_paths(context, manifest);
+	let message = build_release_commit_message(source, manifest);
+	let release_record_path =
+		validate_release_record_file(root, source, manifest, update_release_json)?;
+	let mut tracked_paths = tracked_paths;
+	tracked_paths.push(release_record_path);
+	tracked_paths.sort();
+	tracked_paths.dedup();
+	Ok(PreparedReleaseCommit {
+		message,
+		tracked_paths,
+	})
+}
+
 pub(crate) async fn commit_release(
 	root: &Path,
 	context: &CliContext,
@@ -1932,31 +1989,26 @@ pub(crate) async fn commit_release(
 	update_release_json: bool,
 	stage_all: bool,
 ) -> MonochangeResult<CommitReleaseReport> {
-	let tracked_paths = tracked_release_pull_request_paths(context, manifest);
-	let message = build_release_commit_message(source, manifest);
-	let release_record_path =
-		validate_release_record_file(root, source, manifest, update_release_json)?;
-	let mut tracked_paths = tracked_paths;
-	tracked_paths.push(release_record_path);
+	let prepared = prepare_release_commit(root, context, source, manifest, update_release_json)?;
 	if !context.dry_run {
 		// patch-coverage:ignore-start -- exercised by end-to-end release PR flows; branch delegates to covered git helpers.
 		if stage_all {
 			git_stage_all(root).await?;
 		} else {
-			git_stage_paths(root, &tracked_paths).await?;
+			git_stage_paths(root, &prepared.tracked_paths).await?;
 		}
 		// patch-coverage:ignore-end
-		git_commit_paths(root, &message, no_verify).await?;
+		git_commit_paths(root, &prepared.message, no_verify).await?;
 	}
 	Ok(CommitReleaseReport {
-		subject: message.subject,
-		body: message.body.unwrap_or_default(),
+		subject: prepared.message.subject,
+		body: prepared.message.body.unwrap_or_default(),
 		commit: if context.dry_run {
 			None
 		} else {
 			Some(git_head_commit(root).await?)
 		},
-		tracked_paths,
+		tracked_paths: prepared.tracked_paths,
 		dry_run: context.dry_run,
 		status: if context.dry_run {
 			"dry_run".to_string()
@@ -1964,6 +2016,225 @@ pub(crate) async fn commit_release(
 			"completed".to_string()
 		},
 	})
+}
+
+pub(crate) async fn hosted_commit_release(
+	root: &Path,
+	context: &CliContext,
+	source: Option<&SourceConfiguration>,
+	manifest: &ReleaseManifest,
+	update_release_json: bool,
+	options: &HostedCommitOptions,
+) -> MonochangeResult<CommitReleaseReport> {
+	let prepared = prepare_release_commit(root, context, source, manifest, update_release_json)?;
+	let body = prepared.message.body.clone().unwrap_or_default();
+	let request = build_hosted_commit_request(root, &prepared, context.dry_run).await?;
+	let response = if context.dry_run {
+		HostedCommitResponse {
+			commit: None,
+			status: Some("dry_run".to_string()),
+		}
+	} else {
+		let options = options.clone();
+		tokio::task::spawn_blocking(move || send_hosted_commit_request(&request, &options))
+			.await
+			.unwrap_or_else(|error| panic!("hosted CommitRelease request task panicked: {error}"))?
+	};
+	Ok(CommitReleaseReport {
+		subject: prepared.message.subject,
+		body,
+		commit: response.commit,
+		tracked_paths: prepared.tracked_paths,
+		dry_run: context.dry_run,
+		status: response.status.unwrap_or_else(|| "completed".to_string()),
+	})
+}
+
+async fn build_hosted_commit_request(
+	root: &Path,
+	prepared: &PreparedReleaseCommit,
+	dry_run: bool,
+) -> MonochangeResult<HostedCommitRequest> {
+	let repository = std::env::var("GITHUB_REPOSITORY").map_err(|_| {
+		MonochangeError::Config(
+			"hosted CommitRelease requires GITHUB_REPOSITORY (for example `owner/repo`)"
+				.to_string(),
+		)
+	})?;
+	let head_ref = std::env::var("GITHUB_HEAD_REF").ok();
+	let ref_name = std::env::var("GITHUB_REF_NAME").ok();
+	build_hosted_commit_request_for_github(
+		root,
+		prepared,
+		dry_run,
+		&repository,
+		head_ref.as_deref(),
+		ref_name.as_deref(),
+	)
+	.await
+}
+
+async fn build_hosted_commit_request_for_github(
+	root: &Path,
+	prepared: &PreparedReleaseCommit,
+	dry_run: bool,
+	repository: &str,
+	head_ref: Option<&str>,
+	ref_name: Option<&str>,
+) -> MonochangeResult<HostedCommitRequest> {
+	let (owner, repository) = repository.split_once('/').ok_or_else(|| {
+		MonochangeError::Config("GITHUB_REPOSITORY must use `owner/repo` format".to_string())
+	})?;
+	let branch = head_ref
+		.filter(|value| !value.is_empty())
+		.or(ref_name)
+		.filter(|value| !value.is_empty())
+		.map_or_else(
+			|| git_current_branch(root).unwrap_or_else(|_| "HEAD".to_string()),
+			ToString::to_string,
+		);
+	let files = prepared
+		.tracked_paths
+		.iter()
+		.map(|path| hosted_commit_file(root, path))
+		.collect::<MonochangeResult<Vec<_>>>()?;
+	Ok(HostedCommitRequest {
+		provider: "github",
+		owner: owner.to_string(),
+		repository: repository.to_string(),
+		branch,
+		base_commit: git_head_commit(root).await?,
+		subject: prepared.message.subject.clone(),
+		body: prepared.message.body.clone().unwrap_or_default(),
+		files,
+		dry_run,
+	})
+}
+
+fn hosted_commit_file(root: &Path, path: &Path) -> MonochangeResult<HostedCommitFile> {
+	let full_path = root.join(path);
+	let content = if full_path.exists() {
+		Some(fs::read_to_string(&full_path).map_err(|error| {
+			MonochangeError::Io(format!(
+				"read hosted commit file `{}`: {error}",
+				path.display()
+			))
+		})?)
+	} else {
+		None
+	};
+	Ok(HostedCommitFile {
+		path: path.to_string_lossy().replace('\\', "/"),
+		content,
+	})
+}
+
+fn send_hosted_commit_request(
+	request: &HostedCommitRequest,
+	options: &HostedCommitOptions,
+) -> MonochangeResult<HostedCommitResponse> {
+	let base_url = options
+		.url
+		.as_deref()
+		.unwrap_or("https://monochange.dev")
+		.trim_end_matches('/');
+	let token = hosted_commit_bearer_token(options)?;
+	let response = reqwest::blocking::Client::new()
+		.post(format!("{base_url}/api/release-commits"))
+		.bearer_auth(token)
+		.json(&request)
+		.send()
+		.map_err(|error| {
+			MonochangeError::Config(format!("hosted CommitRelease request failed: {error}"))
+		})?;
+	let status = response.status();
+	#[rustfmt::skip]
+	let text = response.text().map_err(|error| MonochangeError::Config(format!("hosted CommitRelease response read failed: {error}")))?;
+	if !status.is_success() {
+		return Err(MonochangeError::Config(format!(
+			"hosted CommitRelease failed with HTTP {status}: {text}"
+		)));
+	}
+	serde_json::from_str(&text).map_err(|error| {
+		MonochangeError::Config(format!(
+			"hosted CommitRelease response was invalid JSON: {error}"
+		))
+	})
+}
+
+fn hosted_commit_bearer_token(options: &HostedCommitOptions) -> MonochangeResult<String> {
+	match options.auth {
+		monochange_core::HostedCommitAuth::Token => monochange_token(),
+		monochange_core::HostedCommitAuth::Oidc => github_actions_oidc_token(options),
+		monochange_core::HostedCommitAuth::Auto => {
+			if std::env::var_os("ACTIONS_ID_TOKEN_REQUEST_URL").is_some() {
+				github_actions_oidc_token(options)
+			} else {
+				monochange_token()
+			}
+		}
+	}
+}
+
+fn monochange_token() -> MonochangeResult<String> {
+	std::env::var("MONOCHANGE_TOKEN").map_err(|_| {
+		MonochangeError::Config(
+			"hosted CommitRelease token auth requires MONOCHANGE_TOKEN".to_string(),
+		)
+	})
+}
+
+#[derive(Deserialize)]
+struct GithubActionsOidcResponse {
+	value: String,
+}
+
+fn github_actions_oidc_token(options: &HostedCommitOptions) -> MonochangeResult<String> {
+	let request_url = std::env::var("ACTIONS_ID_TOKEN_REQUEST_URL").map_err(|_| {
+		MonochangeError::Config(
+			"hosted CommitRelease OIDC auth requires ACTIONS_ID_TOKEN_REQUEST_URL".to_string(),
+		)
+	})?;
+	let request_token = std::env::var("ACTIONS_ID_TOKEN_REQUEST_TOKEN").map_err(|_| {
+		MonochangeError::Config(
+			"hosted CommitRelease OIDC auth requires ACTIONS_ID_TOKEN_REQUEST_TOKEN".to_string(),
+		)
+	})?;
+	let audience = options.oidc_audience.as_deref().unwrap_or("monochange.dev");
+	let separator = if request_url.contains('?') { '&' } else { '?' };
+	let url = format!("{request_url}{separator}audience={audience}");
+	#[rustfmt::skip]
+	let response = reqwest::blocking::Client::new().get(url).bearer_auth(request_token).send().map_err(|error| MonochangeError::Config(format!("GitHub Actions OIDC request failed: {error}")))?;
+	let status = response.status();
+	#[rustfmt::skip]
+	let text = response.text().map_err(|error| MonochangeError::Config(format!("GitHub Actions OIDC response read failed: {error}")))?;
+	if !status.is_success() {
+		return Err(MonochangeError::Config(format!(
+			"GitHub Actions OIDC request failed with HTTP {status}: {text}"
+		)));
+	}
+	let token: GithubActionsOidcResponse = serde_json::from_str(&text).map_err(|error| {
+		MonochangeError::Config(format!(
+			"GitHub Actions OIDC response was invalid JSON: {error}"
+		))
+	})?;
+	Ok(token.value)
+}
+
+fn git_current_branch(root: &Path) -> MonochangeResult<String> {
+	let output = ProcessCommand::new("git")
+		.current_dir(root)
+		.args(["rev-parse", "--abbrev-ref", "HEAD"])
+		.output()
+		.map_err(|error| {
+			MonochangeError::Config(format!("failed to resolve current branch: {error}"))
+		})?;
+	if !output.status.success() {
+		return Err(MonochangeError::Config(
+			"failed to resolve current branch".to_string(),
+		));
+	}
+	Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
 pub(crate) fn tracked_release_pull_request_paths(

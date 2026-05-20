@@ -1,4 +1,5 @@
 useNodeVersion: 24.14.0
 nodeVersion: 24.14.0
 packages:
+  - "apps/monochange_app"
   - "packages/*"

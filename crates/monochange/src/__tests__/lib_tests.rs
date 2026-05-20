@@ -1996,6 +1996,10 @@ fn render_cli_commands_toml_handles_release_and_command_step_variants() {
 				always_run: false,
 				no_verify: false,
 				update_release_json: false,
+				commit_backend: monochange_core::CommitReleaseBackend::default(),
+				hosted_auth: monochange_core::HostedCommitAuth::default(),
+				hosted_url: None,
+				oidc_audience: None,
 				stage_all: false,
 				inputs: BTreeMap::from([(
 					"format".to_string(),
@@ -8799,6 +8803,10 @@ async fn execute_cli_command_commit_release_requires_prepare_release() {
 			always_run: false,
 			no_verify: false,
 			update_release_json: false,
+			commit_backend: monochange_core::CommitReleaseBackend::default(),
+			hosted_auth: monochange_core::HostedCommitAuth::default(),
+			hosted_url: None,
+			oidc_audience: None,
 			stage_all: false,
 			inputs: BTreeMap::new(),
 		}],
@@ -13182,6 +13190,9 @@ fn original_path() -> &'static str {
 fn sanitized_git_command() -> std::process::Command {
 	let mut command = std::process::Command::new("git");
 	command.env("PATH", original_path());
+	command.env("GIT_CONFIG_COUNT", "1");
+	command.env("GIT_CONFIG_KEY_0", "commit.gpgsign");
+	command.env("GIT_CONFIG_VALUE_0", "false");
 	for variable in [
 		"GIT_DIR",
 		"GIT_WORK_TREE",

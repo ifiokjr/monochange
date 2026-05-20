@@ -2055,6 +2055,103 @@ async fn execute_cli_command_with_options_rejects_readiness_for_placeholder_publ
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn execute_cli_command_with_options_commit_release_uses_hosted_backend() {
+	let workspace_dir = initialized_workspace_dir();
+	let root = workspace_dir.path();
+	let configuration = sample_configuration(root);
+	let artifact_path = root.join("prepared-release.json");
+	let cli_command = CliCommandDefinition {
+		name: "commit-release".to_string(),
+		help_text: Some("commit release".to_string()),
+		inputs: Vec::new(),
+		steps: vec![CliStepDefinition::CommitRelease {
+			name: None,
+			when: None,
+			always_run: false,
+			no_verify: false,
+			update_release_json: true,
+			commit_backend: CommitReleaseBackend::Hosted,
+			hosted_auth: HostedCommitAuth::Token,
+			hosted_url: Some("https://monochange.example".to_string()),
+			oidc_audience: Some("monochange.example".to_string()),
+			stage_all: false,
+			inputs: BTreeMap::new(),
+		}],
+		dry_run: false,
+	};
+	save_prepared_release_execution(
+		root,
+		&configuration,
+		&sample_prepared_release(),
+		&[],
+		Some(artifact_path.as_path()),
+	)
+	.await
+	.unwrap_or_else(|error| panic!("save prepared release artifact: {error}"));
+
+	temp_env::async_with_vars(
+		[("GITHUB_REPOSITORY", Some("monochange/monochange"))],
+		async {
+			let output = execute_cli_command_with_options(
+				root,
+				&configuration,
+				&cli_command,
+				ExecuteCliCommandOptions {
+					dry_run: true,
+					quiet: false,
+					show_diff: false,
+					inputs: BTreeMap::new(),
+					prepared_release_path: Some(artifact_path),
+					progress_format: ProgressFormat::Auto,
+				},
+			)
+			.await
+			.unwrap_or_else(|error| panic!("execute hosted commit command: {error}"));
+
+			assert!(output.contains("## Release commit"), "output was: {output}");
+			assert!(
+				output.contains("**Status:** dry-run"),
+				"output was: {output}"
+			);
+		},
+	)
+	.await;
+}
+
+#[test]
+fn parse_commit_release_hosted_inputs_accepts_values_and_rejects_bad_values() {
+	let mut inputs = BTreeMap::new();
+	inputs.insert("commit_backend".to_string(), vec!["hosted".to_string()]);
+	inputs.insert("hosted_auth".to_string(), vec!["oidc".to_string()]);
+	inputs.insert(
+		"hosted_url".to_string(),
+		vec!["https://monochange.example".to_string()],
+	);
+	inputs.insert(
+		"oidc_audience".to_string(),
+		vec!["monochange.example".to_string()],
+	);
+
+	assert_eq!(
+		parse_commit_release_backend_input(&inputs).unwrap(),
+		Some(CommitReleaseBackend::Hosted)
+	);
+	assert_eq!(
+		parse_hosted_commit_auth_input(&inputs).unwrap(),
+		Some(HostedCommitAuth::Oidc)
+	);
+
+	inputs.insert(
+		"hosted_url".to_string(),
+		vec!["one".to_string(), "two".to_string()],
+	);
+	let error = parse_string_step_input(&inputs, "hosted_url")
+		.expect_err("multi-value hosted url should fail")
+		.to_string();
+	assert!(error.contains("input `hosted_url` expects a single value"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn execute_cli_command_with_options_reuses_prepared_release_artifact_for_versions() {
 	let workspace_dir = prepared_release_git_workspace();
 	let root = workspace_dir.path();
