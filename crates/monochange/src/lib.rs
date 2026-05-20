@@ -873,13 +873,13 @@ where
 			if quiet {
 				Ok(String::new())
 			} else {
-ttt// patch-coverage:ignore-start -- knope suggestion branch covered by init_workspace tests.
+				// patch-coverage:ignore-start -- knope suggestion branch covered by init_workspace tests.
 				let mut output = result.summary();
 				if let Some(suggestion) = result.knope_suggestion() {
 					output.push_str("\n\n");
 					output.push_str(&suggestion);
 				}
-ttt// patch-coverage:ignore-end
+				// patch-coverage:ignore-end
 				Ok(output)
 			}
 		}

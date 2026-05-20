@@ -1622,10 +1622,10 @@ pub fn load_changeset_contents_with_context(
 			&& !context.groups_by_id.contains_key(change.package.as_str())
 		{
 			let mut hint = "declare the package or group id in monochange.toml before referencing it in a changeset".to_string();
-ttt// patch-coverage:ignore-start -- knope tip covered by changeset validation tests.
+			// patch-coverage:ignore-start -- knope tip covered by changeset validation tests.
 			if change.package == "default" {
 				hint.push_str("\n\nTip: knope uses `default` as a catch-all bump key; in monochange, replace `default:` with the group id (e.g. `main:`) or list each package separately. Run `mc migrate knope` for automatic migration.");
-ttt// patch-coverage:ignore-end
+				// patch-coverage:ignore-end
 			}
 			return Err(changeset_diagnostic(
 				contents,
