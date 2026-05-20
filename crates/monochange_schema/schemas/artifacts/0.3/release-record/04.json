@@ -1,0 +1,89 @@
+{
+	"changedFiles": [
+		"crates/acydu_0/src/lib.rs"
+	],
+	"changelogs": [],
+	"changesets": [
+		{
+			"context": {
+				"host": "forgejo.example.com",
+				"provider": "forgejo"
+			},
+			"details": "Generated from deterministic proptest seed 15028899576697502756.",
+			"path": ".changeset/schema-artifact-4.md",
+			"summary": "Exercise schema artifact fixture 4",
+			"targets": [
+				{
+					"evidenceRefs": [
+						"crates/acydu_0/src/lib.rs"
+					],
+					"id": "acydu_0",
+					"kind": "package",
+					"origin": ".changeset/schema-artifact-4.md"
+				}
+			]
+		}
+	],
+	"command": "mc release --dry-run",
+	"createdAt": "2026-01-04T00:00:00Z",
+	"deletedChangesets": [
+		".changeset/schema-artifact-4.md"
+	],
+	"kind": "monochange.releaseRecord",
+	"packagePublications": [],
+	"provider": {
+		"host": "forgejo.example.com",
+		"kind": "forgejo",
+		"owner": "acydu",
+		"repo": "xhjrbwwvc"
+	},
+	"releaseTargets": [
+		{
+			"id": "main",
+			"kind": "group",
+			"members": [],
+			"release": true,
+			"tag": true,
+			"tagName": "v0.3.4",
+			"version": "0.3.4",
+			"versionFormat": "primary"
+		},
+		{
+			"id": "acydu_1",
+			"kind": "package",
+			"members": [],
+			"release": true,
+			"tag": true,
+			"tagName": "acydu_1/v0.3.4",
+			"version": "0.3.4",
+			"versionFormat": "primary"
+		},
+		{
+			"id": "acydu_2",
+			"kind": "package",
+			"members": [],
+			"release": true,
+			"tag": true,
+			"tagName": "acydu_2/v0.3.4",
+			"version": "0.3.4",
+			"versionFormat": "primary"
+		}
+	],
+	"releasedPackages": [
+		"acydu_0",
+		"acydu_1",
+		"acydu_2",
+		"acydu_3"
+	],
+	"schemaVersion": "0.3",
+	"updatedChangelogs": [
+		"fixtures/changelog-4.md"
+	],
+	"version": "0.3.4",
+	"versions": {
+		"acydu_0": "0.3.4",
+		"acydu_1": "0.3.4",
+		"acydu_2": "0.3.4",
+		"main": "0.3.4"
+	}
+}

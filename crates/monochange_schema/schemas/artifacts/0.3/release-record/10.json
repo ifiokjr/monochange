@@ -1,0 +1,117 @@
+{
+	"changedFiles": [
+		"crates/ijpz_0/src/lib.rs",
+		"crates/ijpz_1/src/lib.rs",
+		"crates/ijpz_2/src/lib.rs"
+	],
+	"changelogs": [],
+	"changesets": [
+		{
+			"details": "Generated from deterministic proptest seed 14522967256005614231.",
+			"path": ".changeset/schema-artifact-10.md",
+			"summary": "Exercise schema artifact fixture 10",
+			"targets": [
+				{
+					"causedBy": [
+						"ijpz-schema-compat"
+					],
+					"evidenceRefs": [
+						"crates/ijpz_0/src/lib.rs"
+					],
+					"id": "ijpz_0",
+					"kind": "package",
+					"origin": ".changeset/schema-artifact-10.md"
+				}
+			]
+		}
+	],
+	"command": "mc release --commit",
+	"createdAt": "2026-01-10T00:00:00Z",
+	"deletedChangesets": [
+		".changeset/schema-artifact-10.md"
+	],
+	"kind": "monochange.releaseRecord",
+	"packagePublications": [
+		{
+			"ecosystem": "cargo",
+			"package": "ijpz_0",
+			"version": "0.3.10"
+		},
+		{
+			"ecosystem": "cargo",
+			"package": "ijpz_1",
+			"version": "0.3.10"
+		},
+		{
+			"ecosystem": "cargo",
+			"package": "ijpz_2",
+			"version": "0.3.10"
+		},
+		{
+			"ecosystem": "cargo",
+			"package": "ijpz_3",
+			"version": "0.3.10"
+		},
+		{
+			"ecosystem": "cargo",
+			"package": "ijpz_4",
+			"version": "0.3.10"
+		}
+	],
+	"provider": {
+		"host": "forgejo.example.com",
+		"kind": "forgejo",
+		"owner": "ijpz",
+		"repo": "leewmbab"
+	},
+	"releaseTargets": [
+		{
+			"id": "main",
+			"kind": "group",
+			"members": [],
+			"release": true,
+			"tag": true,
+			"tagName": "v0.3.10",
+			"version": "0.3.10",
+			"versionFormat": "primary"
+		},
+		{
+			"id": "ijpz_1",
+			"kind": "package",
+			"members": [],
+			"release": true,
+			"tag": true,
+			"tagName": "ijpz_1/v0.3.10",
+			"version": "0.3.10",
+			"versionFormat": "namespaced"
+		},
+		{
+			"id": "ijpz_2",
+			"kind": "package",
+			"members": [],
+			"release": true,
+			"tag": true,
+			"tagName": "ijpz_2/v0.3.10",
+			"version": "0.3.10",
+			"versionFormat": "namespaced"
+		}
+	],
+	"releasedPackages": [
+		"ijpz_0",
+		"ijpz_1",
+		"ijpz_2",
+		"ijpz_3",
+		"ijpz_4"
+	],
+	"schemaVersion": "0.3",
+	"updatedChangelogs": [
+		"fixtures/changelog-10.md"
+	],
+	"version": "0.3.10",
+	"versions": {
+		"ijpz_0": "0.3.10",
+		"ijpz_1": "0.3.10",
+		"ijpz_2": "0.3.10",
+		"main": "0.3.10"
+	}
+}

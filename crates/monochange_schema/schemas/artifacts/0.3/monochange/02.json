@@ -1,0 +1,77 @@
+{
+	"defaults": {
+		"empty_update_message": "No significant changes for vcle packages.",
+		"include_private": true,
+		"package_type": "python",
+		"parent_bump": "major",
+		"strict_version_conflicts": false,
+		"warn_on_group_mismatch": false
+	},
+	"ecosystems": {
+		"go": {
+			"enabled": true,
+			"publish": {
+				"enabled": true
+			},
+			"roots": [
+				"crates/go"
+			]
+		}
+	},
+	"package": {
+		"vcle_0": {
+			"path": "crates/vcle_0",
+			"release": true,
+			"tag": true,
+			"type": "python",
+			"version_format": "namespaced"
+		},
+		"vcle_1": {
+			"path": "crates/vcle_1",
+			"release": false,
+			"tag": false,
+			"type": "python",
+			"version_format": "namespaced"
+		},
+		"vcle_2": {
+			"path": "crates/vcle_2",
+			"release": false,
+			"tag": false,
+			"type": "python",
+			"version_format": "namespaced"
+		},
+		"vcle_3": {
+			"path": "crates/vcle_3",
+			"release": false,
+			"tag": false,
+			"type": "python",
+			"version_format": "namespaced"
+		},
+		"vcle_4": {
+			"path": "crates/vcle_4",
+			"release": false,
+			"tag": false,
+			"type": "python",
+			"version_format": "namespaced"
+		}
+	},
+	"source": {
+		"api_url": "api.gitlab.example.com",
+		"host": "gitlab.example.com",
+		"owner": "vcle",
+		"provider": "gitlab",
+		"pull_requests": {
+			"auto_merge": false,
+			"base": "main",
+			"branch_prefix": "vcle/release",
+			"enabled": true,
+			"labels": [
+				"release",
+				"automated"
+			],
+			"title": "chore(release): prepare vcle release",
+			"verified_commits": false
+		},
+		"repo": "acymwm"
+	}
+}

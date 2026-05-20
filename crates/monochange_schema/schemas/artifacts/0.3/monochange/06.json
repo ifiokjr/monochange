@@ -1,0 +1,39 @@
+{
+	"defaults": {
+		"changelog_version_title": "v{{version}} — rjlmpjuthgi release",
+		"empty_update_message": "No significant changes for rjlmpjuthgi packages.",
+		"include_private": true,
+		"package_type": "npm",
+		"parent_bump": "patch",
+		"release_title": "rjlmpjuthgi release",
+		"strict_version_conflicts": true,
+		"warn_on_group_mismatch": false
+	},
+	"package": {
+		"rjlmpjuthgi_0": {
+			"path": "crates/rjlmpjuthgi_0",
+			"release": true,
+			"tag": true,
+			"type": "npm",
+			"version_format": "namespaced"
+		}
+	},
+	"source": {
+		"host": "gitea.example.com",
+		"owner": "rjlmpjuthgi",
+		"provider": "gitea",
+		"pull_requests": {
+			"auto_merge": false,
+			"base": "main",
+			"branch_prefix": "rjlmpjuthgi/release",
+			"enabled": true,
+			"labels": [
+				"release",
+				"automated"
+			],
+			"title": "chore(release): prepare rjlmpjuthgi release",
+			"verified_commits": false
+		},
+		"repo": "hng"
+	}
+}

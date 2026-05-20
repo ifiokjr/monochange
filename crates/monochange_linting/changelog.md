@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.6.0](https://github.com/monochange/monochange/releases/tag/v0.6.0) (2026-05-20)
+
+### 🐛 Fixed
+
+#### add missing crate metadata and align READMEs with badge template
+
+- Add `keywords` to `monochange_analysis`, `monochange_lint`, and `monochange_linting`
+- Add `authors`, `categories`, `homepage`, `readme`, `rust-version`, and `keywords` to `monochange_test_helpers`
+- Update `monochange_lint`, `monochange_linting`, and `monochange_test_helpers` READMEs to use the badge-row template consistent with other published crates
+
+No API changes. crates.io metadata and documentation only.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #512](https://github.com/monochange/monochange/pull/512) _Introduced in:_ [`f7bc995`](https://github.com/monochange/monochange/commit/f7bc9950aaa58983c2d9b3d53ec1a942debc263d)
+
 ## [0.5.1](https://github.com/monochange/monochange/releases/tag/v0.5.1) (2026-05-15)
 
 ### 📝 Changed

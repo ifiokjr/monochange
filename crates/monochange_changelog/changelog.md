@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 This changelog is managed by [monochange](https://github.com/monochange/monochange).
 
+## [0.6.0](https://github.com/monochange/monochange/releases/tag/v0.6.0) (2026-05-20)
+
+### 🚀 Feature
+
+#### Add configurable changelog rendering styles
+
+Add configurable changelog and release-note rendering style options for section separators, package labels, metadata lines, and collapsed sections.
+
+```toml
+[changelog.style]
+sectionSeparator = "blank_line"
+packageLabelStyle = "inline"
+packageLabelPlacement = "after_heading"
+metadataStyle = "plain"
+collapsedSectionStyle = "details"
+
+[changelog.release_notes]
+metadataStyle = "blockquote"
+```
+
+The config schema now includes `ChangelogStyle` and `ReleaseNotesStyleOverrides`, with release notes inheriting `[changelog.style]` unless a field-specific override is set.
+
+Default section headings now include emoji in the `heading` string, while the stable section keys remain unchanged:
+
+- `breaking`: `💥 Breaking Change`
+- `feat`: `🚀 Feature`
+- `change`: `📝 Changed`
+- `fix`: `🐛 Fixed`
+- `test`: `🧪 Testing`
+- `refactor`: `🔨 Refactor`
+- `docs`: `📖 Documentation`
+- `security`: `🔒 Security`
+- `perf`: `⚡ Performance`
+- `none`: `🔖 None`
+
+Semver level type aliases route to semantic sections: `major` to `breaking`, `minor` to `feat`, and `patch` to `fix`.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #511](https://github.com/monochange/monochange/pull/511) _Introduced in:_ [`b03612b`](https://github.com/monochange/monochange/commit/b03612b5d69f05becd68a803efa535e0f874ee01)
+
 ## [0.5.1](https://github.com/monochange/monochange/releases/tag/v0.5.1) (2026-05-15)
 
 ### 📝 Changed
