@@ -1,0 +1,102 @@
+{
+	"changedFiles": [
+		"crates/hail_0/src/lib.rs"
+	],
+	"changelogs": [
+		{
+			"format": "monochange",
+			"notes": {
+				"sections": [
+					{
+						"collapsed": false,
+						"entries": [
+							"fix: schema artifact 6"
+						],
+						"title": "Bug Fixes"
+					}
+				],
+				"summary": [
+					"Release 6"
+				],
+				"title": "v0.3.6"
+			},
+			"ownerId": "main",
+			"ownerKind": "group",
+			"path": "fixtures/changelog-6.md",
+			"rendered": "## Bug Fixes\n- fix: schema artifact 6"
+		}
+	],
+	"changesets": [
+		{
+			"details": "Generated from deterministic proptest seed 8430656067206529462.",
+			"path": ".changeset/schema-artifact-6.md",
+			"summary": "Exercise schema artifact fixture 6",
+			"targets": [
+				{
+					"causedBy": [
+						"hail-schema-compat"
+					],
+					"changeType": "feature",
+					"evidenceRefs": [
+						"crates/hail_0/src/lib.rs"
+					],
+					"id": "hail_0",
+					"kind": "package",
+					"origin": ".changeset/schema-artifact-6.md"
+				}
+			]
+		}
+	],
+	"command": "mc release --dry-run",
+	"createdAt": "2026-01-06T00:00:00Z",
+	"deletedChangesets": [
+		".changeset/schema-artifact-6.md"
+	],
+	"kind": "monochange.releaseRecord",
+	"packagePublications": [],
+	"provider": {
+		"host": null,
+		"kind": "gitlab",
+		"owner": "hail",
+		"repo": "iityebtf"
+	},
+	"releaseTargets": [
+		{
+			"id": "main",
+			"kind": "group",
+			"members": [],
+			"release": true,
+			"tag": true,
+			"tagName": "v0.3.6",
+			"version": "0.3.6",
+			"versionFormat": "primary"
+		},
+		{
+			"id": "hail_1",
+			"kind": "package",
+			"members": [],
+			"release": true,
+			"tag": true,
+			"tagName": "hail_1/v0.3.6",
+			"version": "0.3.6",
+			"versionFormat": "namespaced"
+		}
+	],
+	"releasedPackages": [
+		"hail_0",
+		"hail_1",
+		"hail_2",
+		"hail_3"
+	],
+	"schemaVersion": "0.3",
+	"updatedChangelogs": [
+		"fixtures/changelog-6.md"
+	],
+	"version": "0.3.6",
+	"versions": {
+		"hail_0": "0.3.6",
+		"hail_1": "0.3.6",
+		"hail_2": "0.3.6",
+		"main": "0.3.6"
+	}
+}

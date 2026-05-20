@@ -8,6 +8,16 @@
 - Documented verified built-in commands, step commands, MCP tools, user-defined command behavior, and all current CLI step types.
 - Replaced obsolete examples with current `monochange.toml`, changeset, release-preview, and publishing workflow examples.
 
+## [0.6.0](https://github.com/monochange/monochange/releases/tag/v0.6.0) (2026-05-20)
+
+### 🐛 Fixed
+
+#### Add `nix` / `devenv` installation instructions
+
+Mention the `ifiokjr/nixpkgs` flake overlay.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) _Review:_ [PR #519](https://github.com/monochange/monochange/pull/519) _Introduced in:_ [`23bd962`](https://github.com/monochange/monochange/commit/23bd962434001e4293abdd8e9d33cf185cab3221)
+
 ## [0.5.1](https://github.com/monochange/monochange/releases/tag/v0.5.1) (2026-05-15)
 
 ### 📝 Changed

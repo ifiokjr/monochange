@@ -1,0 +1,96 @@
+{
+	"changedFiles": [
+		"crates/opsncwia_0/src/lib.rs",
+		"crates/opsncwia_1/src/lib.rs",
+		"crates/opsncwia_2/src/lib.rs",
+		"crates/opsncwia_3/src/lib.rs",
+		"crates/opsncwia_4/src/lib.rs"
+	],
+	"changelogs": [
+		{
+			"format": "monochange",
+			"notes": {
+				"sections": [
+					{
+						"collapsed": false,
+						"entries": [
+							"fix: schema artifact 9"
+						],
+						"title": "Bug Fixes"
+					}
+				],
+				"summary": [
+					"Release 9"
+				],
+				"title": "v0.3.9"
+			},
+			"ownerId": "main",
+			"ownerKind": "group",
+			"path": "fixtures/changelog-9.md",
+			"rendered": "## Bug Fixes\n- fix: schema artifact 9"
+		}
+	],
+	"changesets": [
+		{
+			"details": "Generated from deterministic proptest seed 16213144066895037197.",
+			"path": ".changeset/schema-artifact-9.md",
+			"summary": "Exercise schema artifact fixture 9",
+			"targets": [
+				{
+					"bump": "patch",
+					"causedBy": [
+						"opsncwia-schema-compat"
+					],
+					"changeType": "feature",
+					"evidenceRefs": [
+						"crates/opsncwia_0/src/lib.rs"
+					],
+					"id": "opsncwia_0",
+					"kind": "package",
+					"origin": ".changeset/schema-artifact-9.md"
+				}
+			]
+		}
+	],
+	"command": "mc step:release",
+	"createdAt": "2026-01-09T00:00:00Z",
+	"deletedChangesets": [
+		".changeset/schema-artifact-9.md"
+	],
+	"kind": "monochange.releaseRecord",
+	"packagePublications": [],
+	"provider": {
+		"host": null,
+		"kind": "github",
+		"owner": "opsncwia",
+		"repo": "ant"
+	},
+	"releaseTargets": [
+		{
+			"id": "main",
+			"kind": "group",
+			"members": [],
+			"release": true,
+			"tag": true,
+			"tagName": "v0.3.9",
+			"version": "0.3.9",
+			"versionFormat": "primary"
+		}
+	],
+	"releasedPackages": [
+		"opsncwia_0",
+		"opsncwia_1",
+		"opsncwia_2"
+	],
+	"schemaVersion": "0.3",
+	"updatedChangelogs": [
+		"fixtures/changelog-9.md"
+	],
+	"version": "0.3.9",
+	"versions": {
+		"main": "0.3.9",
+		"opsncwia_0": "0.3.9",
+		"opsncwia_1": "0.3.9",
+		"opsncwia_2": "0.3.9"
+	}
+}

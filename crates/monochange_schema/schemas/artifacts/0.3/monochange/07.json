@@ -1,0 +1,115 @@
+{
+	"changelog": {
+		"sections": {
+			"bug-fixes": {
+				"description": "Resolved defects",
+				"heading": "🐛 Bug Fixes",
+				"priority": 10
+			},
+			"features": {
+				"description": "New capabilities",
+				"heading": "✨ Features",
+				"priority": 20
+			}
+		},
+		"style": {
+			"collapsedSectionStyle": "plain",
+			"metadataStyle": "blockquote",
+			"packageLabelPlacement": "after_heading",
+			"packageLabelStyle": "badge",
+			"sectionSeparator": "thematic_break"
+		},
+		"types": {
+			"feature": {
+				"bump": "minor",
+				"description": "New features",
+				"section": "features"
+			},
+			"fix": {
+				"bump": "patch",
+				"description": "Bug fixes",
+				"section": "bug-fixes"
+			}
+		}
+	},
+	"changesets": {
+		"affected": {
+			"changed_paths": [
+				"crates/iphohpfbuail/"
+			],
+			"comment_on_failure": true,
+			"enabled": true,
+			"ignored_paths": [
+				"**/*.md"
+			],
+			"required": true,
+			"skip_labels": [
+				"skip-changeset"
+			]
+		}
+	},
+	"defaults": {
+		"changelog_version_title": "v{{version}} — iphohpfbuail release",
+		"empty_update_message": "No significant changes for iphohpfbuail packages.",
+		"include_private": true,
+		"package_type": "deno",
+		"parent_bump": "none",
+		"strict_version_conflicts": true,
+		"warn_on_group_mismatch": false
+	},
+	"ecosystems": {
+		"npm": {
+			"enabled": true,
+			"publish": {
+				"enabled": true
+			},
+			"roots": [
+				"crates/npm"
+			]
+		}
+	},
+	"lints": {
+		"rules": {
+			"no-unnecessary-releases": "error"
+		},
+		"scopes": [
+			"crates/iphohpfbuail"
+		],
+		"use": [
+			"no-unnecessary-releases"
+		]
+	},
+	"package": {
+		"iphohpfbuail_0": {
+			"path": "crates/iphohpfbuail_0",
+			"release": true,
+			"tag": true,
+			"type": "deno",
+			"version_format": "namespaced"
+		},
+		"iphohpfbuail_1": {
+			"path": "crates/iphohpfbuail_1",
+			"release": false,
+			"tag": false,
+			"type": "deno",
+			"version_format": "namespaced"
+		}
+	},
+	"source": {
+		"owner": "iphohpfbuail",
+		"provider": "forgejo",
+		"pull_requests": {
+			"auto_merge": false,
+			"base": "main",
+			"branch_prefix": "iphohpfbuail/release",
+			"enabled": true,
+			"labels": [
+				"release",
+				"automated"
+			],
+			"title": "chore(release): prepare iphohpfbuail release",
+			"verified_commits": true
+		},
+		"repo": "iityebtf"
+	}
+}

@@ -1,0 +1,124 @@
+{
+	"changedFiles": [
+		"crates/trsrzwekwunm_0/src/lib.rs",
+		"crates/trsrzwekwunm_1/src/lib.rs",
+		"crates/trsrzwekwunm_2/src/lib.rs",
+		"crates/trsrzwekwunm_3/src/lib.rs"
+	],
+	"changelogs": [
+		{
+			"format": "monochange",
+			"notes": {
+				"sections": [
+					{
+						"collapsed": false,
+						"entries": [
+							"fix: schema artifact 7"
+						],
+						"title": "Bug Fixes"
+					}
+				],
+				"summary": [
+					"Release 7"
+				],
+				"title": "v0.3.7"
+			},
+			"ownerId": "main",
+			"ownerKind": "group",
+			"path": "fixtures/changelog-7.md",
+			"rendered": "## Bug Fixes\n- fix: schema artifact 7"
+		}
+	],
+	"changesets": [
+		{
+			"context": {
+				"host": "gitea.example.com",
+				"provider": "gitea"
+			},
+			"details": "Generated from deterministic proptest seed 9231595614672416574.",
+			"path": ".changeset/schema-artifact-7.md",
+			"summary": "Exercise schema artifact fixture 7",
+			"targets": [
+				{
+					"causedBy": [
+						"trsrzwekwunm-schema-compat"
+					],
+					"changeType": "feature",
+					"evidenceRefs": [
+						"crates/trsrzwekwunm_0/src/lib.rs"
+					],
+					"id": "trsrzwekwunm_0",
+					"kind": "package",
+					"origin": ".changeset/schema-artifact-7.md"
+				}
+			]
+		}
+	],
+	"command": "mc release --dry-run",
+	"createdAt": "2026-01-07T00:00:00Z",
+	"deletedChangesets": [
+		".changeset/schema-artifact-7.md"
+	],
+	"kind": "monochange.releaseRecord",
+	"packagePublications": [
+		{
+			"ecosystem": "cargo",
+			"package": "trsrzwekwunm_0",
+			"version": "0.3.7"
+		},
+		{
+			"ecosystem": "cargo",
+			"package": "trsrzwekwunm_1",
+			"version": "0.3.7"
+		},
+		{
+			"ecosystem": "cargo",
+			"package": "trsrzwekwunm_2",
+			"version": "0.3.7"
+		}
+	],
+	"provider": {
+		"host": null,
+		"kind": "gitea",
+		"owner": "trsrzwekwunm",
+		"repo": "qvoldgmcq"
+	},
+	"releaseTargets": [
+		{
+			"id": "main",
+			"kind": "group",
+			"members": [],
+			"release": true,
+			"tag": true,
+			"tagName": "v0.3.7",
+			"version": "0.3.7",
+			"versionFormat": "primary"
+		},
+		{
+			"id": "trsrzwekwunm_1",
+			"kind": "package",
+			"members": [],
+			"release": true,
+			"tag": true,
+			"tagName": "trsrzwekwunm_1/v0.3.7",
+			"version": "0.3.7",
+			"versionFormat": "namespaced"
+		}
+	],
+	"releasedPackages": [
+		"trsrzwekwunm_0",
+		"trsrzwekwunm_1",
+		"trsrzwekwunm_2"
+	],
+	"schemaVersion": "0.3",
+	"updatedChangelogs": [
+		"fixtures/changelog-7.md"
+	],
+	"version": "0.3.7",
+	"versions": {
+		"main": "0.3.7",
+		"trsrzwekwunm_0": "0.3.7",
+		"trsrzwekwunm_1": "0.3.7",
+		"trsrzwekwunm_2": "0.3.7"
+	}
+}
