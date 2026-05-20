@@ -319,6 +319,7 @@ mod jq_filter;
 mod lint;
 mod lint_check_reporter;
 mod mcp;
+mod migrate_knope;
 mod migration_audit;
 mod package_publish;
 mod prepared_release_cache;

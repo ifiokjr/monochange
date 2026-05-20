@@ -484,6 +484,41 @@ Migration notes:
 						.value_parser(["text", "json", "markdown", "md"]),
 				),
 		)
+		.subcommand(
+			Command::new("knope")
+				.about("Translate a knope.toml to monochange.toml and convert changeset files")
+				.after_help(
+					r"Examples:
+  mc migrate knope --dry-run
+  mc migrate knope
+  mc migrate knope --ci
+  mc migrate knope --dry-run --format json
+
+Migration notes:
+  - Reads knope.toml and generates a monochange.toml draft.
+  - Converts .changeset/*.md from knope format to monochange format.
+  - With --ci, generates GitHub Actions workflow files.",
+				)
+				.arg(
+					Arg::new("dry-run")
+						.long("dry-run")
+						.help("Preview migration without writing files")
+						.action(ArgAction::SetTrue),
+				)
+				.arg(
+					Arg::new("ci")
+						.long("ci")
+						.help("Generate GitHub Actions workflow files")
+						.action(ArgAction::SetTrue),
+				)
+				.arg(
+					Arg::new("format")
+						.long("format")
+						.help("Output format")
+						.default_value("text")
+						.value_parser(["text", "json", "markdown", "md"]),
+				),
+		)
 }
 
 pub(crate) fn build_check_subcommand() -> Command {
